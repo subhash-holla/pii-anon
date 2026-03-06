@@ -1,0 +1,254 @@
+name: core-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-type-test-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,cli,crypto,engines]
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Type check
+        run: mypy src/pii_anon
+
+      - name: Unit and integration tests
+        run: pytest -m "not performance"
+
+      - name: Performance SLA gates
+        run: pytest -m performance --no-cov
+
+      - name: Build packages
+        run: |
+          python -m build --outdir dist
+
+      - name: Package size check
+        run: python scripts/check_package_size.py --dist-dir dist --max-wheel-mb 1.5 --package-name pii_anon
+
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: CLI smoke test
+        run: |
+          pii-anon version
+          pii-anon health --output json
+          pii-anon capabilities --output json
+
+      - name: Notebook smoke test
+        run: |
+          jupyter nbconvert \
+            --to notebook \
+            --execute notebooks/llm_pipeline_quickstart.ipynb \
+            --output /tmp/llm_pipeline_quickstart.executed.ipynb
+
+  benchmark-compare:
+    needs: lint-type-test-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<2.6"
+          pip install -e .[dev,cli,crypto,engines,benchmark]
+
+      - name: Generate benchmark dataset
+        run: python scripts/generate_benchmark_dataset.py
+
+      - name: Discover and qualify OSS competitors
+        run: |
+          python scripts/discover_oss_competitors.py \
+            --output-json artifacts/benchmarks/competitor-qualification.json
+
+      - name: Run competitor benchmark
+        run: |
+          mkdir -p artifacts/benchmarks
+          python scripts/check_benchmark_runtime.py \
+            --strict-runtime \
+            --require-all-competitors \
+            --require-native-competitors \
+            --output-json artifacts/benchmarks/runtime-preflight.json
+          python scripts/run_competitor_benchmark.py \
+            --dataset pii_anon_benchmark_v1 \
+            --dataset-source package-only \
+            --matrix src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json \
+            --strict-runtime \
+            --require-all-competitors \
+            --require-native-competitors \
+            --output-json artifacts/benchmarks/benchmark-results.json \
+            --output-csv artifacts/benchmarks/benchmark-raw.csv \
+            --output-floor-report artifacts/benchmarks/floor-gate-report.md \
+            --output-baseline artifacts/benchmarks/floor-baseline.v1.0.0.json \
+            --preflight-output-json artifacts/benchmarks/runtime-preflight.json \
+            --progress-interval-sec 10 \
+            --write-artifacts-on-fail
+
+      - name: Validate benchmark artifact schema
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("artifacts/benchmarks/benchmark-results.json").read_text(encoding="utf-8"))
+          required = {
+              "report_schema_version",
+              "dataset",
+              "dataset_source",
+              "floor_pass",
+              "qualification_gate_pass",
+              "expected_competitors",
+              "available_competitors",
+              "unavailable_competitors",
+              "all_competitors_available",
+              "run_metadata",
+              "failed_profiles",
+              "profile_results",
+              "systems",
+              "profiles",
+              "evaluation_tracks",
+          }
+          missing = sorted(required.difference(payload))
+          if missing:
+              raise SystemExit(f"benchmark-results.json missing fields: {', '.join(missing)}")
+          if payload["report_schema_version"] != "2026-02-19.v3":
+              raise SystemExit(f"unexpected report schema version: {payload['report_schema_version']}")
+          for index, row in enumerate(payload["systems"]):
+              if "evaluation_track" not in row:
+                  raise SystemExit(f"system row {index} missing evaluation_track")
+          print("benchmark schema validation passed")
+          PY
+
+      - name: Benchmark reproducibility check
+        run: |
+          python scripts/run_competitor_benchmark.py \
+            --dataset pii_anon_benchmark_v1 \
+            --dataset-source package-only \
+            --matrix src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json \
+            --strict-runtime \
+            --require-all-competitors \
+            --require-native-competitors \
+            --output-json artifacts/benchmarks/benchmark-results.repro.json \
+            --output-csv artifacts/benchmarks/benchmark-raw.repro.csv \
+            --output-floor-report artifacts/benchmarks/floor-gate-report.repro.md \
+            --preflight-output-json artifacts/benchmarks/runtime-preflight.repro.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          first = json.loads(Path("artifacts/benchmarks/benchmark-results.json").read_text(encoding="utf-8"))
+          second = json.loads(Path("artifacts/benchmarks/benchmark-results.repro.json").read_text(encoding="utf-8"))
+          if first["floor_pass"] != second["floor_pass"]:
+              raise SystemExit("repro check failed: floor_pass differs between runs")
+          if first["qualification_gate_pass"] != second["qualification_gate_pass"]:
+              raise SystemExit("repro check failed: qualification_gate_pass differs between runs")
+          first_core = next((row for row in first["systems"] if row["system"] == "pii-anon"), None)
+          second_core = next((row for row in second["systems"] if row["system"] == "pii-anon"), None)
+          if first_core is None or second_core is None:
+              raise SystemExit("repro check failed: missing pii-anon row")
+          for metric, tol in (("f1", 0.02), ("recall", 0.02), ("precision", 0.02)):
+              if abs(float(first_core[metric]) - float(second_core[metric])) > tol:
+                  raise SystemExit(
+                      f"repro check failed: pii-anon {metric} drift exceeds tolerance {tol}"
+                  )
+          print("benchmark reproducibility check passed")
+          PY
+
+      - name: Render benchmark summary
+        run: |
+          python scripts/render_benchmark_summary.py \
+            --input-json artifacts/benchmarks/benchmark-results.json \
+            --output-markdown artifacts/benchmarks/benchmark-summary.md \
+            --require-floor-pass \
+            --update-readme README.md
+
+      - name: Enforce floor gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("artifacts/benchmarks/benchmark-results.json").read_text(encoding="utf-8"))
+          if not payload.get("floor_pass", False):
+              failed = payload.get("failed_profiles", [])
+              raise SystemExit(f"floor gate failed for profiles: {', '.join(failed) if failed else 'unknown'}")
+          if not payload.get("qualification_gate_pass", False):
+              raise SystemExit("qualification gate failed")
+          if not payload.get("all_competitors_available", False):
+              unavailable = payload.get("unavailable_competitors", {})
+              raise SystemExit(f"competitor availability gate failed: {unavailable}")
+          print("floor gate enforcement passed")
+          PY
+
+      - name: Render complex mode README example
+        run: |
+          python scripts/render_complex_mode_example.py \
+            --output-markdown artifacts/benchmarks/complex-mode-example.md \
+            --update-readme README.md
+
+      - name: Run continuity benchmark gate
+        run: |
+          timeout 30m python scripts/run_continuity_benchmark.py \
+            --max-samples 0 \
+            --long-token-count 200000 \
+            --enforce \
+            --progress-interval-sec 10 \
+            --progress-token-step 50000 \
+            --output-json artifacts/benchmarks/continuity-results.json \
+            --output-markdown artifacts/benchmarks/continuity-gate-report.md | tee /tmp/continuity.log
+          grep -q "phase: long-context orchestration start" /tmp/continuity.log
+          grep -q "phase: long-context orchestration complete" /tmp/continuity.log
+
+      - name: Validate README benchmark section
+        run: |
+          python scripts/check_readme_benchmark.py \
+            --readme README.md \
+            --summary artifacts/benchmarks/benchmark-summary.md \
+            --complex-summary artifacts/benchmarks/complex-mode-example.md \
+            --report-json artifacts/benchmarks/benchmark-results.json
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-artifacts
+          path: artifacts/benchmarks/*
+
+  python-3-14-experimental:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,cli,crypto,engines]
+      - name: Experimental quality smoke
+        run: |
+          ruff check src tests
+          mypy src/pii_anon
+          pytest -m "not performance"

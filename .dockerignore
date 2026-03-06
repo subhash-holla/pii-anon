@@ -1,0 +1,15 @@
+.venv
+.git
+__pycache__
+*.pyc
+*.egg-info
+dist
+build
+artifacts
+.publish-suite
+.mypy_cache
+.pytest_cache
+.ruff_cache
+htmlcov
+notebooks
+results

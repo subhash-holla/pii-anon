@@ -1,0 +1,1 @@
+system,available,skipped_reason,license_gate_passed,license_gate_reason,qualification_status,license_name,license_source,citation_url,precision,recall,f1,latency_p50_ms,docs_per_hour,composite_score,elo_rating,entity_types_detected,entity_types_total,samples,per_entity_recall,per_entity_precision,dominance_pass_by_profile,evaluation_track

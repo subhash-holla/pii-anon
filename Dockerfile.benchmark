@@ -1,0 +1,46 @@
+# Pre-baked benchmark image with all engines, models, and tools installed.
+#
+# Build once:   make benchmark-docker-build
+# Run many:     make benchmark-canonical-macos
+#
+# Rebuilding is only needed when pyproject.toml dependencies change.
+
+# Platform is set via `docker build --platform` in the Makefile; using ARG
+# avoids the "constant value" lint warning from BuildKit.
+ARG TARGETPLATFORM=linux/amd64
+FROM python:3.11-bookworm
+
+# OS-level deps (none needed beyond what python:3.11-bookworm provides)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel build twine tqdm
+
+# PyTorch CPU-only (installed first — large and rarely changes)
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 'torch>=2.2,<2.6'
+
+# Copy only dependency metadata first for Docker layer caching.
+# If pyproject.toml hasn't changed, everything below this is cached.
+WORKDIR /work
+COPY pyproject.toml README.md LICENSE ./
+COPY src/pii_anon/__init__.py src/pii_anon/__init__.py
+
+# Install all extras EXCEPT datasets (pii-anon-datasets is a local package
+# that isn't on PyPI — it's bind-mounted and installed at runtime).
+RUN pip install --no-cache-dir '.[dev,cli,crypto,benchmark]'
+
+# Download NLP models (cached in the image)
+# - spaCy en_core_web_sm: lightweight model for Presidio's NER backend
+# - GLiNER PII model: knowledgator/gliner-pii-base-v1.0
+# - LLM Guard: verify import and warm scanner (downloads internal assets)
+RUN python -m spacy download en_core_web_sm \
+    && python -c "from gliner import GLiNER; GLiNER.from_pretrained('knowledgator/gliner-pii-base-v1.0')" \
+    && python -c "import llm_guard.input_scanners; print('llm_guard ok')"
+
+# Clean up the stub source — real source is bind-mounted at runtime
+RUN rm -rf /work/*
+
+# Suppress noisy library output during benchmark runs
+ENV HF_HUB_DISABLE_PROGRESS_BARS=1 \
+    TRANSFORMERS_NO_ADVISORY_WARNINGS=1 \
+    TOKENIZERS_PARALLELISM=false \
+    PYTHONWARNINGS="ignore::FutureWarning,ignore::UserWarning:torch"
+
+WORKDIR /work

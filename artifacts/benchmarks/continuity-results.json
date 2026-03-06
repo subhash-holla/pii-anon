@@ -1,0 +1,25 @@
+{
+  "alias_link_f1": 1.0,
+  "alias_link_precision": 1.0,
+  "alias_link_recall": 1.0,
+  "ambiguous_cases": 1050,
+  "ambiguous_overlink_rate": 0.591429,
+  "anonymize_placeholder_consistency": 1.0,
+  "boundary_trace": {
+    "deduped_findings": 105,
+    "merged_spans": 105,
+    "overlap_tokens": 128,
+    "segments_processed": 53
+  },
+  "continuity_gate_pass": true,
+  "long_context_alias_precision": 1.0,
+  "long_context_alias_recall": 1.0,
+  "long_context_pseudonym_consistency": 1.0,
+  "mentions_evaluated": 7995,
+  "mentions_expected": 1596,
+  "mentions_found": 1596,
+  "mentions_linked": 1596,
+  "pseudonym_consistency": 1.0,
+  "samples": 2800,
+  "token_count": 100016
+}

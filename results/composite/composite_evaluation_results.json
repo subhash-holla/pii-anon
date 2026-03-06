@@ -1,0 +1,95 @@
+{
+  "report_schema_version": "2026-02-17.v3",
+  "dataset": "llm_pipeline_core",
+  "samples": 10200,
+  "warmup_samples": 10,
+  "measured_runs": 1,
+  "available_competitors": [
+    "scrubadub",
+    "spacy_ner",
+    "stanza_ner"
+  ],
+  "unavailable_competitors": {
+    "presidio": "spaCy model download requires network access",
+    "llm_guard": "package metadata unavailable"
+  },
+  "systems": {
+    "pii-anon": {
+      "f1": 0.611569,
+      "precision": 0.57966,
+      "recall": 0.647196,
+      "latency_p50_ms": 6.942,
+      "docs_per_hour": 514300.2,
+      "composite_score": 0.623296,
+      "elo_rating": 1525,
+      "entity_types_detected": 13,
+      "per_entity_recall": {
+        "BANK_ACCOUNT": 1.0,
+        "IBAN": 1.0,
+        "IP_ADDRESS": 1.0,
+        "MAC_ADDRESS": 1.0,
+        "ROUTING_NUMBER": 1.0,
+        "US_SSN": 1.0,
+        "EMAIL_ADDRESS": 0.995433,
+        "PHONE_NUMBER": 0.961627,
+        "DATE_OF_BIRTH": 0.892055,
+        "CREDIT_CARD": 0.726041,
+        "PERSON_NAME": 0.630348,
+        "ORGANIZATION": 0.246089,
+        "ADDRESS": 0.022973
+      },
+      "end_to_end": {
+        "latency_p50_ms": 14.832,
+        "docs_per_hour": 216165.3
+      }
+    },
+    "scrubadub": {
+      "f1": 0.331956,
+      "precision": 0.730505,
+      "recall": 0.214777,
+      "latency_p50_ms": 0.255,
+      "docs_per_hour": 12163690.47,
+      "composite_score": 0.500173,
+      "elo_rating": 1494,
+      "entity_types_detected": 2,
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 0.916339,
+        "US_SSN": 0.889247
+      }
+    },
+    "spacy_ner": {
+      "f1": 0.257611,
+      "precision": 0.995433,
+      "recall": 0.14795,
+      "latency_p50_ms": 0.604,
+      "docs_per_hour": 5851964.67,
+      "composite_score": 0.485715,
+      "elo_rating": 1491,
+      "entity_types_detected": 1,
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 0.995433
+      }
+    },
+    "stanza_ner": {
+      "f1": 0.203507,
+      "precision": 1.0,
+      "recall": 0.11328,
+      "latency_p50_ms": 0.025,
+      "docs_per_hour": 88125067.06,
+      "composite_score": 0.467623,
+      "elo_rating": 1487,
+      "entity_types_detected": 1,
+      "per_entity_recall": {
+        "PHONE_NUMBER": 0.961627
+      }
+    }
+  },
+  "eval_framework": {
+    "dataset": "eval_framework_v1",
+    "records_evaluated": 500,
+    "micro_f1": 1.0,
+    "micro_precision": 1.0,
+    "micro_recall": 1.0,
+    "fairness_score": 1.0
+  }
+}
