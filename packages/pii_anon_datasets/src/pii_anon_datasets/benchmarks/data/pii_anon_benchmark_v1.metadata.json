@@ -1,0 +1,167 @@
+{
+  "comparable_benchmarks": {
+    "ai4privacy_pii_masking_300k": {
+      "entity_types": 8,
+      "languages": 8,
+      "records": 300000
+    },
+    "microsoft_pii_bench": {
+      "entity_types": 55,
+      "languages": 1,
+      "records": 2842
+    },
+    "nvidia_nemotron_pii": {
+      "entity_types": 55,
+      "languages": 1,
+      "records": 100000
+    },
+    "panorama_memorization": {
+      "entity_types": "diverse",
+      "languages": 1,
+      "records": 384789
+    },
+    "piilo_educational": {
+      "entity_types": 7,
+      "languages": 1,
+      "records": 22000
+    },
+    "spy_synthetic": {
+      "entity_types": 7,
+      "languages": 1,
+      "records": 8688
+    },
+    "tab_anonymization_benchmark": {
+      "entity_types": "semantic",
+      "languages": 1,
+      "records": 1268
+    }
+  },
+  "dataset": "pii_anon_benchmark_v1",
+  "datatype_group_distribution": {
+    "alias_context_loss": 5354,
+    "api_key_like_negative": 941,
+    "crypto_wallet": 870,
+    "device_id": 1646,
+    "general_pii": 21676,
+    "long_context_alias": 2800,
+    "national_health_id": 1168,
+    "passport_intl": 2026,
+    "tax_id_intl": 13519
+  },
+  "difficulty_level_distribution": {
+    "challenging": 3406,
+    "easy": 22130,
+    "hard": 16309,
+    "moderate": 8155
+  },
+  "entity_type_distribution": {
+    "ADDRESS": 35048,
+    "BANK_ACCOUNT": 7283,
+    "CREDIT_CARD": 4699,
+    "CREDIT_CARD_FRAGMENT": 584,
+    "DATE_OF_BIRTH": 15066,
+    "DRIVERS_LICENSE": 1792,
+    "EMAIL_ADDRESS": 63298,
+    "EMPLOYEE_ID": 9041,
+    "IBAN": 3166,
+    "IP_ADDRESS": 3159,
+    "LICENSE_PLATE": 2792,
+    "LOCATION": 1251,
+    "MAC_ADDRESS": 6721,
+    "MEDICAL_RECORD_NUMBER": 6076,
+    "NATIONAL_ID": 4383,
+    "ORGANIZATION": 21815,
+    "PASSPORT": 4326,
+    "PERSON_NAME": 146298,
+    "PHONE_NUMBER": 48850,
+    "ROUTING_NUMBER": 2416,
+    "USERNAME": 4075,
+    "US_SSN": 34766
+  },
+  "evaluation_dimension_distribution": {
+    "context_preservation": 8434,
+    "edge_cases": 3186,
+    "entity_consistency": 8650,
+    "format_variations": 1500,
+    "multilingual": 15227,
+    "pii_type_coverage": 10803,
+    "temporal_consistency": 2200
+  },
+  "evaluation_dimension_weights": {
+    "context_preservation": 0.2,
+    "edge_cases": 0.1,
+    "entity_consistency": 0.2,
+    "format_variations": 0.1,
+    "multilingual": 0.15,
+    "pii_type_coverage": 0.2,
+    "temporal_consistency": 0.05
+  },
+  "language_distribution": {
+    "ar": 1400,
+    "de": 2804,
+    "en": 28000,
+    "es": 5499,
+    "fr": 4029,
+    "hi": 1400,
+    "it": 1390,
+    "ja": 1168,
+    "ko": 1345,
+    "nl": 525,
+    "pt": 1040,
+    "zh": 1400
+  },
+  "licenses": {
+    "curated_public": "CC-BY-4.0",
+    "synthetic": "CC0-1.0"
+  },
+  "record_count": 50000,
+  "scenario_distribution": {
+    "baseline": 31066,
+    "context_loss": 7134,
+    "context_preservation": 2000,
+    "continuity_ambiguous": 1050,
+    "continuity_tracking": 1750,
+    "edge_case_code_embedded": 333,
+    "edge_case_dense_pii": 333,
+    "edge_case_false_positive": 334,
+    "edge_case_overlapping": 334,
+    "edge_case_pii_in_url": 333,
+    "edge_case_unicode": 333,
+    "entity_consistency": 2000,
+    "format_csv": 375,
+    "format_json": 375,
+    "format_table": 375,
+    "format_xml": 375,
+    "temporal_consistency": 1500
+  },
+  "schema": [
+    "id",
+    "text",
+    "language",
+    "labels",
+    "source_type",
+    "source_id",
+    "license",
+    "scenario_id",
+    "entity_cluster_id",
+    "mention_variant",
+    "context_group",
+    "size_tier",
+    "datatype_group",
+    "difficulty_level",
+    "evaluation_dimension"
+  ],
+  "seed": 42,
+  "size_tier_distribution": {
+    "context_loss": 7134,
+    "large": 7875,
+    "medium": 28283,
+    "small": 3833,
+    "very_large": 2875
+  },
+  "source_distribution": {
+    "curated_public": 10707,
+    "synthetic": 39293
+  },
+  "version": "v1.0.0"
+}

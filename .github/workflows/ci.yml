@@ -1,0 +1,77 @@
+name: core-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-type-test-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,cli,crypto,engines]
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Type check
+        run: mypy src/pii_anon
+
+      - name: Unit and integration tests
+        run: pytest -m "not performance"
+
+      - name: Performance SLA gates
+        run: pytest -m performance --no-cov
+
+      - name: Build packages
+        run: |
+          python -m build --outdir dist
+
+      - name: Package size check
+        run: python scripts/check_package_size.py --dist-dir dist --max-wheel-mb 1.5 --package-name pii_anon
+
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: CLI smoke test
+        run: |
+          pii-anon version
+          pii-anon health --output json
+          pii-anon capabilities --output json
+
+      - name: Notebook quickstart smoke test
+        run: |
+          jupyter nbconvert \
+            --to notebook \
+            --execute notebooks/quickstart.ipynb \
+            --output /tmp/quickstart.executed.ipynb
+
+  python-3-14-experimental:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,cli,crypto,engines]
+      - name: Experimental quality smoke
+        run: |
+          ruff check src tests
+          mypy src/pii_anon
+          pytest -m "not performance"

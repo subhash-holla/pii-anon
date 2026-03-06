@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.so
+.DS_Store
+.venv/
+venv/
+
+# Benchmark dataset (lives in pii-anon-eval-data repo)
+packages/pii_anon_datasets/src/pii_anon_datasets/benchmarks/data/*.jsonl

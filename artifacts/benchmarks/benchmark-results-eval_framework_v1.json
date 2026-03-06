@@ -1,0 +1,5059 @@
+{
+  "all_competitors_available": false,
+  "available_competitors": [
+    "presidio",
+    "scrubadub",
+    "gliner",
+    "piiranha"
+  ],
+  "dataset": "eval_framework_v1",
+  "dataset_source": "package-only",
+  "engine_tiers_evaluated": [
+    "auto",
+    "minimal",
+    "standard",
+    "full"
+  ],
+  "evaluation_tracks": {
+    "detect_only": [
+      {
+        "available": true,
+        "citation_url": "https://github.com/urchade/GLiNER",
+        "composite_score": 0.809197,
+        "docs_per_hour": 9998.8,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1591.36,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 1.0,
+        "latency_p50_ms": 334.442,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "license-field",
+        "per_entity_precision": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 1.0,
+        "qualification_status": "qualified",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "gliner"
+      },
+      {
+        "available": false,
+        "citation_url": "https://github.com/protectai/llm-guard",
+        "composite_score": 0.0,
+        "docs_per_hour": 0.0,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 0.0,
+        "entity_types_detected": 0,
+        "entity_types_total": 0,
+        "evaluation_track": "detect_only",
+        "f1": 0.0,
+        "latency_p50_ms": 0.0,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+        "license_source": "license-field",
+        "per_entity_precision": {},
+        "per_entity_recall": {},
+        "precision": 0.0,
+        "qualification_status": "qualified",
+        "recall": 0.0,
+        "samples": 2,
+        "skipped_reason": "llm_guard native scanner unavailable",
+        "system": "llm_guard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.757991,
+        "docs_per_hour": 291403565.01,
+        "dominance_pass_by_profile": {
+          "log_lines": true,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": true,
+          "structured_form_accuracy": false,
+          "structured_form_latency": true
+        },
+        "elo_rating": 1558.03,
+        "entity_types_detected": 2,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.666667,
+        "latency_p50_ms": 0.006,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "EMAIL_ADDRESS": 1.0,
+          "PHONE_NUMBER": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 1.0,
+        "qualification_status": "core",
+        "recall": 0.5,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.585757,
+        "docs_per_hour": 56378467.68,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1448.89,
+        "entity_types_detected": 1,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.4,
+        "latency_p50_ms": 0.058,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "PHONE_NUMBER": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 0.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 1.0,
+        "qualification_status": "core",
+        "recall": 0.25,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.775341,
+        "docs_per_hour": 358035.28,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1568.14,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.8,
+        "latency_p50_ms": 10.169,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.563798,
+        "docs_per_hour": 7968.02,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1437.56,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.666667,
+        "latency_p50_ms": 451.577,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "SOCIALNUM": 0.0,
+          "TELEPHONENUM": 0.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.5,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+        "composite_score": 0.007698,
+        "docs_per_hour": 8979.07,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1340.77,
+        "entity_types_detected": 0,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.0,
+        "latency_p50_ms": 369.993,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache Software License",
+        "license_source": "classifier",
+        "per_entity_precision": {
+          "SOCIALNUM": 0.0,
+          "TELEPHONENUM": 0.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 0.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 0.0,
+          "US_SSN": 0.0
+        },
+        "precision": 0.0,
+        "qualification_status": "qualified",
+        "recall": 0.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "piiranha"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/microsoft/presidio",
+        "composite_score": 0.726264,
+        "docs_per_hour": 373293.12,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1539.27,
+        "entity_types_detected": 3,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.75,
+        "latency_p50_ms": 9.625,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "MIT License",
+        "license_source": "classifier",
+        "per_entity_precision": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 0.75,
+        "qualification_status": "qualified",
+        "recall": 0.75,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "presidio"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/LeapBeyond/scrubadub",
+        "composite_score": 0.656751,
+        "docs_per_hour": 24233367.47,
+        "dominance_pass_by_profile": {
+          "log_lines": false,
+          "long_document": false,
+          "multilingual_mix": false,
+          "short_chat": false,
+          "structured_form_accuracy": false,
+          "structured_form_latency": false
+        },
+        "elo_rating": 1493.75,
+        "entity_types_detected": 2,
+        "entity_types_total": 4,
+        "evaluation_track": "detect_only",
+        "f1": 0.571429,
+        "latency_p50_ms": 0.14,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache Software License",
+        "license_source": "classifier",
+        "per_entity_precision": {
+          "EMAIL_ADDRESS": 1.0,
+          "PHONEFILTH": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 0.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "qualified",
+        "recall": 0.5,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "scrubadub"
+      }
+    ],
+    "end_to_end": [
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.775591,
+        "docs_per_hour": 361464.68,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 9.839,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.775067,
+        "docs_per_hour": 352989.24,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.165,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.563867,
+        "docs_per_hour": 7997.18,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.666667,
+        "latency_p50_ms": 448.269,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "SOCIALNUM": 0.0,
+          "TELEPHONENUM": 0.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.5,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.580901,
+        "docs_per_hour": 14156192.62,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 1,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.4,
+        "latency_p50_ms": 0.245,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "PHONE_NUMBER": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 0.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 1.0,
+        "qualification_status": "core",
+        "recall": 0.25,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774945,
+        "docs_per_hour": 350894.29,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.199,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774932,
+        "docs_per_hour": 350863.18,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.26,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.77486,
+        "docs_per_hour": 349784.35,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.322,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.723704,
+        "docs_per_hour": 341293.55,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.727273,
+        "latency_p50_ms": 10.508,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONEFILTH": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.571429,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774104,
+        "docs_per_hour": 337229.07,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.617,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.773117,
+        "docs_per_hour": 322360.6,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 11.298,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.773632,
+        "docs_per_hour": 331180.19,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 11.237,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.72348,
+        "docs_per_hour": 337852.36,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.727273,
+        "latency_p50_ms": 10.662,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONEFILTH": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.571429,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774871,
+        "docs_per_hour": 349943.27,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.309,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774886,
+        "docs_per_hour": 349991.7,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.247,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.563794,
+        "docs_per_hour": 7944.87,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.666667,
+        "latency_p50_ms": 451.685,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "SOCIALNUM": 0.0,
+          "TELEPHONENUM": 0.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.5,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.580396,
+        "docs_per_hour": 13078361.74,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 1,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.4,
+        "latency_p50_ms": 0.267,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "PHONE_NUMBER": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 0.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 1.0,
+        "qualification_status": "core",
+        "recall": 0.25,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.770126,
+        "docs_per_hour": 274303.57,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 11.914,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.77449,
+        "docs_per_hour": 343452.05,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.426,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.563762,
+        "docs_per_hour": 7923.93,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.666667,
+        "latency_p50_ms": 453.192,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "SOCIALNUM": 0.0,
+          "TELEPHONENUM": 0.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.5,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.580447,
+        "docs_per_hour": 13180110.51,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 1,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.4,
+        "latency_p50_ms": 0.269,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "PHONE_NUMBER": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 0.0,
+          "PERSON_NAME": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 0.0
+        },
+        "precision": 1.0,
+        "qualification_status": "core",
+        "recall": 0.25,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.77485,
+        "docs_per_hour": 349521.86,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.3,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.774445,
+        "docs_per_hour": 342504.67,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.387,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-minimal"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.77504,
+        "docs_per_hour": 352571.52,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.8,
+        "latency_p50_ms": 10.185,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.666667,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-standard"
+      },
+      {
+        "available": true,
+        "citation_url": "https://github.com/subhash-holla/pii-anon",
+        "composite_score": 0.723691,
+        "docs_per_hour": 341363.23,
+        "dominance_pass_by_profile": {},
+        "elo_rating": 0.0,
+        "entity_types_detected": 4,
+        "entity_types_total": 4,
+        "evaluation_track": "end_to_end",
+        "f1": 0.727273,
+        "latency_p50_ms": 10.589,
+        "license_gate_passed": true,
+        "license_gate_reason": null,
+        "license_name": "Apache-2.0",
+        "license_source": "project",
+        "per_entity_precision": {
+          "ADDRESS": 0.0,
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONEFILTH": 0.0,
+          "PHONE_NUMBER": 1.0,
+          "URL": 0.0,
+          "US_SSN": 1.0
+        },
+        "per_entity_recall": {
+          "EMAIL_ADDRESS": 1.0,
+          "PERSON_NAME": 1.0,
+          "PHONE_NUMBER": 1.0,
+          "US_SSN": 1.0
+        },
+        "precision": 0.571429,
+        "qualification_status": "core",
+        "recall": 1.0,
+        "samples": 2,
+        "skipped_reason": null,
+        "system": "pii-anon-full"
+      }
+    ]
+  },
+  "expected_competitors": [
+    "presidio",
+    "scrubadub",
+    "llm_guard",
+    "gliner",
+    "piiranha"
+  ],
+  "failed_profiles": [
+    "long_document",
+    "structured_form_accuracy",
+    "multilingual_mix"
+  ],
+  "floor_pass": false,
+  "max_samples": null,
+  "measured_runs": 3,
+  "mit_gate_pass": false,
+  "profile_results": [
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.006,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.14
+        },
+        {
+          "actual": 291403565.01,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 24233367.47
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "short_chat",
+      "qualified_competitors": 4,
+      "winners": {
+        "docs_per_hour": {
+          "metric": "docs_per_hour",
+          "system": "pii-anon-full",
+          "value": 56378467.68
+        },
+        "latency_p50_ms": {
+          "metric": "latency_p50_ms",
+          "system": "pii-anon-full",
+          "value": 0.058
+        }
+      }
+    },
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "long_document",
+      "qualified_competitors": 4,
+      "winners": {
+        "f1": {
+          "metric": "f1",
+          "system": "gliner",
+          "value": 1.0
+        },
+        "recall": {
+          "metric": "recall",
+          "system": "pii-anon-minimal",
+          "value": 1.0
+        }
+      }
+    },
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "structured_form_accuracy",
+      "qualified_competitors": 4,
+      "winners": {
+        "f1": {
+          "metric": "f1",
+          "system": "gliner",
+          "value": 1.0
+        },
+        "recall": {
+          "metric": "recall",
+          "system": "pii-anon-minimal",
+          "value": 1.0
+        }
+      }
+    },
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.006,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.135
+        },
+        {
+          "actual": 459574525.94,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 24600246.15
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "structured_form_latency",
+      "qualified_competitors": 4,
+      "winners": {
+        "docs_per_hour": {
+          "metric": "docs_per_hour",
+          "system": "pii-anon-full",
+          "value": 59593276.8
+        },
+        "latency_p50_ms": {
+          "metric": "latency_p50_ms",
+          "system": "pii-anon-full",
+          "value": 0.057
+        }
+      }
+    },
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.007,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.141
+        },
+        {
+          "actual": 372144297.04,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 23477189.02
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "log_lines",
+      "qualified_competitors": 4,
+      "winners": {
+        "docs_per_hour": {
+          "metric": "docs_per_hour",
+          "system": "pii-anon-full",
+          "value": 60738136.87
+        },
+        "latency_p50_ms": {
+          "metric": "latency_p50_ms",
+          "system": "pii-anon-full",
+          "value": 0.056
+        }
+      }
+    },
+    {
+      "evaluation_track": "detect_only",
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "multilingual_mix",
+      "qualified_competitors": 4,
+      "winners": {
+        "f1": {
+          "metric": "f1",
+          "system": "gliner",
+          "value": 1.0
+        },
+        "recall": {
+          "metric": "recall",
+          "system": "pii-anon-minimal",
+          "value": 1.0
+        }
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775591,
+          "docs_per_hour": 361464.68,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 9.839,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775067,
+          "docs_per_hour": 352989.24,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.165,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563867,
+          "docs_per_hour": 7997.18,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.666667,
+          "latency_p50_ms": 448.269,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.580901,
+          "docs_per_hour": 14156192.62,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.4,
+          "latency_p50_ms": 0.245,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.006,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.14
+        },
+        {
+          "actual": 291403565.01,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 24233367.47
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "short_chat",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.757991,
+          "docs_per_hour": 291403565.01,
+          "dominance_pass_by_profile": {
+            "log_lines": true,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": true,
+            "structured_form_accuracy": false,
+            "structured_form_latency": true
+          },
+          "elo_rating": 1558.03,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 0.006,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775341,
+          "docs_per_hour": 358035.28,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1568.14,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.169,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563798,
+          "docs_per_hour": 7968.02,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1437.56,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 451.577,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.585757,
+          "docs_per_hour": 56378467.68,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1448.89,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.4,
+          "latency_p50_ms": 0.058,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.656751,
+          "docs_per_hour": 24233367.47,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1493.75,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.14,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.726264,
+          "docs_per_hour": 373293.12,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1539.27,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 9.625,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.007698,
+          "docs_per_hour": 8979.07,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1340.77,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 369.993,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.809197,
+          "docs_per_hour": 9998.8,
+          "dominance_pass_by_profile": {
+            "log_lines": false,
+            "long_document": false,
+            "multilingual_mix": false,
+            "short_chat": false,
+            "structured_form_accuracy": false,
+            "structured_form_latency": false
+          },
+          "elo_rating": 1591.36,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 334.442,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        }
+      ]
+    },
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774945,
+          "docs_per_hour": 350894.29,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.199,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774932,
+          "docs_per_hour": 350863.18,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.26,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.77486,
+          "docs_per_hour": 349784.35,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.322,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.723704,
+          "docs_per_hour": 341293.55,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.508,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "long_document",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.77505,
+          "docs_per_hour": 352949.59,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.239,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774819,
+          "docs_per_hour": 349477.81,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.438,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775186,
+          "docs_per_hour": 355170.42,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.162,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.723745,
+          "docs_per_hour": 342004.85,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.497,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.657033,
+          "docs_per_hour": 26168622.67,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.134,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.724211,
+          "docs_per_hour": 339748.4,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 10.778,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.008009,
+          "docs_per_hour": 9143.24,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 361.644,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.809564,
+          "docs_per_hour": 10310.46,
+          "dominance_pass_by_profile": {
+            "long_document": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 327.186,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        }
+      ]
+    },
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774104,
+          "docs_per_hour": 337229.07,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.617,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.773117,
+          "docs_per_hour": 322360.6,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 11.298,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.773632,
+          "docs_per_hour": 331180.19,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 11.237,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.72348,
+          "docs_per_hour": 337852.36,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.662,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "structured_form_accuracy",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.773122,
+          "docs_per_hour": 322493.15,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 11.312,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.772011,
+          "docs_per_hour": 302688.64,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 11.133,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774404,
+          "docs_per_hour": 342597.93,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.611,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.723755,
+          "docs_per_hour": 342152.93,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.492,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.656531,
+          "docs_per_hour": 22905620.91,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.146,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.72518,
+          "docs_per_hour": 354614.06,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 10.043,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.007978,
+          "docs_per_hour": 9051.74,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 362.241,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.80946,
+          "docs_per_hour": 9976.45,
+          "dominance_pass_by_profile": {
+            "structured_form_accuracy": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 328.676,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        }
+      ]
+    },
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774871,
+          "docs_per_hour": 349943.27,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.309,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774886,
+          "docs_per_hour": 349991.7,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.247,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563794,
+          "docs_per_hour": 7944.87,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.666667,
+          "latency_p50_ms": 451.685,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.580396,
+          "docs_per_hour": 13078361.74,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.4,
+          "latency_p50_ms": 0.267,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.006,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.135
+        },
+        {
+          "actual": 459574525.94,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 24600246.15
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "structured_form_latency",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.758116,
+          "docs_per_hour": 459574525.94,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": true
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 0.006,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774906,
+          "docs_per_hour": 350645.08,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.329,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563756,
+          "docs_per_hour": 7955.0,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 453.675,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.58585,
+          "docs_per_hour": 59593276.8,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.4,
+          "latency_p50_ms": 0.057,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.656808,
+          "docs_per_hour": 24600246.15,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.135,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.726216,
+          "docs_per_hour": 372697.87,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 9.714,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.008072,
+          "docs_per_hour": 9079.41,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 359.752,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.809691,
+          "docs_per_hour": 10013.52,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 323.967,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "structured_form_latency": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        }
+      ]
+    },
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.770126,
+          "docs_per_hour": 274303.57,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 11.914,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.77449,
+          "docs_per_hour": 343452.05,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.426,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563762,
+          "docs_per_hour": 7923.93,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.666667,
+          "latency_p50_ms": 453.192,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.580447,
+          "docs_per_hour": 13180110.51,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.4,
+          "latency_p50_ms": 0.269,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.007,
+          "comparator": "scrubadub",
+          "metric": "latency_p50_ms",
+          "passed": true,
+          "target": 0.141
+        },
+        {
+          "actual": 372144297.04,
+          "comparator": "scrubadub",
+          "metric": "docs_per_hour",
+          "passed": true,
+          "target": 23477189.02
+        }
+      ],
+      "floor_pass": true,
+      "mit_qualified_competitors": 1,
+      "objective": "speed",
+      "profile": "log_lines",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.758065,
+          "docs_per_hour": 372144297.04,
+          "dominance_pass_by_profile": {
+            "log_lines": true
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 0.007,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775125,
+          "docs_per_hour": 354045.16,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.165,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.563347,
+          "docs_per_hour": 7587.19,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.666667,
+          "latency_p50_ms": 474.014,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.5,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.58588,
+          "docs_per_hour": 60738136.87,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 1,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.4,
+          "latency_p50_ms": 0.056,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "PHONE_NUMBER": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 1.0,
+          "qualification_status": "core",
+          "recall": 0.25,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.656629,
+          "docs_per_hour": 23477189.02,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.141,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.725983,
+          "docs_per_hour": 369062.8,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 9.919,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.007897,
+          "docs_per_hour": 8986.24,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 364.31,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.809427,
+          "docs_per_hour": 10003.61,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 329.45,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "log_lines": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        }
+      ]
+    },
+    {
+      "end_to_end_systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.77485,
+          "docs_per_hour": 349521.86,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.3,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774445,
+          "docs_per_hour": 342504.67,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.387,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.77504,
+          "docs_per_hour": 352571.52,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.8,
+          "latency_p50_ms": 10.185,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.723691,
+          "docs_per_hour": 341363.23,
+          "dominance_pass_by_profile": {},
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "end_to_end",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.589,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        }
+      ],
+      "floor_checks": [
+        {
+          "actual": 0.8,
+          "comparator": "gliner",
+          "metric": "f1",
+          "passed": false,
+          "target": 1.0
+        },
+        {
+          "actual": 1.0,
+          "comparator": "gliner",
+          "metric": "recall",
+          "passed": true,
+          "target": 1.0
+        }
+      ],
+      "floor_pass": false,
+      "mit_qualified_competitors": 1,
+      "objective": "accuracy",
+      "profile": "multilingual_mix",
+      "qualified_competitors": 4,
+      "systems": [
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775044,
+          "docs_per_hour": 352512.54,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.151,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.775105,
+          "docs_per_hour": 353922.61,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.227,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-minimal"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.774383,
+          "docs_per_hour": 340961.33,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.8,
+          "latency_p50_ms": 10.271,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-standard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/subhash-holla/pii-anon",
+          "composite_score": 0.723729,
+          "docs_per_hour": 341664.02,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.727273,
+          "latency_p50_ms": 10.483,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "project",
+          "per_entity_precision": {
+            "ADDRESS": 0.0,
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONEFILTH": 0.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.571429,
+          "qualification_status": "core",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "pii-anon-full"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/LeapBeyond/scrubadub",
+          "composite_score": 0.656754,
+          "docs_per_hour": 24254919.41,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 2,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.571429,
+          "latency_p50_ms": 0.145,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PHONEFILTH": 0.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 1.0
+          },
+          "precision": 0.666667,
+          "qualification_status": "qualified",
+          "recall": 0.5,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "scrubadub"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/microsoft/presidio",
+          "composite_score": 0.725545,
+          "docs_per_hour": 360277.71,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 3,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.75,
+          "latency_p50_ms": 9.745,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "MIT License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "URL": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.75,
+          "qualification_status": "qualified",
+          "recall": 0.75,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "presidio"
+        },
+        {
+          "available": true,
+          "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+          "composite_score": 0.007809,
+          "docs_per_hour": 9037.45,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 366.957,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache Software License",
+          "license_source": "classifier",
+          "per_entity_precision": {
+            "SOCIALNUM": 0.0,
+            "TELEPHONENUM": 0.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 0.0,
+            "PERSON_NAME": 0.0,
+            "PHONE_NUMBER": 0.0,
+            "US_SSN": 0.0
+          },
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "piiranha"
+        },
+        {
+          "available": false,
+          "citation_url": "https://github.com/protectai/llm-guard",
+          "composite_score": 0.0,
+          "docs_per_hour": 0.0,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 0,
+          "entity_types_total": 0,
+          "evaluation_track": "detect_only",
+          "f1": 0.0,
+          "latency_p50_ms": 0.0,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+          "license_source": "license-field",
+          "per_entity_precision": {},
+          "per_entity_recall": {},
+          "precision": 0.0,
+          "qualification_status": "qualified",
+          "recall": 0.0,
+          "samples": 2,
+          "skipped_reason": "llm_guard native scanner unavailable",
+          "system": "llm_guard"
+        },
+        {
+          "available": true,
+          "citation_url": "https://github.com/urchade/GLiNER",
+          "composite_score": 0.809546,
+          "docs_per_hour": 9951.15,
+          "dominance_pass_by_profile": {
+            "multilingual_mix": false
+          },
+          "elo_rating": 0.0,
+          "entity_types_detected": 4,
+          "entity_types_total": 4,
+          "evaluation_track": "detect_only",
+          "f1": 1.0,
+          "latency_p50_ms": 326.824,
+          "license_gate_passed": true,
+          "license_gate_reason": null,
+          "license_name": "Apache-2.0",
+          "license_source": "license-field",
+          "per_entity_precision": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "per_entity_recall": {
+            "EMAIL_ADDRESS": 1.0,
+            "PERSON_NAME": 1.0,
+            "PHONE_NUMBER": 1.0,
+            "US_SSN": 1.0
+          },
+          "precision": 1.0,
+          "qualification_status": "qualified",
+          "recall": 1.0,
+          "samples": 2,
+          "skipped_reason": null,
+          "system": "gliner"
+        }
+      ]
+    }
+  ],
+  "qualification_gate_pass": false,
+  "report_schema_version": "2026-02-19.v3",
+  "require_all_competitors": true,
+  "require_native_competitors": true,
+  "required_profiles": [
+    "short_chat",
+    "long_document",
+    "structured_form_accuracy",
+    "structured_form_latency",
+    "log_lines",
+    "multilingual_mix"
+  ],
+  "required_profiles_passed": false,
+  "run_metadata": {
+    "canonical_claim_run": false,
+    "dataset_path": null,
+    "dataset_sha256": null,
+    "dataset_source": "package-only",
+    "engine_tiers_evaluated": [
+      "auto",
+      "minimal",
+      "standard",
+      "full"
+    ],
+    "git_sha": "unknown",
+    "matrix_path": "src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json",
+    "matrix_sha256": "796858b734bb2d586486544116c5eaec0827b45274ba4bf0ecb331329cd55dd5",
+    "require_all_competitors": true,
+    "require_native_competitors": true,
+    "required_profiles": [
+      "short_chat",
+      "long_document",
+      "structured_form_accuracy",
+      "structured_form_latency",
+      "log_lines",
+      "multilingual_mix"
+    ],
+    "required_profiles_passed": false,
+    "strict_runtime": true,
+    "timestamp_utc": "2026-02-21T17:21:42Z"
+  },
+  "runtime_preflight": {
+    "all_competitors_available": true,
+    "available_competitors": [
+      "presidio",
+      "scrubadub",
+      "llm_guard",
+      "gliner",
+      "piiranha"
+    ],
+    "competitors": {
+      "gliner": {
+        "available": true,
+        "import_name": "gliner",
+        "import_ok": true,
+        "import_output": "",
+        "import_return_code": 0,
+        "model_check_required": true,
+        "model_output": "",
+        "model_ready": true,
+        "model_return_code": 0,
+        "native_ready": true,
+        "reason": "ok"
+      },
+      "llm_guard": {
+        "available": true,
+        "import_name": "llm_guard",
+        "import_ok": true,
+        "import_output": "",
+        "import_return_code": 0,
+        "model_check_required": false,
+        "model_output": null,
+        "model_ready": null,
+        "model_return_code": null,
+        "native_ready": true,
+        "reason": "ok"
+      },
+      "piiranha": {
+        "available": true,
+        "import_name": "transformers",
+        "import_ok": true,
+        "import_output": "",
+        "import_return_code": 0,
+        "model_check_required": true,
+        "model_output": "Device set to use cpu",
+        "model_ready": true,
+        "model_return_code": 0,
+        "native_ready": true,
+        "reason": "ok"
+      },
+      "presidio": {
+        "available": true,
+        "import_name": "presidio_analyzer",
+        "import_ok": true,
+        "import_output": "",
+        "import_return_code": 0,
+        "model_check_required": false,
+        "model_output": null,
+        "model_ready": null,
+        "model_return_code": null,
+        "native_ready": true,
+        "reason": "ok"
+      },
+      "scrubadub": {
+        "available": true,
+        "import_name": "scrubadub",
+        "import_ok": true,
+        "import_output": "",
+        "import_return_code": 0,
+        "model_check_required": false,
+        "model_output": null,
+        "model_ready": null,
+        "model_return_code": null,
+        "native_ready": true,
+        "reason": "ok"
+      }
+    },
+    "expected_competitors": [
+      "presidio",
+      "scrubadub",
+      "llm_guard",
+      "gliner",
+      "piiranha"
+    ],
+    "failures": [],
+    "linux_runtime_ok": true,
+    "platform_release": "6.12.67-linuxkit",
+    "platform_system": "linux",
+    "python_executable": "/usr/local/bin/python",
+    "python_version": "3.11.14",
+    "ready": true,
+    "require_all_competitors": true,
+    "require_native_competitors": true,
+    "schema_version": "2026-02-16.v1",
+    "shared_memory_ok": true,
+    "shared_memory_path": "/dev/shm",
+    "shared_memory_reason": "ok",
+    "strict_runtime": true,
+    "timestamp_utc": "2026-02-21T17:18:49Z",
+    "unavailable_competitors": {}
+  },
+  "systems": [
+    {
+      "available": true,
+      "citation_url": "https://github.com/urchade/GLiNER",
+      "composite_score": 0.809197,
+      "docs_per_hour": 9998.8,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1591.36,
+      "entity_types_detected": 4,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 1.0,
+      "latency_p50_ms": 334.442,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache-2.0",
+      "license_source": "license-field",
+      "per_entity_precision": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 1.0
+      },
+      "precision": 1.0,
+      "qualification_status": "qualified",
+      "recall": 1.0,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "gliner"
+    },
+    {
+      "available": false,
+      "citation_url": "https://github.com/protectai/llm-guard",
+      "composite_score": 0.0,
+      "docs_per_hour": 0.0,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 0.0,
+      "entity_types_detected": 0,
+      "entity_types_total": 0,
+      "evaluation_track": "detect_only",
+      "f1": 0.0,
+      "latency_p50_ms": 0.0,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "The MIT License (MIT)\n\nCopyright (c) Protect AI. All rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+      "license_source": "license-field",
+      "per_entity_precision": {},
+      "per_entity_recall": {},
+      "precision": 0.0,
+      "qualification_status": "qualified",
+      "recall": 0.0,
+      "samples": 2,
+      "skipped_reason": "llm_guard native scanner unavailable",
+      "system": "llm_guard"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/subhash-holla/pii-anon",
+      "composite_score": 0.757991,
+      "docs_per_hour": 291403565.01,
+      "dominance_pass_by_profile": {
+        "log_lines": true,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": true,
+        "structured_form_accuracy": false,
+        "structured_form_latency": true
+      },
+      "elo_rating": 1558.03,
+      "entity_types_detected": 2,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.666667,
+      "latency_p50_ms": 0.006,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache-2.0",
+      "license_source": "project",
+      "per_entity_precision": {
+        "EMAIL_ADDRESS": 1.0,
+        "PHONE_NUMBER": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 0.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 0.0
+      },
+      "precision": 1.0,
+      "qualification_status": "core",
+      "recall": 0.5,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "pii-anon"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/subhash-holla/pii-anon",
+      "composite_score": 0.585757,
+      "docs_per_hour": 56378467.68,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1448.89,
+      "entity_types_detected": 1,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.4,
+      "latency_p50_ms": 0.058,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache-2.0",
+      "license_source": "project",
+      "per_entity_precision": {
+        "PHONE_NUMBER": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 0.0,
+        "PERSON_NAME": 0.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 0.0
+      },
+      "precision": 1.0,
+      "qualification_status": "core",
+      "recall": 0.25,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "pii-anon-full"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/subhash-holla/pii-anon",
+      "composite_score": 0.775341,
+      "docs_per_hour": 358035.28,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1568.14,
+      "entity_types_detected": 4,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.8,
+      "latency_p50_ms": 10.169,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache-2.0",
+      "license_source": "project",
+      "per_entity_precision": {
+        "ADDRESS": 0.0,
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "URL": 0.0,
+        "US_SSN": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 1.0
+      },
+      "precision": 0.666667,
+      "qualification_status": "core",
+      "recall": 1.0,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "pii-anon-minimal"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/subhash-holla/pii-anon",
+      "composite_score": 0.563798,
+      "docs_per_hour": 7968.02,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1437.56,
+      "entity_types_detected": 4,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.666667,
+      "latency_p50_ms": 451.577,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache-2.0",
+      "license_source": "project",
+      "per_entity_precision": {
+        "ADDRESS": 0.0,
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "SOCIALNUM": 0.0,
+        "TELEPHONENUM": 0.0,
+        "URL": 0.0,
+        "US_SSN": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 1.0
+      },
+      "precision": 0.5,
+      "qualification_status": "core",
+      "recall": 1.0,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "pii-anon-standard"
+    },
+    {
+      "available": true,
+      "citation_url": "https://huggingface.co/iiiorg/piiranha-v1-detect-personal-information",
+      "composite_score": 0.007698,
+      "docs_per_hour": 8979.07,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1340.77,
+      "entity_types_detected": 0,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.0,
+      "latency_p50_ms": 369.993,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache Software License",
+      "license_source": "classifier",
+      "per_entity_precision": {
+        "SOCIALNUM": 0.0,
+        "TELEPHONENUM": 0.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 0.0,
+        "PERSON_NAME": 0.0,
+        "PHONE_NUMBER": 0.0,
+        "US_SSN": 0.0
+      },
+      "precision": 0.0,
+      "qualification_status": "qualified",
+      "recall": 0.0,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "piiranha"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/microsoft/presidio",
+      "composite_score": 0.726264,
+      "docs_per_hour": 373293.12,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1539.27,
+      "entity_types_detected": 3,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.75,
+      "latency_p50_ms": 9.625,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "MIT License",
+      "license_source": "classifier",
+      "per_entity_precision": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "URL": 0.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 1.0,
+        "PHONE_NUMBER": 1.0,
+        "US_SSN": 0.0
+      },
+      "precision": 0.75,
+      "qualification_status": "qualified",
+      "recall": 0.75,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "presidio"
+    },
+    {
+      "available": true,
+      "citation_url": "https://github.com/LeapBeyond/scrubadub",
+      "composite_score": 0.656751,
+      "docs_per_hour": 24233367.47,
+      "dominance_pass_by_profile": {
+        "log_lines": false,
+        "long_document": false,
+        "multilingual_mix": false,
+        "short_chat": false,
+        "structured_form_accuracy": false,
+        "structured_form_latency": false
+      },
+      "elo_rating": 1493.75,
+      "entity_types_detected": 2,
+      "entity_types_total": 4,
+      "evaluation_track": "detect_only",
+      "f1": 0.571429,
+      "latency_p50_ms": 0.14,
+      "license_gate_passed": true,
+      "license_gate_reason": null,
+      "license_name": "Apache Software License",
+      "license_source": "classifier",
+      "per_entity_precision": {
+        "EMAIL_ADDRESS": 1.0,
+        "PHONEFILTH": 0.0,
+        "US_SSN": 1.0
+      },
+      "per_entity_recall": {
+        "EMAIL_ADDRESS": 1.0,
+        "PERSON_NAME": 0.0,
+        "PHONE_NUMBER": 0.0,
+        "US_SSN": 1.0
+      },
+      "precision": 0.666667,
+      "qualification_status": "qualified",
+      "recall": 0.5,
+      "samples": 2,
+      "skipped_reason": null,
+      "system": "scrubadub"
+    }
+  ],
+  "unavailable_competitors": {
+    "llm_guard": "short_chat: llm_guard native scanner unavailable; long_document: llm_guard native scanner unavailable; structured_form_accuracy: llm_guard native scanner unavailable; structured_form_latency: llm_guard native scanner unavailable; log_lines: llm_guard native scanner unavailable; multilingual_mix: llm_guard native scanner unavailable"
+  },
+  "warmup_samples": 100
+}

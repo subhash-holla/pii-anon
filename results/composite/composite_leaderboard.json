@@ -1,0 +1,63 @@
+{
+  "benchmark": "pii-anon-benchmark",
+  "dataset": "llm_pipeline_core",
+  "samples": 10200,
+  "systems": [
+    {
+      "rank": null,
+      "system": "pii-anon",
+      "composite_score": 0.623296,
+      "f1": 0.611569,
+      "precision": 0.57966,
+      "recall": 0.647196,
+      "latency_p50_ms": 6.942,
+      "docs_per_hour": 514300.0,
+      "elo_rating": 1525.0,
+      "elo_rd": 276.7,
+      "evaluation_track": "detect_only",
+      "license": "Apache-2.0"
+    },
+    {
+      "rank": null,
+      "system": "scrubadub",
+      "composite_score": 0.500173,
+      "f1": 0.331956,
+      "precision": 0.730505,
+      "recall": 0.214777,
+      "latency_p50_ms": 0.255,
+      "docs_per_hour": 12163690.0,
+      "elo_rating": 1494.0,
+      "elo_rd": 276.7,
+      "evaluation_track": "detect_only",
+      "license": "Apache Software License"
+    },
+    {
+      "rank": null,
+      "system": "spacy_ner",
+      "composite_score": 0.485715,
+      "f1": 0.257611,
+      "precision": 0.995433,
+      "recall": 0.14795,
+      "latency_p50_ms": 0.604,
+      "docs_per_hour": 5851965.0,
+      "elo_rating": 1491.0,
+      "elo_rd": 276.7,
+      "evaluation_track": "detect_only",
+      "license": "MIT License"
+    },
+    {
+      "rank": null,
+      "system": "stanza_ner",
+      "composite_score": 0.467623,
+      "f1": 0.203507,
+      "precision": 1.0,
+      "recall": 0.11328,
+      "latency_p50_ms": 0.025,
+      "docs_per_hour": 88125067.0,
+      "elo_rating": 1487.0,
+      "elo_rd": 276.7,
+      "evaluation_track": "detect_only",
+      "license": "Apache License 2.0"
+    }
+  ]
+}

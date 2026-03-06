@@ -1,0 +1,179 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pii-anon"
+version = "1.0.0"
+description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "PII Platform Contributors" }]
+keywords = [
+  "pii",
+  "privacy",
+  "anonymization",
+  "pseudonymization",
+  "llm",
+  "data-security",
+  "data-pipeline",
+  "compliance",
+  "evaluation",
+  "benchmark",
+  "multilingual",
+  "ner",
+  "gdpr",
+  "nist",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["pydantic>=2.8"]
+
+[project.urls]
+Homepage = "https://github.com/subhash-holla/pii-anon"
+Documentation = "https://github.com/subhash-holla/pii-anon-doc"
+Repository = "https://github.com/subhash-holla/pii-anon"
+Issues = "https://github.com/subhash-holla/pii-anon/issues"
+
+[project.scripts]
+pii-anon = "pii_anon.cli:main"
+
+[project.entry-points."pii_anon.engines"]
+regex = "pii_anon.engines.regex_adapter:RegexEngineAdapter"
+presidio = "pii_anon.engines.presidio_adapter:PresidioAdapter"
+llm_guard = "pii_anon.engines.llm_guard_adapter:LLMGuardAdapter"
+scrubadub = "pii_anon.engines.scrubadub_adapter:ScrubadubAdapter"
+spacy_ner = "pii_anon.engines.spacy_adapter:SpacyNERAdapter"
+stanza_ner = "pii_anon.engines.stanza_adapter:StanzaNERAdapter"
+gliner = "pii_anon.engines.gliner_adapter:GLiNERAdapter"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.8",
+  "mypy>=1.10",
+  "build>=1.2",
+  "twine>=5.0",
+  "tqdm>=4.66",
+  "jupyter>=1.0",
+  "nbconvert>=7.0",
+]
+engines = [
+  "presidio-analyzer>=2.2",
+  "scrubadub>=2.0",
+  "spacy>=3.7",
+  "stanza>=1.8",
+  "gliner>=0.2",
+  "transformers>=4.38",
+]
+llm-guard = ["llm-guard>=0.3.11"]
+gliner = ["gliner>=0.2"]
+benchmark = [
+  "presidio-analyzer>=2.2",
+  "scrubadub>=2.0",
+  "spacy>=3.7",
+  "stanza>=1.8",
+  "gliner>=0.2",
+  "llm-guard>=0.3.11",
+  "transformers>=4.38",
+  "tqdm>=4.66",
+  "numpy>=1.24",
+]
+crypto = ["cryptography>=41.0"]
+cli = ["typer>=0.12", "rich>=13.0", "pyyaml>=6.0"]
+datasets = ["pii-anon-datasets>=1.0.0"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.package-data]
+pii_anon = [
+  "benchmarks/matrix/*.json",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q -m \"not performance\" --cov=pii_anon --cov-report=term-missing --cov-fail-under=85"
+testpaths = ["tests"]
+markers = [
+  "performance: performance and SLA checks",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+# Environment variables must be set before importing torch/transformers.
+"src/pii_anon/evaluation/competitor_compare.py" = ["E402"]
+# sys.path setup and offline env patching must precede library imports.
+"scripts/run_composite_evaluation.py" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["pii_anon"]
+
+# Optional dependencies — not installed in every environment.
+[[tool.mypy.overrides]]
+module = [
+  "pyarrow",
+  "pyarrow.parquet",
+  "pandas",
+  "sentence_transformers",
+  "sklearn.*",
+  "presidio_analyzer",
+  "presidio_analyzer.*",
+  "spacy",
+  "spacy.*",
+  "stanza",
+  "stanza.*",
+  "gliner",
+  "gliner.*",
+  "scrubadub",
+  "scrubadub.*",
+  "llm_guard.*",
+  "transformers",
+  "transformers.*",
+  "typer",
+  "typer.*",
+  "rich",
+  "rich.*",
+]
+ignore_missing_imports = true
+
+# CLI module uses typer decorators which are inherently untyped in strict mode.
+[[tool.mypy.overrides]]
+module = "pii_anon.cli"
+disallow_untyped_decorators = false
+
+[tool.coverage.run]
+source = ["src/pii_anon"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@abstractmethod",
+  "\\.\\.\\.",
+]

@@ -1,0 +1,85 @@
+{
+  "all_competitors_available": true,
+  "available_competitors": [
+    "presidio",
+    "scrubadub",
+    "llm_guard",
+    "gliner"
+  ],
+  "competitors": {
+    "gliner": {
+      "available": true,
+      "import_name": "gliner",
+      "import_ok": true,
+      "import_output": "",
+      "import_return_code": 0,
+      "model_check_required": true,
+      "model_output": "",
+      "model_ready": true,
+      "model_return_code": 0,
+      "native_ready": true,
+      "reason": "ok"
+    },
+    "llm_guard": {
+      "available": true,
+      "import_name": "llm_guard",
+      "import_ok": true,
+      "import_output": "",
+      "import_return_code": 0,
+      "model_check_required": false,
+      "model_output": null,
+      "model_ready": null,
+      "model_return_code": null,
+      "native_ready": true,
+      "reason": "ok"
+    },
+    "presidio": {
+      "available": true,
+      "import_name": "presidio_analyzer",
+      "import_ok": true,
+      "import_output": "",
+      "import_return_code": 0,
+      "model_check_required": false,
+      "model_output": null,
+      "model_ready": null,
+      "model_return_code": null,
+      "native_ready": true,
+      "reason": "ok"
+    },
+    "scrubadub": {
+      "available": true,
+      "import_name": "scrubadub",
+      "import_ok": true,
+      "import_output": "",
+      "import_return_code": 0,
+      "model_check_required": false,
+      "model_output": null,
+      "model_ready": null,
+      "model_return_code": null,
+      "native_ready": true,
+      "reason": "ok"
+    }
+  },
+  "expected_competitors": [
+    "presidio",
+    "scrubadub",
+    "llm_guard",
+    "gliner"
+  ],
+  "failures": [],
+  "linux_runtime_ok": true,
+  "platform_release": "25.3.0",
+  "platform_system": "darwin",
+  "python_executable": "/Users/subhashholla/Development/pii_anonymize_pseudonymize/pii-anon-core/pii-anon-code/.venv/bin/python",
+  "python_version": "3.12.12",
+  "ready": true,
+  "require_all_competitors": true,
+  "require_native_competitors": true,
+  "schema_version": "2026-02-16.v1",
+  "shared_memory_ok": true,
+  "shared_memory_path": "posix_shm (darwin)",
+  "shared_memory_reason": "ok (macOS uses kernel shm_open)",
+  "strict_runtime": true,
+  "timestamp_utc": "2026-03-04T12:33:37Z",
+  "unavailable_competitors": {}
+}
