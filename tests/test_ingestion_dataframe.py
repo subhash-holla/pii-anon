@@ -217,6 +217,9 @@ class TestReadDataframeIndexHandling:
         assert records[0].record_id == hash("idx_a")
 
 
+pd = pytest.importorskip("pandas")
+
+
 class TestResultsToDataframe:
     """Test results_to_dataframe conversion to pandas DataFrame."""
 
