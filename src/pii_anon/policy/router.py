@@ -31,14 +31,14 @@ class PolicyRouter:
     """
 
     def __init__(self, router_config: dict[str, object] | None = None) -> None:
-        cfg = router_config or {}
-        self._ensemble_threshold = float(cfg.get("ensemble_confidence_threshold", 0.70))
-        self._accuracy_threshold = float(cfg.get("accuracy_confidence_threshold", 0.88))
-        self._balanced_threshold = float(cfg.get("balanced_confidence_threshold", 0.80))
-        self._ensemble_concurrency = int(cfg.get("ensemble_concurrency_cap", 8))
-        self._accuracy_concurrency = int(cfg.get("accuracy_concurrency_cap", 4))
-        self._balanced_concurrency = int(cfg.get("balanced_concurrency_cap", 3))
-        self._seg_token_threshold = int(cfg.get("segmentation_token_threshold", 2000))
+        cfg: dict[str, object] = router_config or {}
+        self._ensemble_threshold = float(cfg.get("ensemble_confidence_threshold", 0.70))  # type: ignore[arg-type]
+        self._accuracy_threshold = float(cfg.get("accuracy_confidence_threshold", 0.88))  # type: ignore[arg-type]
+        self._balanced_threshold = float(cfg.get("balanced_confidence_threshold", 0.80))  # type: ignore[arg-type]
+        self._ensemble_concurrency = int(cfg.get("ensemble_concurrency_cap", 8))  # type: ignore[call-overload]
+        self._accuracy_concurrency = int(cfg.get("accuracy_concurrency_cap", 4))  # type: ignore[call-overload]
+        self._balanced_concurrency = int(cfg.get("balanced_concurrency_cap", 3))  # type: ignore[call-overload]
+        self._seg_token_threshold = int(cfg.get("segmentation_token_threshold", 2000))  # type: ignore[call-overload]
 
     def select(
         self,

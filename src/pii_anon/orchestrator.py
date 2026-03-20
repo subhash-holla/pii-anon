@@ -163,7 +163,7 @@ class AsyncPIIOrchestrator:
         self._register_default_strategies()
 
         # Per-instance fusion strategy cache (avoids rebuilding per detect call).
-        self._fusion_cache: dict[tuple, FusionStrategy] = {}
+        self._fusion_cache: dict[tuple[object, ...], FusionStrategy] = {}
 
     @classmethod
     def from_config_path(
