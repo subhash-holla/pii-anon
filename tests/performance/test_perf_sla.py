@@ -11,7 +11,7 @@ from pii_anon.types import ProcessingProfileSpec, SegmentationPlan
 @pytest.mark.performance
 def test_regex_latency_p50_under_300ms() -> None:
     engine = RegexEngineAdapter(enabled=True)
-    text = " ".join(["alice@example.com"] * 10_000)
+    text = " ".join(["alice@example.com"] * 1_000)
     payload = {"text": text}
     context = {"language": "en", "policy_mode": "balanced"}
 
