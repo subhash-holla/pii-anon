@@ -10,7 +10,6 @@ from pii_anon.ingestion.dataframe import (
     _get_columns,
     _safe_value,
 )
-from pii_anon.ingestion.schema import IngestRecord
 
 
 class TestReadDataframeWithIterRows:
@@ -317,7 +316,6 @@ class TestResultsToDataframe:
 
     def test_results_to_dataframe_no_pandas_raises(self):
         """results_to_dataframe raises ImportError when pandas unavailable."""
-        import sys
         import builtins
 
         results = [{"metadata": {}, "transformed_payload": {"text": "text"}}]

@@ -5,17 +5,11 @@ from __future__ import annotations
 import time
 import threading
 
-import pytest
 
 from pii_anon.tokenization.reidentification import (
     ReidentificationService,
-    ReidentificationAuditEntry,
 )
 from pii_anon.tokenization.store import InMemoryTokenStore, TokenMapping
-from pii_anon.tokenization.providers import (
-    DeterministicHMACTokenizer,
-    TokenRecord,
-)
 from pii_anon.tokenization.key_manager import KeyManager
 
 

@@ -9,8 +9,6 @@ Targets uncovered lines in src/pii_anon/transforms/strategies.py:
   PerturbationStrategy edge cases
 """
 
-import pytest
-import math
 from pii_anon.transforms.base import TransformContext
 from pii_anon.transforms.strategies import (
     PlaceholderStrategy,

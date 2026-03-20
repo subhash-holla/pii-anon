@@ -6,7 +6,6 @@ context-aware confidence adjustment system.
 
 from __future__ import annotations
 
-import pytest
 
 from pii_anon.engines.regex import confidence
 

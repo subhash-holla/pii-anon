@@ -145,7 +145,6 @@ class TestParquetWriter:
     def test_write_parquet_missing_pyarrow(self, tmp_path: Path, monkeypatch) -> None:
         """write_results raises ImportError when pyarrow unavailable."""
         pytest = __import__("pytest")
-        import sys
         import builtins
 
         path = tmp_path / "output.parquet"

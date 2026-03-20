@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from pii_anon.eval_framework.metrics.base import EvaluationLevel, LabeledSpan, MatchMode
+from pii_anon.eval_framework.metrics.base import LabeledSpan
 from pii_anon.eval_framework.metrics.utility_metrics import (
     FormatPreservationMetric,
     SemanticPreservationMetric,

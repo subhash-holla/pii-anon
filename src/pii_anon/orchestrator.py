@@ -57,7 +57,7 @@ from pii_anon.engines import (
     ScrubadubAdapter,
 )
 from pii_anon.errors import EngineExecutionError
-from pii_anon.fusion import build_fusion, build_fusion_audit
+from pii_anon.fusion import FusionStrategy, build_fusion, build_fusion_audit
 from pii_anon.observability import get_logger
 from pii_anon.policy import ExecutionPlan, PolicyRouter
 from pii_anon.segmentation import BoundaryReconciler, Segmenter

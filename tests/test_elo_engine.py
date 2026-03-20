@@ -457,7 +457,6 @@ class TestTournamentSummary:
 
 class TestGovernanceEvaluation:
     def test_unknown_system_fails(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         result = engine.evaluate_governance("nonexistent")
         assert not result.passed
@@ -465,7 +464,6 @@ class TestGovernanceEvaluation:
         assert "not found" in result.notes[0].lower()
 
     def test_all_criteria_met(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         engine.ensure_system("a")
         engine._ratings["a"].rating = 1600.0
@@ -478,7 +476,6 @@ class TestGovernanceEvaluation:
         assert result.min_matches_met
 
     def test_low_rating_fails(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         engine.ensure_system("a")
         engine._ratings["a"].rating = 1400.0
@@ -489,7 +486,6 @@ class TestGovernanceEvaluation:
         assert not result.min_rating_met
 
     def test_high_rd_fails(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         engine.ensure_system("a")
         engine._ratings["a"].rating = 1600.0
@@ -500,7 +496,6 @@ class TestGovernanceEvaluation:
         assert not result.max_rd_met
 
     def test_insufficient_matches_fails(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         engine.ensure_system("a")
         engine._ratings["a"].rating = 1600.0
@@ -522,7 +517,6 @@ class TestGovernanceEvaluation:
         assert result.passed
 
     def test_evaluate_all_governance(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         composites = {"a": 0.9, "b": 0.5, "c": 0.3}
         engine.run_round_robin(composites)
@@ -533,7 +527,6 @@ class TestGovernanceEvaluation:
             assert results[i].rating >= results[i + 1].rating
 
     def test_governance_result_serialization(self):
-        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
         engine = PIIRateEloEngine()
         engine.ensure_system("a")
         engine._ratings["a"].rating = 1600.0

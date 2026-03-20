@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
 
 from pii_anon.eval_framework.metrics.base import LabeledSpan
 from pii_anon.eval_framework.metrics.streaming import (
@@ -176,7 +175,7 @@ class TestDriftDetector:
 
     def test_update_initializes_metric(self):
         detector = DriftDetector()
-        alert = detector.update("f1", 0.8)
+        detector.update("f1", 0.8)
         assert "f1" in detector.metric_history
         assert "f1" in detector.metric_stats
 
