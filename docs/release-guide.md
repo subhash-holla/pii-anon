@@ -207,7 +207,7 @@ python3 -m pytest tests/ \
     -v
 ```
 
-Expected result: **1052+ tests passing**, coverage around **90%**, well above the 85% gate.
+Expected result: **2197+ tests passing**, coverage around **87%**, well above the 85% gate.
 
 ### 3.2 Run individual test categories
 
@@ -227,7 +227,7 @@ python3 -m pytest tests/test_composite_scoring.py tests/test_governance_threshol
 # Benchmark pipeline (summary rendering, competitor comparison)
 python3 -m pytest tests/test_benchmark_summary_render.py tests/test_competitor_compare_unit.py -v --no-cov
 
-# Multi-tier and multi-dataset benchmark tests
+# Multi-dataset benchmark tests
 python3 -m pytest tests/test_multi_dataset_benchmark.py -v --no-cov
 
 # Performance SLA tests (excluded from the default run; run them separately)
@@ -283,23 +283,28 @@ make benchmark-portable
 
 This runs the evaluation with relaxed flags against the default single dataset. Results land in `artifacts/benchmarks/`.
 
-### 4.3 Multi-tier benchmark (all engine tiers, single dataset)
+### 4.3 Profile-filtered benchmark (single profile)
 
 ```bash
-make benchmark-multi-tier
+python3 scripts/run_competitor_benchmark.py \
+    --dataset pii_anon_benchmark_v1 \
+    --profiles short_chat \
+    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
+    --output-json artifacts/benchmarks/benchmark-results.json
 ```
 
-Evaluates all four pii-anon engine tiers (`auto`, `minimal`, `standard`, `full`) as separate systems alongside competitors. Each tier uses a different engine configuration — `minimal` is regex+presidio (fastest), `standard` adds GLiNER (best F1), and `full` includes all available engines. Results show how each tier stacks up against competitors.
+Evaluates only the specified profile(s) and writes a checkpoint. Useful for parallelizing across profiles or debugging a single profile. Supports multiple profiles: `--profiles short_chat long_document`.
 
-### 4.4 Comprehensive benchmark (all tiers × all datasets)
+### 4.4 Merge-only mode (combine profile checkpoints)
 
 ```bash
-make benchmark-comprehensive
+python3 scripts/run_competitor_benchmark.py \
+    --merge-only \
+    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
+    --output-json artifacts/benchmarks/benchmark-results.json
 ```
 
-Runs the full matrix: all four engine tiers evaluated against all datasets (`pii_anon_benchmark_v1`, `eval_framework_v1`). Produces per-dataset artifacts plus a combined cross-dataset report (`benchmark-combined.json`) with aggregated metrics and an interpretation section. This is the best way to see a complete picture of where each tier succeeds and where it falls short.
-
-The suite uses an **evaluations-first** pipeline: all time-consuming evaluations (per-dataset benchmarks + continuity) run to completion before any post-processing. If one dataset fails its floor gate, the remaining datasets still finish. A final summary table shows PASS/FAIL per dataset, and floor enforcement is deferred until after all results are rendered — so you always get the full picture.
+Skips evaluation entirely — reads all per-profile checkpoint files from the checkpoint directory and produces the final merged report artifacts. Use this after parallel profile runs have completed.
 
 ### 4.5 Canonical benchmark (publication-grade, all gates enforced)
 
@@ -319,7 +324,7 @@ Alternatively, for full Docker-based reproducibility (slower due to Rosetta x86_
 make benchmark-canonical-macos
 ```
 
-Both targets run the full suite with strict runtime checks, floor gates, and README sync validation. The canonical suite evaluates all engine tiers across all datasets by default.
+Both targets run the full suite with strict runtime checks, floor gates, and README sync validation.
 
 If you're on an Intel Mac:
 
@@ -336,7 +341,7 @@ The canonical benchmark automatically saves **per-profile checkpoints** to `arti
 make benchmark-canonical-macos
 ```
 
-The pipeline will detect existing checkpoint files, skip already-completed profiles (crediting their work to the progress bar), and continue from where it left off. This can save hours on long runs where slow systems (like `pii-anon-standard` or `gliner`) take a long time per profile.
+The pipeline will detect existing checkpoint files, skip already-completed profiles (crediting their work to the progress bar), and continue from where it left off. This can save hours on long runs where slow systems (like `gliner`) take a long time per profile.
 
 To **force a fresh run** (discarding checkpoints), delete the checkpoint directory first:
 
@@ -669,20 +674,27 @@ pii-anon compare-competitors \
     --output json
 ```
 
-To evaluate multiple engine tiers in a single run:
+To evaluate specific profiles in parallel (one per process):
 
 ```bash
+# Run each profile independently
 python3 scripts/run_competitor_benchmark.py \
     --dataset pii_anon_benchmark_v1 \
-    --engine-tiers auto minimal standard full \
+    --profiles short_chat \
+    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
     --warmup-samples 50 \
-    --measured-runs 3 \
+    --measured-runs 3
+
+# After all profiles complete, merge into a final report
+python3 scripts/run_competitor_benchmark.py \
+    --merge-only \
+    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
     --output-json benchmark-results.json \
     --output-csv benchmark-raw.csv \
     --output-floor-report floor-gate-report.md
 ```
 
-This produces four `pii-anon` variants (`pii-anon`, `pii-anon-minimal`, `pii-anon-standard`, `pii-anon-full`) alongside competitors. Competitors are evaluated only once regardless of how many tiers are requested.
+The `--profiles` flag accepts one or more profile names from the use-case matrix (e.g., `short_chat`, `long_document`, `structured_form_accuracy`). The `--merge-only` flag skips evaluation and produces the final report from per-profile checkpoints.
 
 ### 4.8 Evaluation framework assessment
 
@@ -697,7 +709,7 @@ pii-anon eval-framework \
 
 The benchmark summary table includes these columns per system:
 
-- **Composite** — Two-tier weighted score combining accuracy (Tier 1: β-weighted F1 from precision/recall) and operational metrics (Tier 2: latency, throughput, entity coverage).
+- **Composite** — Weighted score combining accuracy (β-weighted F1 from precision/recall) and operational metrics (latency, throughput, entity coverage).
 - **F1 / Precision / Recall** — Standard detection accuracy metrics computed against ground-truth labels.
 - **p50 Latency (ms)** — Median per-document detection latency.
 - **Docs/hour** — Throughput extrapolated from total elapsed time.
@@ -705,9 +717,9 @@ The benchmark summary table includes these columns per system:
 - **Per-entity precision/recall** — Breakdown by entity type (in JSON artifacts, not in summary table).
 - **Entity coverage** — Count of entity types with non-zero recall vs total types in ground truth.
 
-When multiple engine tiers are evaluated, the summary includes one row per tier (`pii-anon`, `pii-anon-minimal`, `pii-anon-standard`, `pii-anon-full`). The floor gate uses only the canonical `pii-anon` (auto) tier; other tier variants are informational.
+The benchmark evaluates `pii-anon` (auto mode) and `pii-anon-ensemble` (mixture-of-experts mode with per-entity-type expert weights) alongside all competitor systems. The ensemble mode uses weighted consensus fusion with entity-level specialization derived from comparative evaluation data.
 
-When multiple datasets are evaluated, the combined report (`benchmark-combined.json`, schema `2026-02-19.v3`) adds a cross-dataset summary with sample-weighted averages per system, best/worst dataset per system, and a per-tier F1 breakdown by dataset. The rendered markdown includes an interpretation section explaining what it means to succeed on one dataset but fall short on another.
+When multiple datasets are evaluated, the combined report (`benchmark-combined.json`) adds a cross-dataset summary with sample-weighted averages per system and a per-system F1 breakdown by dataset. The rendered markdown includes an interpretation section explaining what it means to succeed on one dataset but fall short on another.
 
 ### 4.10 Regenerate the README benchmark section
 
@@ -751,19 +763,22 @@ git diff --stat
 
 # Stage and commit
 git add -A
-git commit -m "v1.0.0: Production release with research-grade evaluation framework
+git commit -m "v1.0.1: Production release with mixture-of-experts ensemble and configurable parameters
 
 - 36 PII entity types with context-aware confidence scoring and checksum validation
-- Multi-engine ensemble detection (regex, Presidio, scrubadub, spaCy, stanza)
+- Multi-engine mixture-of-experts ensemble (regex, Presidio, scrubadub, spaCy, stanza)
+- Per-entity-type expert weights for optimal engine specialization
 - Modular regex engine with declarative PatternSpec registry
-- Two-tier composite scoring (β-weighted F1 composition + governance gates)
+- All assumed defaults exposed as configurable parameters (confidence, fusion, risk, router)
+- Composite scoring (β-weighted F1 composition + governance gates)
 - PII-Rate-Elo tournament ratings with per-entity precision and entity coverage
+- Parallel profile evaluation with checkpoint/resume and merge-only mode
 - Sync engine fast-path bypassing asyncio overhead for single-engine benchmarks
 - 10K-record evaluation dataset with 52-language taxonomy support
 - Bootstrap CI, paired significance testing, Cohen's kappa
 - Context-preserving pseudonymization with entity linking
 - File ingestion (CSV, JSON, JSONL, TXT) and streaming chunker
-- 1052 tests at 90% code coverage
+- 2197 tests at 87% code coverage
 - NIST, GDPR, ISO, HIPAA, CCPA, PCI-DSS compliance validation"
 
 git branch -M main
@@ -1277,16 +1292,15 @@ open https://pypi.org/project/pii-anon-datasets/
 
 4. TESTS
    [ ] make all passes (lint + type + tests + perf + build + checks)
-   [ ] 1052+ tests passing, ~90% coverage, 85% gate met
+   [ ] 2197+ tests passing, ~87% coverage, 85% gate met
 
 5. EVALUATION
    [ ] make benchmark-portable (or benchmark-canonical-macos for full gates)
-   [ ] make benchmark-comprehensive (all 4 engine tiers × all datasets)
    [ ] All 3 competitors evaluated (presidio, scrubadub, gliner)
-   [ ] All engine tiers evaluated (auto, minimal, standard, full)
+   [ ] Both pii-anon and pii-anon-ensemble evaluated
    [ ] All datasets evaluated (pii_anon_benchmark_v1, eval_framework_v1)
    [ ] Cross-dataset combined report reviewed (benchmark-combined.json)
-   [ ] Per-tier performance differences reviewed
+   [ ] Ensemble MoE weights verified (per-entity-type specialization)
    [ ] Results reviewed in artifacts/benchmarks/
 
 6. VERSION SYNC

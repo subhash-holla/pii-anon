@@ -328,3 +328,298 @@ class TestCompositeScoreSerialization:
             if "." in val_str:
                 decimals = len(val_str.split(".")[1])
                 assert decimals <= 6
+
+
+# ---------------------------------------------------------------------------
+# Adversarial normalization functions
+# ---------------------------------------------------------------------------
+
+class TestNormalizeAttackSuccessRate:
+    def test_zero_success_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_attack_success_rate
+        assert normalize_attack_success_rate(0.0) == 1.0
+
+    def test_full_success_yields_zero(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_attack_success_rate
+        assert normalize_attack_success_rate(1.0) == 0.0
+
+    def test_half_success_yields_half(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_attack_success_rate
+        assert normalize_attack_success_rate(0.5) == 0.5
+
+    def test_clamped_negative_input(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_attack_success_rate
+        # Negative input gets 1 - (-0.5) = 1.5, clamped to 1.0
+        assert normalize_attack_success_rate(-0.5) == 1.0
+
+    def test_clamped_high_input(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_attack_success_rate
+        # Input > 1.0 gets 1 - 1.5 = -0.5, clamped to 0.0
+        assert normalize_attack_success_rate(1.5) == 0.0
+
+
+class TestNormalizeMiaAuc:
+    def test_random_guessing_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_mia_auc
+        assert normalize_mia_auc(0.5) == 1.0
+
+    def test_perfect_attack_yields_zero(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_mia_auc
+        assert normalize_mia_auc(1.0) == 0.0
+
+    def test_medium_auc(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_mia_auc
+        result = normalize_mia_auc(0.75)
+        assert 0.4 < result < 0.6
+
+    def test_clamped_to_range(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_mia_auc
+        assert 0.0 <= normalize_mia_auc(2.0) <= 1.0
+
+
+class TestNormalizeCanaryExposure:
+    def test_zero_exposure_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_canary_exposure
+        assert normalize_canary_exposure(0.0) == 1.0
+
+    def test_negative_exposure_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_canary_exposure
+        assert normalize_canary_exposure(-5.0) == 1.0
+
+    def test_high_exposure_approaches_zero(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_canary_exposure
+        result = normalize_canary_exposure(50.0, c=5.0)
+        assert result < 0.001
+
+    def test_custom_c_parameter(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_canary_exposure
+        result_c5 = normalize_canary_exposure(5.0, c=5.0)
+        result_c10 = normalize_canary_exposure(5.0, c=10.0)
+        assert result_c10 > result_c5
+
+
+class TestNormalizeKAnonymity:
+    def test_k_one_yields_zero(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_k_anonymity
+        assert normalize_k_anonymity(1) == 0.0
+
+    def test_k_max_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_k_anonymity
+        assert normalize_k_anonymity(100, k_max=100) == 1.0
+
+    def test_logarithmic_scaling(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_k_anonymity
+        result_10 = normalize_k_anonymity(10, k_max=100)
+        result_100 = normalize_k_anonymity(100, k_max=100)
+        assert 0 < result_10 < result_100
+
+    def test_low_k_max(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_k_anonymity
+        assert normalize_k_anonymity(2, k_max=1) == 1.0
+
+
+class TestNormalizeEpsilonDp:
+    def test_zero_epsilon_yields_one(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_epsilon_dp
+        assert normalize_epsilon_dp(0.0) == 1.0
+
+    def test_with_delta_penalty(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_epsilon_dp
+        without_delta = normalize_epsilon_dp(1.0, delta=None)
+        with_delta = normalize_epsilon_dp(1.0, delta=1e-4)
+        assert with_delta < without_delta
+
+    def test_high_epsilon_low_privacy(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_epsilon_dp
+        result = normalize_epsilon_dp(10.0, epsilon_0=1.0)
+        assert result < 0.001
+
+
+# ---------------------------------------------------------------------------
+# Floor gates
+# ---------------------------------------------------------------------------
+
+class TestFloorGates:
+    def test_all_gates_pass(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(
+            min_f1=0.5, min_privacy=0.5, min_fairness=0.5, min_entity_coverage=0.5,
+            enabled=True
+        )
+        result = evaluate_floor_gates(
+            f1=0.8, privacy_score=0.8, fairness_score=0.8, entity_coverage=0.8,
+            config=config
+        )
+        assert result.all_passed
+        assert not result.capped
+
+    def test_f1_gate_fails(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_f1=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.5, privacy_score=0.9, fairness_score=0.9, entity_coverage=0.9,
+            config=config
+        )
+        assert not result.all_passed
+        assert result.capped
+        assert "f1" in [g for g in result.gates if not result.gates[g]["passed"]]
+
+    def test_privacy_gate_fails(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_privacy=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.9, privacy_score=0.5, fairness_score=0.9, entity_coverage=0.9,
+            config=config
+        )
+        assert not result.all_passed
+        assert "privacy" in result.gates
+
+    def test_fairness_gate_fails(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_fairness=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.9, privacy_score=0.9, fairness_score=0.5, entity_coverage=0.9,
+            config=config
+        )
+        assert not result.all_passed
+
+    def test_coverage_gate_fails(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_entity_coverage=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.9, privacy_score=0.9, fairness_score=0.9, entity_coverage=0.5,
+            config=config
+        )
+        assert not result.all_passed
+
+    def test_remediation_suggestions(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_f1=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.5, privacy_score=0.9, fairness_score=0.9, entity_coverage=0.9,
+            config=config
+        )
+        assert len(result.remediation) > 0
+        assert any("f1" in r.lower() for r in result.remediation)
+
+    def test_floor_gate_result_serialization(self):
+        from pii_anon.eval_framework.metrics.composite import evaluate_floor_gates, FloorGateConfig
+        config = FloorGateConfig(min_f1=0.8, enabled=True)
+        result = evaluate_floor_gates(
+            f1=0.5, privacy_score=0.9, fairness_score=0.9, entity_coverage=0.9,
+            config=config
+        )
+        d = result.to_dict()
+        assert "all_passed" in d
+        assert "gates" in d
+        assert "capped" in d
+        assert "remediation" in d
+
+
+# ---------------------------------------------------------------------------
+# Entity coverage normalization
+# ---------------------------------------------------------------------------
+
+class TestNormalizeEntityCoverage:
+    def test_perfect_coverage(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_entity_coverage
+        result = normalize_entity_coverage(13, 13)
+        assert result == 1.0
+
+    def test_zero_total_returns_zero(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_entity_coverage
+        result = normalize_entity_coverage(5, 0)
+        assert result == 0.0
+
+    def test_partial_coverage(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_entity_coverage
+        result = normalize_entity_coverage(5, 10)
+        assert result == 0.5
+
+    def test_negative_detected_clamped(self):
+        from pii_anon.eval_framework.metrics.composite import normalize_entity_coverage
+        result = normalize_entity_coverage(-1, 10)
+        assert result == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Pareto frontier analysis
+# ---------------------------------------------------------------------------
+
+class TestParetoFrontierAnalyzer:
+    def test_empty_analyzer(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        assert analyzer.compute_frontier() == []
+
+    def test_single_system_on_frontier(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.7, 0.8)
+        frontier = analyzer.compute_frontier()
+        assert frontier == ["a"]
+
+    def test_dominated_system(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.9, 0.9)  # Better on both dimensions
+        analyzer.add_system("b", 0.7, 0.8)  # Worse on both
+        frontier = analyzer.compute_frontier()
+        assert frontier == ["a"]
+        assert not analyzer.is_dominated("a")
+        assert analyzer.is_dominated("b")
+
+    def test_trade_off_both_on_frontier(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.9, 0.6)  # High privacy, low utility
+        analyzer.add_system("b", 0.6, 0.9)  # Low privacy, high utility
+        frontier = analyzer.compute_frontier()
+        assert set(frontier) == {"a", "b"}
+
+    def test_distance_to_frontier_on_frontier(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.8, 0.8)
+        distance = analyzer.distance_to_frontier("a")
+        assert distance == 0.0
+
+    def test_distance_to_frontier_off_frontier(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.9, 0.9)
+        analyzer.add_system("b", 0.5, 0.5)
+        distance = analyzer.distance_to_frontier("b")
+        assert distance > 0.0
+
+    def test_distance_unknown_system(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        distance = analyzer.distance_to_frontier("nonexistent")
+        assert distance == float("inf")
+
+    def test_frontier_data_serialization(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.8, 0.7)
+        analyzer.add_system("b", 0.6, 0.9)
+        data = analyzer.frontier_data()
+        assert "systems" in data
+        assert "frontier" in data
+        assert "dominated" in data
+        assert "a" in data["systems"]
+        assert "on_frontier" in data["systems"]["a"]
+
+    def test_reset_clears_systems(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 0.8, 0.7)
+        analyzer.reset()
+        assert analyzer.compute_frontier() == []
+
+    def test_clipping_values(self):
+        from pii_anon.eval_framework.metrics.composite import ParetoFrontierAnalyzer
+        analyzer = ParetoFrontierAnalyzer()
+        analyzer.add_system("a", 1.5, -0.5)  # Out of bounds
+        assert analyzer._systems["a"][0] == 1.0  # Clipped to [0, 1]
+        assert analyzer._systems["a"][1] == 0.0  # Clipped to [0, 1]

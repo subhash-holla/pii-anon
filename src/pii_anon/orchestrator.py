@@ -143,7 +143,9 @@ class AsyncPIIOrchestrator:
         self.token_store = token_store or InMemoryTokenStore()
         self.config = config or CoreConfig.default()
         self.identity_ledger = IdentityLedger()
-        self.router = PolicyRouter()
+        self.router = PolicyRouter(
+            router_config=self.config.router.model_dump() if hasattr(self.config, "router") else None,
+        )
         self.logger = get_logger(
             "pii_anon.orchestrator",
             level=self.config.logging.level,
@@ -159,6 +161,9 @@ class AsyncPIIOrchestrator:
 
         self.strategy_registry = StrategyRegistry()
         self._register_default_strategies()
+
+        # Per-instance fusion strategy cache (avoids rebuilding per detect call).
+        self._fusion_cache: dict[tuple, FusionStrategy] = {}
 
     @classmethod
     def from_config_path(
@@ -610,11 +615,7 @@ class AsyncPIIOrchestrator:
                         continue
                     raw_findings.extend(result)
 
-        fusion = build_fusion(
-            plan.fusion_mode,
-            weights=self._resolve_weights(profile),
-            min_consensus=profile.min_consensus,
-        )
+        fusion = self._get_or_build_fusion(plan.fusion_mode, profile)
         merged, audits = self._merge_with_audit(fusion=fusion, raw_findings=raw_findings)
         merged, audits, raw_findings = await self._maybe_escalate(
             payload=payload,
@@ -697,6 +698,37 @@ class AsyncPIIOrchestrator:
                 token_version=token_version,
             )
 
+    # ── Fusion strategy cache ──────────────────────────────────────────
+    # The fusion strategy only depends on mode + weights + config, which
+    # are stable across calls with the same profile.  Caching avoids
+    # re-creating FusionStrategy objects (and the MoE registry) per call.
+
+    def _get_or_build_fusion(
+        self,
+        fusion_mode: str,
+        profile: ProcessingProfileSpec,
+    ) -> "FusionStrategy":
+        _iou = self.config.fusion.iou_threshold if hasattr(self.config, "fusion") else 0.5
+        # Build a hashable cache key from the fusion parameters.
+        weights = self._resolve_weights(profile)
+        cache_key = (
+            fusion_mode,
+            profile.min_consensus,
+            _iou,
+            tuple(sorted(weights.items())),
+        )
+        fusion = self._fusion_cache.get(cache_key)
+        if fusion is None:
+            fusion = build_fusion(
+                fusion_mode,
+                weights=weights,
+                min_consensus=profile.min_consensus,
+                entity_weights=self._resolve_entity_weights(),
+                iou_threshold=_iou,
+            )
+            self._fusion_cache[cache_key] = fusion
+        return fusion
+
     def _resolve_weights(self, profile: ProcessingProfileSpec) -> dict[str, float]:
         if profile.engine_weights:
             return profile.engine_weights
@@ -705,6 +737,19 @@ class AsyncPIIOrchestrator:
         for adapter_id, cfg in self.config.engines.items():
             out[adapter_id] = cfg.weight
         return out
+
+    def _resolve_entity_weights(self) -> dict[str, dict[str, float]]:
+        """Build per-entity-type per-engine weight overrides from config.
+
+        Returns a dict keyed by engine ID whose values are dicts mapping
+        entity types to weights.  Only includes engines that have non-empty
+        ``entity_weights`` configured.
+        """
+        out: dict[str, dict[str, float]] = {}
+        for adapter_id, cfg in self.config.engines.items():
+            if cfg.entity_weights:
+                out[adapter_id] = dict(cfg.entity_weights)
+        return out or {}
 
     def _resolve_execution_plan(
         self,
@@ -798,11 +843,7 @@ class AsyncPIIOrchestrator:
             return merged, audits, raw_findings
 
         all_raw = [*raw_findings, *extra]
-        fusion = build_fusion(
-            plan.fusion_mode,
-            weights=self._resolve_weights(profile),
-            min_consensus=profile.min_consensus,
-        )
+        fusion = self._get_or_build_fusion(plan.fusion_mode, profile)
         escalated_merged, escalated_audit = self._merge_with_audit(fusion=fusion, raw_findings=all_raw)
         return escalated_merged, escalated_audit, all_raw
 
@@ -1082,9 +1123,11 @@ class AsyncPIIOrchestrator:
         }
 
         risk_level: RiskLevel
-        if score >= 0.9:
+        low_threshold = getattr(self.config.risk, "low_risk_threshold", 0.90) if hasattr(self.config, "risk") else 0.90
+        moderate_threshold = getattr(self.config.risk, "moderate_risk_threshold", 0.75) if hasattr(self.config, "risk") else 0.75
+        if score >= low_threshold:
             risk_level = "low"
-        elif score >= 0.75:
+        elif score >= moderate_threshold:
             risk_level = "moderate"
         else:
             risk_level = "high"
@@ -1488,17 +1531,44 @@ class PIIOrchestrator:
         )
 
 
+_SYNC_LOOP: asyncio.AbstractEventLoop | None = None
+_SYNC_LOOP_THREAD: threading.Thread | None = None
+
+
+def _get_or_create_sync_loop() -> asyncio.AbstractEventLoop:
+    """Return a persistent background event loop for sync callers.
+
+    The loop runs in a dedicated daemon thread and is reused across all
+    ``_run_coroutine_sync`` calls, eliminating the per-call overhead of
+    ``asyncio.run()`` (which creates and destroys a loop each time).
+    """
+    global _SYNC_LOOP, _SYNC_LOOP_THREAD  # noqa: PLW0603
+    if _SYNC_LOOP is not None and _SYNC_LOOP.is_running():
+        return _SYNC_LOOP
+    loop = asyncio.new_event_loop()
+    _SYNC_LOOP = loop
+    t = threading.Thread(target=loop.run_forever, daemon=True, name="pii-anon-sync-loop")
+    t.start()
+    _SYNC_LOOP_THREAD = t
+    return loop
+
+
 def _run_coroutine_sync(coroutine: Coroutine[Any, Any, T]) -> T:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(coroutine)
+        # No event loop running — use the persistent background loop.
+        loop = _get_or_create_sync_loop()
+        future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+        return future.result()
 
+    # Already inside an event loop — run in a thread to avoid deadlock.
     holder: dict[str, object] = {}
 
     def runner() -> None:
         try:
-            holder["result"] = asyncio.run(coroutine)
+            loop = _get_or_create_sync_loop()
+            holder["result"] = asyncio.run_coroutine_threadsafe(coroutine, loop).result()
         except Exception as exc:  # pragma: no cover
             holder["error"] = exc
 

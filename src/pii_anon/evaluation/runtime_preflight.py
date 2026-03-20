@@ -17,9 +17,20 @@ class _CompetitorProbeSpec:
 
 
 _COMPETITOR_PROBES: dict[str, _CompetitorProbeSpec] = {
-    "presidio": _CompetitorProbeSpec(import_name="presidio_analyzer"),
+    "presidio": _CompetitorProbeSpec(
+        import_name="presidio_analyzer",
+        model_probe=(
+            "from presidio_analyzer import AnalyzerEngine; "
+            "from presidio_analyzer.nlp_engine import NlpEngineProvider; "
+            "nlp_config = {'nlp_engine_name': 'spacy', 'models': [{'lang_code': 'en', 'model_name': 'en_core_web_sm'}]}; "
+            "nlp_engine = NlpEngineProvider(nlp_configuration=nlp_config).create_engine(); "
+            "analyzer = AnalyzerEngine(nlp_engine=nlp_engine); "
+            "results = analyzer.analyze(text='John Smith at john@test.com', language='en'); "
+            "import sys; sys.exit(0)"
+        ),
+        model_hint="Install spaCy model: python -m spacy download en_core_web_sm",
+    ),
     "scrubadub": _CompetitorProbeSpec(import_name="scrubadub"),
-    "llm_guard": _CompetitorProbeSpec(import_name="llm_guard"),
     "gliner": _CompetitorProbeSpec(
         import_name="gliner",
         model_probe=(

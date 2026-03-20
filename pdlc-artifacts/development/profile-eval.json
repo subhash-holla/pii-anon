@@ -1,0 +1,7273 @@
+{
+  "overall": {
+    "regex": {
+      "overall": {
+        "precision": 0.873021219265746,
+        "recall": 0.9097929097929098,
+        "f1": 0.8910278446201444,
+        "tp": 7776,
+        "fp": 1131,
+        "fn": 771
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 615,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9501557632398754,
+          "recall": 1.0,
+          "f1": 0.9744408945686901,
+          "tp": 305,
+          "fp": 16,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 206,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8922413793103449,
+          "f1": 0.9430523917995445,
+          "tp": 414,
+          "fp": 0,
+          "fn": 50
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 83,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 1149,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 316,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 91,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 34,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 104,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 189,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7702702702702703,
+          "f1": 0.8702290076335879,
+          "tp": 57,
+          "fp": 0,
+          "fn": 17
+        },
+        "ORGANIZATION": {
+          "precision": 0.7372013651877133,
+          "recall": 1.0,
+          "f1": 0.8487229862475443,
+          "tp": 216,
+          "fp": 77,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 157,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7153569286142771,
+          "recall": 0.8049274384070199,
+          "f1": 0.7575035731300618,
+          "tp": 2385,
+          "fp": 949,
+          "fn": 578
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9126106194690266,
+          "f1": 0.9543088490456911,
+          "tp": 825,
+          "fp": 0,
+          "fn": 79
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 66,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 124,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.826171875,
+          "recall": 0.9,
+          "f1": 0.8615071283095723,
+          "tp": 423,
+          "fp": 89,
+          "fn": 47
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8087330873308733,
+        "recall": 0.9231309231309232,
+        "f1": 0.8621537452876578,
+        "tp": 7890,
+        "fp": 1866,
+        "fn": 657
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 615,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.6616052060737527,
+          "recall": 1.0,
+          "f1": 0.7963446475195822,
+          "tp": 305,
+          "fp": 156,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 206,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8922413793103449,
+          "f1": 0.9430523917995445,
+          "tp": 414,
+          "fp": 0,
+          "fn": 50
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 83,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8691376701966718,
+          "recall": 1.0,
+          "f1": 0.9299878591663294,
+          "tp": 1149,
+          "fp": 173,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 316,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 91,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 34,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 104,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 189,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7702702702702703,
+          "f1": 0.8702290076335879,
+          "tp": 57,
+          "fp": 0,
+          "fn": 17
+        },
+        "ORGANIZATION": {
+          "precision": 0.7372013651877133,
+          "recall": 1.0,
+          "f1": 0.8487229862475443,
+          "tp": 216,
+          "fp": 77,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 157,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7153569286142771,
+          "recall": 0.8049274384070199,
+          "f1": 0.7575035731300618,
+          "tp": 2385,
+          "fp": 949,
+          "fn": 578
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7062549485352335,
+          "recall": 0.9867256637168141,
+          "f1": 0.8232579603137977,
+          "tp": 892,
+          "fp": 371,
+          "fn": 12
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 66,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 124,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7704918032786885,
+          "recall": 1.0,
+          "f1": 0.8703703703703703,
+          "tp": 470,
+          "fp": 140,
+          "fn": 0
+        }
+      }
+    },
+    "records": 1000
+  },
+  "difficulty_challenging": {
+    "regex": {
+      "overall": {
+        "precision": 0.8382419574082465,
+        "recall": 0.9236145781328008,
+        "f1": 0.8788598574821852,
+        "tp": 1850,
+        "fp": 357,
+        "fn": 153
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 211,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 68,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 41,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8588235294117647,
+          "f1": 0.9240506329113923,
+          "tp": 73,
+          "fp": 0,
+          "fn": 12
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 304,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 64,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 26,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.535,
+          "recall": 0.7697841726618705,
+          "f1": 0.6312684365781711,
+          "tp": 107,
+          "fp": 93,
+          "fn": 32
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 22,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6571428571428571,
+          "recall": 0.8687050359712231,
+          "f1": 0.7482571649883811,
+          "tp": 483,
+          "fp": 252,
+          "fn": 73
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9397590361445783,
+          "f1": 0.9689440993788819,
+          "tp": 234,
+          "fp": 0,
+          "fn": 15
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 23,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9259259259259259,
+          "recall": 0.8771929824561403,
+          "f1": 0.9009009009009009,
+          "tp": 150,
+          "fp": 12,
+          "fn": 21
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7804982817869416,
+        "recall": 0.9071392910634049,
+        "f1": 0.8390671900253983,
+        "tp": 1817,
+        "fp": 511,
+        "fn": 186
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 211,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.8095238095238095,
+          "recall": 1.0,
+          "f1": 0.8947368421052632,
+          "tp": 68,
+          "fp": 16,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 41,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8588235294117647,
+          "f1": 0.9240506329113923,
+          "tp": 73,
+          "fp": 0,
+          "fn": 12
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8994082840236687,
+          "recall": 1.0,
+          "f1": 0.9470404984423676,
+          "tp": 304,
+          "fp": 34,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 64,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 26,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.535,
+          "recall": 0.7697841726618705,
+          "f1": 0.6312684365781711,
+          "tp": 107,
+          "fp": 93,
+          "fn": 32
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 22,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6571428571428571,
+          "recall": 0.8687050359712231,
+          "f1": 0.7482571649883811,
+          "tp": 483,
+          "fp": 252,
+          "fn": 73
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6527777777777778,
+          "recall": 0.7550200803212851,
+          "f1": 0.7001862197392924,
+          "tp": 188,
+          "fp": 100,
+          "fn": 61
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 23,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9106145251396648,
+          "recall": 0.9532163742690059,
+          "f1": 0.9314285714285714,
+          "tp": 163,
+          "fp": 16,
+          "fn": 8
+        }
+      }
+    },
+    "records": 300
+  },
+  "difficulty_easy": {
+    "regex": {
+      "overall": {
+        "precision": 0.8424396442185514,
+        "recall": 0.9519023689877961,
+        "f1": 0.8938321536905965,
+        "tp": 1326,
+        "fp": 248,
+        "fn": 67
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 142,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 74,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 114,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 169,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 42,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8333333333333334,
+          "recall": 1.0,
+          "f1": 0.9090909090909091,
+          "tp": 60,
+          "fp": 12,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 51,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.46736292428198434,
+          "recall": 0.7782608695652173,
+          "f1": 0.5840130505709624,
+          "tp": 179,
+          "fp": 204,
+          "fn": 51
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 173,
+          "fp": 0,
+          "fn": 0
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.75,
+          "recall": 0.8571428571428571,
+          "f1": 0.7999999999999999,
+          "tp": 96,
+          "fp": 32,
+          "fn": 16
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7599093997734995,
+        "recall": 0.9633883704235463,
+        "f1": 0.8496359607470718,
+        "tp": 1342,
+        "fp": 424,
+        "fn": 51
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 142,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.6434782608695652,
+          "recall": 1.0,
+          "f1": 0.7830687830687831,
+          "tp": 74,
+          "fp": 41,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 114,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.7681818181818182,
+          "recall": 1.0,
+          "f1": 0.8688946015424165,
+          "tp": 169,
+          "fp": 51,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 42,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8333333333333334,
+          "recall": 1.0,
+          "f1": 0.9090909090909091,
+          "tp": 60,
+          "fp": 12,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 51,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.46736292428198434,
+          "recall": 0.7782608695652173,
+          "f1": 0.5840130505709624,
+          "tp": 179,
+          "fp": 204,
+          "fn": 51
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6975806451612904,
+          "recall": 1.0,
+          "f1": 0.8218527315914489,
+          "tp": 173,
+          "fp": 75,
+          "fn": 0
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7320261437908496,
+          "recall": 1.0,
+          "f1": 0.8452830188679245,
+          "tp": 112,
+          "fp": 41,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "difficulty_hard": {
+    "regex": {
+      "overall": {
+        "precision": 0.8474797597283886,
+        "recall": 0.8851609383524277,
+        "f1": 0.8659106070713809,
+        "tp": 3245,
+        "fp": 584,
+        "fn": 421
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 216,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.8148148148148148,
+          "recall": 1.0,
+          "f1": 0.8979591836734693,
+          "tp": 88,
+          "fp": 20,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 68,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 156,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 440,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 80,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 68,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 83,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 76,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.6078431372549019,
+          "f1": 0.7560975609756097,
+          "tp": 31,
+          "fp": 0,
+          "fn": 20
+        },
+        "ORGANIZATION": {
+          "precision": 0.5333333333333333,
+          "recall": 1.0,
+          "f1": 0.6956521739130436,
+          "tp": 80,
+          "fp": 70,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 88,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6967910936476752,
+          "recall": 0.751412429378531,
+          "f1": 0.7230716955487597,
+          "tp": 1064,
+          "fp": 463,
+          "fn": 352
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9427083333333334,
+          "f1": 0.9705093833780161,
+          "tp": 362,
+          "fp": 0,
+          "fn": 22
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 48,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8640350877192983,
+          "recall": 0.8794642857142857,
+          "f1": 0.8716814159292036,
+          "tp": 197,
+          "fp": 31,
+          "fn": 27
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.77954061094009,
+        "recall": 0.8979814511729405,
+        "f1": 0.8345797946507795,
+        "tp": 3292,
+        "fp": 931,
+        "fn": 374
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 216,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.49162011173184356,
+          "recall": 1.0,
+          "f1": 0.6591760299625469,
+          "tp": 88,
+          "fp": 91,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 68,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 156,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9016393442622951,
+          "recall": 1.0,
+          "f1": 0.9482758620689655,
+          "tp": 440,
+          "fp": 48,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 80,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 68,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 83,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 76,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.6078431372549019,
+          "f1": 0.7560975609756097,
+          "tp": 31,
+          "fp": 0,
+          "fn": 20
+        },
+        "ORGANIZATION": {
+          "precision": 0.5333333333333333,
+          "recall": 1.0,
+          "f1": 0.6956521739130436,
+          "tp": 80,
+          "fp": 70,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 88,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6967910936476752,
+          "recall": 0.751412429378531,
+          "f1": 0.7230716955487597,
+          "tp": 1064,
+          "fp": 463,
+          "fn": 352
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6701754385964912,
+          "recall": 0.9947916666666666,
+          "f1": 0.80083857442348,
+          "tp": 382,
+          "fp": 188,
+          "fn": 2
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 48,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7593220338983051,
+          "recall": 1.0,
+          "f1": 0.8631984585741811,
+          "tp": 224,
+          "fp": 71,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "difficulty_moderate": {
+    "regex": {
+      "overall": {
+        "precision": 0.9239482200647249,
+        "recall": 0.8975635315692952,
+        "f1": 0.9105647840531561,
+        "tp": 3426,
+        "fp": 282,
+        "fn": 391
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 119,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 119,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.6629834254143646,
+          "f1": 0.7973421926910298,
+          "tp": 120,
+          "fp": 0,
+          "fn": 61
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 600,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 179,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 70,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8420128730251609,
+          "recall": 0.8575685339690108,
+          "f1": 0.8497195157956894,
+          "tp": 1439,
+          "fp": 270,
+          "fn": 239
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.8,
+          "f1": 0.888888888888889,
+          "tp": 288,
+          "fp": 0,
+          "fn": 72
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 61,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8947368421052632,
+          "recall": 0.8429752066115702,
+          "f1": 0.8680851063829788,
+          "tp": 102,
+          "fp": 12,
+          "fn": 19
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8773466833541927,
+        "recall": 0.9182604139376473,
+        "f1": 0.8973374295954941,
+        "tp": 3505,
+        "fp": 490,
+        "fn": 312
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9083969465648855,
+          "recall": 1.0,
+          "f1": 0.9520000000000001,
+          "tp": 119,
+          "fp": 12,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 119,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.6629834254143646,
+          "f1": 0.7973421926910298,
+          "tp": 120,
+          "fp": 0,
+          "fn": 61
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9077155824508321,
+          "recall": 1.0,
+          "f1": 0.9516256938937351,
+          "tp": 600,
+          "fp": 61,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 179,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 17,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 70,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8420128730251609,
+          "recall": 0.8575685339690108,
+          "f1": 0.8497195157956894,
+          "tp": 1439,
+          "fp": 270,
+          "fn": 239
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7204968944099379,
+          "recall": 0.9666666666666667,
+          "f1": 0.8256227758007116,
+          "tp": 348,
+          "fp": 135,
+          "fn": 12
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 61,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9097744360902256,
+          "recall": 1.0,
+          "f1": 0.952755905511811,
+          "tp": 121,
+          "fp": 12,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_baseline": {
+    "regex": {
+      "overall": {
+        "precision": 0.8647166361974405,
+        "recall": 0.9050899349406812,
+        "f1": 0.8844427823485416,
+        "tp": 2365,
+        "fp": 370,
+        "fn": 248
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 199,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9433962264150944,
+          "recall": 1.0,
+          "f1": 0.970873786407767,
+          "tp": 100,
+          "fp": 6,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 62,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8680555555555556,
+          "f1": 0.929368029739777,
+          "tp": 125,
+          "fp": 0,
+          "fn": 19
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 356,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 118,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 55,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7307692307692307,
+          "f1": 0.8444444444444443,
+          "tp": 19,
+          "fp": 0,
+          "fn": 7
+        },
+        "ORGANIZATION": {
+          "precision": 0.8421052631578947,
+          "recall": 1.0,
+          "f1": 0.9142857142857143,
+          "tp": 80,
+          "fp": 15,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 43,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.68762278978389,
+          "recall": 0.8158508158508159,
+          "f1": 0.7462686567164178,
+          "tp": 700,
+          "fp": 318,
+          "fn": 158
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9013605442176871,
+          "f1": 0.9481216457960644,
+          "tp": 265,
+          "fp": 0,
+          "fn": 29
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.753968253968254,
+          "recall": 0.7307692307692307,
+          "f1": 0.7421874999999999,
+          "tp": 95,
+          "fp": 31,
+          "fn": 35
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7958647850344601,
+        "recall": 0.9280520474550326,
+        "f1": 0.8568904593639576,
+        "tp": 2425,
+        "fp": 622,
+        "fn": 188
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 199,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.6369426751592356,
+          "recall": 1.0,
+          "f1": 0.7782101167315175,
+          "tp": 100,
+          "fp": 57,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 62,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8680555555555556,
+          "f1": 0.929368029739777,
+          "tp": 125,
+          "fp": 0,
+          "fn": 19
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8768472906403941,
+          "recall": 1.0,
+          "f1": 0.9343832020997376,
+          "tp": 356,
+          "fp": 50,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 118,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 55,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7307692307692307,
+          "f1": 0.8444444444444443,
+          "tp": 19,
+          "fp": 0,
+          "fn": 7
+        },
+        "ORGANIZATION": {
+          "precision": 0.8421052631578947,
+          "recall": 1.0,
+          "f1": 0.9142857142857143,
+          "tp": 80,
+          "fp": 15,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 43,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.68762278978389,
+          "recall": 0.8158508158508159,
+          "f1": 0.7462686567164178,
+          "tp": 700,
+          "fp": 318,
+          "fn": 158
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6888361045130641,
+          "recall": 0.9863945578231292,
+          "f1": 0.811188811188811,
+          "tp": 290,
+          "fp": 131,
+          "fn": 4
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7182320441988951,
+          "recall": 1.0,
+          "f1": 0.8360128617363344,
+          "tp": 130,
+          "fp": 51,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_context_loss": {
+    "regex": {
+      "overall": {
+        "precision": 0.9028669234060762,
+        "recall": 0.8887952822240943,
+        "f1": 0.8957758437699003,
+        "tp": 2110,
+        "fp": 227,
+        "fn": 264
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 74,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 69,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 62,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8351177730192719,
+          "recall": 0.7647058823529411,
+          "f1": 0.7983623336745137,
+          "tp": 780,
+          "fp": 154,
+          "fn": 240
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 180,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9341317365269461,
+          "recall": 0.8666666666666667,
+          "f1": 0.899135446685879,
+          "tp": 156,
+          "fp": 11,
+          "fn": 24
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8461538461538461,
+        "recall": 0.8989048020219039,
+        "f1": 0.8717320261437909,
+        "tp": 2134,
+        "fp": 388,
+        "fn": 240
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.8450704225352113,
+          "recall": 1.0,
+          "f1": 0.916030534351145,
+          "tp": 60,
+          "fp": 11,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8333333333333334,
+          "recall": 1.0,
+          "f1": 0.9090909090909091,
+          "tp": 300,
+          "fp": 60,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 74,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 69,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 62,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8351177730192719,
+          "recall": 0.7647058823529411,
+          "f1": 0.7983623336745137,
+          "tp": 780,
+          "fp": 154,
+          "fn": 240
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 180,
+          "fp": 90,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 60,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9424083769633508,
+          "recall": 1.0,
+          "f1": 0.9703504043126685,
+          "tp": 180,
+          "fp": 11,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_context_preservation": {
+    "regex": {
+      "overall": {
+        "precision": 0.7927020371614059,
+        "recall": 0.8140229885057472,
+        "f1": 0.803221050243847,
+        "tp": 3541,
+        "fp": 926,
+        "fn": 809
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 150,
+          "fp": 0,
+          "fn": 150
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 600,
+          "fp": 300,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7686746987951807,
+          "recall": 0.7088888888888889,
+          "f1": 0.7375722543352602,
+          "tp": 1595,
+          "fp": 480,
+          "fn": 655
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6704288939051919,
+          "recall": 0.99,
+          "f1": 0.7994616419919246,
+          "tp": 297,
+          "fp": 146,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.9966666666666667,
+          "f1": 0.9983305509181971,
+          "tp": 299,
+          "fp": 0,
+          "fn": 1
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7768890759840034,
+        "recall": 0.8485057471264368,
+        "f1": 0.8111196571805296,
+        "tp": 3691,
+        "fp": 1060,
+        "fn": 659
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 600,
+          "fp": 300,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7686746987951807,
+          "recall": 0.7088888888888889,
+          "f1": 0.7375722543352602,
+          "tp": 1595,
+          "fp": 480,
+          "fn": 655
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.5147313691507799,
+          "recall": 0.99,
+          "f1": 0.6773090079817561,
+          "tp": 297,
+          "fp": 280,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.9966666666666667,
+          "f1": 0.9983305509181971,
+          "tp": 299,
+          "fp": 0,
+          "fn": 1
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_continuity": {
+    "regex": {
+      "overall": {
+        "precision": 0.9394201644309823,
+        "recall": 0.8517065515888583,
+        "f1": 0.8934156378600824,
+        "tp": 2171,
+        "fp": 140,
+        "fn": 378
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 149,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 600,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8549222797927462,
+          "recall": 0.6875,
+          "f1": 0.7621247113163973,
+          "tp": 825,
+          "fp": 140,
+          "fn": 375
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.99,
+          "f1": 0.9949748743718593,
+          "tp": 297,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.892657793044225,
+        "recall": 0.8156139662612789,
+        "f1": 0.8523985239852399,
+        "tp": 2079,
+        "fp": 250,
+        "fn": 470
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 149,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 600,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8509052183173589,
+          "recall": 0.6658333333333334,
+          "f1": 0.7470780738662927,
+          "tp": 799,
+          "fp": 140,
+          "fn": 401
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6774193548387096,
+          "recall": 0.77,
+          "f1": 0.7207488299531982,
+          "tp": 231,
+          "fp": 110,
+          "fn": 69
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_edge_cases": {
+    "regex": {
+      "overall": {
+        "precision": 0.7155172413793104,
+        "recall": 0.7114285714285714,
+        "f1": 0.7134670487106017,
+        "tp": 1494,
+        "fp": 594,
+        "fn": 606
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 100,
+          "fp": 50,
+          "fn": 50
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 50
+        },
+        "CREDIT_CARD": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 50,
+          "fp": 50,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 50
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 50,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 50,
+          "fp": 50,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 100,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 50,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 100,
+          "fn": 100
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 30,
+          "fp": 0,
+          "fn": 20
+        },
+        "PASSPORT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 50
+        },
+        "PERSON_NAME": {
+          "precision": 0.5617977528089888,
+          "recall": 0.7142857142857143,
+          "f1": 0.6289308176100629,
+          "tp": 250,
+          "fp": 195,
+          "fn": 100
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.835016835016835,
+          "recall": 0.8266666666666667,
+          "f1": 0.8308207705192631,
+          "tp": 248,
+          "fp": 49,
+          "fn": 52
+        },
+        "USERNAME": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 100,
+          "fp": 50,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7685185185185185,
+          "recall": 0.5533333333333333,
+          "f1": 0.6434108527131783,
+          "tp": 166,
+          "fp": 50,
+          "fn": 134
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.6479631053036126,
+        "recall": 0.8028571428571428,
+        "f1": 0.7171416418545301,
+        "tp": 1686,
+        "fp": 916,
+        "fn": 414
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 100,
+          "fp": 50,
+          "fn": 50
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 50,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 50,
+          "fp": 50,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 50
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 50,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.75,
+          "recall": 1.0,
+          "f1": 0.8571428571428571,
+          "tp": 300,
+          "fp": 100,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 50,
+          "fp": 50,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 100,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 50,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 100,
+          "fn": 100
+        },
+        "MERGEDFILTH": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 109,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 30,
+          "fp": 0,
+          "fn": 20
+        },
+        "PASSPORT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 50
+        },
+        "PERSON_NAME": {
+          "precision": 0.5617977528089888,
+          "recall": 0.7142857142857143,
+          "f1": 0.6289308176100629,
+          "tp": 250,
+          "fp": 195,
+          "fn": 100
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6267281105990783,
+          "recall": 0.9066666666666666,
+          "f1": 0.7411444141689373,
+          "tp": 272,
+          "fp": 162,
+          "fn": 28
+        },
+        "USERNAME": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 100,
+          "fp": 50,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8502994011976048,
+          "recall": 0.9466666666666667,
+          "f1": 0.8958990536277603,
+          "tp": 284,
+          "fp": 50,
+          "fn": 16
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_entity_consistency": {
+    "regex": {
+      "overall": {
+        "precision": 0.7666551006245663,
+        "recall": 0.8183333333333334,
+        "f1": 0.7916517377284128,
+        "tp": 4419,
+        "fp": 1345,
+        "fn": 981
+      },
+      "per_entity": {
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 900,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 0.75,
+          "f1": 0.8571428571428571,
+          "tp": 225,
+          "fp": 0,
+          "fn": 75
+        },
+        "PERSON_NAME": {
+          "precision": 0.6408544726301736,
+          "recall": 0.7272727272727273,
+          "f1": 0.6813342796309441,
+          "tp": 2400,
+          "fp": 1345,
+          "fn": 900
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.99,
+          "f1": 0.9949748743718593,
+          "tp": 594,
+          "fp": 0,
+          "fn": 6
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7416918429003021,
+        "recall": 0.8183333333333334,
+        "f1": 0.7781299524564185,
+        "tp": 4419,
+        "fp": 1539,
+        "fn": 981
+      },
+      "per_entity": {
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 900,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 0.75,
+          "f1": 0.8571428571428571,
+          "tp": 225,
+          "fp": 0,
+          "fn": 75
+        },
+        "PERSON_NAME": {
+          "precision": 0.6408544726301736,
+          "recall": 0.7272727272727273,
+          "f1": 0.6813342796309441,
+          "tp": 2400,
+          "fp": 1345,
+          "fn": 900
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7538071065989848,
+          "recall": 0.99,
+          "f1": 0.8559077809798272,
+          "tp": 594,
+          "fp": 194,
+          "fn": 6
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_format_structured": {
+    "regex": {
+      "overall": {
+        "precision": 0.8565776458951533,
+        "recall": 0.7872727272727272,
+        "f1": 0.8204642349597348,
+        "tp": 2598,
+        "fp": 435,
+        "fn": 702
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 375,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 375
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 525,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 150,
+          "fn": 150
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 75
+        },
+        "ORGANIZATION": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 75,
+          "fp": 75,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7142857142857143,
+          "recall": 1.0,
+          "f1": 0.8333333333333333,
+          "tp": 525,
+          "fp": 210,
+          "fn": 0
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9942857142857143,
+          "f1": 0.9971346704871061,
+          "tp": 522,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.8114285714285714,
+          "f1": 0.8958990536277602,
+          "tp": 426,
+          "fp": 0,
+          "fn": 99
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.768157220165195,
+        "recall": 0.8172727272727273,
+        "f1": 0.7919541917486419,
+        "tp": 2697,
+        "fp": 814,
+        "fn": 603
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 375,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 75,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 375
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 525,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 150,
+          "fn": 150
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 75
+        },
+        "ORGANIZATION": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6666666666666666,
+          "tp": 75,
+          "fp": 75,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7142857142857143,
+          "recall": 1.0,
+          "f1": 0.8333333333333333,
+          "tp": 525,
+          "fp": 210,
+          "fn": 0
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6950732356857523,
+          "recall": 0.9942857142857143,
+          "f1": 0.818181818181818,
+          "tp": 522,
+          "fp": 229,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.875,
+          "recall": 1.0,
+          "f1": 0.9333333333333333,
+          "tp": 525,
+          "fp": 75,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "scenario_temporal_consistency": {
+    "regex": {
+      "overall": {
+        "precision": 0.8885736394119165,
+        "recall": 0.8833333333333333,
+        "f1": 0.885945737430886,
+        "tp": 3445,
+        "fp": 432,
+        "fn": 455
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 450,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 150
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6756756756756757,
+          "recall": 0.75,
+          "f1": 0.7109004739336493,
+          "tp": 900,
+          "fp": 432,
+          "fn": 300
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.99,
+          "f1": 0.9949748743718593,
+          "tp": 297,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.9933333333333333,
+          "f1": 0.9966555183946488,
+          "tp": 298,
+          "fp": 0,
+          "fn": 2
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8030762060125844,
+        "recall": 0.8835897435897436,
+        "f1": 0.8414113050909535,
+        "tp": 3446,
+        "fp": 845,
+        "fn": 454
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 300,
+          "fp": 150,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 450,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 150
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6756756756756757,
+          "recall": 0.75,
+          "f1": 0.7109004739336493,
+          "tp": 900,
+          "fp": 432,
+          "fn": 300
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.724390243902439,
+          "recall": 0.99,
+          "f1": 0.8366197183098592,
+          "tp": 297,
+          "fp": 113,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.6659242761692651,
+          "recall": 0.9966666666666667,
+          "f1": 0.7983978638184246,
+          "tp": 299,
+          "fp": 150,
+          "fn": 1
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_en": {
+    "regex": {
+      "overall": {
+        "precision": 0.8721409823772028,
+        "recall": 0.90682261208577,
+        "f1": 0.8891437308868502,
+        "tp": 2326,
+        "fp": 341,
+        "fn": 239
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 184,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9484536082474226,
+          "recall": 1.0,
+          "f1": 0.9735449735449735,
+          "tp": 92,
+          "fp": 5,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 62,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8920863309352518,
+          "f1": 0.9429657794676806,
+          "tp": 124,
+          "fp": 0,
+          "fn": 15
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 345,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 95,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 27,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 57,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7727272727272727,
+          "f1": 0.8717948717948718,
+          "tp": 17,
+          "fp": 0,
+          "fn": 5
+        },
+        "ORGANIZATION": {
+          "precision": 0.7303370786516854,
+          "recall": 1.0,
+          "f1": 0.8441558441558442,
+          "tp": 65,
+          "fp": 24,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 47,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7152847152847153,
+          "recall": 0.8053993250843644,
+          "f1": 0.7576719576719576,
+          "tp": 716,
+          "fp": 285,
+          "fn": 173
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.915129151291513,
+          "f1": 0.9556840077071291,
+          "tp": 248,
+          "fp": 0,
+          "fn": 23
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 37,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8137931034482758,
+          "recall": 0.8368794326241135,
+          "f1": 0.8251748251748252,
+          "tp": 118,
+          "fp": 27,
+          "fn": 23
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8049609242269793,
+        "recall": 0.9235867446393762,
+        "f1": 0.8602033405954975,
+        "tp": 2369,
+        "fp": 574,
+        "fn": 196
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 184,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.6618705035971223,
+          "recall": 1.0,
+          "f1": 0.7965367965367965,
+          "tp": 92,
+          "fp": 47,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 62,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8920863309352518,
+          "f1": 0.9429657794676806,
+          "tp": 124,
+          "fp": 0,
+          "fn": 15
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8690176322418136,
+          "recall": 1.0,
+          "f1": 0.9299191374663074,
+          "tp": 345,
+          "fp": 52,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 95,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 27,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 57,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.7727272727272727,
+          "f1": 0.8717948717948718,
+          "tp": 17,
+          "fp": 0,
+          "fn": 5
+        },
+        "ORGANIZATION": {
+          "precision": 0.7303370786516854,
+          "recall": 1.0,
+          "f1": 0.8441558441558442,
+          "tp": 65,
+          "fp": 24,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 47,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7152847152847153,
+          "recall": 0.8053993250843644,
+          "f1": 0.7576719576719576,
+          "tp": 716,
+          "fp": 285,
+          "fn": 173
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6836734693877551,
+          "recall": 0.988929889298893,
+          "f1": 0.8084464555052792,
+          "tp": 268,
+          "fp": 124,
+          "fn": 3
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 37,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.7704918032786885,
+          "recall": 1.0,
+          "f1": 0.8703703703703703,
+          "tp": 141,
+          "fp": 42,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_es": {
+    "regex": {
+      "overall": {
+        "precision": 0.8524080787156914,
+        "recall": 0.9268018018018018,
+        "f1": 0.8880496358241166,
+        "tp": 1646,
+        "fp": 285,
+        "fn": 130
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8745247148288974,
+          "recall": 0.9583333333333334,
+          "f1": 0.9145129224652089,
+          "tp": 230,
+          "fp": 33,
+          "fn": 10
+        },
+        "PERSON_NAME": {
+          "precision": 0.6097560975609756,
+          "recall": 0.78125,
+          "f1": 0.684931506849315,
+          "tp": 375,
+          "fp": 240,
+          "fn": 105
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9875,
+          "f1": 0.9937106918238994,
+          "tp": 237,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.95,
+          "recall": 0.95,
+          "f1": 0.9500000000000001,
+          "tp": 228,
+          "fp": 12,
+          "fn": 12
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8404940923737916,
+        "recall": 0.8811936936936937,
+        "f1": 0.8603628367234744,
+        "tp": 1565,
+        "fp": 297,
+        "fn": 211
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8745247148288974,
+          "recall": 0.9583333333333334,
+          "f1": 0.9145129224652089,
+          "tp": 230,
+          "fp": 33,
+          "fn": 10
+        },
+        "PERSON_NAME": {
+          "precision": 0.627906976744186,
+          "recall": 0.84375,
+          "f1": 0.72,
+          "tp": 405,
+          "fp": 240,
+          "fn": 75
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.9130434782608695,
+          "recall": 0.525,
+          "f1": 0.6666666666666667,
+          "tp": 126,
+          "fp": 12,
+          "fn": 114
+        },
+        "US_SSN": {
+          "precision": 0.95,
+          "recall": 0.95,
+          "f1": 0.9500000000000001,
+          "tp": 228,
+          "fp": 12,
+          "fn": 12
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_fr": {
+    "regex": {
+      "overall": {
+        "precision": 0.8507772020725388,
+        "recall": 0.9240292628024761,
+        "f1": 0.885891556514702,
+        "tp": 1642,
+        "fp": 288,
+        "fn": 135
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8588235294117647,
+          "recall": 0.9125,
+          "f1": 0.8848484848484848,
+          "tp": 219,
+          "fp": 36,
+          "fn": 21
+        },
+        "PERSON_NAME": {
+          "precision": 0.627906976744186,
+          "recall": 0.84375,
+          "f1": 0.72,
+          "tp": 405,
+          "fp": 240,
+          "fn": 75
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9875,
+          "f1": 0.9937106918238994,
+          "tp": 237,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.9444444444444444,
+          "recall": 0.85,
+          "f1": 0.8947368421052632,
+          "tp": 204,
+          "fp": 12,
+          "fn": 36
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7400096292729899,
+        "recall": 0.8649409116488463,
+        "f1": 0.7976128697457187,
+        "tp": 1537,
+        "fp": 540,
+        "fn": 240
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8588235294117647,
+          "recall": 0.9125,
+          "f1": 0.8848484848484848,
+          "tp": 219,
+          "fp": 36,
+          "fn": 21
+        },
+        "PERSON_NAME": {
+          "precision": 0.627906976744186,
+          "recall": 0.84375,
+          "f1": 0.72,
+          "tp": 405,
+          "fp": 240,
+          "fn": 75
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.34375,
+          "recall": 0.55,
+          "f1": 0.42307692307692313,
+          "tp": 132,
+          "fp": 252,
+          "fn": 108
+        },
+        "US_SSN": {
+          "precision": 0.9444444444444444,
+          "recall": 0.85,
+          "f1": 0.8947368421052632,
+          "tp": 204,
+          "fp": 12,
+          "fn": 36
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_de": {
+    "regex": {
+      "overall": {
+        "precision": 0.832270720941638,
+        "recall": 0.956056338028169,
+        "f1": 0.8898793917147352,
+        "tp": 1697,
+        "fp": 342,
+        "fn": 78
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8828125,
+          "recall": 0.9416666666666667,
+          "f1": 0.9112903225806451,
+          "tp": 226,
+          "fp": 30,
+          "fn": 14
+        },
+        "PERSON_NAME": {
+          "precision": 0.5833333333333334,
+          "recall": 0.875,
+          "f1": 0.7000000000000001,
+          "tp": 420,
+          "fp": 300,
+          "fn": 60
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9875,
+          "f1": 0.9937106918238994,
+          "tp": 237,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.952191235059761,
+          "recall": 0.9958333333333333,
+          "f1": 0.9735234215885947,
+          "tp": 239,
+          "fp": 12,
+          "fn": 1
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7831325301204819,
+        "recall": 0.8788732394366198,
+        "f1": 0.8282452880276081,
+        "tp": 1560,
+        "fp": 432,
+        "fn": 215
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 12,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8828125,
+          "recall": 0.9416666666666667,
+          "f1": 0.9112903225806451,
+          "tp": 226,
+          "fp": 30,
+          "fn": 14
+        },
+        "PERSON_NAME": {
+          "precision": 0.5652173913043478,
+          "recall": 0.8125,
+          "f1": 0.6666666666666667,
+          "tp": 390,
+          "fp": 300,
+          "fn": 90
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.625,
+          "recall": 0.5416666666666666,
+          "f1": 0.5803571428571429,
+          "tp": 130,
+          "fp": 78,
+          "fn": 110
+        },
+        "US_SSN": {
+          "precision": 0.952191235059761,
+          "recall": 0.9958333333333333,
+          "f1": 0.9735234215885947,
+          "tp": 239,
+          "fp": 12,
+          "fn": 1
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_it+pt+nl": {
+    "regex": {
+      "overall": {
+        "precision": 0.8525012893243941,
+        "recall": 0.9312676056338028,
+        "f1": 0.8901453957996769,
+        "tp": 1653,
+        "fp": 286,
+        "fn": 122
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8664122137404581,
+          "recall": 0.9458333333333333,
+          "f1": 0.9043824701195219,
+          "tp": 227,
+          "fp": 35,
+          "fn": 13
+        },
+        "PERSON_NAME": {
+          "precision": 0.6097560975609756,
+          "recall": 0.78125,
+          "f1": 0.684931506849315,
+          "tp": 375,
+          "fp": 240,
+          "fn": 105
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9833333333333333,
+          "f1": 0.9915966386554621,
+          "tp": 236,
+          "fp": 0,
+          "fn": 4
+        },
+        "US_SSN": {
+          "precision": 0.9561752988047809,
+          "recall": 1.0,
+          "f1": 0.9775967413441955,
+          "tp": 240,
+          "fp": 11,
+          "fn": 0
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8015748031496063,
+        "recall": 0.8602816901408451,
+        "f1": 0.8298913043478261,
+        "tp": 1527,
+        "fp": 378,
+        "fn": 248
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 11,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.8664122137404581,
+          "recall": 0.9458333333333333,
+          "f1": 0.9043824701195219,
+          "tp": 227,
+          "fp": 35,
+          "fn": 13
+        },
+        "PERSON_NAME": {
+          "precision": 0.6,
+          "recall": 0.75,
+          "f1": 0.6666666666666665,
+          "tp": 360,
+          "fp": 240,
+          "fn": 120
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6067961165048543,
+          "recall": 0.5208333333333334,
+          "f1": 0.5605381165919282,
+          "tp": 125,
+          "fp": 81,
+          "fn": 115
+        },
+        "US_SSN": {
+          "precision": 0.9561752988047809,
+          "recall": 1.0,
+          "f1": 0.9775967413441955,
+          "tp": 240,
+          "fp": 11,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_ja+zh+ko": {
+    "regex": {
+      "overall": {
+        "precision": 0.8120184899845917,
+        "recall": 0.891206313416009,
+        "f1": 0.8497715667831227,
+        "tp": 1581,
+        "fp": 366,
+        "fn": 193
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 241,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.6996904024767802,
+          "recall": 0.9377593360995851,
+          "f1": 0.8014184397163121,
+          "tp": 226,
+          "fp": 97,
+          "fn": 15
+        },
+        "PERSON_NAME": {
+          "precision": 0.5971786833855799,
+          "recall": 0.7987421383647799,
+          "f1": 0.683408071748879,
+          "tp": 381,
+          "fp": 257,
+          "fn": 96
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.991701244813278,
+          "f1": 0.9958333333333333,
+          "tp": 239,
+          "fp": 0,
+          "fn": 2
+        },
+        "US_SSN": {
+          "precision": 0.930635838150289,
+          "recall": 0.6680497925311203,
+          "f1": 0.7777777777777777,
+          "tp": 161,
+          "fp": 12,
+          "fn": 80
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7381422924901185,
+        "recall": 0.8421645997745209,
+        "f1": 0.7867298578199053,
+        "tp": 1494,
+        "fp": 530,
+        "fn": 280
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 241,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 12,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.6996904024767802,
+          "recall": 0.9377593360995851,
+          "f1": 0.8014184397163121,
+          "tp": 226,
+          "fp": 97,
+          "fn": 15
+        },
+        "PERSON_NAME": {
+          "precision": 0.5176848874598071,
+          "recall": 0.6750524109014675,
+          "f1": 0.5859872611464969,
+          "tp": 322,
+          "fp": 300,
+          "fn": 155
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.5477178423236515,
+          "recall": 0.5477178423236515,
+          "f1": 0.5477178423236515,
+          "tp": 132,
+          "fp": 109,
+          "fn": 109
+        },
+        "US_SSN": {
+          "precision": 0.9523809523809523,
+          "recall": 0.995850622406639,
+          "f1": 0.973630831643002,
+          "tp": 240,
+          "fp": 12,
+          "fn": 1
+        }
+      }
+    },
+    "records": 300
+  },
+  "lang_ar+hi": {
+    "regex": {
+      "overall": {
+        "precision": 0.8217369222955815,
+        "recall": 0.9115492957746479,
+        "f1": 0.8643162393162392,
+        "tp": 1618,
+        "fp": 351,
+        "fn": 157
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.7040498442367601,
+          "recall": 0.9416666666666667,
+          "f1": 0.8057040998217468,
+          "tp": 226,
+          "fp": 95,
+          "fn": 14
+        },
+        "PERSON_NAME": {
+          "precision": 0.631578947368421,
+          "recall": 0.875,
+          "f1": 0.7336244541484715,
+          "tp": 420,
+          "fp": 245,
+          "fn": 60
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9875,
+          "f1": 0.9937106918238994,
+          "tp": 237,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 0.935672514619883,
+          "recall": 0.6666666666666666,
+          "f1": 0.7785888077858881,
+          "tp": 160,
+          "fp": 11,
+          "fn": 80
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7466863033873343,
+        "recall": 0.8569014084507042,
+        "f1": 0.79800629590766,
+        "tp": 1521,
+        "fp": 516,
+        "fn": 254
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 240,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 11,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.7040498442367601,
+          "recall": 0.9416666666666667,
+          "f1": 0.8057040998217468,
+          "tp": 226,
+          "fp": 95,
+          "fn": 14
+        },
+        "PERSON_NAME": {
+          "precision": 0.5454545454545454,
+          "recall": 0.75,
+          "f1": 0.631578947368421,
+          "tp": 360,
+          "fp": 300,
+          "fn": 120
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.547945205479452,
+          "recall": 0.5,
+          "f1": 0.5228758169934641,
+          "tp": 120,
+          "fp": 99,
+          "fn": 120
+        },
+        "US_SSN": {
+          "precision": 0.9561752988047809,
+          "recall": 1.0,
+          "f1": 0.9775967413441955,
+          "tp": 240,
+          "fp": 11,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_alias_context_loss": {
+    "regex": {
+      "overall": {
+        "precision": 0.8854211201368106,
+        "recall": 0.890752688172043,
+        "f1": 0.8880789022298456,
+        "tp": 2071,
+        "fp": 268,
+        "fn": 254
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 75,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8104125736738703,
+          "recall": 0.7857142857142857,
+          "f1": 0.7978723404255319,
+          "tp": 825,
+          "fp": 193,
+          "fn": 225
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 150,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.8711111111111111,
+          "f1": 0.9311163895486936,
+          "tp": 196,
+          "fp": 0,
+          "fn": 29
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8393285371702638,
+        "recall": 0.9032258064516129,
+        "f1": 0.8701056556867619,
+        "tp": 2100,
+        "fp": 402,
+        "fn": 225
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8,
+          "recall": 1.0,
+          "f1": 0.888888888888889,
+          "tp": 300,
+          "fp": 75,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 75,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8104125736738703,
+          "recall": 0.7857142857142857,
+          "f1": 0.7978723404255319,
+          "tp": 825,
+          "fp": 193,
+          "fn": 225
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7177033492822966,
+          "recall": 1.0,
+          "f1": 0.8356545961002785,
+          "tp": 150,
+          "fp": 59,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 75,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 225,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_api_key_like_negative": {
+    "regex": {
+      "overall": {
+        "precision": 0.824030677460588,
+        "recall": 0.8995348837209303,
+        "f1": 0.860128974872137,
+        "tp": 1934,
+        "fp": 413,
+        "fn": 216
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 210,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9615384615384616,
+          "recall": 1.0,
+          "f1": 0.9803921568627451,
+          "tp": 50,
+          "fp": 2,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 33,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.9,
+          "f1": 0.9473684210526316,
+          "tp": 63,
+          "fp": 0,
+          "fn": 7
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9938080495356038,
+          "recall": 0.9938080495356038,
+          "f1": 0.9938080495356038,
+          "tp": 321,
+          "fp": 2,
+          "fn": 2
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 47,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 24,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.4645669291338583,
+          "recall": 0.7972972972972973,
+          "f1": 0.5870646766169154,
+          "tp": 118,
+          "fp": 136,
+          "fn": 30
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 24,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6787878787878788,
+          "recall": 0.8022922636103151,
+          "f1": 0.7353906762967827,
+          "tp": 560,
+          "fp": 265,
+          "fn": 138
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.94140625,
+          "f1": 0.9698189134808853,
+          "tp": 241,
+          "fp": 0,
+          "fn": 15
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9542857142857143,
+          "recall": 0.8882978723404256,
+          "f1": 0.9201101928374655,
+          "tp": 167,
+          "fp": 8,
+          "fn": 21
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7678282009724473,
+        "recall": 0.8813953488372093,
+        "f1": 0.8207016024252923,
+        "tp": 1895,
+        "fp": 573,
+        "fn": 255
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 210,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.7246376811594203,
+          "recall": 1.0,
+          "f1": 0.8403361344537814,
+          "tp": 50,
+          "fp": 19,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 33,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.9,
+          "f1": 0.9473684210526316,
+          "tp": 63,
+          "fp": 0,
+          "fn": 7
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9197707736389685,
+          "recall": 0.9938080495356038,
+          "f1": 0.9553571428571429,
+          "tp": 321,
+          "fp": 28,
+          "fn": 2
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 47,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 24,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.4645669291338583,
+          "recall": 0.7972972972972973,
+          "f1": 0.5870646766169154,
+          "tp": 118,
+          "fp": 136,
+          "fn": 30
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 24,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6731470230862697,
+          "recall": 0.7936962750716332,
+          "f1": 0.7284681130834977,
+          "tp": 554,
+          "fp": 269,
+          "fn": 144
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6464646464646465,
+          "recall": 0.75,
+          "f1": 0.694394213381555,
+          "tp": 192,
+          "fp": 105,
+          "fn": 64
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9195979899497487,
+          "recall": 0.973404255319149,
+          "f1": 0.9457364341085271,
+          "tp": 183,
+          "fp": 16,
+          "fn": 5
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_crypto_wallet": {
+    "regex": {
+      "overall": {
+        "precision": 0.8364888123924269,
+        "recall": 0.9037656903765691,
+        "f1": 0.8688268156424581,
+        "tp": 1944,
+        "fp": 380,
+        "fn": 207
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 206,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9482758620689655,
+          "recall": 1.0,
+          "f1": 0.9734513274336283,
+          "tp": 55,
+          "fp": 3,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8947368421052632,
+          "f1": 0.9444444444444444,
+          "tp": 68,
+          "fp": 0,
+          "fn": 8
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.99375,
+          "recall": 0.99375,
+          "f1": 0.99375,
+          "tp": 318,
+          "fp": 2,
+          "fn": 2
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 52,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 26,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.4,
+          "f1": 0.5714285714285715,
+          "tp": 2,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.5285714285714286,
+          "recall": 0.7928571428571428,
+          "f1": 0.6342857142857142,
+          "tp": 111,
+          "fp": 99,
+          "fn": 29
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6794258373205742,
+          "recall": 0.8160919540229885,
+          "f1": 0.741514360313316,
+          "tp": 568,
+          "fp": 268,
+          "fn": 128
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.952191235059761,
+          "f1": 0.9755102040816327,
+          "tp": 239,
+          "fp": 0,
+          "fn": 12
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 22,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9515151515151515,
+          "recall": 0.8626373626373627,
+          "f1": 0.9048991354466859,
+          "tp": 157,
+          "fp": 8,
+          "fn": 25
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7791836734693878,
+        "recall": 0.8874941887494189,
+        "f1": 0.8298196044338187,
+        "tp": 1909,
+        "fp": 541,
+        "fn": 242
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 206,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.7333333333333333,
+          "recall": 1.0,
+          "f1": 0.846153846153846,
+          "tp": 55,
+          "fp": 20,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8947368421052632,
+          "f1": 0.9444444444444444,
+          "tp": 68,
+          "fp": 0,
+          "fn": 8
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9085714285714286,
+          "recall": 0.99375,
+          "f1": 0.9492537313432835,
+          "tp": 318,
+          "fp": 32,
+          "fn": 2
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 52,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 26,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.4,
+          "f1": 0.5714285714285715,
+          "tp": 2,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.5285714285714286,
+          "recall": 0.7928571428571428,
+          "f1": 0.6342857142857142,
+          "tp": 111,
+          "fp": 99,
+          "fn": 29
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.671875,
+          "recall": 0.8031609195402298,
+          "f1": 0.731675392670157,
+          "tp": 559,
+          "fp": 273,
+          "fn": 137
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6486486486486487,
+          "recall": 0.7649402390438247,
+          "f1": 0.7020109689213894,
+          "tp": 192,
+          "fp": 104,
+          "fn": 59
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 22,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9319371727748691,
+          "recall": 0.978021978021978,
+          "f1": 0.9544235924932974,
+          "tp": 178,
+          "fp": 13,
+          "fn": 4
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_device_id": {
+    "regex": {
+      "overall": {
+        "precision": 0.8822689975026757,
+        "recall": 0.9152479644707624,
+        "f1": 0.8984559491371481,
+        "tp": 2473,
+        "fp": 330,
+        "fn": 229
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 199,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9583333333333334,
+          "recall": 1.0,
+          "f1": 0.9787234042553191,
+          "tp": 69,
+          "fp": 3,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 48,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8859649122807017,
+          "f1": 0.9395348837209303,
+          "tp": 101,
+          "fp": 0,
+          "fn": 13
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 344,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 78,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 313,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 39,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.4444444444444444,
+          "f1": 0.6153846153846153,
+          "tp": 4,
+          "fp": 0,
+          "fn": 5
+        },
+        "ORGANIZATION": {
+          "precision": 0.6929133858267716,
+          "recall": 0.9072164948453608,
+          "f1": 0.7857142857142857,
+          "tp": 88,
+          "fp": 39,
+          "fn": 9
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 40,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7033084311632871,
+          "recall": 0.7987878787878788,
+          "f1": 0.7480136208853576,
+          "tp": 659,
+          "fp": 278,
+          "fn": 166
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9301470588235294,
+          "f1": 0.9638095238095238,
+          "tp": 253,
+          "fp": 0,
+          "fn": 19
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 30,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9337748344370861,
+          "recall": 0.8924050632911392,
+          "f1": 0.912621359223301,
+          "tp": 141,
+          "fp": 10,
+          "fn": 17
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8325503355704698,
+        "recall": 0.9182087342709104,
+        "f1": 0.8732840549102429,
+        "tp": 2481,
+        "fp": 499,
+        "fn": 221
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 199,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.71875,
+          "recall": 1.0,
+          "f1": 0.8363636363636363,
+          "tp": 69,
+          "fp": 27,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 48,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8859649122807017,
+          "f1": 0.9395348837209303,
+          "tp": 101,
+          "fp": 0,
+          "fn": 13
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8888888888888888,
+          "recall": 1.0,
+          "f1": 0.9411764705882353,
+          "tp": 344,
+          "fp": 43,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 78,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 21,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 313,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 39,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.4444444444444444,
+          "f1": 0.6153846153846153,
+          "tp": 4,
+          "fp": 0,
+          "fn": 5
+        },
+        "ORGANIZATION": {
+          "precision": 0.6929133858267716,
+          "recall": 0.9072164948453608,
+          "f1": 0.7857142857142857,
+          "tp": 88,
+          "fp": 39,
+          "fn": 9
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 40,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7048832271762208,
+          "recall": 0.8048484848484848,
+          "f1": 0.7515563101301641,
+          "tp": 664,
+          "fp": 278,
+          "fn": 161
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7349397590361446,
+          "recall": 0.8970588235294118,
+          "f1": 0.8079470198675497,
+          "tp": 244,
+          "fp": 88,
+          "fn": 28
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 30,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.864406779661017,
+          "recall": 0.9683544303797469,
+          "f1": 0.9134328358208955,
+          "tp": 153,
+          "fp": 24,
+          "fn": 5
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_general_pii": {
+    "regex": {
+      "overall": {
+        "precision": 0.876717415521723,
+        "recall": 0.9073789392774788,
+        "f1": 0.8917847025495751,
+        "tp": 2361,
+        "fp": 332,
+        "fn": 241
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 188,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9411764705882353,
+          "recall": 1.0,
+          "f1": 0.9696969696969697,
+          "tp": 112,
+          "fp": 7,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 72,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8427672955974843,
+          "f1": 0.9146757679180888,
+          "tp": 134,
+          "fp": 0,
+          "fn": 25
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 369,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 128,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 51,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 7
+        },
+        "ORGANIZATION": {
+          "precision": 0.8461538461538461,
+          "recall": 1.0,
+          "f1": 0.9166666666666666,
+          "tp": 77,
+          "fp": 14,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7206595538312318,
+          "recall": 0.8264738598442715,
+          "f1": 0.7699481865284974,
+          "tp": 743,
+          "fp": 288,
+          "fn": 156
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9112627986348123,
+          "f1": 0.9535714285714286,
+          "tp": 267,
+          "fp": 0,
+          "fn": 26
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 38,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8321167883211679,
+          "recall": 0.8085106382978723,
+          "f1": 0.8201438848920863,
+          "tp": 114,
+          "fp": 23,
+          "fn": 27
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8052121617106582,
+        "recall": 0.9262106072252114,
+        "f1": 0.8614834673815908,
+        "tp": 2410,
+        "fp": 583,
+        "fn": 192
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 188,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.7272727272727273,
+          "recall": 1.0,
+          "f1": 0.8421052631578948,
+          "tp": 112,
+          "fp": 42,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 72,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8427672955974843,
+          "f1": 0.9146757679180888,
+          "tp": 134,
+          "fp": 0,
+          "fn": 25
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.8621495327102804,
+          "recall": 1.0,
+          "f1": 0.9259723964868256,
+          "tp": 369,
+          "fp": 59,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 128,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 51,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 7
+        },
+        "ORGANIZATION": {
+          "precision": 0.8461538461538461,
+          "recall": 1.0,
+          "f1": 0.9166666666666666,
+          "tp": 77,
+          "fp": 14,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.7206595538312318,
+          "recall": 0.8264738598442715,
+          "f1": 0.7699481865284974,
+          "tp": 743,
+          "fp": 288,
+          "fn": 156
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6658986175115207,
+          "recall": 0.9863481228668942,
+          "f1": 0.795048143053645,
+          "tp": 289,
+          "fp": 145,
+          "fn": 4
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 38,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.8011363636363636,
+          "recall": 1.0,
+          "f1": 0.8895899053627759,
+          "tp": 141,
+          "fp": 35,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_long_context_alias": {
+    "regex": {
+      "overall": {
+        "precision": 0.9394201644309823,
+        "recall": 0.8517065515888583,
+        "f1": 0.8934156378600824,
+        "tp": 2171,
+        "fp": 140,
+        "fn": 378
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 149,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 600,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8549222797927462,
+          "recall": 0.6875,
+          "f1": 0.7621247113163973,
+          "tp": 825,
+          "fp": 140,
+          "fn": 375
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.99,
+          "f1": 0.9949748743718593,
+          "tp": 297,
+          "fp": 0,
+          "fn": 3
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.892657793044225,
+        "recall": 0.8156139662612789,
+        "f1": 0.8523985239852399,
+        "tp": 2079,
+        "fp": 250,
+        "fn": 470
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 149,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 600,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.8509052183173589,
+          "recall": 0.6658333333333334,
+          "f1": 0.7470780738662927,
+          "tp": 799,
+          "fp": 140,
+          "fn": 401
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6774193548387096,
+          "recall": 0.77,
+          "f1": 0.7207488299531982,
+          "tp": 231,
+          "fp": 110,
+          "fn": 69
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 300,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_national_health_id": {
+    "regex": {
+      "overall": {
+        "precision": 0.8523791682278007,
+        "recall": 0.9136546184738956,
+        "f1": 0.8819538670284939,
+        "tp": 2275,
+        "fp": 394,
+        "fn": 215
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 210,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9444444444444444,
+          "recall": 1.0,
+          "f1": 0.9714285714285714,
+          "tp": 51,
+          "fp": 3,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 35,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8888888888888888,
+          "f1": 0.9411764705882353,
+          "tp": 72,
+          "fp": 0,
+          "fn": 9
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9969418960244648,
+          "recall": 0.9969418960244648,
+          "f1": 0.9969418960244648,
+          "tp": 326,
+          "fp": 1,
+          "fn": 1
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 56,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 326,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "ORGANIZATION": {
+          "precision": 0.4911504424778761,
+          "recall": 0.7928571428571428,
+          "f1": 0.6065573770491802,
+          "tp": 111,
+          "fp": 115,
+          "fn": 29
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 30,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6858147713950762,
+          "recall": 0.8125,
+          "f1": 0.743801652892562,
+          "tp": 585,
+          "fp": 268,
+          "fn": 135
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9372549019607843,
+          "f1": 0.9676113360323887,
+          "tp": 239,
+          "fp": 0,
+          "fn": 16
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9575757575757575,
+          "recall": 0.8729281767955801,
+          "f1": 0.9132947976878613,
+          "tp": 158,
+          "fp": 7,
+          "fn": 23
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.8041458184417442,
+        "recall": 0.9036144578313253,
+        "f1": 0.8509833585476552,
+        "tp": 2250,
+        "fp": 548,
+        "fn": 240
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 210,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.7391304347826086,
+          "recall": 1.0,
+          "f1": 0.85,
+          "tp": 51,
+          "fp": 18,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 35,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8888888888888888,
+          "f1": 0.9411764705882353,
+          "tp": 72,
+          "fp": 0,
+          "fn": 9
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 14,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9131652661064426,
+          "recall": 0.9969418960244648,
+          "f1": 0.9532163742690059,
+          "tp": 326,
+          "fp": 31,
+          "fn": 1
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 56,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 326,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "ORGANIZATION": {
+          "precision": 0.4911504424778761,
+          "recall": 0.7928571428571428,
+          "f1": 0.6065573770491802,
+          "tp": 111,
+          "fp": 115,
+          "fn": 29
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 30,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6827262044653349,
+          "recall": 0.8069444444444445,
+          "f1": 0.7396562698917887,
+          "tp": 581,
+          "fp": 270,
+          "fn": 139
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.6721854304635762,
+          "recall": 0.796078431372549,
+          "f1": 0.7289048473967684,
+          "tp": 203,
+          "fp": 99,
+          "fn": 52
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.9202127659574468,
+          "recall": 0.9558011049723757,
+          "f1": 0.9376693766937669,
+          "tp": 173,
+          "fp": 15,
+          "fn": 8
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_passport_intl": {
+    "regex": {
+      "overall": {
+        "precision": 0.8678823967249721,
+        "recall": 0.9066874027993779,
+        "f1": 0.8868606198897129,
+        "tp": 2332,
+        "fp": 355,
+        "fn": 240
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 298,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 110,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 298,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 72,
+          "fp": 0,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 336,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6120218579234973,
+          "recall": 0.7446808510638298,
+          "f1": 0.6718656268746251,
+          "tp": 560,
+          "fp": 355,
+          "fn": 192
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.8892215568862275,
+          "f1": 0.9413629160063391,
+          "tp": 297,
+          "fp": 0,
+          "fn": 37
+        },
+        "US_SSN": {
+          "precision": 1.0,
+          "recall": 0.8472222222222222,
+          "f1": 0.9172932330827067,
+          "tp": 61,
+          "fp": 0,
+          "fn": 11
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.810126582278481,
+        "recall": 0.9206842923794712,
+        "f1": 0.8618744313011829,
+        "tp": 2368,
+        "fp": 555,
+        "fn": 204
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 298,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "tp": 0,
+          "fp": 36,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 120,
+          "fp": 0,
+          "fn": 0
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 110,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 298,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 36,
+          "fp": 0,
+          "fn": 0
+        },
+        "ORGANIZATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 72,
+          "fp": 0,
+          "fn": 0
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 336,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6120218579234973,
+          "recall": 0.7446808510638298,
+          "f1": 0.6718656268746251,
+          "tp": 560,
+          "fp": 355,
+          "fn": 192
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7155555555555555,
+          "recall": 0.9640718562874252,
+          "f1": 0.8214285714285715,
+          "tp": 322,
+          "fp": 128,
+          "fn": 12
+        },
+        "US_SSN": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "tp": 72,
+          "fp": 36,
+          "fn": 0
+        }
+      }
+    },
+    "records": 300
+  },
+  "datatype_tax_id_intl": {
+    "regex": {
+      "overall": {
+        "precision": 0.810904071773637,
+        "recall": 0.9292210359826019,
+        "f1": 0.8660401695227566,
+        "tp": 2350,
+        "fp": 548,
+        "fn": 179
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 221,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.9583333333333334,
+          "recall": 1.0,
+          "f1": 0.9787234042553191,
+          "tp": 69,
+          "fp": 3,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 46,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8958333333333334,
+          "f1": 0.945054945054945,
+          "tp": 86,
+          "fp": 0,
+          "fn": 10
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 334,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 67,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 31,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.9863013698630136,
+          "f1": 0.993103448275862,
+          "tp": 216,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.7816091954022989,
+          "recall": 0.9855072463768116,
+          "f1": 0.8717948717948718,
+          "tp": 136,
+          "fp": 38,
+          "fn": 2
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6761687571265679,
+          "recall": 0.8293706293706293,
+          "f1": 0.7449748743718593,
+          "tp": 593,
+          "fp": 284,
+          "fn": 122
+        },
+        "PHONE_NUMBER": {
+          "precision": 1.0,
+          "recall": 0.9272727272727272,
+          "f1": 0.9622641509433962,
+          "tp": 255,
+          "fp": 0,
+          "fn": 20
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.4282051282051282,
+          "recall": 0.8835978835978836,
+          "f1": 0.5768566493955095,
+          "tp": 167,
+          "fp": 223,
+          "fn": 22
+        }
+      }
+    },
+    "ensemble": {
+      "overall": {
+        "precision": 0.7211746522411129,
+        "recall": 0.922499011466983,
+        "f1": 0.8095072866065234,
+        "tp": 2333,
+        "fp": 902,
+        "fn": 196
+      },
+      "per_entity": {
+        "ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 221,
+          "fp": 0,
+          "fn": 0
+        },
+        "BANK_ACCOUNT": {
+          "precision": 0.22847682119205298,
+          "recall": 1.0,
+          "f1": 0.37196765498652296,
+          "tp": 69,
+          "fp": 233,
+          "fn": 0
+        },
+        "CREDIT_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 46,
+          "fp": 0,
+          "fn": 0
+        },
+        "DATE_OF_BIRTH": {
+          "precision": 1.0,
+          "recall": 0.8958333333333334,
+          "f1": 0.945054945054945,
+          "tp": 86,
+          "fp": 0,
+          "fn": 10
+        },
+        "DRIVERS_LICENSE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "EMAIL_ADDRESS": {
+          "precision": 0.9002695417789758,
+          "recall": 1.0,
+          "f1": 0.9475177304964539,
+          "tp": 334,
+          "fp": 37,
+          "fn": 0
+        },
+        "EMPLOYEE_ID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 67,
+          "fp": 0,
+          "fn": 0
+        },
+        "IP_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "LICENSE_PLATE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "LOCATION": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "MAC_ADDRESS": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "MEDICAL_RECORD_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 31,
+          "fp": 0,
+          "fn": 0
+        },
+        "NATIONAL_ID": {
+          "precision": 1.0,
+          "recall": 0.9863013698630136,
+          "f1": 0.993103448275862,
+          "tp": 216,
+          "fp": 0,
+          "fn": 3
+        },
+        "ORGANIZATION": {
+          "precision": 0.7816091954022989,
+          "recall": 0.9855072463768116,
+          "f1": 0.8717948717948718,
+          "tp": 136,
+          "fp": 38,
+          "fn": 2
+        },
+        "PASSPORT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 32,
+          "fp": 0,
+          "fn": 0
+        },
+        "PERSON_NAME": {
+          "precision": 0.6765375854214123,
+          "recall": 0.8307692307692308,
+          "f1": 0.7457627118644068,
+          "tp": 594,
+          "fp": 284,
+          "fn": 121
+        },
+        "PHONE_NUMBER": {
+          "precision": 0.7483443708609272,
+          "recall": 0.8218181818181818,
+          "f1": 0.7833622183708838,
+          "tp": 226,
+          "fp": 76,
+          "fn": 49
+        },
+        "ROUTING_NUMBER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 15,
+          "fp": 0,
+          "fn": 0
+        },
+        "USERNAME": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "tp": 25,
+          "fp": 0,
+          "fn": 0
+        },
+        "US_SSN": {
+          "precision": 0.4320388349514563,
+          "recall": 0.9417989417989417,
+          "f1": 0.5923460898502495,
+          "tp": 178,
+          "fp": 234,
+          "fn": 11
+        }
+      }
+    },
+    "records": 300
+  }
+}

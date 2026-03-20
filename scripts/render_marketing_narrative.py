@@ -144,59 +144,9 @@ def _render_why_pii_anon(combined: dict[str, Any]) -> str:
 
 
 def _render_engine_tier_table(combined: dict[str, Any]) -> str:
-    """Render 'Choosing the Right Engine Tier' table."""
-    systems = combined.get("cross_dataset_summary", {}).get("systems", [])
-    if not systems:
-        return ""
-
-    pii_anon_tiers = _extract_pii_anon_systems(systems)
-    if not pii_anon_tiers:
-        return ""
-
-    lines = [
-        "## Choosing the Right Engine Tier",
-        "",
-        "pii-anon offers multiple tiers optimized for different workloads:",
-        "",
-        "| Tier | Best For | F1 Score | Latency (ms) | Throughput | Trade-off |",
-        "|---|---|---:|---:|---:|---|",
-    ]
-
-    # Sort tiers in a sensible order (prefer standard > auto > minimal > full)
-    tier_order = ["minimal", "standard", "auto", "full"]
-    sorted_tiers = []
-    for tier in tier_order:
-        if tier in pii_anon_tiers:
-            data = pii_anon_tiers[tier]
-            # Skip tiers with obviously bad data (zero latency)
-            latency = float(data.get("latency_p50_ms_average", 0.0))
-            if latency > 1.0 or tier in ["standard", "minimal"]:  # Accept minimal even if data is off
-                sorted_tiers.append((tier, data))
-    for tier, data in pii_anon_tiers.items():
-        if tier not in tier_order:
-            sorted_tiers.append((tier, data))
-
-    descriptions = {
-        "minimal": "Fastest, lowest cost. Real-time, latency-sensitive pipelines.",
-        "auto": "Default balanced tier. General-purpose production workloads.",
-        "standard": "Balanced accuracy/speed. Recommended for most use cases.",
-        "full": "Highest recall. Comprehensive PII detection at cost of speed.",
-    }
-
-    for tier, data in sorted_tiers:
-        f1 = float(data.get("f1_average", 0.0))
-        latency = float(data.get("latency_p50_ms_average", 0.0))
-        throughput = float(data.get("docs_per_hour_average", 0.0))
-        description = descriptions.get(tier, "Custom tier")
-
-        lines.append(
-            f"| `{tier}` | {description} | "
-            f"{f1:.3f} | {latency:.1f} | {throughput:.0f} docs/hr | "
-            f"Trade accuracy for speed. |"
-        )
-
-    lines.append("")
-    return "\n".join(lines)
+    """Render engine configuration section (no tiers — single regex-only engine)."""
+    # Engine tiers have been removed; pii-anon always uses regex-only config.
+    return ""
 
 
 def _render_advantages(combined: dict[str, Any]) -> str:
@@ -297,55 +247,6 @@ def _render_limitations(combined: dict[str, Any]) -> str:
         "Understanding where pii-anon excels and where it has gaps:",
         "",
     ]
-
-    # Analyze tier-specific limitations
-    minimal = pii_anon_tiers.get("minimal")
-    standard = pii_anon_tiers.get("standard") or pii_anon_tiers.get("auto")
-    full = pii_anon_tiers.get("full")
-
-    if minimal and standard:
-        f1_minimal = float(minimal.get("f1_average", 0.0))
-        f1_standard = float(standard.get("f1_average", 0.0))
-        latency_minimal = float(minimal.get("latency_p50_ms_average", 0.0))
-        if f1_standard > 0 and f1_minimal > 0 and latency_minimal > 0:
-            if f1_minimal < f1_standard:
-                # Standard is actually better
-                lines.append(
-                    f"- **`minimal` tier speed advantage:** Trades accuracy ({f1_minimal:.3f} F1 vs {f1_standard:.3f}) "
-                    f"for {(latency_minimal):.1f}ms latency (vs {float(standard.get('latency_p50_ms_average', 0.0)):.0f}ms). "
-                    "Use for real-time, latency-critical applications."
-                )
-            else:
-                # Minimal is actually better (data quirk)
-                lines.append(
-                    f"- **`minimal` tier:** Achieves {f1_minimal:.3f} F1 at {latency_minimal:.1f}ms latency, "
-                    f"making it a viable option for both accuracy and speed-sensitive workloads."
-                )
-    lines.append("")
-
-    if standard and full:
-        f1_standard = float(standard.get("f1_average", 0.0))
-        f1_full = float(full.get("f1_average", 0.0))
-        latency_standard = float(standard.get("latency_p50_ms_average", 0.0))
-        latency_full = float(full.get("latency_p50_ms_average", 0.0))
-        if f1_full > 0 and latency_full > 0 and latency_standard > 0:
-            latency_increase = ((latency_full / latency_standard - 1) * 100)
-            # Only show latency comparison if it's a real change (positive)
-            if latency_increase > 5:
-                lines.append(
-                    f"- **`full` tier overhead:** Adds niche entity detection but increases latency by "
-                    f"{latency_increase:.0f}%. Marginal F1 gains ({f1_full:.3f} vs {f1_standard:.3f}) "
-                    "may not justify the cost."
-                )
-            elif latency_increase < -50:
-                # If full is actually faster, that's a data issue - skip
-                pass
-            else:
-                lines.append(
-                    f"- **`full` tier tradeoffs:** F1 score {f1_full:.3f} vs {f1_standard:.3f} for `standard`. "
-                    "Check latency impact based on your workload requirements."
-                )
-    lines.append("")
 
     lines.append("- **Multilingual nuances:** Performance varies by language. eval_framework_v1 includes 52 languages; some low-resource languages may have degraded accuracy.")
     lines.append("")

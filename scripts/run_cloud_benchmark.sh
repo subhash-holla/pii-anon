@@ -152,7 +152,6 @@ if [ "$PARALLEL_MODE" = true ]; then
         --dataset pii_anon_benchmark_v1 \
         --matrix src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json \
         --artifacts-dir artifacts/benchmarks \
-        --engine-tiers auto minimal standard full \
         --warmup-samples 100 \
         --measured-runs 3 \
         --dataset-source package-only \
@@ -165,7 +164,6 @@ if [ "$PARALLEL_MODE" = true ]; then
         --reuse-current-env \
         --install-no-deps \
         --dataset pii_anon_benchmark_v1 \
-        --engine-tiers auto minimal standard full \
         --matrix src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json \
         --artifacts-dir artifacts/benchmarks \
         --work-dir .publish-suite \
@@ -188,7 +186,6 @@ else
         --reuse-current-env \
         --install-no-deps \
         --dataset pii_anon_benchmark_v1 \
-        --engine-tiers auto minimal standard full \
         --matrix src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json \
         --artifacts-dir artifacts/benchmarks \
         --work-dir .publish-suite \

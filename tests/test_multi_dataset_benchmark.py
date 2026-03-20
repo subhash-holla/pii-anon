@@ -71,7 +71,7 @@ class TestAggregateDatasetReports:
     """Test the _aggregate_dataset_reports function from run_publish_grade_suite."""
 
     @staticmethod
-    def _aggregate(per_dataset_jsons: dict[str, Path], engine_tiers: list[str]) -> dict:
+    def _aggregate(per_dataset_jsons: dict[str, Path]) -> dict:
         """Import and call _aggregate_dataset_reports."""
         import importlib.util
 
@@ -81,7 +81,7 @@ class TestAggregateDatasetReports:
         )
         mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
-        return mod._aggregate_dataset_reports(per_dataset_jsons, engine_tiers_evaluated=engine_tiers)
+        return mod._aggregate_dataset_reports(per_dataset_jsons)
 
     def test_combined_report_structure(self, tmp_path: Path) -> None:
         ds1 = tmp_path / "ds1.json"
@@ -91,12 +91,10 @@ class TestAggregateDatasetReports:
 
         combined = self._aggregate(
             {"pii_anon_benchmark_v1": ds1, "other_dataset": ds2},
-            engine_tiers=["auto", "minimal"],
         )
 
         assert combined["report_schema_version"] == "2026-02-19.v3"
         assert set(combined["datasets_evaluated"]) == {"pii_anon_benchmark_v1", "other_dataset"}
-        assert combined["engine_tiers_evaluated"] == ["auto", "minimal"]
         assert "by_dataset" in combined
         assert "pii_anon_benchmark_v1" in combined["by_dataset"]
         assert "other_dataset" in combined["by_dataset"]
@@ -141,7 +139,7 @@ class TestAggregateDatasetReports:
         ds1.write_text(json.dumps(_make_single_dataset_payload("ds_a", systems=ds1_systems)))
         ds2.write_text(json.dumps(_make_single_dataset_payload("ds_b", systems=ds2_systems)))
 
-        combined = self._aggregate({"ds_a": ds1, "ds_b": ds2}, engine_tiers=["auto"])
+        combined = self._aggregate({"ds_a": ds1, "ds_b": ds2})
         systems = combined["cross_dataset_summary"]["systems"]
         assert len(systems) == 1
         pii = systems[0]
@@ -188,7 +186,6 @@ class TestRenderBenchmarkSummaryV3:
         mod = self._load_render_module()
         combined = {
             "datasets_evaluated": ["pii_anon_benchmark_v1", "other_dataset"],
-            "engine_tiers_evaluated": ["auto", "minimal"],
             "cross_dataset_summary": {
                 "systems": [
                     {
@@ -206,21 +203,6 @@ class TestRenderBenchmarkSummaryV3:
                             "other_dataset": {"f1": 0.8, "samples": 80},
                         },
                     },
-                    {
-                        "system": "pii-anon-minimal",
-                        "datasets_evaluated": 2,
-                        "f1_average": 0.75,
-                        "precision_average": 0.70,
-                        "recall_average": 0.80,
-                        "latency_p50_ms_average": 5.0,
-                        "docs_per_hour_average": 4000.0,
-                        "best_f1_dataset": "pii_anon_benchmark_v1",
-                        "worst_f1_dataset": "other_dataset",
-                        "per_dataset": {
-                            "pii_anon_benchmark_v1": {"f1": 0.8, "samples": 100},
-                            "other_dataset": {"f1": 0.7, "samples": 80},
-                        },
-                    },
                 ],
             },
         }
@@ -230,10 +212,8 @@ class TestRenderBenchmarkSummaryV3:
         assert "## Cross-Dataset Performance Summary" in md
         assert "### Dataset Characteristics" in md
         assert "### Aggregated Results" in md
-        assert "### pii-anon Tier Performance by Dataset" in md
         assert "### Interpretation" in md
         assert "pii-anon" in md
-        assert "pii-anon-minimal" in md
         # Check interpretation mentions key patterns.
         assert "`pii_anon_benchmark_v1`" in md
         assert "`other_dataset`" in md
@@ -291,7 +271,6 @@ class TestRunSoftResilience:
         # Only one dataset — should produce a valid combined report.
         combined = mod._aggregate_dataset_reports(
             {"pii_anon_benchmark_v1": ds1},
-            engine_tiers_evaluated=["auto"],
         )
         assert combined["report_schema_version"] == "2026-02-19.v3"
         assert combined["datasets_evaluated"] == ["pii_anon_benchmark_v1"]

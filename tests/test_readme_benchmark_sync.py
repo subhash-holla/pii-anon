@@ -325,7 +325,6 @@ def test_readme_benchmark_sync_accepts_v3_combined_report(tmp_path) -> None:
     combined = {
         "report_schema_version": "2026-02-19.v3",
         "datasets_evaluated": ["pii_anon_benchmark_v1"],
-        "engine_tiers_evaluated": ["auto", "minimal"],
         "by_dataset": {
             "pii_anon_benchmark_v1": {
                 "report_schema_version": "2026-02-19.v3",

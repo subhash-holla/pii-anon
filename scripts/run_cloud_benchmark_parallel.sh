@@ -52,7 +52,6 @@ REQUIRE_ALL_COMPETITORS="--require-all-competitors"
 REQUIRE_NATIVE_COMPETITORS="--require-native-competitors"
 INCLUDE_END_TO_END="--include-end-to-end"
 ALLOW_CORE_NATIVE_ENGINES="--allow-core-native-engines"
-ENGINE_TIERS="auto minimal standard full"
 ENFORCE_FLOORS=""
 
 # ---------------------------------------------------------------------------
@@ -81,13 +80,6 @@ while [[ $# -gt 0 ]]; do
             INCLUDE_END_TO_END="--no-include-end-to-end"; shift ;;
         --no-allow-core-native-engines)
             ALLOW_CORE_NATIVE_ENGINES="--no-allow-core-native-engines"; shift ;;
-        --engine-tiers)
-            shift; ENGINE_TIERS=""
-            while [[ $# -gt 0 && "$1" != --* ]]; do
-                ENGINE_TIERS="$ENGINE_TIERS $1"; shift
-            done
-            ENGINE_TIERS="${ENGINE_TIERS# }"  # trim leading space
-            ;;
         --enforce-floors)       ENFORCE_FLOORS="--enforce-floors"; shift ;;
         --max-samples)
             MAX_SAMPLES="$2"; shift 2 ;;
@@ -174,9 +166,6 @@ COMMON_FLAGS=(
     "--measured-runs" "$MEASURED_RUNS"
     "--checkpoint-dir" "$CHECKPOINT_DIR"
 )
-if [ -n "$ENGINE_TIERS" ]; then
-    COMMON_FLAGS+=("--engine-tiers" $ENGINE_TIERS)
-fi
 if [ -n "$STRICT_RUNTIME" ]; then
     COMMON_FLAGS+=("$STRICT_RUNTIME")
 fi
@@ -299,9 +288,6 @@ MERGE_CMD=(
     "--output-floor-report" "$ARTIFACTS_DIR/floor-gate-report.md"
     "--output-diagnostics" "$ARTIFACTS_DIR/benchmark-diagnostics.json"
 )
-if [ -n "$ENGINE_TIERS" ]; then
-    MERGE_CMD+=("--engine-tiers" $ENGINE_TIERS)
-fi
 if [ -n "$REQUIRE_ALL_COMPETITORS" ]; then
     MERGE_CMD+=("$REQUIRE_ALL_COMPETITORS")
 fi

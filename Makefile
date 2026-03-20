@@ -20,7 +20,6 @@ BENCH_IMAGE ?= pii-anon-bench:latest
 
 EVAL_DATA_DIR ?= ../pii-anon-eval-data
 BENCH_DATASET ?= pii_anon_benchmark_v1
-BENCH_ENGINE_TIERS ?= auto minimal standard full
 BENCH_MATRIX ?= src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json
 BENCH_ARTIFACTS ?= artifacts/benchmarks
 BENCH_WORKDIR ?= .publish-suite
@@ -48,7 +47,6 @@ PORTABLE_SUITE_FLAGS = \
 
 CANONICAL_SUITE_FLAGS = \
 	--dataset $(BENCH_DATASET) \
-	--engine-tiers $(BENCH_ENGINE_TIERS) \
 	--matrix $(BENCH_MATRIX) \
 	--artifacts-dir $(BENCH_ARTIFACTS) \
 	--work-dir $(BENCH_WORKDIR) \
@@ -64,7 +62,7 @@ CANONICAL_SUITE_FLAGS = \
 	--no-enforce-publish-claims \
 	--validate-readme-sync
 
-.PHONY: bootstrap install-dev lint type test perf build twine-check package-size benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup benchmark-multi-tier benchmark-comprehensive readme-benchmark-check cli-smoke docs-smoke all
+.PHONY: bootstrap install-dev lint type test perf build twine-check package-size benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup readme-benchmark-check cli-smoke docs-smoke all
 
 bootstrap:
 	$(PYTHON) -m pip install --upgrade pip
@@ -175,15 +173,6 @@ benchmark-canonical-windows:
 		-e TOKENIZERS_PARALLELISM=false \
 		-v "$$PWD":/work -v "$$(cd $(EVAL_DATA_DIR) && pwd)":/eval-data -w /work $(BENCH_IMAGE) \
 		bash -lc "pip install -q --no-cache-dir --no-deps -e /eval-data/ && pip install -q --no-cache-dir --no-deps -e '.[datasets]' && python scripts/run_publish_grade_suite.py --reuse-current-env --install-no-deps $(CANONICAL_SUITE_FLAGS)"
-
-# Quick local run with all engine tiers against a single dataset.
-# Useful for verifying tier-level differences without running the full matrix.
-benchmark-multi-tier:
-	$(PYTHON) scripts/run_publish_grade_suite.py $(PORTABLE_SUITE_FLAGS) --engine-tiers $(BENCH_ENGINE_TIERS)
-
-# Full matrix: all engine tiers against the unified dataset.
-benchmark-comprehensive:
-	$(PYTHON) scripts/run_publish_grade_suite.py $(PORTABLE_SUITE_FLAGS) --engine-tiers $(BENCH_ENGINE_TIERS)
 
 readme-benchmark-check:
 	$(PYTHON) scripts/check_readme_benchmark.py --readme README.md --summary docs/benchmark-summary.md --report-json benchmark-results.json

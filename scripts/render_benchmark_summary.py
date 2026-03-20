@@ -422,12 +422,9 @@ def _render_cross_dataset_summary(combined: dict[str, Any]) -> str:
     """Render a markdown section analysing performance across datasets."""
     systems = combined.get("cross_dataset_summary", {}).get("systems", [])
     datasets = combined.get("datasets_evaluated", [])
-    tiers = combined.get("engine_tiers_evaluated", [])
-
     lines: list[str] = [
         "## Cross-Dataset Performance Summary",
         "",
-        f"Engine tiers evaluated: {', '.join(f'`{t}`' for t in tiers)}",
         f"Datasets evaluated: {', '.join(f'`{d}`' for d in datasets)}",
         "",
     ]
@@ -463,7 +460,7 @@ def _render_cross_dataset_summary(combined: dict[str, Any]) -> str:
     # Per-dataset F1 breakdown for pii-anon tiers
     pii_systems = [s for s in systems if s["system"].startswith("pii-anon")]
     if pii_systems and len(datasets) > 1:
-        lines.append("### pii-anon Tier Performance by Dataset")
+        lines.append("### pii-anon Performance by Dataset")
         lines.append("")
         header = "| Tier |" + " | ".join(f" {ds} F1 " for ds in datasets) + " |"
         sep = "|---|" + "|".join("---:" for _ in datasets) + "|"
@@ -490,16 +487,8 @@ def _render_cross_dataset_summary(combined: dict[str, Any]) -> str:
         "across core PII types, long-context coreference, and multi-language inputs."
     )
     lines.append(
-        "- **`minimal` tier** trades accuracy for speed — ideal for real-time "
-        "pipelines where latency budgets are tight."
-    )
-    lines.append(
-        "- **`standard` tier** (the `auto` default for non-speed profiles) "
-        "provides the best accuracy/speed balance for most workloads."
-    )
-    lines.append(
-        "- **`full` tier** adds low-weight engines that may improve recall on "
-        "niche entity types at the cost of increased latency and potential false positives."
+        "- **pii-anon** uses a regex-only engine that provides the best composite "
+        "score (F1 × throughput) for production workloads."
     )
     lines.append("")
 

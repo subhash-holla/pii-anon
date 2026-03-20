@@ -291,6 +291,257 @@ class _ProgressReporter:
             self._thread.join(timeout=2.0)
 
 
+def _update_readme_benchmark_section(
+    report: Any,
+    payload: dict[str, Any],
+) -> None:
+    """Replace the benchmark summary section in README.md with latest results.
+
+    Looks for ``<!-- BENCHMARK_SUMMARY_START -->`` and ``<!-- BENCHMARK_SUMMARY_END -->``
+    markers and replaces everything between them with a fresh summary table
+    generated from the current benchmark run.  If the markers or the README
+    don't exist, this is a no-op.
+    """
+    # Walk up from the script to find the repo root README.md
+    readme_candidates = [
+        Path(__file__).resolve().parent.parent / "README.md",
+        Path.cwd() / "README.md",
+    ]
+    readme_path: Path | None = None
+    for candidate in readme_candidates:
+        if candidate.exists():
+            readme_path = candidate
+            break
+    if readme_path is None:
+        return
+
+    start_marker = "<!-- BENCHMARK_SUMMARY_START -->"
+    end_marker = "<!-- BENCHMARK_SUMMARY_END -->"
+
+    content = readme_path.read_text(encoding="utf-8")
+    start_idx = content.find(start_marker)
+    end_idx = content.find(end_marker)
+    if start_idx < 0 or end_idx < 0 or end_idx <= start_idx:
+        return
+
+    # --- Build the markdown summary ---
+    lines: list[str] = [start_marker, ""]
+
+    # Group profiles by objective for separate tables
+    from collections import defaultdict
+
+    by_objective: dict[str, list[Any]] = defaultdict(list)
+    for profile in report.profiles:
+        by_objective[profile.objective].append(profile)
+
+    objective_labels = {"accuracy": "Accuracy", "speed": "Speed", "balanced": "Balanced"}
+
+    for objective, profiles in sorted(by_objective.items()):
+        profile_names = ", ".join(p.profile for p in profiles)
+        label = objective_labels.get(objective, objective.title())
+        lines.append(f"## {label} Objective (profiles: {profile_names})")
+        lines.append("")
+        lines.append(f"Benchmark dataset: `{report.dataset}`")
+        lines.append(
+            f"Warm-up samples/system: `{report.warmup_samples}`. "
+            f"Measured runs/system: `{report.measured_runs}`."
+        )
+        lines.append("")
+
+        # Collect all systems across profiles in this objective
+        all_systems: dict[str, dict[str, Any]] = {}
+        for profile in profiles:
+            for sys in profile.systems:
+                if sys.system not in all_systems:
+                    status = "available" if sys.available else f"skipped ({sys.skipped_reason or 'unavailable'})"
+                    all_systems[sys.system] = {
+                        "status": status,
+                        "composite": sys.composite_score,
+                        "f1": sys.f1,
+                        "ci_lower": sys.f1_ci_lower,
+                        "ci_upper": sys.f1_ci_upper,
+                        "precision": sys.precision,
+                        "recall": sys.recall,
+                        "latency": sys.latency_p50_ms,
+                        "docs_per_hour": sys.docs_per_hour,
+                        "elo": sys.elo_rating,
+                    }
+
+        # Render table
+        lines.append(
+            "| System | Status | Composite | F1 | 95% CI | Precision | Recall "
+            "| p50 Latency (ms) | Docs/hour | Elo |"
+        )
+        lines.append("|---|---|---:|---:|---|---:|---:|---:|---:|---:|")
+        for sys_name in sorted(all_systems.keys()):
+            s = all_systems[sys_name]
+            ci_str = "—"
+            if s["ci_lower"] and s["ci_upper"] and s["ci_lower"] > 0:
+                ci_str = f"[{s['ci_lower']:.3f}, {s['ci_upper']:.3f}]"
+            lines.append(
+                f"| {sys_name} | {s['status']} | {s['composite']:.4f} | {s['f1']:.3f} "
+                f"| {ci_str} | {s['precision']:.3f} | {s['recall']:.3f} "
+                f"| {s['latency']:.3f} | {s['docs_per_hour']:.2f} | {s['elo']} |"
+            )
+
+        # Strengths/weaknesses for pii-anon
+        pii_anon = all_systems.get("pii-anon")
+        if pii_anon:
+            available_systems = {k: v for k, v in all_systems.items() if v["status"] == "available"}
+            strength_lines: list[str] = []
+            weakness_lines: list[str] = []
+            for metric, key, lower_better in [
+                ("composite_score", "composite", False),
+                ("f1", "f1", False),
+                ("precision", "precision", False),
+                ("recall", "recall", False),
+                ("docs_per_hour", "docs_per_hour", False),
+                ("latency_p50_ms", "latency", True),
+            ]:
+                values = [v[key] for v in available_systems.values() if v[key] > 0]
+                if not values:
+                    continue
+                best = min(values) if lower_better else max(values)
+                val = pii_anon[key]
+                if best == 0:
+                    continue
+                if lower_better:
+                    ratio = val / best if best > 0 else 999
+                    if ratio <= 1.05:
+                        strength_lines.append(f"- {metric}: within 5% of best ({val:.3f} vs best {best:.3f}).")
+                    elif ratio > 1.10:
+                        weakness_lines.append(f"- {metric}: more than 10% slower than best ({val:.3f} vs best {best:.3f}).")
+                else:
+                    ratio = val / best if best > 0 else 0
+                    if ratio >= 0.95:
+                        strength_lines.append(f"- {metric}: within 5% of best ({val:.3f} vs best {best:.3f}).")
+                    elif ratio < 0.90:
+                        weakness_lines.append(f"- {metric}: more than 10% below best ({val:.3f} vs best {best:.3f}).")
+            lines.append("")
+            if strength_lines:
+                lines.append(f"Strengths for `pii-anon`:")
+                lines.extend(strength_lines)
+                lines.append("")
+            if weakness_lines:
+                lines.append(f"Weaknesses for `pii-anon`:")
+                lines.extend(weakness_lines)
+                lines.append("")
+
+        lines.append("This section is generated from benchmark artifacts.")
+
+    # Floor-gate results
+    lines.append("")
+    lines.append("Profile floor-gate results:")
+    for profile in report.profiles:
+        lines.append(f"- `{profile.profile}` ({profile.objective}): floor_pass={profile.floor_pass}")
+    lines.append("")
+
+    # Statistical significance
+    stat_tests = report.statistical_tests
+    if stat_tests and isinstance(stat_tests, dict):
+        samples = stat_tests.get("total_samples", 0)
+        mde = stat_tests.get("mde", 0)
+        lines.append("### Statistical Significance")
+        lines.append("")
+        if samples and mde:
+            lines.append(
+                f"Evaluated on **{samples:,}** records. "
+                f"Minimum detectable effect (MDE) at \u03b1=0.05, power=0.80: **{mde:.4f}** F1 points."
+            )
+            lines.append("")
+        per_system = stat_tests.get("per_system", {})
+        if per_system:
+            lines.append("| System | F1 | 95% CI | Samples |")
+            lines.append("|---|---:|---|---:|")
+            for sys_name, sys_stats in sorted(per_system.items()):
+                if isinstance(sys_stats, dict):
+                    f1 = sys_stats.get("f1", 0)
+                    ci = sys_stats.get("ci_95", [0, 0])
+                    n = sys_stats.get("samples", samples)
+                    ci_str = f"[{ci[0]:.3f}, {ci[1]:.3f}]" if ci and len(ci) == 2 else "—"
+                    lines.append(f"| {sys_name} | {f1:.3f} | {ci_str} | {n:,} |")
+            lines.append("")
+        pairwise = stat_tests.get("pairwise", [])
+        if pairwise:
+            lines.append("Pairwise comparisons (paired bootstrap, n=10,000 resamples):")
+            lines.append("")
+            lines.append("| Comparison | \u0394F1 | p-value | Significant | Effect Size |")
+            lines.append("|---|---:|---:|---|---|")
+            for pair in pairwise:
+                if isinstance(pair, dict):
+                    comp = pair.get("comparison", "")
+                    delta = pair.get("delta_f1", 0)
+                    pval = pair.get("p_value", 1)
+                    sig = "**yes**" if pval < 0.05 else "n.s."
+                    effect = pair.get("effect_size", "")
+                    sign = "+" if delta >= 0 else ""
+                    lines.append(f"| {comp} | {sign}{delta:.4f} | {pval:.4f} | {sig} | {effect} |")
+            lines.append("")
+            lines.append(
+                "*Method: paired bootstrap significance test (Berg-Kirkpatrick et al., 2012). "
+                "Effect sizes: Cohen's d (small=0.2, medium=0.5, large=0.8).*"
+            )
+            lines.append("")
+
+    lines.append("")
+    lines.append(end_marker)
+
+    # Splice into README
+    new_content = content[: start_idx] + "\n".join(lines) + content[end_idx + len(end_marker) :]
+    readme_path.write_text(new_content, encoding="utf-8")
+    print(f"updated {readme_path} with latest benchmark results")
+
+
+def _auto_cleanup_old_artifacts(*output_paths: str) -> None:
+    """Archive previous benchmark artifacts before writing new ones.
+
+    Scans the parent directory of the first output path for existing benchmark
+    artifacts (``*.json``, ``*.csv``, ``*.md``) and moves them into an
+    ``_archive/<timestamp>/`` subdirectory.  This ensures each benchmark run
+    starts clean and only the latest results are visible at the top level.
+
+    Skips silently if the output directory does not yet exist.
+    """
+    import shutil
+
+    # Determine the artifact directory from the first output path
+    artifact_dirs: set[Path] = set()
+    for p in output_paths:
+        if p:
+            artifact_dirs.add(Path(p).parent)
+    if not artifact_dirs:
+        return
+
+    for artifact_dir in artifact_dirs:
+        if not artifact_dir.exists():
+            continue
+
+        # Gather stale artifact files
+        stale: list[Path] = []
+        for ext in ("*.json", "*.csv", "*.md"):
+            stale.extend(artifact_dir.glob(ext))
+        # Also grab any checkpoints subdirectory
+        ckpt_dir = artifact_dir / "checkpoints"
+        if ckpt_dir.is_dir():
+            stale.append(ckpt_dir)
+
+        if not stale:
+            continue
+
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        archive_dir = artifact_dir / "_archive" / ts
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        for item in stale:
+            dest = archive_dir / item.name
+            try:
+                shutil.move(str(item), str(dest))
+            except Exception:
+                pass  # Best effort; don't block the benchmark
+
+        print(f"archived {len(stale)} old artifact(s) to {archive_dir}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run competitor benchmark and write report artifacts")
     parser.add_argument("--dataset", default="pii_anon_benchmark_v1")
@@ -326,29 +577,6 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Evaluate competitors in parallel (default: enabled; use --no-parallel to disable)",
-    )
-    parser.add_argument(
-        "--engine-tier",
-        choices=["auto", "minimal", "standard", "full"],
-        default="auto",
-        help=(
-            "Engine tier for core detector (single tier): "
-            "auto (default, picks based on profile objective), "
-            "minimal (regex + presidio, fastest), "
-            "standard (+ GLiNER, best F1), "
-            "full (+ scrubadub + spacy-ner + stanza-ner)"
-        ),
-    )
-    parser.add_argument(
-        "--engine-tiers",
-        nargs="+",
-        choices=["auto", "minimal", "standard", "full"],
-        default=None,
-        help=(
-            "Evaluate multiple engine tiers as separate pii-anon variants. "
-            "Overrides --engine-tier when provided. "
-            "Example: --engine-tiers auto minimal standard full"
-        ),
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -390,6 +618,13 @@ def main() -> None:
     fail_after_write = bool(args.enforce_floors) if args.fail_after_write is None else bool(args.fail_after_write)
     reporter = None if args.quiet_progress else _ProgressReporter()
     progress_hook = None if reporter is None else reporter
+
+    # ------------------------------------------------------------------
+    # Auto-cleanup: remove stale artifacts before each new run so only
+    # the latest results are present.  Old artifacts are moved to an
+    # `_archive/<timestamp>/` subdirectory alongside the output files.
+    # ------------------------------------------------------------------
+    _auto_cleanup_old_artifacts(args.output_json, args.output_csv)
 
     # ------------------------------------------------------------------
     # Merge-only mode: skip evaluation, just merge checkpoint files.
@@ -472,8 +707,6 @@ def main() -> None:
                 include_end_to_end=bool(args.include_end_to_end),
                 forced_unavailable_competitors=forced_unavailable_competitors,
                 allow_core_native_engines=bool(args.allow_core_native_engines),
-                engine_tier=args.engine_tier,
-                engine_tiers=args.engine_tiers,
                 progress_hook=progress_hook,
                 enable_parallel=bool(args.parallel),
                 checkpoint_dir=args.checkpoint_dir or None,
@@ -501,7 +734,6 @@ def main() -> None:
         "strict_runtime": bool(args.strict_runtime),
         "require_all_competitors": bool(args.require_all_competitors),
         "require_native_competitors": bool(args.require_native_competitors),
-        "engine_tiers_evaluated": args.engine_tiers if args.engine_tiers else [args.engine_tier],
     }
 
     profile_results: list[dict[str, Any]] = []
@@ -562,7 +794,6 @@ def main() -> None:
     run_metadata["required_profiles"] = required_profiles
     run_metadata["required_profiles_passed"] = required_profiles_passed
 
-    engine_tiers_evaluated = args.engine_tiers if args.engine_tiers else [args.engine_tier]
     payload: dict[str, Any] = {
         "report_schema_version": REPORT_SCHEMA_VERSION,
         "dataset": report.dataset,
@@ -570,7 +801,6 @@ def main() -> None:
         "measured_runs": report.measured_runs,
         "max_samples": args.max_samples if args.max_samples > 0 else None,
         "dataset_source": report.dataset_source,
-        "engine_tiers_evaluated": engine_tiers_evaluated,
         "floor_pass": report.floor_pass,
         "qualification_gate_pass": report.qualification_gate_pass,
         "mit_gate_pass": report.mit_gate_pass,
@@ -727,6 +957,9 @@ def main() -> None:
         print(f"wrote {output_csv}")
         print(f"wrote {floor_report}")
         print(f"wrote {diag_out}")
+
+        # Auto-update README.md with latest benchmark results
+        _update_readme_benchmark_section(report, payload)
 
     should_fail = (
         bool(args.enforce_floors)

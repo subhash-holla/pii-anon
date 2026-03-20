@@ -283,3 +283,265 @@ class TestLeaderboardAndHistory:
     def test_get_rating_unknown_returns_none(self):
         engine = PIIRateEloEngine()
         assert engine.get_rating("nonexistent") is None
+
+
+# ---------------------------------------------------------------------------
+# Auto-calibration and convergence
+# ---------------------------------------------------------------------------
+
+class TestAutoCalibrate:
+    def test_empty_composites_returns_default(self):
+        engine = PIIRateEloEngine()
+        result = engine.auto_calibrate({})
+        assert result.old_parameters["scale"] == engine._scale
+        assert result.new_parameters["scale"] == engine._scale
+        assert result.recommendation == "No systems provided; no calibration applied."
+
+    def test_single_system_calibration(self):
+        engine = PIIRateEloEngine()
+        result = engine.auto_calibrate({"a": 0.5})
+        assert result.score_distribution["num_systems"] == 1
+        assert "mean" in result.score_distribution
+        assert "std" in result.score_distribution
+
+    def test_tight_cluster_increases_scale(self):
+        """Tightly clustered scores should increase scale (less sensitive)."""
+        engine = PIIRateEloEngine()
+        # All scores very close together
+        composites = {f"sys_{i}": 0.5 + i * 0.001 for i in range(10)}
+        result = engine.auto_calibrate(composites)
+        assert result.new_parameters["scale"] > engine._scale
+
+    def test_spread_out_scores_decrease_scale(self):
+        """Spread out scores should decrease scale (more sensitive)."""
+        engine = PIIRateEloEngine()
+        # Widely spread scores
+        composites = {f"sys_{i}": i / 10.0 for i in range(10)}
+        result = engine.auto_calibrate(composites)
+        assert result.new_parameters["scale"] < engine._scale
+
+    def test_scale_clamped_to_bounds(self):
+        """New scale must be within [100, 1000]."""
+        engine = PIIRateEloEngine()
+        # Extreme clustering
+        composites = {f"sys_{i}": 0.5 for i in range(100)}
+        result = engine.auto_calibrate(composites)
+        assert 100.0 <= result.new_parameters["scale"] <= 1000.0
+
+    def test_few_systems_increase_k_base(self):
+        """Fewer systems should increase k_base for faster convergence."""
+        engine = PIIRateEloEngine()
+        result_2sys = engine.auto_calibrate({"a": 0.7, "b": 0.3})
+        result_8sys = engine.auto_calibrate({f"sys_{i}": i/10.0 for i in range(8)})
+        assert result_2sys.new_parameters["k_base"] > result_8sys.new_parameters["k_base"]
+
+    def test_k_base_clamped_to_bounds(self):
+        """New k_base must be within [8, 64]."""
+        engine = PIIRateEloEngine()
+        composites = {f"sys_{i}": i / 100.0 for i in range(100)}
+        result = engine.auto_calibrate(composites)
+        assert 8.0 <= result.new_parameters["k_base"] <= 64.0
+
+    def test_recommendation_generated(self):
+        """Calibration should generate a recommendation string."""
+        engine = PIIRateEloEngine()
+        composites = {"a": 0.9, "b": 0.1}
+        result = engine.auto_calibrate(composites)
+        assert result.recommendation != ""
+        assert isinstance(result.recommendation, str)
+
+    def test_to_dict_serialization(self):
+        """Calibration result should serialize to dict."""
+        engine = PIIRateEloEngine()
+        result = engine.auto_calibrate({"a": 0.8, "b": 0.2})
+        d = result.to_dict()
+        assert "old_parameters" in d
+        assert "new_parameters" in d
+        assert "score_distribution" in d
+        assert "recommendation" in d
+
+
+class TestCheckConvergence:
+    def test_no_systems_returns_true(self):
+        engine = PIIRateEloEngine()
+        assert engine.check_convergence()
+
+    def test_all_below_threshold_returns_true(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine.ensure_system("b")
+        engine._ratings["a"].rd = 30.0
+        engine._ratings["b"].rd = 40.0
+        assert engine.check_convergence(threshold_rd=100.0)
+
+    def test_any_above_threshold_returns_false(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine.ensure_system("b")
+        engine._ratings["a"].rd = 50.0
+        engine._ratings["b"].rd = 150.0
+        assert not engine.check_convergence(threshold_rd=100.0)
+
+    def test_default_threshold_2x_rd_floor(self):
+        engine = PIIRateEloEngine(rd_floor=30.0)
+        engine.ensure_system("a")
+        engine._ratings["a"].rd = 59.0
+        assert engine.check_convergence()
+
+    def test_custom_threshold(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rd = 150.0
+        assert not engine.check_convergence(threshold_rd=100.0)
+        assert engine.check_convergence(threshold_rd=200.0)
+
+
+class TestTournamentSummary:
+    def test_empty_tournament(self):
+        engine = PIIRateEloEngine()
+        summary = engine.tournament_summary()
+        assert summary["rankings"] == []
+        assert summary["num_systems"] == 0
+        assert summary["total_matches"] == 0
+
+    def test_single_system_summary(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        summary = engine.tournament_summary()
+        assert len(summary["rankings"]) == 1
+        assert summary["rankings"][0]["name"] == "a"
+        assert "ci_lower" in summary["rankings"][0]
+        assert "ci_upper" in summary["rankings"][0]
+
+    def test_rankings_sorted_by_rating(self):
+        engine = PIIRateEloEngine()
+        composites = {"a": 0.9, "b": 0.5, "c": 0.1}
+        engine.run_round_robin(composites)
+        summary = engine.tournament_summary()
+        for i in range(len(summary["rankings"]) - 1):
+            assert summary["rankings"][i]["rating"] >= summary["rankings"][i + 1]["rating"]
+
+    def test_confidence_intervals_valid(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1500.0
+        engine._ratings["a"].rd = 100.0
+        summary = engine.tournament_summary()
+        ranking = summary["rankings"][0]
+        assert ranking["ci_lower"] < ranking["rating"]
+        assert ranking["rating"] < ranking["ci_upper"]
+
+    def test_pairwise_significance_all_pairs(self):
+        engine = PIIRateEloEngine()
+        composites = {"a": 0.9, "b": 0.5, "c": 0.3}
+        engine.run_round_robin(composites)
+        summary = engine.tournament_summary()
+        # For 3 systems, expect 3 pairwise comparisons
+        assert len(summary["pairwise_significance"]) == 3
+
+    def test_min_distinguishable_diff_computed(self):
+        engine = PIIRateEloEngine()
+        composites = {"a": 0.9, "b": 0.5}
+        engine.run_round_robin(composites)
+        summary = engine.tournament_summary()
+        assert "min_distinguishable_diff" in summary
+        assert summary["min_distinguishable_diff"] >= 0.0
+
+    def test_convergence_flag_set(self):
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rd = 30.0
+        summary = engine.tournament_summary()
+        assert "converged" in summary
+
+
+class TestGovernanceEvaluation:
+    def test_unknown_system_fails(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        result = engine.evaluate_governance("nonexistent")
+        assert not result.passed
+        assert not result.min_rating_met
+        assert "not found" in result.notes[0].lower()
+
+    def test_all_criteria_met(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1600.0
+        engine._ratings["a"].rd = 50.0
+        engine._ratings["a"].num_matches = 10
+        result = engine.evaluate_governance("a")
+        assert result.passed
+        assert result.min_rating_met
+        assert result.max_rd_met
+        assert result.min_matches_met
+
+    def test_low_rating_fails(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1400.0
+        engine._ratings["a"].rd = 50.0
+        engine._ratings["a"].num_matches = 10
+        result = engine.evaluate_governance("a")
+        assert not result.passed
+        assert not result.min_rating_met
+
+    def test_high_rd_fails(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1600.0
+        engine._ratings["a"].rd = 150.0
+        engine._ratings["a"].num_matches = 10
+        result = engine.evaluate_governance("a")
+        assert not result.passed
+        assert not result.max_rd_met
+
+    def test_insufficient_matches_fails(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1600.0
+        engine._ratings["a"].rd = 50.0
+        engine._ratings["a"].num_matches = 2
+        result = engine.evaluate_governance("a")
+        assert not result.passed
+        assert not result.min_matches_met
+
+    def test_custom_thresholds(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1550.0
+        engine._ratings["a"].rd = 80.0
+        engine._ratings["a"].num_matches = 5
+        custom = GovernanceThresholds(min_rating=1500.0, max_rd=100.0, min_matches=4)
+        result = engine.evaluate_governance("a", thresholds=custom)
+        assert result.passed
+
+    def test_evaluate_all_governance(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        composites = {"a": 0.9, "b": 0.5, "c": 0.3}
+        engine.run_round_robin(composites)
+        results = engine.evaluate_all_governance()
+        assert len(results) == 3
+        # Results should be sorted by rating
+        for i in range(len(results) - 1):
+            assert results[i].rating >= results[i + 1].rating
+
+    def test_governance_result_serialization(self):
+        from pii_anon.eval_framework.rating.elo import GovernanceThresholds
+        engine = PIIRateEloEngine()
+        engine.ensure_system("a")
+        engine._ratings["a"].rating = 1600.0
+        engine._ratings["a"].rd = 50.0
+        engine._ratings["a"].num_matches = 10
+        result = engine.evaluate_governance("a")
+        d = result.to_dict()
+        assert d["system_name"] == "a"
+        assert "rating" in d
+        assert "rd" in d
+        assert "notes" in d

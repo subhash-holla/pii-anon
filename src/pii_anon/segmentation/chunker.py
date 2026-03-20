@@ -70,10 +70,15 @@ class StreamingChunker:
                     text, buffer, segment_idx, segment_start_token
                 )
                 segment_idx += 1
-                # Slide: keep only the last overlap_tokens entries
+                # Slide: keep only the last overlap_tokens entries.
                 advance = self.max_tokens - self.overlap_tokens
-                for _ in range(advance):
-                    buffer.popleft()
+                # Constructing a new deque via maxlen keeps only the tail
+                # entries in a single C-level pass. We then wrap in an
+                # unbounded deque so it can grow for the next segment.
+                if self.overlap_tokens > 0:
+                    buffer = deque(deque(buffer, maxlen=self.overlap_tokens))
+                else:
+                    buffer.clear()
                 segment_start_token += advance
 
         # Emit any remaining tokens in the buffer

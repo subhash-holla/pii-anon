@@ -1,0 +1,111 @@
+================================================================================
+ROUND 3 EVALUATION: Post-Bug-Fix Assessment of pii-anon
+================================================================================
+
+Loaded 200 records (every 250th record from pii_anon_benchmark_v1)
+Ground truth: 142 entity labels
+
+
+REGEX DETECTOR RESULTS
+--------------------------------------------------------------------------------
+Overall: Precision=0.3374, Recall=0.9718, F1=0.5009 (TP=138, FP=271, FN=4)
+
+Per-Entity-Type Metrics:
+Entity Type                    Precision    Recall       F1           TP     FP     FN    
+--------------------------------------------------------------------------------------
+ADDRESS                        0.0000       0.0000       0.0000       0      37     0     
+CREDIT_CARD                    0.0000       0.0000       0.0000       0      24     0     
+DATE_OF_BIRTH                  0.0000       0.0000       0.0000       0      22     0     
+EMAIL_ADDRESS                  1.0000       1.0000       1.0000       56     0      0     
+EMPLOYEE_ID                    0.0000       0.0000       0.0000       0      23     0     
+IP_ADDRESS                     1.0000       1.0000       1.0000       32     0      0     
+ORGANIZATION                   0.0000       0.0000       0.0000       0      64     0     
+PERSON_NAME                    0.0000       0.0000       0.0000       0      63     0     
+PHONE_NUMBER                   1.0000       0.8750       0.9333       28     0      4     
+USERNAME                       0.0000       0.0000       0.0000       0      38     0     
+US_SSN                         1.0000       1.0000       1.0000       22     0      0     
+
+
+ENSEMBLE DETECTOR RESULTS
+--------------------------------------------------------------------------------
+Overall: Precision=0.3374, Recall=0.9718, F1=0.5009 (TP=138, FP=271, FN=4)
+
+Per-Entity-Type Metrics:
+Entity Type                    Precision    Recall       F1           TP     FP     FN    
+--------------------------------------------------------------------------------------
+ADDRESS                        0.0000       0.0000       0.0000       0      37     0     
+CREDIT_CARD                    0.0000       0.0000       0.0000       0      24     0     
+DATE_OF_BIRTH                  0.0000       0.0000       0.0000       0      22     0     
+EMAIL_ADDRESS                  1.0000       1.0000       1.0000       56     0      0     
+EMPLOYEE_ID                    0.0000       0.0000       0.0000       0      23     0     
+IP_ADDRESS                     1.0000       1.0000       1.0000       32     0      0     
+ORGANIZATION                   0.0000       0.0000       0.0000       0      64     0     
+PERSON_NAME                    0.0000       0.0000       0.0000       0      63     0     
+PHONE_NUMBER                   1.0000       0.8750       0.9333       28     0      4     
+USERNAME                       0.0000       0.0000       0.0000       0      38     0     
+US_SSN                         1.0000       1.0000       1.0000       22     0      0     
+
+================================================================================
+COMPARISON WITH ROUND 1 BASELINE
+================================================================================
+
+REGEX DETECTOR:
+  Round 1: F1=0.7786, Precision=0.7035, Recall=0.8716
+  Round 3: F1=0.5009, Precision=0.3374, Recall=0.9718
+  Change:  F1=-0.2777 (-35.67%)
+
+ENSEMBLE DETECTOR:
+  Round 1: F1=0.6380, Precision=0.8456, Recall=0.5122
+  Round 3: F1=0.5009, Precision=0.3374, Recall=0.9718
+  Change:  F1=-0.1371 (-21.49%)
+
+================================================================================
+PROBLEM ENTITY TYPES (Round 1 Issues)
+================================================================================
+
+Regex Detector - Problem Entity Types:
+  _BENCHMARK_IGNORE: No detections in Round 3
+  _BENCHMARK_IGNORE: No detections in Round 3
+  _BENCHMARK_IGNORE: No detections in Round 3
+  EMPLOYEE_ID:
+    FP=23 (was 100 in R1)
+    Precision=0.0000, Recall=0.0000, F1=0.0000
+  _BENCHMARK_IGNORE: No detections in Round 3
+
+Ensemble Detector - Problem Entity Types:
+  _BENCHMARK_IGNORE: No detections in Round 3
+  _BENCHMARK_IGNORE: No detections in Round 3
+  _BENCHMARK_IGNORE: No detections in Round 3
+  EMPLOYEE_ID:
+    FP=23
+    Precision=0.0000, Recall=0.0000, F1=0.0000
+  _BENCHMARK_IGNORE: No detections in Round 3
+
+================================================================================
+SEMANTIC ENTITY TYPES (Round 1: Ensemble F1=0)
+================================================================================
+
+Regex Detector:
+  PERSON_NAME: F1=0.0000, Precision=0.0000, Recall=0.0000
+  ORGANIZATION: F1=0.0000, Precision=0.0000, Recall=0.0000
+  USERNAME: F1=0.0000, Precision=0.0000, Recall=0.0000
+
+Ensemble Detector:
+  PERSON_NAME: F1=0.0000, Precision=0.0000, Recall=0.0000
+  ORGANIZATION: F1=0.0000, Precision=0.0000, Recall=0.0000
+  USERNAME: F1=0.0000, Precision=0.0000, Recall=0.0000
+
+================================================================================
+MOE UNION GUARANTEE TEST
+================================================================================
+
+Result: PASSED
+✓ MoE fusion output is a SUPERSET of all expert findings
+
+================================================================================
+SUMMARY
+================================================================================
+
+Regex F1: 0.5009 (vs R1: 0.7786, change: -0.2777)
+Ensemble F1: 0.5009 (vs R1: 0.6380, change: -0.1371)
+MoE Union Guarantee: PASSED

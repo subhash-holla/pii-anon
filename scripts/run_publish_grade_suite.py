@@ -95,8 +95,6 @@ def _pick_single(pattern: str, *, root: Path) -> Path:
 
 def _aggregate_dataset_reports(
     per_dataset_jsons: dict[str, Path],
-    *,
-    engine_tiers_evaluated: list[str],
 ) -> dict[str, Any]:
     """Load per-dataset benchmark JSONs and produce a combined report.
 
@@ -161,7 +159,6 @@ def _aggregate_dataset_reports(
     return {
         "report_schema_version": "2026-02-19.v3",
         "datasets_evaluated": list(per_dataset_jsons.keys()),
-        "engine_tiers_evaluated": engine_tiers_evaluated,
         "by_dataset": by_dataset,
         "cross_dataset_summary": {
             "systems": cross_dataset_systems,
@@ -243,16 +240,6 @@ def main() -> None:
         default=True,
         help="Validate README benchmark section sync against generated artifacts",
     )
-    parser.add_argument(
-        "--engine-tiers",
-        nargs="+",
-        choices=["auto", "minimal", "standard", "full"],
-        default=None,
-        help=(
-            "Evaluate multiple engine tiers as separate pii-anon variants. "
-            "Example: --engine-tiers auto minimal standard full"
-        ),
-    )
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-readme-update", action="store_true")
     parser.add_argument("--python", default=sys.executable)
@@ -270,7 +257,6 @@ def main() -> None:
 
     # Resolve dataset list: --datasets overrides --dataset.
     datasets: list[str] = args.datasets if args.datasets else [args.dataset]
-    engine_tiers: list[str] | None = args.engine_tiers
 
     repo_root = Path(__file__).resolve().parents[1]
     artifacts_dir = (repo_root / args.artifacts_dir).resolve()
@@ -430,8 +416,6 @@ def main() -> None:
             if args.allow_core_native_engines
             else "--no-allow-core-native-engines"
         )
-        if engine_tiers:
-            benchmark_cmd.extend(["--engine-tiers", *engine_tiers])
         # Checkpoint support: default to artifacts_dir/checkpoints/<dataset>
         # so that interrupted runs can be resumed by re-running the suite.
         ckpt_dir = args.checkpoint_dir
@@ -493,10 +477,7 @@ def main() -> None:
     if len(per_dataset_jsons) > 1:
         progress.step("Aggregating multi-dataset results")
         combined_json = artifacts_dir / "benchmark-combined.json"
-        combined_payload = _aggregate_dataset_reports(
-            per_dataset_jsons,
-            engine_tiers_evaluated=engine_tiers or ["auto"],
-        )
+        combined_payload = _aggregate_dataset_reports(per_dataset_jsons)
         combined_json.write_text(
             json.dumps(combined_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

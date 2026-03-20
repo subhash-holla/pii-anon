@@ -29,12 +29,73 @@ from typing import Any
 
 DEFAULT_DENY_LISTS: dict[str, set[str]] = {
     "PERSON_NAME": {
+        # ── Geographic: Countries & Regions ───────────────────────────
         "new york", "san francisco", "los angeles", "united states",
         "north america", "south america", "east coast", "west coast",
         "great britain", "new zealand", "south africa", "north korea",
         "south korea", "united kingdom", "hong kong", "el salvador",
         "costa rica", "puerto rico", "sri lanka", "saudi arabia",
+        "dominican republic", "czech republic", "ivory coast",
+        "sierra leone", "burkina faso", "papua new guinea",
+        "trinidad and tobago", "antigua and barbuda",
+        "saint lucia", "cape verde", "san marino", "east timor",
+        "marshall islands", "solomon islands", "equatorial guinea",
+        "central african republic", "bosnia and herzegovina",
+        # ── Geographic: US Cities & Places ────────────────────────────
+        "las vegas", "san diego", "san jose", "san antonio",
+        "santa monica", "santa cruz", "santa barbara", "santa fe",
+        "el paso", "fort worth", "grand rapids", "little rock",
+        "long beach", "palm springs", "park city", "salt lake",
+        "baton rouge", "corpus christi", "des moines", "ann arbor",
+        "cedar rapids", "palo alto", "monte carlo", "monte vista",
+        "palm beach", "virginia beach", "daytona beach",
+        "west palm", "west point", "north pole",
+        # ── Geographic: European/International ────────────────────────
+        "monte carlo", "tel aviv", "buenos aires", "kuala lumpur",
+        "rio de janeiro", "sao paulo", "ho chi minh", "addis ababa",
+        "dar es salaam", "port au prince", "la paz", "el cairo",
+        "abu dhabi", "new delhi", "st petersburg", "st louis",
+        # ── Common two-word phrases (false positives) ─────────────────
+        "high school", "public school", "middle school",
+        "real estate", "ice cream", "black friday",
+        "good morning", "good afternoon", "good evening",
+        "happy birthday", "merry christmas", "happy new",
+        "first name", "last name", "full name",
+        "social security", "credit card", "phone number",
+        "email address", "date birth", "blood type",
+        "health care", "mental health", "public health",
+        "law enforcement", "prime minister", "vice president",
+        "chief executive", "general manager",
+        "board directors", "human resources", "customer service",
+        "data protection", "privacy policy", "terms service",
+        "machine learning", "artificial intelligence",
+        "deep learning", "natural language",
+        "open source", "best practice", "high quality",
+        "long term", "short term", "real time",
+        "next step", "action item", "follow up",
+        # ── Business/Professional role prefixes ──────────────────────
+        "support ticket", "case number", "case no",
+        "account number", "account holder", "account manager",
+        "project manager", "product manager", "program manager",
+        "technical support", "customer support", "help desk",
+        "system administrator", "network administrator",
+        "quality assurance", "business analyst",
+        "information technology", "information security",
+        "risk management", "compliance officer",
+        "hello mr", "hello mrs", "hello ms", "hello dr",
+        "dear sir", "dear madam",
+        # ── Test & Placeholder Data ───────────────────────────────────
         "test user", "sample data", "john doe", "jane doe",
+        "foo bar", "lorem ipsum", "hello world",
+        "test case", "test data", "dummy data",
+    },
+    "LOCATION": {
+        # Common false-positive terms for LOCATION entity type
+        "high school", "public school", "middle school",
+        "real estate", "ice cream", "health care",
+        "first name", "last name", "next step",
+        "open source", "machine learning", "deep learning",
+        "best practice", "good morning", "good evening",
     },
 }
 

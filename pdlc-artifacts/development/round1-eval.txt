@@ -1,0 +1,93 @@
+==========================================================================================
+PII-ANON DETECTOR EVALUATION REPORT
+==========================================================================================
+
+Dataset:          pii_anon_benchmark_v1
+Sample size:      200 records (evenly sampled)
+Total labels:     1636
+
+REGEX CORE DETECTOR (accuracy mode)
+------------------------------------------------------------------------------------------
+Predictions:      2027
+Overall Precision: 0.7035
+Overall Recall:    0.8716
+Overall F1:        0.7786
+(TP=1426, FP=601, FN=210)
+
+==========================================================================================
+Entity Type                  Precision       Recall     F1 Score       TP       FP       FN
+==========================================================================================
+ADDRESS                         0.9799       0.9799       0.9799      146        3        3
+BANK_ACCOUNT                    0.9583       0.9583       0.9583       46        2        2
+CREDIT_CARD                     0.7895       0.8333       0.8108       15        4        3
+CREDIT_CARD_FRAGMENT            0.4000       1.0000       0.5714        4        6        0
+DATE_ISO                        0.0000       0.0000       0.0000        0      115        0
+DATE_OF_BIRTH                   1.0000       0.8103       0.8952       47        0       11
+DATE_TIME                       0.0000       0.0000       0.0000        0       20        0
+DRIVERS_LICENSE                 0.5000       0.5000       0.5000        4        4        4
+EMAIL_ADDRESS                   0.9459       1.0000       0.9722      245       14        0
+EMPLOYEE_ID                     0.1736       0.6364       0.2727       21      100       12
+GPS_COORDINATES                 0.0000       0.0000       0.0000        0       14        0
+IP_ADDRESS                      0.9375       1.0000       0.9677       15        1        0
+LICENSE_PLATE                   1.0000       0.0833       0.1538        1        0       11
+LOCATION                        1.0000       1.0000       1.0000       10        0        0
+MAC_ADDRESS                     1.0000       1.0000       1.0000       30        0        0
+MEDICAL_RECORD_NUMBER           0.8333       0.8333       0.8333       10        2        2
+NATIONAL_ID                     1.0000       0.7692       0.8696       10        0        3
+ORGANIZATION                    0.8070       0.9485       0.8720       92       22        5
+PASSPORT                        1.0000       0.9474       0.9730       18        0        1
+PERSON_NAME                     0.5769       0.7545       0.6539      375      275      122
+PHONE_NUMBER                    0.9779       0.9415       0.9593      177        4       11
+ROUTING_NUMBER                  1.0000       1.0000       1.0000       12        0        0
+URL_WITH_PII                    0.0000       0.0000       0.0000        0        2        0
+USERNAME                        0.9500       1.0000       0.9744       19        1        0
+US_SSN                          0.9149       0.8658       0.8897      129       12       20
+==========================================================================================
+
+ENSEMBLE DETECTOR
+------------------------------------------------------------------------------------------
+Predictions:      991
+Overall Precision: 0.8456
+Overall Recall:    0.5122
+Overall F1:        0.6380
+(TP=838, FP=153, FN=798)
+
+==========================================================================================
+Entity Type                  Precision       Recall     F1 Score       TP       FP       FN
+==========================================================================================
+ADDRESS                         0.9799       0.9799       0.9799      146        3        3
+BANK_ACCOUNT                    0.9583       0.9583       0.9583       46        2        2
+CREDIT_CARD                     0.7895       0.8333       0.8108       15        4        3
+CREDIT_CARD_FRAGMENT            0.0000       0.0000       0.0000        0        0        4
+DATE_OF_BIRTH                   1.0000       0.8103       0.8952       47        0       11
+DRIVERS_LICENSE                 0.5000       0.5000       0.5000        4        4        4
+EMAIL_ADDRESS                   0.9459       1.0000       0.9722      245       14        0
+EMPLOYEE_ID                     0.1736       0.6364       0.2727       21      100       12
+IP_ADDRESS                      0.9375       1.0000       0.9677       15        1        0
+LICENSE_PLATE                   1.0000       0.0833       0.1538        1        0       11
+LOCATION                        1.0000       1.0000       1.0000       10        0        0
+MAC_ADDRESS                     1.0000       1.0000       1.0000       30        0        0
+MEDICAL_RECORD_NUMBER           0.0000       0.0000       0.0000        0        0       12
+NATIONAL_ID                     0.0000       0.0000       0.0000        0        0       13
+ORGANIZATION                    0.0000       0.0000       0.0000        0        0       97
+PASSPORT                        1.0000       0.9474       0.9730       18        0        1
+PERSON_NAME                     0.0000       0.0000       0.0000        0        0      497
+PHONE_NUMBER                    0.8839       0.5266       0.6600       99       13       89
+ROUTING_NUMBER                  1.0000       1.0000       1.0000       12        0        0
+USERNAME                        0.0000       0.0000       0.0000        0        0       19
+US_SSN                          0.9149       0.8658       0.8897      129       12       20
+==========================================================================================
+
+COMPARATIVE ANALYSIS
+==========================================================================================
+
+Strong entity types (F1 >= 0.80):
+  Regex:    MAC_ADDRESS(1.00), LOCATION(1.00), ROUTING_NUMBER(1.00), ADDRESS(0.98), USERNAME(0.97), PASSPORT(0.97), EMAIL_ADDRESS(0.97), IP_ADDRESS(0.97), PHONE_NUMBER(0.96), BANK_ACCOUNT(0.96), DATE_OF_BIRTH(0.90), US_SSN(0.89), ORGANIZATION(0.87), NATIONAL_ID(0.87), MEDICAL_RECORD_NUMBER(0.83), CREDIT_CARD(0.81)
+  Ensemble: MAC_ADDRESS(1.00), ROUTING_NUMBER(1.00), LOCATION(1.00), ADDRESS(0.98), PASSPORT(0.97), EMAIL_ADDRESS(0.97), IP_ADDRESS(0.97), BANK_ACCOUNT(0.96), DATE_OF_BIRTH(0.90), US_SSN(0.89), CREDIT_CARD(0.81)
+
+Weak entity types (F1 < 0.50):
+  Regex:    DATE_TIME(0.00), DATE_ISO(0.00), GPS_COORDINATES(0.00), URL_WITH_PII(0.00), LICENSE_PLATE(0.15), EMPLOYEE_ID(0.27)
+  Ensemble: PERSON_NAME(0.00), USERNAME(0.00), ORGANIZATION(0.00), NATIONAL_ID(0.00), CREDIT_CARD_FRAGMENT(0.00), MEDICAL_RECORD_NUMBER(0.00), LICENSE_PLATE(0.15), EMPLOYEE_ID(0.27)
+
+Entity types where ensemble improves over regex:
+  None

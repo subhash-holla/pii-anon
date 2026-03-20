@@ -5,7 +5,7 @@ from pii_anon.evaluation import compare_competitors
 from pii_anon.evaluation import competitor_compare as cc
 
 
-EXPECTED_SYSTEMS = {"pii-anon", "presidio", "scrubadub", "gliner"}
+EXPECTED_SYSTEMS = {"pii-anon", "pii-anon-ensemble", "presidio", "scrubadub", "gliner"}
 
 
 def _records() -> list[BenchmarkRecord]:

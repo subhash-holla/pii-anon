@@ -92,6 +92,10 @@ CONTEXT_WORDS: dict[str, set[str]] = {
         "mac", "hardware", "device", "interface", "ethernet",
         "wifi", "adapter", "network",
     },
+    "EMPLOYEE_ID": {
+        "employee", "emp", "staff", "personnel", "worker",
+        "badge", "payroll", "contractor",
+    },
     "ORGANIZATION": {
         "company", "corporation", "inc", "ltd", "llc", "org",
         "enterprise", "firm", "business", "employer",
@@ -107,21 +111,55 @@ CONTEXT_WORDS: dict[str, set[str]] = {
 }
 
 # Entity types where absence of context should *penalize* confidence.
-# Expanded to match the paper's identification of high-FP categories:
-# PERSON_NAME, LOCATION, ORGANIZATION, and ADDRESS all produce
-# frequent false positives when context is absent (Section 6.3).
+# Expanded based on benchmark analysis showing high false-positive rates
+# for these entity types when context keywords are absent.
 HIGH_FP_TYPES: frozenset[str] = frozenset({
     "US_SSN",
     "PERSON_NAME",
     "LOCATION",
     "ORGANIZATION",
     "ADDRESS",
+    "PHONE_NUMBER",
+    "EMPLOYEE_ID",
+    "IP_ADDRESS",
+    "EMAIL_ADDRESS",
 })
 
-# Tuning constants.
-CONTEXT_BOOST: float = 0.08
-CONTEXT_PENALTY: float = 0.05
+# Tuning constants — module-level defaults.
+# These are overridden at runtime when CoreConfig.confidence is provided
+# to the regex engine adapter via ``configure_from_config()``.
+CONTEXT_BOOST: float = 0.10
+CONTEXT_PENALTY: float = 0.15
 CONTEXT_WINDOW: int = 50
+CONFIDENCE_CAP: float = 0.99
+CONFIDENCE_FLOOR: float = 0.40
+
+
+def configure_from_config(
+    *,
+    context_boost: float | None = None,
+    context_penalty: float | None = None,
+    context_window: int | None = None,
+    confidence_cap: float | None = None,
+    confidence_floor: float | None = None,
+) -> None:
+    """Override module-level tuning constants from external configuration.
+
+    Called by the regex engine adapter during initialization so that
+    ``CoreConfig.confidence`` values take effect.
+    """
+    global CONTEXT_BOOST, CONTEXT_PENALTY, CONTEXT_WINDOW  # noqa: PLW0603
+    global CONFIDENCE_CAP, CONFIDENCE_FLOOR  # noqa: PLW0603
+    if context_boost is not None:
+        CONTEXT_BOOST = context_boost
+    if context_penalty is not None:
+        CONTEXT_PENALTY = context_penalty
+    if context_window is not None:
+        CONTEXT_WINDOW = context_window
+    if confidence_cap is not None:
+        CONFIDENCE_CAP = confidence_cap
+    if confidence_floor is not None:
+        CONFIDENCE_FLOOR = confidence_floor
 
 # Pre-compiled word tokenizer.
 _WORD_RE = re.compile(r"\b\w+\b")
@@ -159,9 +197,9 @@ def has_context_words(entity_type: str, context_text: str) -> bool:
     words = CONTEXT_WORDS.get(entity_type)
     if not words:
         return False
-    # Split is faster than regex tokenization for plain ASCII context text.
-    tokens = context_text.split()
-    return any(t in words for t in tokens)
+    # ``not words.isdisjoint(...)`` short-circuits on the first common
+    # element and avoids materialising a full split list or genexpr.
+    return not words.isdisjoint(context_text.split())
 
 
 def adjust_confidence(
@@ -189,11 +227,11 @@ def adjust_confidence(
     Returns
     -------
     float
-        Adjusted confidence in [0.50, 0.99].
+        Adjusted confidence in [0.40, 0.99].
     """
     ctx = extract_context(text, start, end)
     if has_context_words(entity_type, ctx):
-        return min(0.99, base_confidence + CONTEXT_BOOST)
+        return min(CONFIDENCE_CAP, base_confidence + CONTEXT_BOOST)
     if entity_type in HIGH_FP_TYPES:
-        return max(0.50, base_confidence - CONTEXT_PENALTY)
+        return max(CONFIDENCE_FLOOR, base_confidence - CONTEXT_PENALTY)
     return base_confidence

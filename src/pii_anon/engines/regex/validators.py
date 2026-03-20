@@ -31,6 +31,17 @@ from __future__ import annotations
 
 import re
 
+# ── Fast digit extraction ────────────────────────────────────────────
+# ``str.translate`` with a pre-built table is ~3× faster than the
+# ``"".join(ch for ch in s if ch.isdigit())`` pattern used in validators.
+_NON_DIGIT_TABLE = str.maketrans("", "", "".join(chr(c) for c in range(256) if not chr(c).isdigit()))
+
+
+def _extract_digits(s: str) -> str:
+    """Return only the digit characters from *s* (fast C-level path)."""
+    return s.translate(_NON_DIGIT_TABLE)
+
+
 # Street-address suffixes used by ``looks_like_address_phrase``.
 ADDRESS_SUFFIXES: frozenset[str] = frozenset({
     "street", "st", "avenue", "ave", "road", "rd", "way",
@@ -119,7 +130,7 @@ def is_cc_format(digits: str) -> bool:
 
 def is_valid_credit_card(candidate: str) -> bool:
     """Validate via Luhn checksum **or** issuer-prefix format match."""
-    digits = "".join(ch for ch in candidate if ch.isdigit())
+    digits = _extract_digits(candidate)
     if len(digits) < 13 or len(digits) > 19:
         return False
     if luhn_checksum(digits):
@@ -334,6 +345,68 @@ def is_valid_dea_number(candidate: str) -> bool:
     even_sum = d[1] + d[3] + d[5]
     check = (odd_sum + 2 * even_sum) % 10
     return check == d[6]
+
+
+# ---------------------------------------------------------------------------
+# Phone number validator
+# ---------------------------------------------------------------------------
+
+
+# Common non-phone number patterns: version numbers, dates, zip+4, etc.
+_PHONE_FALSE_POSITIVE_RE = re.compile(
+    r"^(?:"
+    r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}"  # dates (MM/DD/YYYY)
+    r"|v?\d+\.\d+\.\d+"                     # version numbers (1.2.3)
+    r"|\d{5}-\d{4}"                          # ZIP+4
+    r"|0{3,}"                                # all zeros
+    r"|1{3,}"                                # all ones
+    r"|(\d)\1{6,}"                           # repeated digits (7+)
+    r"|123456\d*"                            # sequential digits
+    r")$"
+)
+
+# Area codes that are never assigned (N11, 0XX, 1XX).
+_INVALID_US_AREA_CODES = frozenset({
+    "000", "100", "200", "211", "311", "411", "511", "611", "711", "811", "911",
+})
+
+
+def is_valid_phone_number(candidate: str) -> bool:
+    """Validate a phone number candidate to reduce false positives.
+
+    Strips formatting, then checks:
+    1. Not a date, version number, or repeating-digit pattern.
+    2. If it looks like a US number (10 digits), the area code must be valid.
+    3. Must have at least 7 digits total.
+    """
+    digits = _extract_digits(candidate)
+
+    # Too few digits — not a real phone number
+    if len(digits) < 7:
+        return False
+
+    # Check for common false-positive patterns on the raw text
+    stripped = candidate.strip()
+    if _PHONE_FALSE_POSITIVE_RE.match(stripped):
+        return False
+
+    # Check for all-same-digit sequences (e.g., 5555555555)
+    if len(set(digits)) <= 2 and len(digits) >= 7:
+        return False
+
+    # US number validation: 10 or 11 digits (1 + 10)
+    if len(digits) == 11 and digits[0] == "1":
+        digits = digits[1:]
+    if len(digits) == 10:
+        area = digits[:3]
+        if area in _INVALID_US_AREA_CODES:
+            return False
+        # Area code cannot start with 0 or 1 (NANP rule).
+        # Exchange code cannot start with 0 (1XX is valid since 1995).
+        if digits[0] in ("0", "1") or digits[3] == "0":
+            return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------

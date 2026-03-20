@@ -120,20 +120,26 @@ def _cluster_overlapping_spans(
 
     clusters: list[list[EngineFinding]] = []
     for group in by_group.values():
+        n = len(group)
+        if n == 1:
+            # Common fast-path: single-engine finding — no sorting needed.
+            clusters.append(group)
+            continue
         # Sort by span_start for sweep-line clustering
-        sorted_group = sorted(group, key=lambda f: (f.span_start or 0, f.span_end or 0))
-        used = [False] * len(sorted_group)
-        for i, anchor in enumerate(sorted_group):
+        group.sort(key=lambda f: (f.span_start or 0, f.span_end or 0))
+        used = bytearray(n)  # bytearray is faster than list[bool]
+        for i in range(n):
             if used[i]:
                 continue
+            anchor = group[i]
             cluster = [anchor]
-            used[i] = True
+            used[i] = 1
             a_start = anchor.span_start or 0
             a_end = anchor.span_end or 0
-            for j in range(i + 1, len(sorted_group)):
+            for j in range(i + 1, n):
                 if used[j]:
                     continue
-                b = sorted_group[j]
+                b = group[j]
                 b_start = b.span_start or 0
                 b_end = b.span_end or 0
                 if b_start >= a_end + 5:
@@ -141,10 +147,12 @@ def _cluster_overlapping_spans(
                     break
                 if _overlap_iou(a_start, a_end, b_start, b_end) >= iou_threshold:
                     cluster.append(b)
-                    used[j] = True
+                    used[j] = 1
                     # Expand anchor envelope to union of spans
-                    a_start = min(a_start, b_start)
-                    a_end = max(a_end, b_end)
+                    if b_start < a_start:
+                        a_start = b_start
+                    if b_end > a_end:
+                        a_end = b_end
             clusters.append(cluster)
     return clusters
 
@@ -154,6 +162,16 @@ class WeightedConsensusFusion(FusionStrategy):
 
     Groups findings by location (entity type, field, span), then computes
     a weighted average confidence. Engine weights reflect relative reliability.
+
+    Supports per-entity-type ``entity_weights``: weight overrides that let
+    each engine contribute more (or less) for entity types it specialises in.
+    For example, GLiNER may get weight 1.8 for ``PERSON_NAME`` while regex
+    gets 0.5, but regex gets weight 2.0 for ``US_SSN`` while GLiNER gets 0.6.
+
+    .. note::
+       For full mixture-of-experts routing, use ``MoEFusionStrategy`` from
+       ``pii_anon.moe`` (selected via ``mode="mixture_of_experts"`` in
+       ``build_fusion()``).
 
     When multiple engines detect the same entity at slightly different
     boundaries (e.g. regex finds "123-45-6789" at (15, 26) while Presidio
@@ -166,8 +184,13 @@ class WeightedConsensusFusion(FusionStrategy):
     Parameters
     ----------
     weights : dict[str, float] | None
-        Per-engine weights. Default weight is 1.0. Higher weight = more
+        Per-engine global weights. Default weight is 1.0. Higher weight = more
         influential engine.
+    entity_weights : dict[str, dict[str, float]] | None
+        Per-entity-type per-engine weight overrides.  Outer key is engine ID,
+        inner key is entity type.  When present, overrides the global weight
+        for that engine+entity combination.
+        Example: ``{"gliner-compatible": {"PERSON_NAME": 1.8}}``
     iou_threshold : float
         Minimum Intersection-over-Union for two spans to be considered
         overlapping (default 0.5).
@@ -178,10 +201,34 @@ class WeightedConsensusFusion(FusionStrategy):
         self,
         weights: dict[str, float] | None = None,
         *,
+        entity_weights: dict[str, dict[str, float]] | None = None,
         iou_threshold: float = 0.5,
     ) -> None:
         self.weights = weights or {}
+        self.entity_weights = entity_weights or {}
         self.iou_threshold = iou_threshold
+        self._weight_cache: dict[tuple[str, str], float] = {}
+
+    def _get_weight(self, engine_id: str, entity_type: str) -> float:
+        """Resolve weight for a specific engine + entity type combination.
+
+        Returns the per-entity override if one exists, otherwise the global
+        engine weight, otherwise 1.0.  Results are cached in ``_weight_cache``
+        for O(1) lookups on subsequent calls with the same arguments.
+        """
+        cache_key = (engine_id, entity_type)
+        cached = self._weight_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        engine_overrides = self.entity_weights.get(engine_id)
+        if engine_overrides:
+            override = engine_overrides.get(entity_type)
+            if override is not None:
+                self._weight_cache[cache_key] = override
+                return override
+        w = self.weights.get(engine_id, 1.0)
+        self._weight_cache[cache_key] = w
+        return w
 
     def merge(self, findings: list[EngineFinding]) -> list[EnsembleFinding]:
         """Merge findings by location, weighted by engine reliability.
@@ -190,6 +237,9 @@ class WeightedConsensusFusion(FusionStrategy):
         then each cluster is reduced to a single ensemble finding using
         weighted-average confidence and the highest-confidence engine's
         span boundaries.
+
+        Uses per-entity expert weights when available (mixture-of-experts),
+        falling back to global engine weights.
 
         Parameters
         ----------
@@ -208,6 +258,7 @@ class WeightedConsensusFusion(FusionStrategy):
             weighted_sum = 0.0
             total_weight = 0.0
             engines: list[str] = []
+            entity_type = cluster[0].entity_type
             # Collect all span boundaries for majority voting.
             # When engines disagree on exact boundaries, use the most common
             # start/end pair rather than the single highest-confidence engine's
@@ -218,7 +269,7 @@ class WeightedConsensusFusion(FusionStrategy):
             start_votes: dict[int, float] = {}
             end_votes: dict[int, float] = {}
             for item in cluster:
-                weight = self.weights.get(item.engine_id, 1.0)
+                weight = self._get_weight(item.engine_id, entity_type)
                 weighted_sum += item.confidence * weight
                 total_weight += weight
                 engines.append(item.engine_id)
@@ -395,11 +446,19 @@ def available_fusion_modes() -> list[str]:
         "weighted_consensus",
         "calibrated_majority",
         "intersection_consensus",
+        "mixture_of_experts",
     ]
     return sorted(set(builtin + list(_CUSTOM_FACTORIES.keys())))
 
 
-def build_fusion(mode: FusionMode, *, weights: dict[str, float], min_consensus: int) -> FusionStrategy:
+def build_fusion(
+    mode: FusionMode,
+    *,
+    weights: dict[str, float],
+    min_consensus: int,
+    entity_weights: dict[str, dict[str, float]] | None = None,
+    iou_threshold: float = 0.5,
+) -> FusionStrategy:
     """Instantiate a fusion strategy by name.
 
     Selects and configures a fusion strategy based on the mode string.
@@ -410,9 +469,12 @@ def build_fusion(mode: FusionMode, *, weights: dict[str, float], min_consensus: 
     mode : FusionMode
         Strategy name (e.g., "weighted_consensus", "calibrated_majority").
     weights : dict[str, float]
-        Per-engine weights (passed to strategies that support it).
+        Per-engine global weights (passed to strategies that support it).
     min_consensus : int
         Consensus threshold (passed to strategies that support it).
+    entity_weights : dict[str, dict[str, float]] | None
+        Per-entity-type per-engine weight overrides for mixture-of-experts
+        fusion.  Outer key is engine ID, inner key is entity type.
 
     Returns
     -------
@@ -431,7 +493,18 @@ def build_fusion(mode: FusionMode, *, weights: dict[str, float], min_consensus: 
     if mode == "intersection_consensus":
         return IntersectionConsensusFusion(min_consensus=min_consensus)
     if mode == "weighted_consensus":
-        return WeightedConsensusFusion(weights=weights)
+        return WeightedConsensusFusion(
+            weights=weights, entity_weights=entity_weights, iou_threshold=iou_threshold,
+        )
+    if mode == "mixture_of_experts":
+        from pii_anon.moe import MoEFusionStrategy, get_default_registry
+        return MoEFusionStrategy(
+            registry=get_default_registry(),
+            top_k=3,
+            iou_threshold=iou_threshold,
+            performance_floor=True,
+            min_expert_weight=0.15,
+        )
     if mode in _CUSTOM_FACTORIES:
         return _CUSTOM_FACTORIES[mode](weights, min_consensus)
     raise FusionError(f"Unknown fusion mode `{mode}`")

@@ -56,6 +56,7 @@ from pii_anon.engines.regex.confidence import (
 from pii_anon.engines.regex.deny_list import DenyListManager
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex import validators
+from pii_anon.engines.regex.validators import _extract_digits
 from pii_anon.types import EngineCapabilities, EngineFinding, Payload
 
 # Backward-compatible aliases — tests and external code may import these
@@ -78,6 +79,11 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 # Custom handlers (string sentinels) still use if-elif in _run_validator()
 # because they require complex multi-step logic.
 
+# Minimum confidence threshold for emitting a finding.  Findings below
+# this threshold are suppressed to reduce false positives from patterns
+# that receive context penalties.
+_MIN_EMIT_CONFIDENCE: float = 0.50
+
 _VALIDATORS: dict[str, Any] = {
     # Simple bool validators — callable, return True/False
     "ipv4": lambda text, _m: validators.is_valid_ipv4(text),
@@ -85,6 +91,7 @@ _VALIDATORS: dict[str, Any] = {
     "vin": lambda text, _m: validators.is_valid_vin_check_digit(text),
     "npi": lambda text, _m: validators.is_valid_npi(text),
     "dea": lambda text, _m: validators.is_valid_dea_number(text),
+    "phone": lambda text, _m: validators.is_valid_phone_number(text),
     # Custom handlers — need multi-step logic in _run_validator()
     "ssn_dash": "_ssn_dash",       # area-code validation (000, 666, 900+)
     "ssn_space": "_ssn_space",     # area-code validation (space-separated)
@@ -300,12 +307,23 @@ class RegexEngineAdapter(EngineAdapter):
         self._has_allow_lists = bool(self._list_mgr._allow_lists)
 
     def initialize(self, config: dict[str, Any] | None = None) -> None:
-        """Initialize engine, loading deny/allow-lists from config."""
+        """Initialize engine, loading deny/allow-lists and confidence tuning from config."""
         super().initialize(config)
         if config:
             self._list_mgr.initialize(config)
             self._deny_lists = self._list_mgr._deny_lists
             self._has_allow_lists = bool(self._list_mgr._allow_lists)
+            # Apply confidence tuning from CoreConfig.confidence
+            conf = config.get("confidence", {})
+            if conf:
+                from pii_anon.engines.regex.confidence import configure_from_config
+                configure_from_config(
+                    context_boost=conf.get("context_boost"),
+                    context_penalty=conf.get("context_penalty"),
+                    context_window=conf.get("context_window"),
+                    confidence_cap=conf.get("confidence_cap"),
+                    confidence_floor=conf.get("confidence_floor"),
+                )
 
     def capabilities(self) -> EngineCapabilities:
         """Return engine capabilities including supported languages."""
@@ -481,6 +499,14 @@ class RegexEngineAdapter(EngineAdapter):
                             spec.context_type, confidence, value, span_start, span_end,
                         )
 
+                    # ── Confidence threshold filter ────────────────
+                    # Suppress low-confidence findings to reduce false
+                    # positives.  The threshold is intentionally set low
+                    # so that only findings penalized by both low base
+                    # confidence AND missing context are suppressed.
+                    if confidence < _MIN_EMIT_CONFIDENCE:
+                        continue
+
                     findings.append(
                         EngineFinding(
                             entity_type=spec.entity_type,
@@ -542,7 +568,7 @@ class RegexEngineAdapter(EngineAdapter):
 
         # ── Credit card: Luhn vs format-only ───────────────────────
         if v == "credit_card":
-            digits = "".join(ch for ch in matched_text if ch.isdigit())
+            digits = _extract_digits(matched_text)
             if len(digits) < 13 or len(digits) > 19:
                 return 0, "", True
             if validators.luhn_checksum(digits):
@@ -561,7 +587,7 @@ class RegexEngineAdapter(EngineAdapter):
 
         # ── Canadian SIN: Luhn on 9 digits ─────────────────────────
         if v == "sin_luhn":
-            digits = "".join(ch for ch in matched_text if ch.isdigit())
+            digits = _extract_digits(matched_text)
             if len(digits) != 9:
                 return 0, "", True
             if validators.luhn_checksum(digits):
@@ -570,7 +596,7 @@ class RegexEngineAdapter(EngineAdapter):
 
         # ── Aadhaar: Verhoeff on 12 digits ─────────────────────────
         if v == "aadhaar":
-            digits = "".join(ch for ch in matched_text if ch.isdigit())
+            digits = _extract_digits(matched_text)
             if len(digits) != 12:
                 return 0, "", True
             if validators.is_valid_aadhaar_verhoeff(digits):

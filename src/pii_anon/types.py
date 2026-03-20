@@ -236,8 +236,9 @@ class ProcessingProfileSpec:
         Language code (e.g., "en").
     use_case : str
         Use case label for traceability (e.g., "pii_redaction", "compliance_audit").
-    objective : Literal["accuracy", "balanced", "speed"]
+    objective : Literal["accuracy", "balanced", "speed", "ensemble"]
         Optimization objective. Affects engine selection and execution strategy.
+        ``"ensemble"`` enables all available engines for maximum detection quality.
     transform_mode : TransformMode
         Output format ("pseudonymize" or "anonymize").
     placeholder_template : str
@@ -256,7 +257,7 @@ class ProcessingProfileSpec:
     policy_mode: PolicyMode = "balanced"
     language: str = "en"
     use_case: str = "default"
-    objective: Literal["accuracy", "balanced", "speed"] = "balanced"
+    objective: Literal["accuracy", "balanced", "speed", "ensemble"] = "balanced"
     transform_mode: TransformMode = "pseudonymize"
     placeholder_template: str = "<{entity_type}:anon_{index}>"
     entity_tracking_enabled: bool = True

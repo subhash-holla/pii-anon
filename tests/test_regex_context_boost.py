@@ -108,10 +108,10 @@ class TestAdjustConfidence:
         conf = RegexEngineAdapter._adjust_confidence("EMAIL_ADDRESS", 0.99, text, 15, 31)
         assert conf <= 0.99
 
-    def test_penalty_floor_at_050(self) -> None:
+    def test_penalty_floor_at_040(self) -> None:
         text = "Random text 123-45-6789 more random text."
         conf = RegexEngineAdapter._adjust_confidence("US_SSN", 0.52, text, 12, 23)
-        assert conf >= 0.50
+        assert conf >= 0.40
 
     def test_person_name_penalized_without_context(self) -> None:
         assert "PERSON_NAME" in _HIGH_FP_TYPES
@@ -155,8 +155,8 @@ class TestContextBoostInDetect:
         findings = self._detect("Call me at phone 555-123-4567 anytime.")
         phones = [f for f in findings if f.entity_type == "PHONE_NUMBER"]
         assert len(phones) >= 1
-        # With context, should be boosted above base 0.96
-        assert phones[0].confidence >= 0.96
+        # With context, should be boosted above base 0.80
+        assert phones[0].confidence >= 0.80
 
 
 # ---------------------------------------------------------------------------

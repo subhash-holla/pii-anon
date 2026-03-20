@@ -35,8 +35,8 @@ def test_regex_adapter_filters_invalid_ip_but_accepts_format_cc_and_iban() -> No
     cc_findings = adapter.detect({"text": cc_text}, {"language": "en", "policy_mode": "balanced"})
     cc_cards = [f for f in cc_findings if f.entity_type == "CREDIT_CARD"]
     assert len(cc_cards) == 1
-    # format match base 0.80 + context boost 0.08 ("card" keyword) = 0.88
-    assert cc_cards[0].confidence == 0.88  # format match, context-boosted
+    # format match base 0.80 + context boost 0.10 ("card" keyword) = 0.90
+    assert cc_cards[0].confidence == 0.90  # format match, context-boosted
 
     # Luhn-valid card → high confidence + context boost
     cc_valid_text = "card 4111-1111-1111-1111"
@@ -207,11 +207,11 @@ def test_regex_adapter_credit_card_tiered_confidence() -> None:
     assert len(valid_cc) >= 1
     assert valid_cc[0].confidence == 0.99
 
-    # Luhn-invalid but Visa prefix + context boost: 0.80 + 0.08 = 0.88
+    # Luhn-invalid but Visa prefix + context boost: 0.80 + 0.10 = 0.90
     format_findings = adapter.detect({"text": "card 4111111111111112"}, ctx)
     format_cc = [f for f in format_findings if f.entity_type == "CREDIT_CARD"]
     assert len(format_cc) >= 1
-    assert format_cc[0].confidence == 0.88
+    assert format_cc[0].confidence == 0.90
 
 
 def test_regex_adapter_iban_tiered_confidence() -> None:
@@ -219,8 +219,8 @@ def test_regex_adapter_iban_tiered_confidence() -> None:
     adapter = RegexEngineAdapter(enabled=True)
     ctx = {"language": "en", "policy_mode": "balanced"}
 
-    # Valid IBAN format + context boost ("IBAN" keyword): 0.78→0.86 or 0.93→0.99
+    # Valid IBAN format + context boost ("IBAN" keyword): 0.78→0.88 or 0.93→0.99
     format_findings = adapter.detect({"text": "IBAN DE99123456789012345678"}, ctx)
     format_ibans = [f for f in format_findings if f.entity_type == "IBAN"]
     assert len(format_ibans) >= 1
-    assert format_ibans[0].confidence in (0.86, 0.99)  # context-boosted
+    assert format_ibans[0].confidence in (0.88, 0.99)  # context-boosted

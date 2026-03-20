@@ -18,7 +18,27 @@ class ExecutionPlan:
 
 
 class PolicyRouter:
-    """Fast deterministic router that selects engines and fusion policy."""
+    """Fast deterministic router that selects engines and fusion policy.
+
+    Parameters
+    ----------
+    router_config : dict | None
+        Optional configuration dict (from ``CoreConfig.router``) with keys:
+        ``ensemble_confidence_threshold``, ``accuracy_confidence_threshold``,
+        ``balanced_confidence_threshold``, ``ensemble_concurrency_cap``,
+        ``accuracy_concurrency_cap``, ``balanced_concurrency_cap``,
+        ``segmentation_token_threshold``.  All values have sensible defaults.
+    """
+
+    def __init__(self, router_config: dict[str, object] | None = None) -> None:
+        cfg = router_config or {}
+        self._ensemble_threshold = float(cfg.get("ensemble_confidence_threshold", 0.70))
+        self._accuracy_threshold = float(cfg.get("accuracy_confidence_threshold", 0.88))
+        self._balanced_threshold = float(cfg.get("balanced_confidence_threshold", 0.80))
+        self._ensemble_concurrency = int(cfg.get("ensemble_concurrency_cap", 8))
+        self._accuracy_concurrency = int(cfg.get("accuracy_concurrency_cap", 4))
+        self._balanced_concurrency = int(cfg.get("balanced_concurrency_cap", 3))
+        self._seg_token_threshold = int(cfg.get("segmentation_token_threshold", 2000))
 
     def select(
         self,
@@ -48,7 +68,21 @@ class PolicyRouter:
                 escalate_on_low_confidence=False,
             )
 
-        segmentation_enabled = token_count > 2000 and use_case in {"long_document", "multilingual_mix"}
+        segmentation_enabled = (
+            token_count > self._seg_token_threshold
+            and use_case in {"long_document", "multilingual_mix"}
+        )
+
+        if objective == "ensemble":
+            return ExecutionPlan(
+                plan_id="ensemble_all",
+                engine_ids=list(available),
+                fusion_mode="weighted_consensus",
+                segmentation_enabled=segmentation_enabled,
+                concurrency_cap=min(self._ensemble_concurrency, max(1, len(available))),
+                low_confidence_threshold=self._ensemble_threshold,
+                escalate_on_low_confidence=False,
+            )
 
         if objective == "accuracy":
             return ExecutionPlan(
@@ -56,8 +90,8 @@ class PolicyRouter:
                 engine_ids=accuracy_engines,
                 fusion_mode="weighted_consensus",
                 segmentation_enabled=segmentation_enabled,
-                concurrency_cap=min(4, max(1, len(accuracy_engines))),
-                low_confidence_threshold=0.88,
+                concurrency_cap=min(self._accuracy_concurrency, max(1, len(accuracy_engines))),
+                low_confidence_threshold=self._accuracy_threshold,
                 escalate_on_low_confidence=True,
                 escalation_engine_ids=[engine_id for engine_id in available if engine_id not in accuracy_engines],
             )
@@ -79,8 +113,8 @@ class PolicyRouter:
             engine_ids=balanced_engines,
             fusion_mode="weighted_consensus",
             segmentation_enabled=segmentation_enabled,
-            concurrency_cap=min(3, max(1, len(balanced_engines))),
-            low_confidence_threshold=0.80,
+            concurrency_cap=min(self._balanced_concurrency, max(1, len(balanced_engines))),
+            low_confidence_threshold=self._balanced_threshold,
             escalate_on_low_confidence=True,
             escalation_engine_ids=[engine_id for engine_id in available if engine_id not in balanced_engines],
         )
