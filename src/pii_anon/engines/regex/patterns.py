@@ -285,15 +285,15 @@ _LICENSE_PLATE_US = re.compile(
 )
 
 # Credit card fragment / masked card number.
-# Matches "Card ending 1234", "ends with 1234", "last four: 1234", etc.
-# Reduced false positives (6 FP): require explicit context keywords rather than
-# just masked asterisks.  The context prefix is a non-capturing group.
+# Requires "card" in the prefix to avoid matching non-CC contexts like
+# "ending in 2023" (year) or "last four characters".
+# (autoresearch: CREDIT_CARD_FRAGMENT precision 13.4% → 23.6%)
 _CREDIT_CARD_FRAGMENT = re.compile(
     r"(?:"
-    r"(?:card\s+)?ending\s+(?:in\s+|with\s+)?"  # Card ending [in|with]
-    r"|(?:card\s+)?ends\s+(?:in|with)\s+"  # card ends in/with
-    r"|last\s+(?:four|4)\s*(?:digits?)?\s*[:\-]?\s*"  # last four:
-    r"|ends\s+(?:with|in)\s+"  # ends with 1234
+    r"card\s+ending\s+(?:in\s+|with\s+)?"  # Card ending [in|with]
+    r"|card\s+ends\s+(?:in|with)\s+"  # card ends in/with
+    r"|card\s+last\s+(?:four|4)\s*(?:digits?)?\s*[:\-]?\s*"  # card last four:
+    r"|card\s*#?\s*(?:\*+|x+|\.+)\s*"  # card ****1234
     r")"
     r"(\d{4})\b",
     re.IGNORECASE,
@@ -527,6 +527,13 @@ _SSN_9XX_SPACE = re.compile(r"\b9\d{2}\s\d{2}\s\d{4}\b")
 # US phone number in +1 (XXX) XXX-XXXX format, not covered by the general
 # _PHONE_EN pattern.  (autoresearch: PHONE_NUMBER recall 96.3% → 97.2%)
 _PHONE_PLUS1 = re.compile(r"\+1\s*\(\d{3}\)\s*\d{3}[-.\s]\d{4}\b")
+
+# International phone: +CC XXX-XXX-XXX format (DE, NL, JP, BR, KR, CN, IN, SA, etc.)
+# (autoresearch: PHONE_NUMBER recall 97.2% → 100%)
+_PHONE_INTL = re.compile(r"\+\d{1,3}\s+\d{2,4}[-.\s]\d{3}[-.\s]\d{3,4}\b")
+
+# UK phone: +44 20 XXXX XXXX format with space separators.
+_PHONE_UK = re.compile(r"\+44\s+\d{2}\s+\d{4}\s+\d{4}\b")
 
 # Broader DOB pattern: case-insensitive, allows "? A:" separator, and
 # includes "Fecha de nacimiento" (Spanish).
@@ -1156,6 +1163,20 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.92,
         context_type="PHONE_NUMBER",
         explanation="US phone number in +1 (area) format",
+    ),
+    PatternSpec(
+        entity_type="PHONE_NUMBER",
+        pattern=_PHONE_INTL,
+        base_confidence=0.88,
+        context_type="PHONE_NUMBER",
+        explanation="international phone +CC XXX-XXX-XXX",
+    ),
+    PatternSpec(
+        entity_type="PHONE_NUMBER",
+        pattern=_PHONE_UK,
+        base_confidence=0.90,
+        context_type="PHONE_NUMBER",
+        explanation="UK phone +44 20 XXXX XXXX",
     ),
     PatternSpec(
         entity_type="DATE_OF_BIRTH",

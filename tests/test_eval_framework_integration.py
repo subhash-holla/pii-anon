@@ -16,7 +16,7 @@ class TestTopLevelImports:
 
     def test_version_is_1_3_0(self) -> None:
         import pii_anon
-        assert pii_anon.__version__ == "1.0.0"
+        assert pii_anon.__version__ == "1.1.0"
 
     def test_eval_framework_imports(self) -> None:
         from pii_anon import (

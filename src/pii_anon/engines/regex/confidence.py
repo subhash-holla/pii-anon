@@ -37,6 +37,11 @@ CONTEXT_WORDS: dict[str, set[str]] = {
         "credit", "card", "visa", "mastercard", "amex", "discover",
         "payment", "debit", "charge", "cc", "cardnumber",
     },
+    "CREDIT_CARD_FRAGMENT": {
+        "credit", "card", "visa", "mastercard", "amex", "discover",
+        "payment", "debit", "charge", "cc", "cardnumber", "pan",
+        "account", "transaction", "purchase",
+    },
     "PHONE_NUMBER": {
         "call", "phone", "tel", "telephone", "mobile", "fax",
         "cell", "contact", "reach", "cellphone",
@@ -70,7 +75,8 @@ CONTEXT_WORDS: dict[str, set[str]] = {
     },
     "BANK_ACCOUNT": {
         "account", "bank", "checking", "savings", "deposit",
-        "acct", "cuenta", "compte",
+        "acct", "cuenta", "compte", "routing", "wire",
+        "transfer", "iban", "swift", "ach",
     },
     "DRIVERS_LICENSE": {
         "driver", "license", "licence", "dl", "driving", "permit",
@@ -123,6 +129,8 @@ HIGH_FP_TYPES: frozenset[str] = frozenset({
     "EMPLOYEE_ID",
     "IP_ADDRESS",
     "EMAIL_ADDRESS",
+    "CREDIT_CARD_FRAGMENT",
+    "BANK_ACCOUNT",
 })
 
 # Tuning constants — module-level defaults.

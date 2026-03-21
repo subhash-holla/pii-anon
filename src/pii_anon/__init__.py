@@ -110,7 +110,7 @@ from .pipeline import (  # noqa: E402, F401  — public re-export
     PipelineReport,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "__version__",
