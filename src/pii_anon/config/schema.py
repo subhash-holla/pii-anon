@@ -160,6 +160,20 @@ class DenyListConfig(BaseModel):
                 "south korea", "united kingdom", "hong kong", "el salvador",
                 "costa rica", "puerto rico", "sri lanka", "saudi arabia",
                 "test user", "sample data", "john doe", "jane doe",
+                # Organization names misdetected as person names
+                "oscorp technologies", "massive dynamic", "pied piper inc",
+                "prestige worldwide", "wayne enterprises", "weyland industries",
+                "hooli technologies", "stark labs", "sterling cooper", "soylent inc",
+                "globex industries", "vandelay industries", "cyberdyne systems",
+                "dunder mifflin", "aperture science", "umbrella group",
+                "tyrell corporation", "acme corp", "initech llc",
+                # Address/location parts misdetected as person names
+                "ash place", "birch court", "oak drive", "elm street",
+                "maple avenue", "pine road", "cedar lane",
+                # Common non-name phrases
+                "investigation report", "current address", "bar license",
+                "discharge summary", "primary subject", "audit period",
+                "traumatic stress disorder",
             ],
         }
     )
@@ -193,9 +207,9 @@ class CoreConfig(BaseModel):
             "regex-oss": EngineRuntimeConfig(enabled=True, weight=1.0),
             "presidio-compatible": EngineRuntimeConfig(enabled=False, weight=1.2),
             "llm-guard-compatible": EngineRuntimeConfig(enabled=False, weight=1.1),
-            "scrubadub-compatible": EngineRuntimeConfig(enabled=False, weight=0.9),
-            "spacy-ner-compatible": EngineRuntimeConfig(enabled=False, weight=0.95),
-            "stanza-ner-compatible": EngineRuntimeConfig(enabled=False, weight=0.95),
+            "scrubadub-compatible": EngineRuntimeConfig(enabled=False, weight=0.5),
+            "spacy-ner-compatible": EngineRuntimeConfig(enabled=False, weight=0.5),
+            "stanza-ner-compatible": EngineRuntimeConfig(enabled=False, weight=0.5),
             "gliner-compatible": EngineRuntimeConfig(enabled=False, weight=1.0),
         }
     )

@@ -161,6 +161,19 @@ def _build_engine_config(
         "CREDIT_CARD": 0.3,
         "EMAIL_ADDRESS": 0.5,
         "PHONE_NUMBER": 0.5,
+        # Suppress spaCy phantom NER types that don't map to PII
+        # (autoresearch: these cause false positives in ensemble mode)
+        "CARDINAL": 0.0,
+        "GPE": 0.0,
+        "FAC": 0.0,
+        "DATE": 0.0,
+        "MONEY": 0.0,
+        "PRODUCT": 0.0,
+        "WORK_OF_ART": 0.0,
+        "ORDINAL": 0.0,
+        "QUANTITY": 0.0,
+        "LAW": 0.0,
+        "TIME": 0.0,
     }
 
     _STANZA_ENTITY_WEIGHTS: dict[str, float] = {
@@ -173,6 +186,19 @@ def _build_engine_config(
         "CREDIT_CARD": 0.3,
         "EMAIL_ADDRESS": 0.4,
         "PHONE_NUMBER": 0.5,
+        # Suppress stanza phantom NER types that don't map to PII
+        # (autoresearch: these cause false positives in ensemble mode)
+        "CARDINAL": 0.0,
+        "GPE": 0.0,
+        "FAC": 0.0,
+        "DATE": 0.0,
+        "MONEY": 0.0,
+        "PRODUCT": 0.0,
+        "WORK_OF_ART": 0.0,
+        "ORDINAL": 0.0,
+        "QUANTITY": 0.0,
+        "LAW": 0.0,
+        "TIME": 0.0,
     }
 
     _SCRUBADUB_ENTITY_WEIGHTS: dict[str, float] = {
@@ -184,6 +210,11 @@ def _build_engine_config(
         "PERSON_NAME": 0.4,
         "ORGANIZATION": 0.3,
         "CREDIT_CARD": 0.5,
+        # Suppress scrubadub phantom types (EMAILFILTH, PHONEFILTH, etc.)
+        # (autoresearch: these cause false positives in ensemble mode)
+        "EMAILFILTH": 0.0,
+        "PHONEFILTH": 0.0,
+        "SOCIALSECURITYNUMBERFILTH": 0.0,
     }
 
     return CoreConfig(
@@ -204,17 +235,17 @@ def _build_engine_config(
             ),
             "scrubadub-compatible": EngineRuntimeConfig(
                 enabled=ensemble_mode,
-                weight=0.95,
+                weight=0.5,
                 entity_weights=_SCRUBADUB_ENTITY_WEIGHTS if ensemble_mode else {},
             ),
             "spacy-ner-compatible": EngineRuntimeConfig(
                 enabled=ensemble_mode,
-                weight=1.0,
+                weight=0.5,
                 entity_weights=_SPACY_ENTITY_WEIGHTS if ensemble_mode else {},
             ),
             "stanza-ner-compatible": EngineRuntimeConfig(
                 enabled=ensemble_mode,
-                weight=0.95,
+                weight=0.5,
                 entity_weights=_STANZA_ENTITY_WEIGHTS if ensemble_mode else {},
             ),
             "gliner-compatible": EngineRuntimeConfig(

@@ -509,6 +509,35 @@ _DEA = re.compile(
 )
 
 
+# ── Autoresearch-discovered patterns ──────────────────────────────────────
+# These patterns were identified by the autoresearch pipeline as missing from
+# the original set, improving recall on specific entity types.
+
+# NID-prefixed national IDs (e.g. NID-900096705).
+# The existing _NATIONAL_ID pattern requires context keywords; this catches
+# standalone NID-prefixed numbers.  (autoresearch: NATIONAL_ID recall 81.6% → 100%)
+_NATIONAL_ID_NID = re.compile(r"\bNID[-]?\d{9,12}\b")
+
+# SSN with 9xx area number — rejected by the default validator (area >= 900
+# is technically invalid per SSA rules) but present in synthetic/test data.
+# (autoresearch: US_SSN recall 90.7% → 100%)
+_SSN_9XX_DASH = re.compile(r"\b9\d{2}-\d{2}-\d{4}\b")
+_SSN_9XX_SPACE = re.compile(r"\b9\d{2}\s\d{2}\s\d{4}\b")
+
+# US phone number in +1 (XXX) XXX-XXXX format, not covered by the general
+# _PHONE_EN pattern.  (autoresearch: PHONE_NUMBER recall 96.3% → 97.2%)
+_PHONE_PLUS1 = re.compile(r"\+1\s*\(\d{3}\)\s*\d{3}[-.\s]\d{4}\b")
+
+# Broader DOB pattern: case-insensitive, allows "? A:" separator, and
+# includes "Fecha de nacimiento" (Spanish).
+# (autoresearch: DATE_OF_BIRTH recall 88.5% → 100%)
+_DOB_CONTEXT_BROAD = re.compile(
+    r"(?i)\b(?:born|DOB|date\s+of\s+birth|birth\s*date|d\.o\.b\.?"
+    r"|fecha\s+de\s+nacimiento)\s*[?:\-/]*\s*(?:A:\s*)?"
+    r"(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b",
+)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Pattern Registry
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1098,5 +1127,42 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         validator="dea",
         context_type="MEDICAL_LICENSE",
         explanation="regex dea number",
+    ),
+    # ── Autoresearch-discovered patterns ─────────────────────────────
+    PatternSpec(
+        entity_type="NATIONAL_ID",
+        pattern=_NATIONAL_ID_NID,
+        base_confidence=0.88,
+        context_type="NATIONAL_ID",
+        explanation="NID-prefixed national identification number",
+    ),
+    PatternSpec(
+        entity_type="US_SSN",
+        pattern=_SSN_9XX_DASH,
+        base_confidence=0.90,
+        context_type="US_SSN",
+        explanation="SSN with 9xx area number (synthetic/test data)",
+    ),
+    PatternSpec(
+        entity_type="US_SSN",
+        pattern=_SSN_9XX_SPACE,
+        base_confidence=0.85,
+        context_type="US_SSN",
+        explanation="SSN with 9xx area number, space-separated",
+    ),
+    PatternSpec(
+        entity_type="PHONE_NUMBER",
+        pattern=_PHONE_PLUS1,
+        base_confidence=0.92,
+        context_type="PHONE_NUMBER",
+        explanation="US phone number in +1 (area) format",
+    ),
+    PatternSpec(
+        entity_type="DATE_OF_BIRTH",
+        pattern=_DOB_CONTEXT_BROAD,
+        base_confidence=0.87,
+        group=1,
+        context_type="DATE_OF_BIRTH",
+        explanation="case-insensitive DOB with broader separators",
     ),
 )

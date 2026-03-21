@@ -92,6 +92,45 @@ from pii_anon.types import (
 
 T = TypeVar("T")
 
+# ── Supported PII entity types ────────────────────────────────────────────
+# Entity types recognized by pii-anon.  When multiple engines are running in
+# ensemble mode, NER engines (spaCy, stanza) emit entity types that don't
+# correspond to PII categories (CARDINAL, GPE, FAC, DATE, MONEY, etc.).
+# Filtering to this whitelist prevents those phantom types from appearing in
+# output and dragging down precision.
+# (autoresearch: ensemble precision 46.3% → 79.9% with this filter)
+SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset({
+    "ADDRESS",
+    "BANK_ACCOUNT",
+    "CREDIT_CARD",
+    "CREDIT_CARD_FRAGMENT",
+    "CRYPTO_WALLET",
+    "DATE_ISO",
+    "DATE_OF_BIRTH",
+    "DATE_TIME",
+    "DRIVERS_LICENSE",
+    "EMAIL_ADDRESS",
+    "EMPLOYEE_ID",
+    "GPS_COORDINATES",
+    "IBAN",
+    "IP_ADDRESS",
+    "LICENSE_PLATE",
+    "LOCATION",
+    "MAC_ADDRESS",
+    "MEDICAL_RECORD_NUMBER",
+    "MEDICAL_LICENSE",
+    "NATIONAL_ID",
+    "ORGANIZATION",
+    "PASSPORT",
+    "PERSON_NAME",
+    "PHONE_NUMBER",
+    "ROUTING_NUMBER",
+    "USERNAME",
+    "US_SSN",
+    "VIN",
+    "AGE",
+})
+
 
 class AsyncPIIOrchestrator:
     """Async orchestrator for PII detection, fusion, and transformation.
@@ -497,6 +536,8 @@ class AsyncPIIOrchestrator:
             fusion_audit.extend(audits)
 
         flat = [item for batch in findings_batches for item in batch]
+        # Filter out phantom entity types from NER engines (CARDINAL, GPE, etc.)
+        flat = [f for f in flat if f.entity_type in SUPPORTED_ENTITY_TYPES]
         return flat, fusion_audit, boundary_trace, plan
 
     async def _detect_segmented_field(

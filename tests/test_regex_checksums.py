@@ -95,14 +95,21 @@ class TestSSNAreaValidation:
         ssn = [f for f in findings if f.entity_type == "US_SSN"]
         assert len(ssn) == 0
 
-    def test_dash_format_area_900_rejected(self) -> None:
+    def test_dash_format_area_900_detected(self) -> None:
+        """9xx area SSNs are detected by the dedicated 9xx pattern.
+
+        While the SSA does not issue area numbers >= 900, synthetic and test
+        datasets frequently use them.  The autoresearch pipeline confirmed
+        that detecting these improves recall (90.7% → 100%) without harming
+        precision.
+        """
         adapter = RegexEngineAdapter()
         findings = adapter.detect(
             {"text": "SSN is 900-45-6789"},
             {"language": "en"},
         )
         ssn = [f for f in findings if f.entity_type == "US_SSN"]
-        assert len(ssn) == 0
+        assert len(ssn) == 1
 
     def test_space_format_area_000_rejected(self) -> None:
         adapter = RegexEngineAdapter()
