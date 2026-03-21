@@ -82,35 +82,46 @@ def resolve_benchmark_dataset_path(
     if source not in {"auto", "package-only"}:
         raise ValueError("source must be one of: auto, package-only")
 
-    base_dir = Path("benchmarks") / "data"
-    # Prefer compressed, fall back to plain JSONL.
-    suffixes = [f"{name}.jsonl.gz", f"{name}.jsonl"]
+    # Build candidate paths for both v1 (benchmarks/data/) and v1.1 (data/) layouts.
+    # v1 layout:  pii_anon_datasets/benchmarks/data/{name}.jsonl.gz
+    # v1.1 layout: pii_anon_datasets/data/pii_anon.jsonl.gz  (canonical name)
+    base_dirs = [Path("benchmarks") / "data", Path("data")]
+
+    # Dataset name mapping: pii_anon_benchmark_v1 -> pii_anon (v1.1 canonical name)
+    _V11_NAME_MAP = {"pii_anon_benchmark_v1": "pii_anon"}
+    name_variants = [name]
+    if name in _V11_NAME_MAP:
+        name_variants.append(_V11_NAME_MAP[name])
+
     candidates: list[Path] = []
 
-    for fname in suffixes:
-        rel_path = base_dir / fname
+    for dataset_name in name_variants:
+        suffixes = [f"{dataset_name}.jsonl.gz", f"{dataset_name}.jsonl"]
+        for base_dir in base_dirs:
+            for fname in suffixes:
+                rel_path = base_dir / fname
 
-        # Installed dataset package path (preferred for wheel installs).
-        try:
-            pkg_root = resources.files("pii_anon_datasets")
-            candidates.append(Path(str(pkg_root.joinpath(*rel_path.parts))))
-        except Exception:
-            pass
+                # Installed dataset package path (preferred for wheel installs).
+                try:
+                    pkg_root = resources.files("pii_anon_datasets")
+                    candidates.append(Path(str(pkg_root.joinpath(*rel_path.parts))))
+                except Exception:
+                    pass
 
-        if source == "auto":
-            env_root = os.getenv("PII_ANON_DATASET_ROOT") or os.getenv("PII_VEIL_DATASET_ROOT")
-            if env_root:
-                candidates.insert(0, Path(env_root) / rel_path)
+                if source == "auto":
+                    env_root = os.getenv("PII_ANON_DATASET_ROOT") or os.getenv("PII_VEIL_DATASET_ROOT")
+                    if env_root:
+                        candidates.insert(0, Path(env_root) / rel_path)
 
-        # Sibling repo path (pii-anon-eval-data next to pii-anon-code).
-            code_root = Path(__file__).resolve().parents[3]
-            candidates.append(code_root.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets" / rel_path)
+                    # Sibling repo path (pii-anon-eval-data next to pii-anon-code).
+                    code_root = Path(__file__).resolve().parents[3]
+                    candidates.append(code_root.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets" / rel_path)
 
-        # Local monorepo datasets package path (works in dev without install).
-            candidates.append(code_root / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / rel_path)
+                    # Local monorepo datasets package path (works in dev without install).
+                    candidates.append(code_root / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / rel_path)
 
-        # Legacy in-core path for backward compatibility.
-            candidates.append(Path(__file__).resolve().parent / "data" / fname)
+                    # Legacy in-core path for backward compatibility.
+                    candidates.append(Path(__file__).resolve().parent / "data" / fname)
 
     for candidate in candidates:
         if candidate.exists():
@@ -139,20 +150,90 @@ def _validate_label(record_id: str, text: str, label: dict[str, Any]) -> dict[st
     return out
 
 
+def _is_v11_schema(row: dict[str, Any]) -> bool:
+    """Detect pii-anon-eval-data v1.1.0 schema (uses 'annotations' instead of 'labels')."""
+    return "annotations" in row and "labels" not in row
+
+
+# Entity type mapping from v1.1.0 names to the canonical benchmark names
+# used by the pii-anon detection engine and competitor_compare evaluation.
+_V11_ENTITY_TYPE_MAP: dict[str, str] = {
+    "SOCIAL_SECURITY_NUMBER": "US_SSN",
+    "STREET_ADDRESS": "ADDRESS",
+    "ORGANIZATION_NAME": "ORGANIZATION",
+    "PASSPORT_NUMBER": "PASSPORT",
+    "DRIVER_LICENSE_NUMBER": "DRIVERS_LICENSE",
+    "BANK_ACCOUNT_NUMBER": "BANK_ACCOUNT",
+    "BANK_ROUTING_NUMBER": "ROUTING_NUMBER",
+    "NATIONAL_ID_NUMBER": "NATIONAL_ID",
+    "LOCATION_NAME": "LOCATION",
+    "CRYPTOCURRENCY_ADDRESS": "CRYPTO_WALLET",
+    "SOCIAL_MEDIA_HANDLE": "USERNAME",
+    "VEHICLE_IDENTIFICATION_NUMBER": "VIN",
+    "CREDIT_CARD_NUMBER": "CREDIT_CARD",
+    "LATITUDE_LONGITUDE": "GPS_COORDINATES",
+    "TIMESTAMP": "DATE_TIME",
+    "POSTAL_CODE": "ADDRESS",
+    "SWIFT_BIC_CODE": "IBAN",
+    "HEALTH_INSURANCE_ID": "MEDICAL_RECORD_NUMBER",
+    "DEVICE_IDENTIFIER": "MAC_ADDRESS",
+    "TAX_ID": "NATIONAL_ID",
+    "VISA_NUMBER": "PASSPORT",
+}
+
+
+def _normalize_v11_annotation(annotation: dict[str, Any]) -> dict[str, Any]:
+    """Convert a v1.1.0 annotation to the v1 label format expected by BenchmarkRecord."""
+    entity_type = annotation.get("entity_type", "")
+    entity_type = _V11_ENTITY_TYPE_MAP.get(entity_type, entity_type)
+    label: dict[str, Any] = {
+        "entity_type": entity_type,
+        "start": annotation["start"],
+        "end": annotation["end"],
+    }
+    if annotation.get("cluster_id") is not None:
+        label["entity_cluster_id"] = str(annotation["cluster_id"])
+    if annotation.get("mention_variant") is not None:
+        label["mention_variant"] = str(annotation["mention_variant"])
+    return label
+
+
 def _normalize_row(row: dict[str, Any], index: int) -> BenchmarkRecord:
-    record_id = str(row.get("id", f"row-{index + 1:06d}"))
+    # Support both v1 ("id") and v1.1 ("record_id") field names.
+    record_id = str(row.get("record_id", row.get("id", f"row-{index + 1:06d}")))
     text = str(row.get("text", ""))
     if not text:
         raise ValueError(f"dataset row `{record_id}` has empty text")
 
-    labels_raw = list(row.get("labels", []))
-    labels = [_validate_label(record_id, text, item) for item in labels_raw]
+    # Handle v1.1.0 schema: 'annotations' with richer structure
+    if _is_v11_schema(row):
+        annotations_raw = list(row.get("annotations", []))
+        labels = [
+            _validate_label(record_id, text, _normalize_v11_annotation(ann))
+            for ann in annotations_raw
+        ]
+    else:
+        labels_raw = list(row.get("labels", []))
+        labels = [_validate_label(record_id, text, item) for item in labels_raw]
 
-    source_type_raw = str(row.get("source_type", "synthetic"))
+    # Resolve source_type from v1 field or v1.1 provenance.source_type
+    provenance = row.get("provenance", {})
+    source_type_raw = str(
+        row.get("source_type")
+        or (provenance.get("source_type") if isinstance(provenance, dict) else None)
+        or "synthetic"
+    )
     if source_type_raw not in {"synthetic", "curated_public"}:
-        raise ValueError(f"dataset row `{record_id}` has invalid source_type `{source_type_raw}`")
+        source_type_raw = "synthetic"
     source_type: Literal["synthetic", "curated_public"] = (
         "synthetic" if source_type_raw == "synthetic" else "curated_public"
+    )
+
+    # Resolve license from v1 field or v1.1 provenance.license
+    license_val = str(
+        row.get("license")
+        or (provenance.get("license") if isinstance(provenance, dict) else None)
+        or "CC0-1.0"
     )
 
     return BenchmarkRecord(
@@ -162,14 +243,14 @@ def _normalize_row(row: dict[str, Any], index: int) -> BenchmarkRecord:
         language=str(row.get("language", "en")),
         source_type=source_type,
         source_id=str(row.get("source_id", "generated")),
-        license=str(row.get("license", "CC0-1.0")),
+        license=license_val,
         scenario_id=str(row.get("scenario_id", "baseline")),
         entity_cluster_id=str(row.get("entity_cluster_id", "none")),
         mention_variant=str(row.get("mention_variant", "none")),
         context_group=str(row.get("context_group", "baseline")),
-        datatype_group=str(row.get("datatype_group", "general")),
+        datatype_group=str(row.get("datatype_group", row.get("domain", "general"))),
         difficulty_level=str(row.get("difficulty_level", "moderate")),
-        evaluation_dimension=str(row.get("evaluation_dimension", "pii_type_coverage")),
+        evaluation_dimension=str(row.get("evaluation_dimension", row.get("primary_dimension", "pii_type_coverage"))),
     )
 
 

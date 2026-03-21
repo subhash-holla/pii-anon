@@ -16,7 +16,7 @@ def test_cli_version_command() -> None:
     result = runner.invoke(app, ["version"])
 
     assert result.exit_code == 0
-    assert "1.0.0" in result.stdout
+    assert "1.1.0" in result.stdout
 
 
 def test_cli_health_json() -> None:
