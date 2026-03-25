@@ -28,12 +28,15 @@ from typing import Any, Literal
 
 # ── Type Aliases ───────────────────────────────────────────────────────────
 
-FusionMode = Literal[
-    "union_high_recall",
-    "weighted_consensus",
-    "calibrated_majority",
-    "intersection_consensus",
-] | str
+FusionMode = (
+    Literal[
+        "union_high_recall",
+        "weighted_consensus",
+        "calibrated_majority",
+        "intersection_consensus",
+    ]
+    | str
+)
 """Fusion strategy selection.
 
 - ``union_high_recall``: emit all findings (highest recall, no merging).
@@ -53,9 +56,17 @@ PolicyMode = Literal["recall_max", "balanced", "precision_guarded"]
 RiskLevel = Literal["low", "moderate", "high"]
 """Confidence-based risk classification."""
 
-TransformMode = Literal[
-    "pseudonymize", "anonymize", "redact", "generalize", "synthetic", "perturb",
-] | str
+TransformMode = (
+    Literal[
+        "pseudonymize",
+        "anonymize",
+        "redact",
+        "generalize",
+        "synthetic",
+        "perturb",
+    ]
+    | str
+)
 """Output transformation mode.
 
 - ``pseudonymize``: replace with reversible tokens.
@@ -100,6 +111,7 @@ class EngineFinding:
     language : str
         Language code (e.g., "en", "es", "fr").
     """
+
     entity_type: str
     confidence: float
     field_path: str | None = None
@@ -137,6 +149,7 @@ class EnsembleFinding:
     language : str
         Language code.
     """
+
     entity_type: str
     confidence: float
     engines: list[str]
@@ -175,6 +188,7 @@ class FusionAuditRecord:
     notes : list[str]
         Optional notes (e.g., "consensus threshold not met").
     """
+
     strategy: str
     entity_type: str
     field_path: str | None
@@ -206,6 +220,7 @@ class ConfidenceEnvelope:
     by_entity_type : dict[str, float]
         Per-entity-type average confidence (e.g., {"EMAIL": 0.92, ...}).
     """
+
     score: float
     risk_level: RiskLevel
     contributors: list[str] = field(default_factory=list)
@@ -250,6 +265,7 @@ class ProcessingProfileSpec:
     external_competitor_allowlist : list[str]
         Explicit allowlist of external engines (overrides policy).
     """
+
     profile_id: str
     mode: FusionMode = "weighted_consensus"
     engine_weights: dict[str, float] = field(default_factory=dict)
@@ -276,6 +292,12 @@ class ProcessingProfileSpec:
     Maps strategy IDs to parameter dicts, e.g.
     ``{"perturb": {"epsilon": 1.0}, "redact": {"mode": "partial_start"}}``.
     """
+    audit_enabled: bool = True
+    """Whether to generate detailed audit trails.
+
+    Set to ``False`` in throughput-critical paths to skip audit generation
+    and reduce memory/CPU overhead.
+    """
 
 
 @dataclass
@@ -297,6 +319,7 @@ class SegmentationPlan:
     key_field : str
         Field to segment (typically "text").
     """
+
     enabled: bool = False
     max_tokens: int = 4096
     overlap_tokens: int = 128
@@ -321,6 +344,7 @@ class BoundaryReconciliationTrace:
     deduped_findings : int
         Number of duplicate findings removed.
     """
+
     segments_processed: int
     overlap_tokens: int
     merged_spans: int
@@ -349,12 +373,15 @@ class EngineCapabilities:
     supports_runtime_configuration : bool
         Whether the engine accepts runtime config dicts (default True).
     """
+
     adapter_id: str
     native_dependency: str | None
     dependency_available: bool
     supports_languages: list[str] = field(default_factory=lambda: ["en"])
     supports_streaming: bool = False
     supports_runtime_configuration: bool = True
+    supported_entity_types: list[str] | None = None
+    """Entity types this engine can detect. ``None`` means unknown."""
 
 
 @dataclass
@@ -382,6 +409,7 @@ class GuaranteeProfile:
         Maximum fraction of PII that can be leaked to LLM outputs
         (default 0.01 = 1%).
     """
+
     profile_id: str
     taxonomy: list[str]
     language: str = "en"
@@ -414,6 +442,7 @@ class GuaranteeReport:
     failure_buckets : list[dict[str, Any]]
         Categorized violations (e.g., entity types, documents failed).
     """
+
     evaluation_id: str
     profile_id: str
     assumptions: dict[str, Any]
@@ -441,6 +470,7 @@ class StrategyComparisonResult:
     avg_confidence : float
         Average confidence of all findings.
     """
+
     strategy: str
     span_fbeta: float
     findings_count: int

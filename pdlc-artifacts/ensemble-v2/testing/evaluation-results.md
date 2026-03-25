@@ -5,7 +5,7 @@
 | System | Precision | Recall | F1 | TP | FP | FN |
 |---|---|---|---|---|---|---|
 | pii-anon (regex) | 0.8730 | 0.9098 | **0.8910** | 7,776 | 1,131 | 771 |
-| pii-anon-ensemble | 0.8087 | 0.9231 | **0.8622** | 7,890 | 1,866 | 657 |
+| pii-anon-swarm | 0.8087 | 0.9231 | **0.8622** | 7,890 | 1,866 | 657 |
 | GLiNER (benchmark) | 0.9219 | 0.6674 | **0.7743** | — | — | — |
 
 **Ensemble beats GLiNER by +8.8 F1 points (0.8622 vs 0.7743).**

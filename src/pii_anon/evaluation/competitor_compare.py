@@ -461,9 +461,9 @@ def _normalize_entity_type(entity_type: str) -> str:
         "ACCOUNT_NUMBER": "BANK_ACCOUNT",
         "TAX_NUMBER": "NATIONAL_ID",
         "ID_CARD": "NATIONAL_ID",
-        # ── pii-anon-eval-data v1.1.0 entity type names ─────────────
+        # ── pii-anon-eval-data entity type names ──────────────────────
         # These entity types use different naming conventions in the
-        # v1.1.0 dataset schema.  Map to canonical benchmark names.
+        # pii-anon-eval-data schema.  Map to canonical benchmark names.
         "SOCIAL_SECURITY_NUMBER": "US_SSN",
         "ORGANIZATION_NAME": "ORGANIZATION",
         "DRIVER_LICENSE_NUMBER": "DRIVERS_LICENSE",
@@ -482,7 +482,7 @@ def _normalize_entity_type(entity_type: str) -> str:
         "DEVICE_IDENTIFIER": "_BENCHMARK_IGNORE",
         "TAX_ID": "NATIONAL_ID",
         "VISA_NUMBER": "PASSPORT",
-        # v1.1.0 entity types without detection support — ignore in scoring
+        # Entity types without detection support — ignore in scoring
         "BIOMETRIC_ID": "_BENCHMARK_IGNORE",
         "COURT_CASE_NUMBER": "_BENCHMARK_IGNORE",
         "EDUCATION_LEVEL": "_BENCHMARK_IGNORE",
@@ -1585,7 +1585,7 @@ def _core_system_worker(spec: _CoreEvalSpec) -> SystemBenchmarkResult:
     """
     _silence_worker_noise()
     system_name = spec.system_name
-    if system_name == "pii-anon-ensemble" and spec.evaluation_track == "detect_only":
+    if system_name == "pii-anon-swarm" and spec.evaluation_track == "detect_only":
         # Ensemble path: run each competitor natively, fuse via MoE
         detector: Callable[[BenchmarkRecord], list[LabelSpan]] | None = _ensemble_detector(
             use_case=spec.use_case,
@@ -2176,7 +2176,7 @@ def _evaluate_profile(
                 allow_native_engines=True,
                 evaluation_track="detect_only",
                 profile_label=f"profile `{profile}`",
-                system_name="pii-anon-ensemble",
+                system_name="pii-anon-swarm",
                 progress_hook=progress_hook,
                 allow_fallback_detectors=allow_fallback_detectors,
                 require_native_competitors=require_native_competitors,
@@ -2353,7 +2353,7 @@ def _evaluate_profile(
         # never misses a detection any individual engine found (union + weighted vote).
         systems.append(
             _evaluate_system(
-                "pii-anon-ensemble",
+                "pii-anon-swarm",
                 _ensemble_detector(
                     use_case=profile,
                     allow_fallback_detectors=allow_fallback_detectors,
@@ -2366,7 +2366,7 @@ def _evaluate_profile(
                 evidence=core_evidence,
                 evaluation_track="detect_only",
                 progress_hook=progress_hook,
-                progress_label=f"profile `{profile}` pii-anon-ensemble detect_only",
+                progress_label=f"profile `{profile}` pii-anon-swarm detect_only",
             )
         )
 
@@ -3028,7 +3028,7 @@ def compare_competitors(
 
     expected = expected_competitors or list(_COMPETITOR_META.keys())
 
-    num_core_evals = 2  # pii-anon (regex-only) + pii-anon-ensemble
+    num_core_evals = 2  # pii-anon (regex-only) + pii-anon-swarm
 
     if matrix_path is None:
         n = len(records)

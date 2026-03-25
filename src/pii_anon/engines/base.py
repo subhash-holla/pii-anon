@@ -24,9 +24,12 @@ from __future__ import annotations
 
 import importlib.util
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pii_anon.types import EngineCapabilities, EngineFinding, Payload
+
+if TYPE_CHECKING:
+    from pii_anon.engines.manifest import ExpertProfileData
 
 
 class EngineAdapter(ABC):
@@ -48,6 +51,7 @@ class EngineAdapter(ABC):
         Whether this engine is active. Disabled engines are skipped during
         ``detect()`` calls.
     """
+
     adapter_id: str = "unknown"
     native_dependency: str | None = None
 
@@ -180,6 +184,20 @@ class EngineAdapter(ABC):
         Notes
         -----
         The base implementation is a no-op.
+        """
+        return None
+
+    def expert_profile(self) -> ExpertProfileData | None:
+        """Return MoE expert profile data for auto-registration.
+
+        Override this to declare entity-type strengths/weaknesses so the
+        MoE router can include this engine in its gating decisions. Return
+        ``None`` to opt out of MoE auto-registration (the default).
+
+        Returns
+        -------
+        ExpertProfileData | None
+            Expert profile dict, or ``None`` to opt out.
         """
         return None
 

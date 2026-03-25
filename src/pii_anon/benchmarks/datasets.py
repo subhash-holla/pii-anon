@@ -151,11 +151,11 @@ def _validate_label(record_id: str, text: str, label: dict[str, Any]) -> dict[st
 
 
 def _is_v11_schema(row: dict[str, Any]) -> bool:
-    """Detect pii-anon-eval-data v1.1.0 schema (uses 'annotations' instead of 'labels')."""
+    """Detect pii-anon-eval-data extended schema (uses 'annotations' instead of 'labels')."""
     return "annotations" in row and "labels" not in row
 
 
-# Entity type mapping from v1.1.0 names to the canonical benchmark names
+# Entity type mapping from pii-anon-eval-data names to the canonical benchmark names
 # used by the pii-anon detection engine and competitor_compare evaluation.
 _V11_ENTITY_TYPE_MAP: dict[str, str] = {
     "SOCIAL_SECURITY_NUMBER": "US_SSN",
@@ -183,7 +183,7 @@ _V11_ENTITY_TYPE_MAP: dict[str, str] = {
 
 
 def _normalize_v11_annotation(annotation: dict[str, Any]) -> dict[str, Any]:
-    """Convert a v1.1.0 annotation to the v1 label format expected by BenchmarkRecord."""
+    """Convert an extended annotation to the label format expected by BenchmarkRecord."""
     entity_type = annotation.get("entity_type", "")
     entity_type = _V11_ENTITY_TYPE_MAP.get(entity_type, entity_type)
     label: dict[str, Any] = {
@@ -205,7 +205,7 @@ def _normalize_row(row: dict[str, Any], index: int) -> BenchmarkRecord:
     if not text:
         raise ValueError(f"dataset row `{record_id}` has empty text")
 
-    # Handle v1.1.0 schema: 'annotations' with richer structure
+    # Handle extended schema: 'annotations' with richer structure
     if _is_v11_schema(row):
         annotations_raw = list(row.get("annotations", []))
         labels = [

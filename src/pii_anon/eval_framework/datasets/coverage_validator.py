@@ -1,4 +1,4 @@
-"""Coverage validation tool for the PII Anonymization Evaluation Dataset v1.0.0.
+"""Coverage validation tool for the PII Anonymization Evaluation Dataset.
 
 This module provides comprehensive validation that the evaluation dataset meets all
 requirements for the 7 evaluation dimensions:
@@ -48,7 +48,7 @@ SAMPLE_SIZE_GUIDANCE: dict[str, int | str] = {
 
 @dataclass
 class CoverageReport:
-    """Comprehensive coverage validation report for PII Anonymization Eval Dataset v1.0.0.
+    """Comprehensive coverage validation report for PII Anonymization Eval Dataset.
 
     This report documents coverage across all 7 evaluation dimensions and validates
     that the dataset meets statistical requirements for representative evaluation.
@@ -92,7 +92,7 @@ class CoverageReport:
         """
         lines = [
             "=" * 80,
-            "PII ANONYMIZATION EVAL DATASET v1.0.0 - COVERAGE VALIDATION REPORT",
+            "PII ANONYMIZATION EVAL DATASET - COVERAGE VALIDATION REPORT",
             "=" * 80,
             f"Dataset: {self.dataset_name}",
             f"Timestamp: {self.timestamp}",
@@ -504,7 +504,7 @@ def validate_and_report(
     ----------
     dataset_name : str
         Name of the dataset (without .jsonl extension).
-        Defaults to "pii_anon_eval_v1" (v1.0.0 unified dataset).
+        Defaults to "pii_anon_eval_v1" (unified dataset).
 
     Returns
     -------

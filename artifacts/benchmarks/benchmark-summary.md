@@ -5,20 +5,21 @@ Warm-up samples/system: `100`. Measured runs/system: `3`.
 
 | System | Status | Composite | F1 | 95% CI | Precision | Recall | p50 Latency (ms) | Docs/hour | Elo |
 |---|---|---:|---:|---|---:|---:|---:|---:|---:|
-| gliner | available | 0.6859 | 0.774 | — | 0.922 | 0.667 | 86.756 | 34370.56 | 0 |
-| pii-anon | available | 0.8266 | 0.874 | — | 0.857 | 0.892 | 6.623 | 380165.30 | 0 |
-| pii-anon-ensemble | available | 0.6269 | 0.700 | — | 0.565 | 0.922 | 98.582 | 30367.15 | 0 |
-| presidio | available | 0.4601 | 0.431 | — | 0.361 | 0.535 | 14.675 | 138033.60 | 0 |
-| scrubadub | available | 0.5849 | 0.424 | — | 0.945 | 0.273 | 0.264 | 9256286.84 | 0 |
+| gliner | available | 0.6810 | 0.763 | — | 0.908 | 0.658 | 79.586 | 36506.58 | 0 |
+| pii-anon | available | 0.8000 | 0.845 | — | 0.868 | 0.823 | 8.007 | 329390.99 | 0 |
+| pii-anon-swarm | available | 0.5873 | 0.648 | — | 0.528 | 0.839 | 90.378 | 33003.58 | 0 |
+| presidio | available | 0.4749 | 0.453 | — | 0.401 | 0.521 | 14.245 | 137200.71 | 0 |
+| scrubadub | available | 0.5342 | 0.357 | — | 0.872 | 0.225 | 0.224 | 9980506.31 | 0 |
 
 Strengths for `pii-anon`:
-- composite_score: within 5% of best (0.827 vs best 0.827).
-- recall: within 5% of best (0.892 vs best 0.922).
-- f1: within 5% of best (0.874 vs best 0.874).
+- composite_score: within 5% of best (0.800 vs best 0.800).
+- precision: within 5% of best (0.868 vs best 0.908).
+- recall: within 5% of best (0.823 vs best 0.839).
+- f1: within 5% of best (0.845 vs best 0.845).
 
 Weaknesses for `pii-anon`:
-- docs_per_hour: more than 10% below best (380165.300 vs best 9256286.840).
-- latency_p50_ms: more than 10% slower than best (6.623 vs best 0.264).
+- docs_per_hour: more than 10% below best (329390.990 vs best 9980506.310).
+- latency_p50_ms: more than 10% slower than best (8.007 vs best 0.224).
 
 This section is generated from benchmark artifacts.
 ## Speed Objective (profiles: short_chat, structured_form_latency, log_lines)
@@ -28,20 +29,21 @@ Warm-up samples/system: `100`. Measured runs/system: `3`.
 
 | System | Status | Composite | F1 | 95% CI | Precision | Recall | p50 Latency (ms) | Docs/hour | Elo |
 |---|---|---:|---:|---|---:|---:|---:|---:|---:|
-| gliner | available | 0.6858 | 0.774 | — | 0.922 | 0.667 | 87.021 | 34592.09 | 1524 |
-| pii-anon | available | 0.8389 | 0.825 | — | 0.807 | 0.844 | 0.371 | 3827207.89 | 1590 |
-| pii-anon-ensemble | available | 0.6273 | 0.700 | — | 0.565 | 0.922 | 97.887 | 30917.77 | 1492 |
-| presidio | available | 0.4605 | 0.431 | — | 0.361 | 0.535 | 14.746 | 143224.78 | 1414 |
-| scrubadub | available | 0.5802 | 0.424 | — | 0.945 | 0.273 | 0.263 | 6108137.59 | 1470 |
+| gliner | available | 0.6810 | 0.763 | — | 0.908 | 0.658 | 79.627 | 36873.26 | 1534 |
+| pii-anon | available | 0.8129 | 0.792 | — | 0.768 | 0.818 | 0.346 | 3791089.96 | 1588 |
+| pii-anon-swarm | available | 0.5873 | 0.648 | — | 0.528 | 0.839 | 90.385 | 33306.11 | 1483 |
+| presidio | available | 0.4753 | 0.453 | — | 0.401 | 0.521 | 14.332 | 142615.45 | 1428 |
+| scrubadub | available | 0.5282 | 0.357 | — | 0.872 | 0.225 | 0.224 | 5642522.18 | 1454 |
 
 Strengths for `pii-anon`:
-- composite_score: within 5% of best (0.839 vs best 0.839).
-- f1: within 5% of best (0.825 vs best 0.825).
+- composite_score: within 5% of best (0.813 vs best 0.813).
+- recall: within 5% of best (0.818 vs best 0.839).
+- f1: within 5% of best (0.792 vs best 0.792).
 
 Weaknesses for `pii-anon`:
-- precision: more than 10% below best (0.807 vs best 0.945).
-- docs_per_hour: more than 10% below best (3827207.890 vs best 6108137.590).
-- latency_p50_ms: more than 10% slower than best (0.371 vs best 0.263).
+- precision: more than 10% below best (0.768 vs best 0.908).
+- docs_per_hour: more than 10% below best (3791089.960 vs best 5642522.180).
+- latency_p50_ms: more than 10% slower than best (0.346 vs best 0.224).
 
 This section is generated from benchmark artifacts.
 
@@ -55,25 +57,25 @@ Profile floor-gate results:
 
 ### Statistical Significance
 
-Evaluated on **50,000** records. Minimum detectable effect (MDE) at α=0.05, power=0.80: **0.0027** F1 points.
+Evaluated on **106,855** records. Minimum detectable effect (MDE) at α=0.05, power=0.80: **0.0018** F1 points.
 
 | System | F1 | 95% CI | Samples |
 |---|---:|---|---:|
-| gliner | 0.774 | [0.786, 0.788] | 50,000 |
-| pii-anon | 0.825 | [0.828, 0.830] | 50,000 |
-| pii-anon-ensemble | 0.700 | [0.709, 0.711] | 50,000 |
-| presidio | 0.431 | [0.379, 0.383] | 50,000 |
-| scrubadub | 0.424 | [0.413, 0.416] | 50,000 |
+| gliner | 0.763 | [0.759, 0.761] | 106,855 |
+| pii-anon | 0.792 | [0.784, 0.786] | 106,855 |
+| pii-anon-swarm | 0.648 | [0.646, 0.647] | 106,855 |
+| presidio | 0.453 | [0.404, 0.407] | 106,855 |
+| scrubadub | 0.357 | [0.354, 0.357] | 106,855 |
 
 Pairwise comparisons (paired bootstrap, n=10,000 resamples):
 
 | Comparison | ΔF1 | p-value | Significant | Effect Size |
 |---|---:|---:|---|---|
-| pii-anon-ensemble vs presidio | +0.3290 | 0.4959 | n.s. | large (d=+1.900) |
-| pii-anon vs presidio | +0.4479 | 0.4973 | n.s. | large (d=+2.509) |
-| pii-anon-ensemble vs gliner | -0.0773 | 0.4978 | n.s. | medium (d=-0.785) |
-| pii-anon vs scrubadub | +0.4143 | 0.5025 | n.s. | large (d=+2.700) |
-| pii-anon vs gliner | +0.0416 | 0.5026 | n.s. | small (d=+0.386) |
-| pii-anon-ensemble vs scrubadub | +0.2954 | 0.5029 | n.s. | large (d=+2.007) |
+| pii-anon-swarm vs gliner | -0.1138 | 0.4990 | n.s. | medium (d=-0.767) |
+| pii-anon vs gliner | +0.0245 | 0.5020 | n.s. | negligible (d=+0.142) |
+| pii-anon-swarm vs scrubadub | +0.2907 | 0.5035 | n.s. | large (d=+1.592) |
+| pii-anon vs presidio | +0.3791 | 0.5055 | n.s. | large (d=+1.793) |
+| pii-anon-swarm vs presidio | +0.2408 | 0.5067 | n.s. | large (d=+1.250) |
+| pii-anon vs scrubadub | +0.4290 | 0.5095 | n.s. | large (d=+2.120) |
 
 *Method: paired bootstrap significance test (Berg-Kirkpatrick et al., 2012). Effect sizes: Cohen's d (small=0.2, medium=0.5, large=0.8).*

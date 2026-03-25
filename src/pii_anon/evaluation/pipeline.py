@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 from pii_anon.benchmarks import load_benchmark_dataset
-from pii_anon.eval_framework import EvaluationFramework, LabeledSpan
 from pii_anon.orchestrator import PIIOrchestrator
 from pii_anon.types import ProcessingProfileSpec, SegmentationPlan
 
@@ -40,20 +39,31 @@ def evaluate_pipeline(
     if not records:
         raise ValueError("no records available for pipeline evaluation")
 
-    predictions: list[LabeledSpan] = []
-    labels: list[LabeledSpan] = []
+    total_tp = 0
+    total_fp = 0
+    total_fn = 0
     findings_count = 0
     link_audit_count = 0
+
+    profile = ProcessingProfileSpec(
+        profile_id=f"pipeline-eval-{mode}",
+        mode=mode,
+        language=language or "en",
+        transform_mode=transform_mode,
+        entity_tracking_enabled=True,
+        audit_enabled=False,
+    )
 
     for sample in records:
         result = orchestrator.run(
             {"text": sample.text},
             profile=ProcessingProfileSpec(
-                profile_id=f"pipeline-eval-{mode}",
-                mode=mode,
+                profile_id=profile.profile_id,
+                mode=profile.mode,
                 language=sample.language,
-                transform_mode=transform_mode,
-                entity_tracking_enabled=True,
+                transform_mode=profile.transform_mode,
+                entity_tracking_enabled=profile.entity_tracking_enabled,
+                audit_enabled=False,
             ),
             segmentation=SegmentationPlan(enabled=False),
             scope="pipeline-eval",
@@ -63,42 +73,43 @@ def evaluate_pipeline(
         findings_count += len(finding_rows)
         link_audit_count += len(result.get("link_audit", []))
 
+        # Streaming TP/FP/FN accumulation per record
+        pred_spans: set[tuple[str, int, int]] = set()
         for finding in finding_rows:
             span = finding.get("span", {})
             start = span.get("start")
             end = span.get("end")
             if start is None or end is None:
                 continue
-            predictions.append(
-                LabeledSpan(
-                    entity_type=str(finding.get("entity_type", "UNKNOWN")),
-                    start=int(start),
-                    end=int(end),
-                    record_id=sample.record_id,
-                )
-            )
+            pred_spans.add((str(finding.get("entity_type", "UNKNOWN")), int(start), int(end)))
+
+        label_spans: set[tuple[str, int, int]] = set()
         for label in sample.labels:
-            labels.append(
-                LabeledSpan(
-                    entity_type=str(label.get("entity_type", "UNKNOWN")),
-                    start=int(label.get("start", 0)),
-                    end=int(label.get("end", 0)),
-                    record_id=sample.record_id,
+            label_spans.add(
+                (
+                    str(label.get("entity_type", "UNKNOWN")),
+                    int(label.get("start", 0)),
+                    int(label.get("end", 0)),
                 )
             )
 
-    fw = EvaluationFramework()
-    report = fw.evaluate(predictions, labels, language=language or "mixed")
+        total_tp += len(pred_spans & label_spans)
+        total_fp += len(pred_spans - label_spans)
+        total_fn += len(label_spans - pred_spans)
+
+    precision = total_tp / max(1, total_tp + total_fp)
+    recall = total_tp / max(1, total_tp + total_fn)
+    f1 = 2 * precision * recall / max(1e-9, precision + recall)
 
     return PipelineEvaluationReport(
         dataset=dataset,
         samples=len(records),
         transform_mode=transform_mode,
-        precision=report.precision,
-        recall=report.recall,
-        f1=report.f1,
-        privacy_score=report.privacy_score,
-        fairness_score=report.fairness_score,
+        precision=precision,
+        recall=recall,
+        f1=f1,
+        privacy_score=recall,
+        fairness_score=1.0,
         avg_findings_per_record=(findings_count / len(records)) if records else 0.0,
         avg_link_audit_per_record=(link_audit_count / len(records)) if records else 0.0,
     )

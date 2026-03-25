@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class ClusterState:
     cluster_id: str
     entity_family: str
@@ -19,13 +19,30 @@ class ClusterState:
 class IdentityLedger:
     """Session/document-scoped entity linkage ledger."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_scopes: int | None = None) -> None:
         self._clusters_by_scope: dict[str, dict[str, ClusterState]] = {}
         self._alias_to_cluster: dict[str, dict[str, str]] = {}
         self._counter_by_scope: dict[str, int] = {}
+        self._clusters_by_family: dict[str, dict[str, dict[str, ClusterState]]] = {}
+        self._max_scopes = max_scopes
+        self._scope_order: list[str] = []
 
     def all_clusters(self, scope: str) -> list[ClusterState]:
         return list(self._clusters_by_scope.get(scope, {}).values())
+
+    def clusters_by_family(self, scope: str, family: str) -> list[ClusterState]:
+        return list(self._clusters_by_family.get(scope, {}).get(family, {}).values())
+
+    def clear_scope(self, scope: str) -> None:
+        """Remove all data for a given scope."""
+        self._clusters_by_scope.pop(scope, None)
+        self._alias_to_cluster.pop(scope, None)
+        self._counter_by_scope.pop(scope, None)
+        self._clusters_by_family.pop(scope, None)
+        try:
+            self._scope_order.remove(scope)
+        except ValueError:
+            pass
 
     def find_by_alias(self, scope: str, alias_norm: str) -> ClusterState | None:
         cluster_id = self._alias_to_cluster.get(scope, {}).get(alias_norm)
@@ -45,6 +62,11 @@ class IdentityLedger:
         last_name_alias: str | None,
         email_local_alias: str | None,
     ) -> ClusterState:
+        if scope not in self._clusters_by_scope:
+            self._scope_order.append(scope)
+            if self._max_scopes is not None and len(self._scope_order) > self._max_scopes:
+                evict = self._scope_order.pop(0)
+                self.clear_scope(evict)
         count = self._counter_by_scope.get(scope, 0) + 1
         self._counter_by_scope[scope] = count
         cluster_id = f"{entity_family}-{count:04d}"
@@ -66,6 +88,7 @@ class IdentityLedger:
 
         self._clusters_by_scope.setdefault(scope, {})[cluster_id] = state
         self._alias_to_cluster.setdefault(scope, {})[alias_norm] = cluster_id
+        self._clusters_by_family.setdefault(scope, {}).setdefault(entity_family, {})[cluster_id] = state
         return state
 
     def register_alias(

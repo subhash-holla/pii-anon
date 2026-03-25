@@ -372,7 +372,7 @@ def main() -> None:
         benchmark_json = artifacts_dir / f"benchmark-results{ds_suffix}.json"
         benchmark_csv = artifacts_dir / f"benchmark-raw{ds_suffix}.csv"
         floor_report = artifacts_dir / f"floor-gate-report{ds_suffix}.md"
-        baseline_json = artifacts_dir / f"floor-baseline{ds_suffix}.v1.0.0.json"
+        baseline_json = artifacts_dir / f"floor-baseline{ds_suffix}.json"
 
         benchmark_cmd = [
             str(python_bin),

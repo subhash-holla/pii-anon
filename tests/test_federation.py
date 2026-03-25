@@ -39,7 +39,7 @@ def test_orchestrator_tokenizes_and_reports_envelope_and_audit() -> None:
         scope="claims",
         token_version=1,
     )
-    # PERSON and EMAIL aliases are intentionally unified for continuity in v1.0.1.
+    # PERSON and EMAIL aliases are intentionally unified for continuity.
     assert "<PERSON_NAME:v1:tok_" in result["transformed_payload"]["email"]
     assert "confidence_envelope" in result
     assert "fusion_audit" in result

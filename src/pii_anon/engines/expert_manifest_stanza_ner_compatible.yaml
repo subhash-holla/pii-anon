@@ -1,0 +1,17 @@
+schema_version: "1.0"
+expert_id: "stanza-ner-compatible"
+display_name: "Stanza NER"
+entity_strengths:
+  PERSON_NAME: 0.75
+  ORGANIZATION: 0.68
+  LOCATION: 0.72
+entity_weaknesses:
+  US_SSN: 0.10
+  CREDIT_CARD: 0.10
+  EMAIL_ADDRESS: 0.25
+  PHONE_NUMBER: 0.20
+default_weight: 0.95
+metadata:
+  type: "neural-ner"
+  languages: ["en"]
+  description: "Stanford Stanza NER pipeline"

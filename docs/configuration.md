@@ -48,7 +48,7 @@ auto_discover_engines: true              # Auto-discover entry-point plugins
 # ─── Engine Configuration ───────────────────────────────────
 # Each engine can be enabled/disabled and weighted independently.
 # pii-anon (speed offering) uses only regex-oss.
-# pii-anon-ensemble uses all enabled engines fused through MoE.
+# pii-anon-swarm uses all enabled engines fused through MoE.
 engines:
   regex-oss:
     enabled: true

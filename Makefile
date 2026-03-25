@@ -95,12 +95,12 @@ benchmark-preflight:
 	$(PYTHON) scripts/check_benchmark_runtime.py --strict-runtime --require-all-competitors --require-native-competitors --output-json artifacts/benchmarks/runtime-preflight.json
 
 compare-benchmark:
-	$(PYTHON) scripts/run_competitor_benchmark.py --dataset $(BENCH_DATASET) --dataset-source package-only --matrix $(BENCH_MATRIX) --strict-runtime --require-all-competitors --require-native-competitors --enforce-floors --output-json benchmark-results.json --output-csv benchmark-raw.csv --output-floor-report floor-gate-report.md --output-baseline artifacts/benchmarks/floor-baseline.v1.0.0.json --preflight-output-json artifacts/benchmarks/runtime-preflight.json
+	$(PYTHON) scripts/run_competitor_benchmark.py --dataset $(BENCH_DATASET) --dataset-source package-only --matrix $(BENCH_MATRIX) --strict-runtime --require-all-competitors --require-native-competitors --enforce-floors --output-json benchmark-results.json --output-csv benchmark-raw.csv --output-floor-report floor-gate-report.md --output-baseline artifacts/benchmarks/floor-baseline.json --preflight-output-json artifacts/benchmarks/runtime-preflight.json
 
 benchmark:
 	$(PYTHON) scripts/generate_benchmark_dataset.py
 	$(PYTHON) scripts/check_benchmark_runtime.py --strict-runtime --require-all-competitors --require-native-competitors --output-json artifacts/benchmarks/runtime-preflight.json
-	$(PYTHON) scripts/run_competitor_benchmark.py --dataset $(BENCH_DATASET) --dataset-source package-only --matrix $(BENCH_MATRIX) --strict-runtime --require-all-competitors --require-native-competitors --enforce-floors --output-json benchmark-results.json --output-csv benchmark-raw.csv --output-floor-report floor-gate-report.md --output-baseline artifacts/benchmarks/floor-baseline.v1.0.0.json --preflight-output-json artifacts/benchmarks/runtime-preflight.json
+	$(PYTHON) scripts/run_competitor_benchmark.py --dataset $(BENCH_DATASET) --dataset-source package-only --matrix $(BENCH_MATRIX) --strict-runtime --require-all-competitors --require-native-competitors --enforce-floors --output-json benchmark-results.json --output-csv benchmark-raw.csv --output-floor-report floor-gate-report.md --output-baseline artifacts/benchmarks/floor-baseline.json --preflight-output-json artifacts/benchmarks/runtime-preflight.json
 	$(PYTHON) scripts/render_benchmark_summary.py --input-json benchmark-results.json --output-markdown docs/benchmark-summary.md --require-floor-pass
 
 benchmark-publish-suite:

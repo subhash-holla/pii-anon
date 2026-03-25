@@ -1,0 +1,17 @@
+schema_version: "1.0"
+expert_id: "spacy-ner-compatible"
+display_name: "spaCy NER"
+entity_strengths:
+  PERSON_NAME: 0.78
+  ORGANIZATION: 0.72
+  LOCATION: 0.75
+entity_weaknesses:
+  US_SSN: 0.10
+  CREDIT_CARD: 0.10
+  EMAIL_ADDRESS: 0.30
+  PHONE_NUMBER: 0.25
+default_weight: 1.0
+metadata:
+  type: "neural-ner"
+  languages: ["en"]
+  description: "spaCy NER pipeline for named entity recognition"

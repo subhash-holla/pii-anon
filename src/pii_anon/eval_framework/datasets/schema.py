@@ -1,4 +1,4 @@
-"""Extended benchmark record schema for the PII Anonymization Evaluation Framework v1.0.0.
+"""Extended benchmark record schema for the PII Anonymization Evaluation Framework.
 
 Backward-compatible with the existing ``BenchmarkRecord`` (all new fields
 have defaults) while adding seven evaluation dimensions, quasi-identifier
@@ -60,7 +60,7 @@ DIMENSION_WEIGHTS: dict[str, float] = {
 
 @dataclass
 class EvalBenchmarkRecord:
-    """A single evaluation benchmark record for PII Anonymization Eval v1.0.0.
+    """A single evaluation benchmark record for PII Anonymization Eval.
 
     All fields present in the original ``BenchmarkRecord`` are preserved
     (with identical names and semantics).  New fields carry defaults so
@@ -93,47 +93,47 @@ class EvalBenchmarkRecord:
     script: str = "Latin"
     entity_types_present: list[str] = field(default_factory=list)
 
-    # ── v1.0.0: Dimension tracking ───────────────────────────────────
+    # ──: Dimension tracking ───────────────────────────────────
     dimension_tags: list[str] = field(default_factory=list)
 
-    # ── v1.0.0 Dim 1: Entity Tracking (20%) ─────────────────────────
+    # ── Dim 1: Entity Tracking (20%) ─────────────────────────
     num_repeated_entities: int = 0
     coreference_chains: list[str] = field(default_factory=list)
     entity_tracking_difficulty: str = "none"
 
-    # ── v1.0.0 Dim 2: Multilingual & Dialect (15%) ──────────────────
+    # ── Dim 2: Multilingual & Dialect (15%) ──────────────────
     language_family: str = ""
     resource_level: str = "high"
     dialect_variant: str | None = None
 
-    # ── v1.0.0 Dim 3: Context Preservation (20%) ────────────────────
+    # ── Dim 3: Context Preservation (20%) ────────────────────
     has_conversational_context: bool = False
     context_type: str = "standalone"
     turn_count: int = 1
     preservation_challenge: str = "none"
 
-    # ── v1.0.0 Dim 5: Edge Cases (10%) ──────────────────────────────
+    # ── Dim 5: Edge Cases (10%) ──────────────────────────────
     edge_case_types: list[str] = field(default_factory=list)
 
-    # ── v1.0.0 Dim 6: Data Format Variations (10%) ──────────────────
+    # ── Dim 6: Data Format Variations (10%) ──────────────────
     format_subtype: str | None = None
     format_complexity: str = "simple"
 
-    # ── v1.0.0 Dim 7: Temporal Consistency (5%) ─────────────────────
+    # ── Dim 7: Temporal Consistency (5%) ─────────────────────
     is_time_series: bool = False
     time_series_id: str | None = None
     temporal_ordering: int = 0
     temporal_consistency_type: str = "none"
 
-    # ── v1.0.0: Re-identification risk (Sweeney 2002) ───────────────
+    # ──: Re-identification risk (Sweeney 2002) ───────────────
     quasi_identifiers_present: list[str] = field(default_factory=list)
     reidentification_risk_tier: str = "low"
 
-    # ── v1.0.0: Adversarial robustness ──────────────────────────────
+    # ──: Adversarial robustness ──────────────────────────────
     adversarial_attack_type: str | None = None
     adversarial_difficulty: str = "clean"
 
-    # ── v1.0.0: Stratification ──────────────────────────────────────
+    # ──: Stratification ──────────────────────────────────────
     stratum_id: str = ""
 
 
@@ -303,7 +303,7 @@ def _normalize_eval_row(row: dict[str, Any], index: int) -> EvalBenchmarkRecord:
     else:
         regulatory_domain = []
 
-    # v1.0.0 fields: infer from content if not explicitly set
+    # fields: infer from content if not explicitly set
     dimension_tags = _infer_dimension_tags(row, labels)
     num_repeated = row.get("num_repeated_entities", _count_repeated_entities(labels))
 
@@ -347,7 +347,7 @@ def _normalize_eval_row(row: dict[str, Any], index: int) -> EvalBenchmarkRecord:
         adversarial_type=row.get("adversarial_type"),
         script=str(row.get("script", "Latin")),
         entity_types_present=entity_types_present,
-        # v1.0.0 fields
+        # fields
         dimension_tags=dimension_tags,
         num_repeated_entities=num_repeated,
         coreference_chains=coreference_chains,
@@ -390,7 +390,7 @@ def load_eval_dataset(
     ----------
     name:
         Dataset filename (without ``.jsonl``).  Defaults to ``pii_anon_eval_v1``
-        (the v1.0.0 unified dataset), falling back to ``eval_framework_v1``
+        (the unified dataset), falling back to ``eval_framework_v1``
         for backward compatibility.
     language:
         Filter by ISO 639-1 code.
@@ -442,7 +442,7 @@ def summarize_eval_dataset(name: str = _DEFAULT_DATASET) -> dict[str, Any]:
     records = load_eval_dataset(name)
     summary: dict[str, Any] = {
         "dataset": name,
-        "version": "1.0.0",
+        "version": "latest",
         "total_records": len(records),
         "by_language": {},
         "by_data_type": {},
@@ -469,7 +469,7 @@ def summarize_eval_dataset(name: str = _DEFAULT_DATASET) -> dict[str, Any]:
         summary["entity_types"].update(r.entity_types_present)
         summary["regulatory_domains"].update(r.regulatory_domain)
 
-        # v1.0.0 summaries
+        # summaries
         for dim in r.dimension_tags:
             summary["by_dimension"][dim] = summary["by_dimension"].get(dim, 0) + 1
         summary["by_context_type"][r.context_type] = summary["by_context_type"].get(r.context_type, 0) + 1

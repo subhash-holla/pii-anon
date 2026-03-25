@@ -266,7 +266,7 @@ _REFS: dict[str, ResearchReference] = {
         relevance="Standardised dataset documentation; motivates our dataset_statistics, "
         "checksum verification, and distribution analysis functions.",
     ),
-    # -- v1.0.0: PII-Rate-Elo composite metric & rating engine --
+    # -- PII-Rate-Elo composite metric & rating engine --
     "elo_1978": ResearchReference(
         key="elo_1978",
         title="The Rating of Chessplayers, Past and Present",

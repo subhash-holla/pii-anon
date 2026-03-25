@@ -13,16 +13,27 @@ class EngineRegistry:
     def __init__(self) -> None:
         self._engines: dict[str, EngineAdapter] = {}
         self._lock = Lock()
+        self._moe_bridge: Any | None = None
+
+    def attach_moe_bridge(self, bridge: Any) -> None:
+        """Attach a MoeSyncBridge to receive registration events."""
+        self._moe_bridge = bridge
 
     def register(self, engine: EngineAdapter) -> None:
         with self._lock:
             self._engines[engine.adapter_id] = engine
+        # Notify bridge outside lock to avoid deadlocks
+        if self._moe_bridge is not None:
+            self._moe_bridge.on_engine_registered(engine)
 
     def unregister(self, adapter_id: str) -> None:
         with self._lock:
             if adapter_id in self._engines:
                 self._engines[adapter_id].shutdown()
                 del self._engines[adapter_id]
+        # Notify bridge outside lock
+        if self._moe_bridge is not None:
+            self._moe_bridge.on_engine_unregistered(adapter_id)
 
     def get(self, adapter_id: str) -> EngineAdapter | None:
         with self._lock:

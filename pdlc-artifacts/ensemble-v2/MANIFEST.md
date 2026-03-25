@@ -1,13 +1,13 @@
 # PDLC MANIFEST — Ensemble v2: Beat GLiNER
 
 ## Goal
-Guarantee pii-anon-ensemble F1 >= GLiNER F1 (0.7743) while preserving high recall.
+Guarantee pii-anon-swarm F1 >= GLiNER F1 (0.7743) while preserving high recall.
 
 ## Result
 | System | F1 (before) | F1 (after) | Precision | Recall |
 |---|---|---|---|---|
 | pii-anon (regex) | 0.8743 | 0.8910 | 0.873 | 0.910 |
-| pii-anon-ensemble | 0.6265 | **0.8622** | 0.809 | 0.923 |
+| pii-anon-swarm | 0.6265 | **0.8622** | 0.809 | 0.923 |
 | GLiNER | 0.7743 | 0.7743 | 0.922 | 0.667 |
 
 **Ensemble now beats GLiNER by +8.8 F1 points.**

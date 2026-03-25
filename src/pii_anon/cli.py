@@ -135,7 +135,9 @@ def create_app() -> Any:
         output_file: Path | None = typer.Option(None, "--output", "-o", help="Output file path"),
         file_format: str | None = typer.Option(None, "--format", "-f", help="Force file format: csv|json|jsonl|txt"),
         whole_file: bool = typer.Option(False, help="TXT only: treat entire file as one record"),
-        segmentation_enabled: bool = typer.Option(False, "--segmentation/--no-segmentation", help="Enable segmentation"),
+        segmentation_enabled: bool = typer.Option(
+            False, "--segmentation/--no-segmentation", help="Enable segmentation"
+        ),
         max_tokens: int = typer.Option(4096, help="Max tokens per segment"),
         output: str = typer.Option("json", help="Console output format: json|text"),
     ) -> None:
@@ -564,6 +566,92 @@ def create_app() -> Any:
         if proc.returncode != 0:
             raise typer.Exit(proc.returncode)
 
+    @app.command("calibrate-offline")
+    def calibrate_offline(
+        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        max_samples: int = typer.Option(0, help="Optional sample cap (0 means full dataset)"),
+        min_entity_samples: int = typer.Option(5, help="Minimum samples per entity type for calibration"),
+        store_path: str | None = typer.Option(None, help="Custom calibration store path"),
+        token_key: str = typer.Option("dev-key", help="Tokenization key"),
+        config: str | None = typer.Option(None, help="Path to JSON/YAML config file"),
+        output: str = typer.Option("json", help="Output format: json|text"),
+    ) -> None:
+        """Run offline calibration of MoE expert weights against labeled data."""
+        from pii_anon.calibration.offline import OfflineCalibrationConfig, OfflineCalibrator
+
+        from pii_anon.moe import get_default_registry
+
+        orchestrator = _build_orchestrator(token_key=token_key, config_path=config)
+        cal_config = OfflineCalibrationConfig(
+            dataset=dataset,
+            max_samples=max_samples if max_samples > 0 else None,
+            min_entity_samples=min_entity_samples,
+            store_path=store_path,
+        )
+        calibrator = OfflineCalibrator(
+            engine_registry=orchestrator._async.registry,
+            expert_registry=get_default_registry(),
+            config=cal_config,
+        )
+        try:
+            result = calibrator.run_and_apply()
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc))
+        _dump_output(
+            {
+                "calibrated_at": result.calibrated_at,
+                "dataset": result.dataset,
+                "engine_entity_f1": result.engine_entity_f1,
+                "sample_counts": result.sample_counts,
+                "skipped_engines": result.skipped_engines,
+            },
+            output,
+        )
+
+    @app.command("verify-dominance")
+    def verify_dominance(
+        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        max_samples: int = typer.Option(0, help="Optional sample cap (0 means full dataset)"),
+        token_key: str = typer.Option("dev-key", help="Tokenization key"),
+        config: str | None = typer.Option(None, help="Path to JSON/YAML config file"),
+        output: str = typer.Option("json", help="Output format: json|text"),
+    ) -> None:
+        """Verify MoE dominance guarantee: F1(ensemble) >= max(F1(expert_i)) per entity type."""
+        from pii_anon.calibration.dominance import DominanceVerifier
+
+        orchestrator = _build_orchestrator(token_key=token_key, config_path=config)
+        verifier = DominanceVerifier(
+            orchestrator=orchestrator,
+            engine_registry=orchestrator._async.registry,
+        )
+        try:
+            report = verifier.verify(
+                dataset=dataset,
+                max_samples=max_samples if max_samples > 0 else None,
+            )
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc))
+        violations_data = [
+            {
+                "entity_type": v.entity_type,
+                "best_expert_id": v.best_expert_id,
+                "best_expert_f1": round(v.best_expert_f1, 4),
+                "ensemble_f1": round(v.ensemble_f1, 4),
+                "gap": round(v.gap, 4),
+            }
+            for v in report.violations
+        ]
+        _dump_output(
+            {
+                "passed": report.passed,
+                "violations": violations_data,
+                "entity_type_results": report.entity_type_results,
+            },
+            output,
+        )
+        if not report.passed:
+            raise typer.Exit(1)
+
     @app.command("version")
     def version() -> None:
         print(__version__)
@@ -576,9 +664,7 @@ def main() -> None:
         app = create_app()
         app()
     except ImportError:
-        raise SystemExit(
-            "CLI dependencies are not installed. Install with `pip install pii-anon[cli]`."
-        )
+        raise SystemExit("CLI dependencies are not installed. Install with `pip install pii-anon[cli]`.")
 
 
 if __name__ == "__main__":

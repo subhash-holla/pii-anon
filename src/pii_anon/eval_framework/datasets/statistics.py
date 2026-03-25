@@ -1,4 +1,4 @@
-"""Statistical validation and dataset adequacy assessment for PII Anonymization Evaluation v1.0.0.
+"""Statistical validation and dataset adequacy assessment for PII Anonymization Evaluation.
 
 This module provides comprehensive statistical tools for validating evaluation datasets against
 the seven-dimensional evaluation framework. Uses stdlib-only implementations (no scipy dependency)

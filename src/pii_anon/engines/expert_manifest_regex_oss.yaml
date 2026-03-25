@@ -1,0 +1,36 @@
+schema_version: "1.0"
+expert_id: "regex-oss"
+display_name: "pii-anon Regex Engine"
+entity_strengths:
+  EMAIL_ADDRESS: 0.99
+  US_SSN: 0.99
+  CREDIT_CARD: 0.99
+  CREDIT_CARD_FRAGMENT: 0.80
+  IP_ADDRESS: 0.99
+  MAC_ADDRESS: 0.99
+  IBAN: 0.99
+  PHONE_NUMBER: 0.95
+  DATE_OF_BIRTH: 0.92
+  DRIVERS_LICENSE: 0.90
+  PASSPORT: 0.90
+  BANK_ACCOUNT: 0.95
+  ROUTING_NUMBER: 0.95
+  CRYPTO_WALLET: 0.95
+  EMPLOYEE_ID: 0.85
+  LICENSE_PLATE: 0.85
+  LOCATION: 1.0
+  ADDRESS: 0.80
+  NATIONAL_ID: 0.85
+  MEDICAL_RECORD_NUMBER: 0.85
+  PERSON_NAME: 0.30
+  ORGANIZATION: 0.25
+  USERNAME: 0.60
+entity_weaknesses:
+  PERSON_NAME: 0.30
+  ORGANIZATION: 0.25
+  USERNAME: 0.60
+default_weight: 1.0
+metadata:
+  type: "rule-based"
+  languages: ["en"]
+  description: "High-precision regex patterns for structured PII"

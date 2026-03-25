@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover - optional dependency
     AESSIV = None  # type: ignore
 
 
-@dataclass
+@dataclass(slots=True)
 class TokenRecord:
     entity_type: str
     version: int
@@ -47,6 +47,9 @@ class TokenizerProvider:
 
 
 class DeterministicHMACTokenizer(TokenizerProvider):
+    def __init__(self) -> None:
+        self._token_cache: dict[tuple[str, int, str, str, str], TokenRecord] = {}
+
     def tokenize(
         self,
         entity_type: str,
@@ -57,11 +60,17 @@ class DeterministicHMACTokenizer(TokenizerProvider):
         *,
         store: TokenStore | None = None,
     ) -> TokenRecord:
+        cache_key = (scope, version, entity_type, plaintext, key)
+        cached = self._token_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         raw = f"{scope}|v{version}|{entity_type}|{plaintext}".encode("utf-8")
         digest = hmac.new(key.encode("utf-8"), raw, hashlib.sha256).digest()
         packed = base64.urlsafe_b64encode(digest[:18]).decode("utf-8").rstrip("=")
         token = f"<{entity_type}:v{version}:tok_{packed}>"
         record = TokenRecord(entity_type=entity_type, version=version, token=token, scope=scope)
+        self._token_cache[cache_key] = record
 
         if store is not None:
             store.put(
@@ -93,13 +102,21 @@ class DeterministicHMACTokenizer(TokenizerProvider):
 
 
 class AESSIVTokenizer(TokenizerProvider):
+    def __init__(self) -> None:
+        self._cipher_cache: dict[str, "AESSIV"] = {}
+
     def _build_cipher(self, key: str) -> "AESSIV":
+        cached = self._cipher_cache.get(key)
+        if cached is not None:
+            return cached
         if AESSIV is None:
             raise TokenizationError(
                 "AESSIVTokenizer requires optional dependency `cryptography`. Install with `pip install pii-anon[crypto]`."
             )
         material = hashlib.sha512(key.encode("utf-8")).digest()
-        return AESSIV(material)
+        cipher = AESSIV(material)
+        self._cipher_cache[key] = cipher
+        return cipher
 
     def tokenize(
         self,

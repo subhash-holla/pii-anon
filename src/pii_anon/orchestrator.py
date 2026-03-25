@@ -99,37 +99,39 @@ T = TypeVar("T")
 # Filtering to this whitelist prevents those phantom types from appearing in
 # output and dragging down precision.
 # (autoresearch: ensemble precision 46.3% → 79.9% with this filter)
-SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset({
-    "ADDRESS",
-    "BANK_ACCOUNT",
-    "CREDIT_CARD",
-    "CREDIT_CARD_FRAGMENT",
-    "CRYPTO_WALLET",
-    "DATE_ISO",
-    "DATE_OF_BIRTH",
-    "DATE_TIME",
-    "DRIVERS_LICENSE",
-    "EMAIL_ADDRESS",
-    "EMPLOYEE_ID",
-    "GPS_COORDINATES",
-    "IBAN",
-    "IP_ADDRESS",
-    "LICENSE_PLATE",
-    "LOCATION",
-    "MAC_ADDRESS",
-    "MEDICAL_RECORD_NUMBER",
-    "MEDICAL_LICENSE",
-    "NATIONAL_ID",
-    "ORGANIZATION",
-    "PASSPORT",
-    "PERSON_NAME",
-    "PHONE_NUMBER",
-    "ROUTING_NUMBER",
-    "USERNAME",
-    "US_SSN",
-    "VIN",
-    "AGE",
-})
+SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
+    {
+        "ADDRESS",
+        "BANK_ACCOUNT",
+        "CREDIT_CARD",
+        "CREDIT_CARD_FRAGMENT",
+        "CRYPTO_WALLET",
+        "DATE_ISO",
+        "DATE_OF_BIRTH",
+        "DATE_TIME",
+        "DRIVERS_LICENSE",
+        "EMAIL_ADDRESS",
+        "EMPLOYEE_ID",
+        "GPS_COORDINATES",
+        "IBAN",
+        "IP_ADDRESS",
+        "LICENSE_PLATE",
+        "LOCATION",
+        "MAC_ADDRESS",
+        "MEDICAL_RECORD_NUMBER",
+        "MEDICAL_LICENSE",
+        "NATIONAL_ID",
+        "ORGANIZATION",
+        "PASSPORT",
+        "PERSON_NAME",
+        "PHONE_NUMBER",
+        "ROUTING_NUMBER",
+        "USERNAME",
+        "US_SSN",
+        "VIN",
+        "AGE",
+    }
+)
 
 
 class AsyncPIIOrchestrator:
@@ -167,6 +169,7 @@ class AsyncPIIOrchestrator:
     for multiple payloads. Engine discovery and initialization happen
     during ``__init__``.
     """
+
     def __init__(
         self,
         token_key: str,
@@ -197,6 +200,9 @@ class AsyncPIIOrchestrator:
         if self.config.auto_discover_engines:
             self.registry.discover_entrypoint_engines()
         self.registry.initialize({k: v.model_dump() for k, v in self.config.engines.items()})
+
+        # Attach MoE sync bridge for auto-registering engines as experts
+        self._moe_bridge = self._setup_moe_bridge()
 
         self.strategy_registry = StrategyRegistry()
         self._register_default_strategies()
@@ -233,6 +239,48 @@ class AsyncPIIOrchestrator:
         self.strategy_registry.register(GeneralizationStrategy())
         self.strategy_registry.register(SyntheticReplacementStrategy())
         self.strategy_registry.register(PerturbationStrategy())
+
+    def _setup_moe_bridge(self) -> object | None:
+        """Set up the MoE sync bridge for auto-registering engines as experts.
+
+        Attaches the bridge to the engine registry so that future engine
+        registrations automatically create corresponding MoE expert specs.
+        Also loads offline calibration if available.
+
+        Returns the bridge instance or ``None`` if setup fails gracefully.
+        """
+        try:
+            from pii_anon.moe import get_default_registry
+            from pii_anon.moe_sync import create_default_bridge
+
+            expert_registry = get_default_registry()
+            moe_config = self.config.moe if hasattr(self.config, "moe") else None
+
+            bridge = create_default_bridge(
+                expert_registry=expert_registry,
+                similarity_threshold=getattr(moe_config, "similarity_threshold", 0.95),
+                similarity_action=getattr(moe_config, "similarity_action", "warn"),
+            )
+            self.registry.attach_moe_bridge(bridge)
+
+            # Apply offline calibration if available
+            cal_path = getattr(moe_config, "calibration_path", None)
+            if cal_path or True:  # Always try default path
+                try:
+                    from pii_anon.calibration.store import CalibrationStore
+
+                    store = CalibrationStore(path=cal_path)
+                    store.apply_to_registry(
+                        expert_registry,
+                        min_samples=getattr(moe_config, "calibration_min_samples", 10),
+                    )
+                except Exception:
+                    pass  # No calibration file is normal
+
+            return bridge
+        except Exception:
+            self.logger.debug("moe_bridge_setup_skipped", exc_info=True)
+            return None
 
     def register_strategy(self, strategy: TransformStrategy) -> None:
         """Register a custom transformation strategy.
@@ -470,7 +518,7 @@ class AsyncPIIOrchestrator:
                 "notes": envelope.notes,
                 "by_entity_type": envelope.by_entity_type,
             },
-            "fusion_audit": [self._audit_to_dict(item) for item in fusion_audit],
+            "fusion_audit": [self._audit_to_dict(item) for item in fusion_audit] if profile.audit_enabled else [],
             "boundary_trace": boundary_trace,
             "execution_plan": self._execution_plan_to_dict(plan),
         }
@@ -515,7 +563,9 @@ class AsyncPIIOrchestrator:
             if not isinstance(value, str):
                 continue
 
-            should_segment = (segmentation.enabled or plan.segmentation_enabled) and len(value.split()) > segmentation.max_tokens
+            should_segment = (segmentation.enabled or plan.segmentation_enabled) and len(
+                value.split()
+            ) > segmentation.max_tokens
             if should_segment:
                 findings, boundary_trace, audits = await self._detect_segmented_field(
                     field=field,
@@ -637,10 +687,7 @@ class AsyncPIIOrchestrator:
                 ]
                 return merged, [], raw_findings
         else:
-            tasks = [
-                asyncio.create_task(self._run_engine_detect_async(engine, payload, profile))
-                for engine in engines
-            ]
+            tasks = [asyncio.create_task(self._run_engine_detect_async(engine, payload, profile)) for engine in engines]
 
             if tasks:
                 results: list[list[EngineFinding] | BaseException] = await asyncio.gather(
@@ -657,7 +704,9 @@ class AsyncPIIOrchestrator:
                     raw_findings.extend(result)
 
         fusion = self._get_or_build_fusion(plan.fusion_mode, profile)
-        merged, audits = self._merge_with_audit(fusion=fusion, raw_findings=raw_findings)
+        merged, audits = self._merge_with_audit(
+            fusion=fusion, raw_findings=raw_findings, audit_enabled=profile.audit_enabled
+        )
         merged, audits, raw_findings = await self._maybe_escalate(
             payload=payload,
             profile=profile,
@@ -801,7 +850,9 @@ class AsyncPIIOrchestrator:
         capabilities = dict(self.capabilities())
         external_ids = {"spacy-ner-compatible", "stanza-ner-compatible"}
         policy = self.config.competitor_policy
-        runtime_external_allowed = policy.enabled and policy.runtime_leverage_enabled and profile.use_external_competitors
+        runtime_external_allowed = (
+            policy.enabled and policy.runtime_leverage_enabled and profile.use_external_competitors
+        )
         allowlist = set(profile.external_competitor_allowlist or policy.allowed_adapters)
         if not runtime_external_allowed:
             for adapter_id in external_ids:
@@ -819,7 +870,9 @@ class AsyncPIIOrchestrator:
         if not plan.engine_ids:
             plan.engine_ids = sorted(enabled_ids) if enabled_ids else ["regex-oss"]
         plan.escalation_engine_ids = [
-            engine_id for engine_id in plan.escalation_engine_ids if engine_id in enabled_ids and engine_id not in plan.engine_ids
+            engine_id
+            for engine_id in plan.escalation_engine_ids
+            if engine_id in enabled_ids and engine_id not in plan.engine_ids
         ]
         return plan
 
@@ -834,8 +887,11 @@ class AsyncPIIOrchestrator:
         *,
         fusion: Any,
         raw_findings: list[EngineFinding],
+        audit_enabled: bool = True,
     ) -> tuple[list[EnsembleFinding], list[FusionAuditRecord]]:
         merged = fusion.merge(raw_findings)
+        if not audit_enabled:
+            return merged, []
         audits = build_fusion_audit(fusion, merged, raw_findings)
         return merged, audits
 
@@ -885,7 +941,9 @@ class AsyncPIIOrchestrator:
 
         all_raw = [*raw_findings, *extra]
         fusion = self._get_or_build_fusion(plan.fusion_mode, profile)
-        escalated_merged, escalated_audit = self._merge_with_audit(fusion=fusion, raw_findings=all_raw)
+        escalated_merged, escalated_audit = self._merge_with_audit(
+            fusion=fusion, raw_findings=all_raw, audit_enabled=profile.audit_enabled
+        )
         return escalated_merged, escalated_audit, all_raw
 
     # ── Strategy resolution helpers ────────────────────────────────────
@@ -921,9 +979,7 @@ class AsyncPIIOrchestrator:
             return str(config_strats[entity_type])
 
         # Global transform_mode → strategy mapping
-        return self._TRANSFORM_MODE_TO_STRATEGY.get(
-            profile.transform_mode, profile.transform_mode
-        )
+        return self._TRANSFORM_MODE_TO_STRATEGY.get(profile.transform_mode, profile.transform_mode)
 
     def _build_transform_context(
         self,
@@ -1038,9 +1094,7 @@ class AsyncPIIOrchestrator:
 
             if strategy is not None:
                 # Build full context and delegate to strategy
-                entity_type_resolved = self._cluster_entity_type(
-                    decision.cluster_id, finding.entity_type
-                )
+                entity_type_resolved = self._cluster_entity_type(decision.cluster_id, finding.entity_type)
                 ctx = self._build_transform_context(
                     decision=decision,
                     finding=finding,
@@ -1159,13 +1213,14 @@ class AsyncPIIOrchestrator:
         for item in findings:
             by_type.setdefault(item.entity_type, []).append(item.confidence)
         by_entity_type = {
-            entity_type: round(sum(scores) / max(1, len(scores)), 4)
-            for entity_type, scores in by_type.items()
+            entity_type: round(sum(scores) / max(1, len(scores)), 4) for entity_type, scores in by_type.items()
         }
 
         risk_level: RiskLevel
         low_threshold = getattr(self.config.risk, "low_risk_threshold", 0.90) if hasattr(self.config, "risk") else 0.90
-        moderate_threshold = getattr(self.config.risk, "moderate_risk_threshold", 0.75) if hasattr(self.config, "risk") else 0.75
+        moderate_threshold = (
+            getattr(self.config.risk, "moderate_risk_threshold", 0.75) if hasattr(self.config, "risk") else 0.75
+        )
         if score >= low_threshold:
             risk_level = "low"
         elif score >= moderate_threshold:
@@ -1257,6 +1312,7 @@ class PIIOrchestrator:
     Synchronous methods block until completion. For high-throughput
     scenarios, prefer ``AsyncPIIOrchestrator`` with proper async runtime.
     """
+
     def __init__(
         self,
         token_key: str,
@@ -1308,7 +1364,7 @@ class PIIOrchestrator:
         segmentation: SegmentationPlan,
         scope: str,
         token_version: int,
-        ) -> dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of ``run()``."""
         return await self._async.run(
             payload,
@@ -1525,11 +1581,15 @@ class PIIOrchestrator:
             # Use streaming segmentation for large text
             est_tokens = estimate_token_count(text)
             use_segmentation = segmentation.enabled or est_tokens > threshold
-            active_seg = SegmentationPlan(
-                enabled=use_segmentation,
-                max_tokens=segmentation.max_tokens,
-                overlap_tokens=segmentation.overlap_tokens,
-            ) if use_segmentation and not segmentation.enabled else segmentation
+            active_seg = (
+                SegmentationPlan(
+                    enabled=use_segmentation,
+                    max_tokens=segmentation.max_tokens,
+                    overlap_tokens=segmentation.overlap_tokens,
+                )
+                if use_segmentation and not segmentation.enabled
+                else segmentation
+            )
 
             if use_segmentation and est_tokens > threshold:
                 total_chunks += max(1, est_tokens // (segmentation.max_tokens - segmentation.overlap_tokens))

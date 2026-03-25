@@ -1,0 +1,16 @@
+schema_version: "1.0"
+expert_id: "scrubadub-compatible"
+display_name: "scrubadub"
+entity_strengths:
+  EMAIL_ADDRESS: 0.75
+  PHONE_NUMBER: 0.60
+  US_SSN: 0.55
+entity_weaknesses:
+  PERSON_NAME: 0.20
+  ORGANIZATION: 0.15
+  CREDIT_CARD: 0.30
+default_weight: 0.95
+metadata:
+  type: "rule-based"
+  languages: ["en"]
+  description: "Lightweight rule-based PII scrubber"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-anon"
-version = "1.1.0"
+version = "1.2.1"
 description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -106,6 +106,8 @@ exclude = ["tests", "tests.*"]
 [tool.setuptools.package-data]
 pii_anon = [
   "benchmarks/matrix/*.json",
+  "engines/expert_manifest_*.yaml",
+  "engines/expert_manifest_*.json",
 ]
 
 [tool.pytest.ini_options]

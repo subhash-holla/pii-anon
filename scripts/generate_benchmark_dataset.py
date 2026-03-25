@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic, comprehensive PII benchmark dataset (v1.0.0).
+"""Generate deterministic, comprehensive PII benchmark dataset ().
 
 Produces a single unified JSONL dataset:
 
@@ -60,7 +60,7 @@ DATA_DIR = ROOT / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets"
 UNIFIED_DATASET_FILE = DATA_DIR / "pii_anon_benchmark_v1.jsonl"
 UNIFIED_METADATA_FILE = DATA_DIR / "pii_anon_benchmark_v1.metadata.json"
 
-VERSION = "v1.0.0"
+VERSION = ""
 
 # ---------------------------------------------------------------------------
 # Name pools — diverse, realistic, multi-cultural.  All synthetic.

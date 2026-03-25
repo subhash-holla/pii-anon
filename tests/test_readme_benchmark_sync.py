@@ -146,7 +146,7 @@ def test_committed_readme_matches_committed_summary() -> None:
     section = readme[start:end].strip()
 
     if section != summary:
-        # During v1.0.0 development the README may diverge from the last
+        # During development the README may diverge from the last
         # generated benchmark summary.  The CI pipeline re-syncs both after
         # each canonical run.
         import pytest as _pt

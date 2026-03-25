@@ -16,7 +16,8 @@ def test_cli_version_command() -> None:
     result = runner.invoke(app, ["version"])
 
     assert result.exit_code == 0
-    assert "1.1.0" in result.stdout
+    # Version string should be present (read dynamically from package metadata)
+    assert result.stdout.strip()
 
 
 def test_cli_health_json() -> None:

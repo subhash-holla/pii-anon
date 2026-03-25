@@ -1,7 +1,7 @@
 # Discovery Report: Ensemble v2 — Beat GLiNER
 
 ## Problem Statement
-pii-anon-ensemble (F1=0.6265) underperforms GLiNER (F1=0.7743) by 15 F1 points despite having much better recall (0.950 vs 0.667). The problem is entirely in precision (0.467 vs 0.922).
+pii-anon-swarm (F1=0.6265) underperforms GLiNER (F1=0.7743) by 15 F1 points despite having much better recall (0.950 vs 0.667). The problem is entirely in precision (0.467 vs 0.922).
 
 ## Root Cause Analysis (500-record diagnostic)
 

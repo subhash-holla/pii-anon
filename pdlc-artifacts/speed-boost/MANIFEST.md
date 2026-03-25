@@ -15,7 +15,7 @@ Replaced the 2-pattern speed stub with the full RegexEngineAdapter, which covers
 |---|---|---|---|
 | pii-anon (speed) | 0.4067 | **0.8886** | +118.5% |
 | pii-anon (accuracy) | 0.8743 | **0.8910** | +1.9% |
-| pii-anon-ensemble | 0.6265 | **0.8622** | +37.6% |
+| pii-anon-swarm | 0.6265 | **0.8622** | +37.6% |
 | GLiNER | 0.7743 | 0.7743 | — |
 
 All three offerings now beat GLiNER.

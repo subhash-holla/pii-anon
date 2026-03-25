@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-profile and per-segment evaluation of pii-anon and pii-anon-ensemble.
+"""Per-profile and per-segment evaluation of pii-anon and pii-anon-swarm.
 
 Since all 6 profiles use the same language set (yielding identical records),
 this script also segments by difficulty, scenario, datatype, and language
@@ -103,7 +103,7 @@ def _deterministic_sample(records: list[BenchmarkRecord], n: int) -> list[Benchm
 
 def main():
     print("=" * 90)
-    print("COMPREHENSIVE PER-SEGMENT EVALUATION: pii-anon & pii-anon-ensemble")
+    print("COMPREHENSIVE PER-SEGMENT EVALUATION: pii-anon & pii-anon-swarm")
     print("=" * 90)
 
     records = load_benchmark_dataset("pii_anon_benchmark_v1")

@@ -58,6 +58,7 @@ class LinkDecision:
         Name of the linking rule that produced this decision
         (e.g., "exact_alias", "full_name_exact", "new_cluster").
     """
+
     finding: EnsembleFinding
     mention_text: str
     cluster_id: str
@@ -159,7 +160,7 @@ def link_findings(
             )
             continue
 
-        candidates = [item for item in ledger.all_clusters(scope) if item.entity_family == family]
+        candidates = ledger.clusters_by_family(scope, family)
         best = _best_candidate(
             candidates=candidates,
             features=features,
@@ -223,6 +224,7 @@ class _Features:
     All ``*_norm`` fields store lowercased, alphanumeric-only strings
     produced by ``_norm()`` for fast set-lookup comparisons.
     """
+
     entity_family: str
     alias_norm: str
     full_name_norm: str | None
@@ -247,10 +249,7 @@ def _entity_family(entity_type: str) -> str:
 # Pre-built translation table: maps all non-alphanumeric ASCII chars to None
 # (deletion). Used by _norm() instead of re.sub() for ~3× speedup on short
 # strings — this function is called 2400+ times per pipeline run.
-_STRIP_TABLE = str.maketrans("", "", "".join(
-    ch for ch in (chr(i) for i in range(128))
-    if not ch.isalnum()
-))
+_STRIP_TABLE = str.maketrans("", "", "".join(ch for ch in (chr(i) for i in range(128)) if not ch.isalnum()))
 
 
 def _norm(value: str) -> str:
@@ -393,7 +392,11 @@ def _score_candidate(
     ):
         out.append((cluster, 0.91, "first_last_initial"))
 
-    if features.full_name_norm is None and features.short_name_norm and features.short_name_norm in cluster.short_name_aliases:
+    if (
+        features.full_name_norm is None
+        and features.short_name_norm
+        and features.short_name_norm in cluster.short_name_aliases
+    ):
         out.append((cluster, 0.84, "short_name"))
 
     if (
@@ -433,9 +436,7 @@ def _score_candidate(
 
     if allow_email_name_link and features.full_name_norm:
         if any(
-            features.full_name_norm == value
-            or features.full_name_norm in value
-            or value in features.full_name_norm
+            features.full_name_norm == value or features.full_name_norm in value or value in features.full_name_norm
             for value in cluster.email_local_aliases
         ):
             out.append((cluster, 0.88, "full_name_to_email"))

@@ -19,7 +19,7 @@ def test_regex_adapter_detects_ip_credit_card_and_iban() -> None:
 
 
 def test_regex_adapter_filters_invalid_ip_but_accepts_format_cc_and_iban() -> None:
-    """v1.0.0: Credit cards with valid issuer prefixes and IBANs with valid format
+    """Credit cards with valid issuer prefixes and IBANs with valid format
     are now accepted even if checksum fails (medium confidence).  Only truly
     invalid formats are filtered out."""
     adapter = RegexEngineAdapter(enabled=True)
@@ -74,33 +74,33 @@ def test_regex_adapter_validation_helpers_cover_edge_cases() -> None:
     assert RegexEngineAdapter._is_valid_ipv4("10.0.a.1") is False
     assert RegexEngineAdapter._is_valid_ipv4("10.0.999.1") is False
 
-    # v1.0.0: _is_valid_credit_card now accepts Luhn-valid OR format-match
+    # _is_valid_credit_card now accepts Luhn-valid OR format-match
     assert RegexEngineAdapter._is_valid_credit_card("4111 1111 1111 1111") is True  # Luhn valid
     assert RegexEngineAdapter._is_valid_credit_card("1234") is False  # too short
     assert RegexEngineAdapter._is_valid_credit_card("4111 1111 1111 1112") is True  # format match (Visa prefix)
     assert RegexEngineAdapter._is_valid_credit_card("8111 1111 1111 1113") is False  # no valid prefix + Luhn fail
 
-    # v1.0.0: _is_valid_iban now accepts checksum-valid OR format-valid
+    # _is_valid_iban now accepts checksum-valid OR format-valid
     assert RegexEngineAdapter._is_valid_iban("GB82WEST12345698765432") is True
     assert RegexEngineAdapter._is_valid_iban("GB00TEST123") is False  # too short
     assert RegexEngineAdapter._is_valid_iban("12ABWEST12345678901234") is False  # doesn't start with letters
 
-    # v1.0.0: Luhn helper
+    # Luhn helper
     assert RegexEngineAdapter._luhn_checksum("4111111111111111") is True
     assert RegexEngineAdapter._luhn_checksum("4111111111111112") is False
 
-    # v1.0.0: CC format helper
+    # CC format helper
     assert RegexEngineAdapter._is_cc_format("4111111111111112") is True  # Visa prefix
     assert RegexEngineAdapter._is_cc_format("5111111111111112") is True  # Mastercard
     assert RegexEngineAdapter._is_cc_format("3411111111111112") is True  # Amex
     assert RegexEngineAdapter._is_cc_format("8111111111111113") is False  # Unknown prefix
 
-    # v1.0.0: IBAN format helper
+    # IBAN format helper
     assert RegexEngineAdapter._is_valid_iban_format("GB82WEST12345698765432") is True
     assert RegexEngineAdapter._is_valid_iban_format("GB00TEST123") is False  # too short
     assert RegexEngineAdapter._is_valid_iban_strict("GB82WEST12345698765432") is True
 
-    # v1.0.0: SSN digit validator
+    # SSN digit validator
     assert RegexEngineAdapter._is_valid_ssn_digits("123456789") is True
     assert RegexEngineAdapter._is_valid_ssn_digits("000123456") is False  # area 000
     assert RegexEngineAdapter._is_valid_ssn_digits("666123456") is False  # area 666
@@ -136,7 +136,7 @@ def test_regex_adapter_address_phrase_heuristics_paths() -> None:
 
 
 def test_regex_adapter_new_entity_types() -> None:
-    """v1.0.0: Verify new entity type patterns detect correctly."""
+    """Verify new entity type patterns detect correctly."""
     adapter = RegexEngineAdapter(enabled=True)
     ctx = {"language": "en", "policy_mode": "balanced"}
 
@@ -197,7 +197,7 @@ def test_regex_adapter_new_entity_types() -> None:
 
 
 def test_regex_adapter_credit_card_tiered_confidence() -> None:
-    """v1.0.0: Luhn-valid cards get higher confidence than format-only matches."""
+    """Luhn-valid cards get higher confidence than format-only matches."""
     adapter = RegexEngineAdapter(enabled=True)
     ctx = {"language": "en", "policy_mode": "balanced"}
 
@@ -215,7 +215,7 @@ def test_regex_adapter_credit_card_tiered_confidence() -> None:
 
 
 def test_regex_adapter_iban_tiered_confidence() -> None:
-    """v1.0.0: Checksum-valid IBANs get higher confidence than format-only matches."""
+    """Checksum-valid IBANs get higher confidence than format-only matches."""
     adapter = RegexEngineAdapter(enabled=True)
     ctx = {"language": "en", "policy_mode": "balanced"}
 

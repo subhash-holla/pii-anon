@@ -65,6 +65,6 @@
   "shared_memory_path": "posix_shm (darwin)",
   "shared_memory_reason": "ok (macOS uses kernel shm_open)",
   "strict_runtime": true,
-  "timestamp_utc": "2026-03-18T15:49:37Z",
+  "timestamp_utc": "2026-03-22T18:12:35Z",
   "unavailable_competitors": {}
 }

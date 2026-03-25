@@ -61,7 +61,7 @@ def __getattr__(name: str) -> object:  # noqa: N807
         return getattr(_ef, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-# v1.0.0: Transformation strategies & policies
+# Transformation strategies & policies
 from .transforms import (  # noqa: E402, F401  — public re-export (after __getattr__)
     TransformStrategy,
     TransformContext,
@@ -82,7 +82,7 @@ from .transforms.policies import (  # noqa: E402, F401  — public re-export
     list_compliance_templates,
 )
 
-# v1.0.0: Eval framework bridge
+# Eval framework bridge
 from .bridge import (  # noqa: E402, F401  — public re-export
     ResultAdapter,
     EvaluationPipeline,
@@ -91,7 +91,7 @@ from .bridge import (  # noqa: E402, F401  — public re-export
     QuickBenchReport,
 )
 
-# v1.0.0: Enterprise pseudonymization
+# Enterprise pseudonymization
 from .tokenization import (  # noqa: E402, F401  — public re-export
     KeyManager,
     KeyVersion,
@@ -103,14 +103,19 @@ from .tokenization import (  # noqa: E402, F401  — public re-export
     SQLiteTokenStore,
 )
 
-# v1.0.0: Pipeline builder
+# Pipeline builder
 from .pipeline import (  # noqa: E402, F401  — public re-export
     PipelineBuilder,
     Pipeline,
     PipelineReport,
 )
 
-__version__ = "1.1.0"
+try:
+    from importlib.metadata import version as _pkg_version
+
+    __version__: str = _pkg_version("pii-anon")
+except Exception:  # pragma: no cover — editable installs / missing metadata
+    __version__ = "0.0.0-dev"
 
 __all__ = [
     "__version__",
@@ -165,14 +170,14 @@ __all__ = [
     # Streaming chunker
     "StreamingChunker",
     "estimate_token_count",
-    # v1.0.0: Composite metric & rating engine
+    # Composite metric & rating engine
     "CompositeConfig",
     "CompositeScore",
     "compute_composite",
     "PIIRateEloEngine",
     "EloRating",
     "Leaderboard",
-    # v1.0.0: Transformation strategies
+    # Transformation strategies
     "TransformStrategy",
     "TransformContext",
     "TransformResult",
@@ -184,18 +189,18 @@ __all__ = [
     "GeneralizationStrategy",
     "SyntheticReplacementStrategy",
     "PerturbationStrategy",
-    # v1.0.0: Transformation policies
+    # Transformation policies
     "EntityTransformRule",
     "TransformPolicy",
     "load_compliance_template",
     "list_compliance_templates",
-    # v1.0.0: Eval framework bridge
+    # Eval framework bridge
     "ResultAdapter",
     "EvaluationPipeline",
     "EvaluationPipelineConfig",
     "QuickBench",
     "QuickBenchReport",
-    # v1.0.0: Enterprise pseudonymization
+    # Enterprise pseudonymization
     "KeyManager",
     "KeyVersion",
     "ReidentificationService",
@@ -204,7 +209,7 @@ __all__ = [
     "TokenMapping",
     "InMemoryTokenStore",
     "SQLiteTokenStore",
-    # v1.0.0: Pipeline builder
+    # Pipeline builder
     "PipelineBuilder",
     "Pipeline",
     "PipelineReport",

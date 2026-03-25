@@ -3,7 +3,7 @@
 pii-anon's detection pipeline is built on pluggable engine adapters. You can add your own detection engine to either offering:
 
 - **pii-anon** uses the built-in regex engine only (for sub-millisecond speed)
-- **pii-anon-ensemble** fuses multiple engines through Mixture-of-Experts routing
+- **pii-anon-swarm** fuses multiple engines through Mixture-of-Experts routing
 
 This guide shows how to build a custom engine, register it with the ensemble, and tune its MoE weights.
 
@@ -130,7 +130,7 @@ engines:
 
 ## Step 3: Register with the MoE Expert Registry
 
-For your engine to participate in the Mixture-of-Experts routing (used by pii-anon-ensemble), register an `ExpertSpec` that declares which entity types your engine is strong at:
+For your engine to participate in the Mixture-of-Experts routing (used by pii-anon-swarm), register an `ExpertSpec` that declares which entity types your engine is strong at:
 
 ```python
 from pii_anon.moe import ExpertRegistry, ExpertSpec, get_default_registry

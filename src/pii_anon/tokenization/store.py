@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
 
-@dataclass
+@dataclass(slots=True)
 class TokenMapping:
     """A single token-to-plaintext mapping.
 
@@ -89,15 +90,35 @@ class InMemoryTokenStore(TokenStore):
 
     Suitable for testing, short-lived pipelines, and single-process
     deployments.  All data is lost when the process exits.
+
+    Parameters
+    ----------
+    max_size : int | None
+        Maximum number of mappings to retain.  When exceeded, the oldest
+        entry is evicted (LRU).  ``None`` means unbounded.
     """
 
-    def __init__(self) -> None:
-        self._records: dict[tuple[str, str], TokenMapping] = {}
+    def __init__(self, max_size: int | None = None) -> None:
+        self._records: OrderedDict[tuple[str, str], TokenMapping] = OrderedDict()
+        self._by_scope: dict[str, dict[str, TokenMapping]] = {}
         self._lock = Lock()
+        self._max_size = max_size
 
     def put(self, mapping: TokenMapping) -> None:
         with self._lock:
-            self._records[(mapping.scope, mapping.token)] = mapping
+            key = (mapping.scope, mapping.token)
+            if key in self._records:
+                self._records.move_to_end(key)
+            self._records[key] = mapping
+            self._by_scope.setdefault(mapping.scope, {})[mapping.token] = mapping
+            if self._max_size is not None:
+                while len(self._records) > self._max_size:
+                    evicted_key, evicted = self._records.popitem(last=False)
+                    scope_dict = self._by_scope.get(evicted_key[0])
+                    if scope_dict is not None:
+                        scope_dict.pop(evicted_key[1], None)
+                        if not scope_dict:
+                            del self._by_scope[evicted_key[0]]
 
     def get(self, token: str, *, scope: str | None = None) -> TokenMapping | None:
         now = time.time()
@@ -120,33 +141,28 @@ class InMemoryTokenStore(TokenStore):
     def list_by_scope(self, scope: str) -> list[TokenMapping]:
         now = time.time()
         with self._lock:
-            return [
-                m for (s, _), m in self._records.items()
-                if s == scope and (m.expires_at is None or now <= m.expires_at)
-            ]
+            scope_dict = self._by_scope.get(scope, {})
+            return [m for m in scope_dict.values() if m.expires_at is None or now <= m.expires_at]
 
     def count(self, scope: str | None = None) -> int:
         now = time.time()
         with self._lock:
             if scope is not None:
-                return sum(
-                    1 for (s, _), m in self._records.items()
-                    if s == scope and (m.expires_at is None or now <= m.expires_at)
-                )
-            return sum(
-                1 for m in self._records.values()
-                if m.expires_at is None or now <= m.expires_at
-            )
+                scope_dict = self._by_scope.get(scope, {})
+                return sum(1 for m in scope_dict.values() if m.expires_at is None or now <= m.expires_at)
+            return sum(1 for m in self._records.values() if m.expires_at is None or now <= m.expires_at)
 
     def delete_expired(self) -> int:
         now = time.time()
         with self._lock:
-            expired_keys = [
-                k for k, m in self._records.items()
-                if m.expires_at is not None and now > m.expires_at
-            ]
+            expired_keys = [k for k, m in self._records.items() if m.expires_at is not None and now > m.expires_at]
             for k in expired_keys:
                 del self._records[k]
+                scope_dict = self._by_scope.get(k[0])
+                if scope_dict is not None:
+                    scope_dict.pop(k[1], None)
+                    if not scope_dict:
+                        del self._by_scope[k[0]]
             return len(expired_keys)
 
 
@@ -199,6 +215,13 @@ class SQLiteTokenStore(TokenStore):
                 ON token_mappings(scope)
                 """
             )
+            # Index for token-only lookups (scope-less get)
+            self._conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_token_mappings_token
+                ON token_mappings(token)
+                """
+            )
             # Migrate existing tables that lack the new columns
             self._migrate_schema()
 
@@ -207,15 +230,11 @@ class SQLiteTokenStore(TokenStore):
         try:
             self._conn.execute("SELECT created_at FROM token_mappings LIMIT 1")
         except sqlite3.OperationalError:
-            self._conn.execute(
-                "ALTER TABLE token_mappings ADD COLUMN created_at REAL NOT NULL DEFAULT 0.0"
-            )
+            self._conn.execute("ALTER TABLE token_mappings ADD COLUMN created_at REAL NOT NULL DEFAULT 0.0")
         try:
             self._conn.execute("SELECT expires_at FROM token_mappings LIMIT 1")
         except sqlite3.OperationalError:
-            self._conn.execute(
-                "ALTER TABLE token_mappings ADD COLUMN expires_at REAL"
-            )
+            self._conn.execute("ALTER TABLE token_mappings ADD COLUMN expires_at REAL")
 
     def put(self, mapping: TokenMapping) -> None:
         with self._lock, self._conn:
@@ -227,9 +246,13 @@ class SQLiteTokenStore(TokenStore):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    mapping.scope, mapping.token, mapping.plaintext,
-                    mapping.entity_type, mapping.version,
-                    mapping.created_at, mapping.expires_at,
+                    mapping.scope,
+                    mapping.token,
+                    mapping.plaintext,
+                    mapping.entity_type,
+                    mapping.version,
+                    mapping.created_at,
+                    mapping.expires_at,
                 ),
             )
 
@@ -289,16 +312,10 @@ class SQLiteTokenStore(TokenStore):
     def count(self, scope: str | None = None) -> int:
         now = time.time()
         if scope is not None:
-            query = (
-                "SELECT COUNT(*) FROM token_mappings "
-                "WHERE scope = ? AND (expires_at IS NULL OR expires_at > ?)"
-            )
+            query = "SELECT COUNT(*) FROM token_mappings WHERE scope = ? AND (expires_at IS NULL OR expires_at > ?)"
             params: tuple[object, ...] = (scope, now)
         else:
-            query = (
-                "SELECT COUNT(*) FROM token_mappings "
-                "WHERE expires_at IS NULL OR expires_at > ?"
-            )
+            query = "SELECT COUNT(*) FROM token_mappings WHERE expires_at IS NULL OR expires_at > ?"
             params = (now,)
 
         with self._lock:

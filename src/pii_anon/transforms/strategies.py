@@ -258,6 +258,16 @@ class GeneralizationStrategy(TransformStrategy):
         self._hierarchies = dict(_DEFAULT_HIERARCHIES)
         if custom_hierarchies:
             self._hierarchies.update(custom_hierarchies)
+        self._dispatch_table: dict[str, Callable[..., str]] = {
+            "numeric_range": self._generalize_numeric_range,
+            "date_year_only": self._generalize_date_year,
+            "prefix_mask": self._generalize_prefix_mask,
+            "partial_mask": self._generalize_partial_mask,
+            "email_mask": self._generalize_email,
+            "initials": self._generalize_initials,
+            "truncate_precision": self._generalize_truncate_precision,
+            "subnet_mask": self._generalize_subnet,
+        }
 
     def transform(
         self,
@@ -282,18 +292,8 @@ class GeneralizationStrategy(TransformStrategy):
         )
 
     def _dispatch(self, text: str, gen_type: str, config: dict[str, Any]) -> str:
-        dispatch = {
-            "numeric_range": self._generalize_numeric_range,
-            "date_year_only": self._generalize_date_year,
-            "prefix_mask": self._generalize_prefix_mask,
-            "partial_mask": self._generalize_partial_mask,
-            "email_mask": self._generalize_email,
-            "initials": self._generalize_initials,
-            "truncate_precision": self._generalize_truncate_precision,
-            "subnet_mask": self._generalize_subnet,
-        }
-        handler = dispatch.get(gen_type, self._generic_generalize_with_config)
-        return handler(text, config)
+        handler: Any = self._dispatch_table.get(gen_type, self._generic_generalize_with_config)
+        return str(handler(text, config))
 
     @staticmethod
     def _generalize_numeric_range(text: str, config: dict[str, Any]) -> str:
@@ -442,60 +442,201 @@ class GeneralizationStrategy(TransformStrategy):
 _NAME_POOLS: dict[str, dict[str, list[str]]] = {
     "en": {
         "first": [
-            "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Quinn",
-            "Avery", "Harper", "Parker", "Drew", "Logan", "Sage", "Cameron",
-            "Emerson", "Hayden", "Rowan", "Ellis", "Finley", "Blake",
-            "Oakley", "Skyler", "Reese", "Dakota", "Phoenix", "Adrian",
-            "Sawyer", "River", "Marlowe", "Lennox", "Remington", "Sterling",
+            "Alex",
+            "Jordan",
+            "Taylor",
+            "Morgan",
+            "Casey",
+            "Riley",
+            "Quinn",
+            "Avery",
+            "Harper",
+            "Parker",
+            "Drew",
+            "Logan",
+            "Sage",
+            "Cameron",
+            "Emerson",
+            "Hayden",
+            "Rowan",
+            "Ellis",
+            "Finley",
+            "Blake",
+            "Oakley",
+            "Skyler",
+            "Reese",
+            "Dakota",
+            "Phoenix",
+            "Adrian",
+            "Sawyer",
+            "River",
+            "Marlowe",
+            "Lennox",
+            "Remington",
+            "Sterling",
         ],
         "last": [
-            "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia",
-            "Miller", "Davis", "Rodriguez", "Martinez", "Anderson", "Taylor",
-            "Thomas", "Moore", "Jackson", "Martin", "Lee", "Thompson",
-            "White", "Harris", "Clark", "Lewis", "Walker", "Hall", "Young",
-            "Allen", "King", "Wright", "Scott", "Green", "Baker", "Adams",
+            "Smith",
+            "Johnson",
+            "Williams",
+            "Brown",
+            "Jones",
+            "Garcia",
+            "Miller",
+            "Davis",
+            "Rodriguez",
+            "Martinez",
+            "Anderson",
+            "Taylor",
+            "Thomas",
+            "Moore",
+            "Jackson",
+            "Martin",
+            "Lee",
+            "Thompson",
+            "White",
+            "Harris",
+            "Clark",
+            "Lewis",
+            "Walker",
+            "Hall",
+            "Young",
+            "Allen",
+            "King",
+            "Wright",
+            "Scott",
+            "Green",
+            "Baker",
+            "Adams",
         ],
     },
     "es": {
         "first": [
-            "Alejandro", "Sofía", "Carlos", "Valentina", "Diego", "Camila",
-            "Mateo", "Lucía", "Santiago", "Isabella", "Sebastián", "Mariana",
-            "Andrés", "Gabriela", "Nicolás", "Paula", "Daniel", "Andrea",
+            "Alejandro",
+            "Sofía",
+            "Carlos",
+            "Valentina",
+            "Diego",
+            "Camila",
+            "Mateo",
+            "Lucía",
+            "Santiago",
+            "Isabella",
+            "Sebastián",
+            "Mariana",
+            "Andrés",
+            "Gabriela",
+            "Nicolás",
+            "Paula",
+            "Daniel",
+            "Andrea",
         ],
         "last": [
-            "García", "Rodríguez", "Martínez", "López", "González", "Hernández",
-            "Pérez", "Sánchez", "Ramírez", "Torres", "Flores", "Rivera",
+            "García",
+            "Rodríguez",
+            "Martínez",
+            "López",
+            "González",
+            "Hernández",
+            "Pérez",
+            "Sánchez",
+            "Ramírez",
+            "Torres",
+            "Flores",
+            "Rivera",
         ],
     },
     "fr": {
         "first": [
-            "Camille", "Antoine", "Manon", "Lucas", "Chloé", "Hugo",
-            "Léa", "Gabriel", "Emma", "Louis", "Jade", "Raphaël",
-            "Louise", "Arthur", "Alice", "Jules", "Lina", "Adam",
+            "Camille",
+            "Antoine",
+            "Manon",
+            "Lucas",
+            "Chloé",
+            "Hugo",
+            "Léa",
+            "Gabriel",
+            "Emma",
+            "Louis",
+            "Jade",
+            "Raphaël",
+            "Louise",
+            "Arthur",
+            "Alice",
+            "Jules",
+            "Lina",
+            "Adam",
         ],
         "last": [
-            "Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard",
-            "Petit", "Durand", "Leroy", "Moreau", "Simon", "Laurent",
+            "Martin",
+            "Bernard",
+            "Dubois",
+            "Thomas",
+            "Robert",
+            "Richard",
+            "Petit",
+            "Durand",
+            "Leroy",
+            "Moreau",
+            "Simon",
+            "Laurent",
         ],
     },
     "de": {
         "first": [
-            "Maximilian", "Sophie", "Alexander", "Marie", "Paul", "Emma",
-            "Leon", "Hannah", "Lukas", "Mia", "Felix", "Lena",
-            "Jonas", "Anna", "Tim", "Laura", "Ben", "Lara",
+            "Maximilian",
+            "Sophie",
+            "Alexander",
+            "Marie",
+            "Paul",
+            "Emma",
+            "Leon",
+            "Hannah",
+            "Lukas",
+            "Mia",
+            "Felix",
+            "Lena",
+            "Jonas",
+            "Anna",
+            "Tim",
+            "Laura",
+            "Ben",
+            "Lara",
         ],
         "last": [
-            "Müller", "Schmidt", "Schneider", "Fischer", "Weber", "Meyer",
-            "Wagner", "Becker", "Schulz", "Hoffmann", "Koch", "Richter",
+            "Müller",
+            "Schmidt",
+            "Schneider",
+            "Fischer",
+            "Weber",
+            "Meyer",
+            "Wagner",
+            "Becker",
+            "Schulz",
+            "Hoffmann",
+            "Koch",
+            "Richter",
         ],
     },
 }
 
 _CITY_POOLS: dict[str, list[str]] = {
     "en": [
-        "Springfield", "Riverside", "Fairview", "Georgetown", "Clinton",
-        "Madison", "Salem", "Franklin", "Greenville", "Arlington",
-        "Bristol", "Ashland", "Burlington", "Chester", "Dayton",
+        "Springfield",
+        "Riverside",
+        "Fairview",
+        "Georgetown",
+        "Clinton",
+        "Madison",
+        "Salem",
+        "Franklin",
+        "Greenville",
+        "Arlington",
+        "Bristol",
+        "Ashland",
+        "Burlington",
+        "Chester",
+        "Dayton",
     ],
     "es": ["San Miguel", "Santa Cruz", "La Paz", "San José", "Monterrey"],
     "fr": ["Saint-Denis", "Saint-Étienne", "Villeurbanne", "Clermont", "Nanterre"],
@@ -535,6 +676,17 @@ class SyntheticReplacementStrategy(TransformStrategy):
                 self._pools.names.update(custom_pools["names"])
             if "cities" in custom_pools:
                 self._pools.cities.update(custom_pools["cities"])
+        self._handler_table: dict[str, Callable[[str, str, int], str]] = {
+            "PERSON_NAME": self._synthetic_name,
+            "EMAIL_ADDRESS": self._synthetic_email,
+            "PHONE_NUMBER": self._synthetic_phone,
+            "ADDRESS": self._synthetic_address,
+            "ZIP_CODE": self._synthetic_zip,
+            "CREDIT_CARD_NUMBER": self._synthetic_credit_card,
+            "DATE_OF_BIRTH": self._synthetic_date,
+            "DATE": self._synthetic_date,
+        }
+        self._seed_cache: dict[tuple[str, str, str], int] = {}
 
     def transform(
         self,
@@ -545,7 +697,7 @@ class SyntheticReplacementStrategy(TransformStrategy):
         key = context.token_key or "default-synthetic-key"
         seed = self._derive_seed(key, context.scope, plaintext)
 
-        handler = self._get_handler(entity_type)
+        handler = self._handler_table.get(entity_type, self._synthetic_generic)
         replacement = handler(plaintext, context.language, seed)
 
         return TransformResult(
@@ -555,25 +707,17 @@ class SyntheticReplacementStrategy(TransformStrategy):
             metadata={"locale": context.language, "entity_type": entity_type},
         )
 
-    def _get_handler(self, entity_type: str) -> Callable[[str, str, int], str]:
-        handlers = {
-            "PERSON_NAME": self._synthetic_name,
-            "EMAIL_ADDRESS": self._synthetic_email,
-            "PHONE_NUMBER": self._synthetic_phone,
-            "ADDRESS": self._synthetic_address,
-            "ZIP_CODE": self._synthetic_zip,
-            "CREDIT_CARD_NUMBER": self._synthetic_credit_card,
-            "DATE_OF_BIRTH": self._synthetic_date,
-            "DATE": self._synthetic_date,
-        }
-        return handlers.get(entity_type, self._synthetic_generic)
-
-    @staticmethod
-    def _derive_seed(key: str, scope: str, plaintext: str) -> int:
-        """Deterministic seed from key + scope + plaintext."""
+    def _derive_seed(self, key: str, scope: str, plaintext: str) -> int:
+        """Deterministic seed from key + scope + plaintext (cached)."""
+        cache_key = (key, scope, plaintext)
+        cached = self._seed_cache.get(cache_key)
+        if cached is not None:
+            return cached
         raw = f"{key}|{scope}|{plaintext}".encode("utf-8")
         digest = hmac.new(key.encode("utf-8"), raw, hashlib.sha256).digest()
-        return int(struct.unpack(">Q", digest[:8])[0])
+        seed = int(struct.unpack(">Q", digest[:8])[0])
+        self._seed_cache[cache_key] = seed
+        return seed
 
     def _synthetic_name(self, plaintext: str, language: str, seed: int) -> str:
         pool = self._pools.names.get(language, self._pools.names.get("en", {"first": ["Alex"], "last": ["Smith"]}))
@@ -687,8 +831,14 @@ class SyntheticReplacementStrategy(TransformStrategy):
             reversible=False,
             format_preserving=True,
             supports_entity_types=[
-                "PERSON_NAME", "EMAIL_ADDRESS", "PHONE_NUMBER", "ADDRESS",
-                "ZIP_CODE", "CREDIT_CARD_NUMBER", "DATE_OF_BIRTH", "DATE",
+                "PERSON_NAME",
+                "EMAIL_ADDRESS",
+                "PHONE_NUMBER",
+                "ADDRESS",
+                "ZIP_CODE",
+                "CREDIT_CARD_NUMBER",
+                "DATE_OF_BIRTH",
+                "DATE",
             ],
         )
 
@@ -714,6 +864,14 @@ class PerturbationStrategy(TransformStrategy):
     def __init__(self, epsilon: float = 1.0, sigma: float = 0.1) -> None:
         self._epsilon = epsilon
         self._sigma = sigma
+        self._handler_table: dict[str, Callable[[str, int, float, float], tuple[str, dict[str, Any]]]] = {
+            "AGE": self._perturb_age,
+            "SALARY": self._perturb_salary,
+            "LOCATION_COORDINATES": self._perturb_coordinates,
+            "DATE_OF_BIRTH": self._perturb_date,
+            "DATE": self._perturb_date,
+        }
+        self._seed_cache: dict[tuple[str, int, str], int] = {}
 
     def transform(
         self,
@@ -740,20 +898,18 @@ class PerturbationStrategy(TransformStrategy):
             },
         )
 
-    @staticmethod
-    def _derive_seed(context: TransformContext) -> int:
+    def _derive_seed(self, context: TransformContext) -> int:
+        cache_key = (context.scope, context.mention_index, context.plaintext)
+        cached = self._seed_cache.get(cache_key)
+        if cached is not None:
+            return cached
         raw = f"{context.scope}|{context.mention_index}|{context.plaintext}".encode()
-        return int.from_bytes(hashlib.sha256(raw).digest()[:8], "big")
+        seed = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big")
+        self._seed_cache[cache_key] = seed
+        return seed
 
     def _get_handler(self, entity_type: str) -> Callable[[str, int, float, float], tuple[str, dict[str, Any]]]:
-        handlers = {
-            "AGE": self._perturb_age,
-            "SALARY": self._perturb_salary,
-            "LOCATION_COORDINATES": self._perturb_coordinates,
-            "DATE_OF_BIRTH": self._perturb_date,
-            "DATE": self._perturb_date,
-        }
-        return handlers.get(entity_type, self._perturb_generic)
+        return self._handler_table.get(entity_type, self._perturb_generic)
 
     @staticmethod
     def _laplace_sample(seed: int, scale: float) -> float:
@@ -868,6 +1024,10 @@ class PerturbationStrategy(TransformStrategy):
             reversible=False,
             format_preserving=True,
             supports_entity_types=[
-                "AGE", "SALARY", "LOCATION_COORDINATES", "DATE_OF_BIRTH", "DATE",
+                "AGE",
+                "SALARY",
+                "LOCATION_COORDINATES",
+                "DATE_OF_BIRTH",
+                "DATE",
             ],
         )

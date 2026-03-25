@@ -717,7 +717,7 @@ The benchmark summary table includes these columns per system:
 - **Per-entity precision/recall** — Breakdown by entity type (in JSON artifacts, not in summary table).
 - **Entity coverage** — Count of entity types with non-zero recall vs total types in ground truth.
 
-The benchmark evaluates `pii-anon` (auto mode) and `pii-anon-ensemble` (mixture-of-experts mode with per-entity-type expert weights) alongside all competitor systems. The ensemble mode uses weighted consensus fusion with entity-level specialization derived from comparative evaluation data.
+The benchmark evaluates `pii-anon` (auto mode) and `pii-anon-swarm` (mixture-of-experts mode with per-entity-type expert weights) alongside all competitor systems. The ensemble mode uses weighted consensus fusion with entity-level specialization derived from comparative evaluation data.
 
 When multiple datasets are evaluated, the combined report (`benchmark-combined.json`) adds a cross-dataset summary with sample-weighted averages per system and a per-system F1 breakdown by dataset. The rendered markdown includes an interpretation section explaining what it means to succeed on one dataset but fall short on another.
 
@@ -1297,7 +1297,7 @@ open https://pypi.org/project/pii-anon-datasets/
 5. EVALUATION
    [ ] make benchmark-portable (or benchmark-canonical-macos for full gates)
    [ ] All 3 competitors evaluated (presidio, scrubadub, gliner)
-   [ ] Both pii-anon and pii-anon-ensemble evaluated
+   [ ] Both pii-anon and pii-anon-swarm evaluated
    [ ] All datasets evaluated (pii_anon_benchmark_v1, eval_framework_v1)
    [ ] Cross-dataset combined report reviewed (benchmark-combined.json)
    [ ] Ensemble MoE weights verified (per-entity-type specialization)

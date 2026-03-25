@@ -1,7 +1,7 @@
 # PDLC Manifest: MoE Ensemble Guarantee & Performance Improvement
 
 ## Project
-**Goal**: Guarantee that pii-anon-ensemble (Mixtral-inspired MoE) always performs >= best individual expert, and iteratively improve per-entity-type detection for both pii-anon and pii-anon-ensemble.
+**Goal**: Guarantee that pii-anon-swarm (Mixtral-inspired MoE) always performs >= best individual expert, and iteratively improve per-entity-type detection for both pii-anon and pii-anon-swarm.
 
 ## Stage Status
 

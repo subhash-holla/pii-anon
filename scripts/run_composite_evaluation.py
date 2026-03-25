@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprehensive composite metric evaluation for pii-anon v1.0.0.
+"""Comprehensive composite metric evaluation for pii-anon.
 
 Evaluates ALL systems (pii-anon + competitors) against the full
 benchmark dataset using:
@@ -94,7 +94,7 @@ def _build_scorecards(
 ) -> BenchmarkScorecard:
     """Assemble SystemScorecard objects and pack into BenchmarkScorecard."""
     benchmark = BenchmarkScorecard(
-        benchmark_name="pii-anon composite evaluation v1.0.0",
+        benchmark_name="pii-anon composite evaluation",
         dataset_name="eval_framework_v1",
     )
     for sys_result in systems:
@@ -184,7 +184,7 @@ def run_evaluation(
     benchmark_sc = _build_scorecards(report.systems, composite_scores, elo_ratings)
 
     leaderboard = Leaderboard(
-        benchmark_name="pii-anon v1.0.0 — Composite Evaluation",
+        benchmark_name="pii-anon — Composite Evaluation",
         systems=list(benchmark_sc.system_scorecards.values()),
     )
     leaderboard.sort_by_composite()
@@ -291,7 +291,7 @@ def run_evaluation(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run composite metric evaluation for pii-anon v1.0.0"
+        description="Run composite metric evaluation for pii-anon"
     )
     parser.add_argument(
         "--dataset", default="eval_framework_v1",

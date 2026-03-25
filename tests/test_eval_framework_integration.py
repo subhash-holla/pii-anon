@@ -14,9 +14,9 @@ from __future__ import annotations
 class TestTopLevelImports:
     """Verify the new evaluation framework is accessible from pii_anon."""
 
-    def test_version_is_1_3_0(self) -> None:
+    def test_version_is_set(self) -> None:
         import pii_anon
-        assert pii_anon.__version__ == "1.1.0"
+        assert pii_anon.__version__  # non-empty version string
 
     def test_eval_framework_imports(self) -> None:
         from pii_anon import (

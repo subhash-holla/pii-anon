@@ -75,7 +75,7 @@ class EntityTypeProfile:
     language_variant_hint: str = ""
     related_types: tuple[str, ...] = ()
 
-    # v1.0.0: Quasi-identifier and re-identification risk metadata
+    # Quasi-identifier and re-identification risk metadata
     is_quasi_identifier: bool = False
     quasi_identifier_groups: tuple[str, ...] = ()
     reidentification_contribution: float = 0.0
@@ -172,7 +172,7 @@ class PII_TAXONOMY:
     MARITAL_STATUS = "MARITAL_STATUS"
     HOUSEHOLD_SIZE = "HOUSEHOLD_SIZE"
 
-    # ── Vehicle Linkage (1) — v1.0.0 addition ─────────────────────────
+    # ── Vehicle Linkage (1) ─────────────────────────
     VEHICLE_MODEL = "VEHICLE_MODEL"
 
     @classmethod
@@ -696,7 +696,7 @@ _ENTITY_PROFILES: dict[str, EntityTypeProfile] = {
         ),
         example_patterns=("member of the Green Party",),
     ),
-    # ── v1.0.0 additions: Quasi-identifier entity types ──────────────
+    # ── Quasi-identifier entity types ──────────────
     PII_TAXONOMY.EDUCATION_LEVEL: EntityTypeProfile(
         entity_type=PII_TAXONOMY.EDUCATION_LEVEL,
         category=EntityCategory.EMPLOYMENT,
@@ -871,7 +871,7 @@ class EntityTypeRegistry:
             if any(standard.lower() in ref.standard.lower() for ref in p.regulatory_refs)
         ]
 
-    # ── quasi-identifier queries (v1.0.0) ─────────────────────────────
+    # ── quasi-identifier queries ─────────────────────────────
 
     def quasi_identifiers(self) -> list[EntityTypeProfile]:
         """Return all profiles marked as quasi-identifiers."""

@@ -19,3 +19,11 @@ class FusionError(PiiAnonError):
 
 class TokenizationError(PiiAnonError):
     """Raised when tokenization or detokenization fails."""
+
+
+class CalibrationError(PiiAnonError):
+    """Raised when calibration data is missing or invalid."""
+
+
+class ExpertManifestError(PiiAnonError):
+    """Raised when an expert manifest is malformed or fails validation."""

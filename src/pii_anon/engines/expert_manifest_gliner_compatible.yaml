@@ -1,0 +1,21 @@
+schema_version: "1.0"
+expert_id: "gliner-compatible"
+display_name: "GLiNER PII Base"
+entity_strengths:
+  PERSON_NAME: 0.92
+  ORGANIZATION: 0.88
+  LOCATION: 0.85
+  DATE_OF_BIRTH: 0.80
+  PHONE_NUMBER: 0.75
+  EMAIL_ADDRESS: 0.70
+entity_weaknesses:
+  US_SSN: 0.30
+  CREDIT_CARD: 0.40
+  IP_ADDRESS: 0.20
+  IBAN: 0.15
+  MAC_ADDRESS: 0.10
+default_weight: 1.25
+metadata:
+  type: "neural-ner"
+  languages: ["en"]
+  description: "Transformer-based NER for semantic entity types"

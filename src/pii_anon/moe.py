@@ -619,3 +619,13 @@ def get_default_registry() -> ExpertRegistry:
     if _DEFAULT_REGISTRY is None:
         _DEFAULT_REGISTRY = build_default_registry()
     return _DEFAULT_REGISTRY
+
+
+def reset_default_registry() -> None:
+    """Invalidate the cached default registry singleton.
+
+    Call after applying offline calibration so the next
+    ``get_default_registry()`` reflects calibrated strengths.
+    """
+    global _DEFAULT_REGISTRY  # noqa: PLW0603
+    _DEFAULT_REGISTRY = None

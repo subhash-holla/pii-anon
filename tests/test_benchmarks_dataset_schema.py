@@ -10,7 +10,7 @@ from pii_anon.benchmarks import datasets as datasets_module
 
 
 # ---------------------------------------------------------------------------
-# Unified dataset — pii_anon_benchmark_v1 (v1.0.0, 50 000 records)
+# Unified dataset — pii_anon_benchmark_v1 (50 000 records)
 # ---------------------------------------------------------------------------
 
 def test_dataset_has_expected_size_and_split() -> None:

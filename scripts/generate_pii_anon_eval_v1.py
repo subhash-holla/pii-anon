@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Master generation script for PII Anonymization Evaluation Dataset v1.0.0.
+"""Master generation script for PII Anonymization Evaluation Dataset.
 
 This unified script:
 1. Loads and normalizes 3 existing legacy datasets
@@ -8,7 +8,7 @@ This unified script:
 4. Writes unified pii_anon_eval_v1.jsonl + metadata
 
 Design informed by:
-- Schema: pii_anon.eval_framework.datasets.schema (EvalBenchmarkRecord, v1.0.0 fields)
+- Schema: pii_anon.eval_framework.datasets.schema (EvalBenchmarkRecord, fields)
 - Taxonomy: pii_anon.eval_framework.taxonomy (48 entity types, 7 categories, Sweeney quasi-IDs)
 - Languages: pii_anon.eval_framework.languages (52 languages, 17 scripts)
 - Evidence: Sweeney 2002 (k-anonymity), Gebru et al. 2021 (datasheets),
@@ -51,7 +51,7 @@ DEFAULT_OUTPUT_DIR = (
 )
 
 # Version
-VERSION = "1.0.0"
+VERSION = "latest"
 
 # ============================================================================
 # Name pools — diverse, culturally authentic, fully synthetic
@@ -338,9 +338,9 @@ def _load_legacy_dataset(path: Path) -> list[dict[str, Any]]:
 
 
 def _normalize_legacy_record(row: dict[str, Any], dataset_origin: str, index: int) -> dict[str, Any]:
-    """Normalize a legacy record to v1.0.0 schema.
+    """Normalize a legacy record to schema.
 
-    Adds new v1.0.0 fields (dimension_tags, entity_tracking_difficulty, etc.)
+    Adds new fields (dimension_tags, entity_tracking_difficulty, etc.)
     based on existing content.
 
     Args:
@@ -349,7 +349,7 @@ def _normalize_legacy_record(row: dict[str, Any], dataset_origin: str, index: in
         index: Record index (for ID generation)
 
     Returns:
-        Normalized record dict with all v1.0.0 fields
+        Normalized record dict with all fields
     """
     record_id = str(row.get("id", row.get("record_id", f"{dataset_origin}-{index:06d}")))
     text = str(row.get("text", ""))
@@ -390,7 +390,7 @@ def _normalize_legacy_record(row: dict[str, Any], dataset_origin: str, index: in
     if "GENDER" in entity_types:
         quasi_ids.append("gender")
 
-    # Return normalized record with all v1.0.0 fields
+    # Return normalized record with all fields
     return {
         **row,
         "id": record_id,
@@ -1420,7 +1420,7 @@ def generate_adversarial_samples(count: int = 250, seed: int = 42) -> list[dict[
 def main():
     """Main generation pipeline."""
     parser = argparse.ArgumentParser(
-        description="Generate PII Anonymization Evaluation Dataset v1.0.0"
+        description="Generate PII Anonymization Evaluation Dataset"
     )
     parser.add_argument(
         "--output",
