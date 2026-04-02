@@ -9,6 +9,8 @@ from pii_anon.cli import create_app
 from pii_anon.evaluation.pipeline import PipelineEvaluationReport
 from pii_anon.types import StrategyComparisonResult
 
+from conftest import requires_dataset
+
 
 @pytest.fixture
 def runner():
@@ -38,6 +40,7 @@ def test_cli_detect_and_detect_stream_commands(runner, tmp_path: Path) -> None:
     assert '"count": 2' in stream.stdout
 
 
+@requires_dataset
 def test_cli_tokenize_benchmark_and_evaluate_commands(runner, monkeypatch: pytest.MonkeyPatch) -> None:
     app = create_app()
 

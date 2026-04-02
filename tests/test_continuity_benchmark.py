@@ -5,7 +5,10 @@ import os
 import subprocess
 import sys
 
+from conftest import requires_dataset
 
+
+@requires_dataset
 def test_continuity_benchmark_script_generates_outputs(tmp_path) -> None:
     output_json = tmp_path / "continuity.json"
     output_md = tmp_path / "continuity.md"

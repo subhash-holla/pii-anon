@@ -10,6 +10,8 @@ from pii_anon.evaluation.competitor_compare import (
     SystemBenchmarkResult,
 )
 
+from conftest import requires_dataset
+
 
 def _profile_result(*, floor_pass: bool) -> ProfileBenchmarkResult:
     systems = [
@@ -69,6 +71,7 @@ def _profile_result(*, floor_pass: bool) -> ProfileBenchmarkResult:
     )
 
 
+@requires_dataset
 def test_matrix_floor_gate_can_fail(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cc,
@@ -80,6 +83,7 @@ def test_matrix_floor_gate_can_fail(monkeypatch: pytest.MonkeyPatch) -> None:
         cc.compare_competitors(matrix_path="matrix.json", enforce_floors=True, max_samples=10)
 
 
+@requires_dataset
 def test_matrix_floor_gate_report_is_exposed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cc,

@@ -3,7 +3,10 @@ from __future__ import annotations
 from pii_anon.evaluation.pipeline import evaluate_pipeline
 from pii_anon.orchestrator import PIIOrchestrator
 
+from conftest import requires_dataset
 
+
+@requires_dataset
 def test_evaluate_pipeline_returns_metrics() -> None:
     orchestrator = PIIOrchestrator(token_key="k")
     report = evaluate_pipeline(
@@ -18,6 +21,7 @@ def test_evaluate_pipeline_returns_metrics() -> None:
     assert 0.0 <= report.f1 <= 1.0
 
 
+@requires_dataset
 def test_evaluate_pipeline_supports_anonymize_mode() -> None:
     orchestrator = PIIOrchestrator(token_key="k")
     report = evaluate_pipeline(

@@ -5,8 +5,12 @@ import json
 
 import pytest
 
+from conftest import requires_dataset
+
 from pii_anon.benchmarks import load_benchmark_dataset, load_use_case_matrix, resolve_benchmark_dataset_path, summarize_dataset
 from pii_anon.benchmarks import datasets as datasets_module
+
+pytestmark = requires_dataset  # All tests in this file require the benchmark dataset
 
 
 # ---------------------------------------------------------------------------
