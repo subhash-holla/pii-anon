@@ -86,17 +86,17 @@ class TestAggregateDatasetReports:
     def test_combined_report_structure(self, tmp_path: Path) -> None:
         ds1 = tmp_path / "ds1.json"
         ds2 = tmp_path / "ds2.json"
-        ds1.write_text(json.dumps(_make_single_dataset_payload("pii_anon_benchmark_v1")))
+        ds1.write_text(json.dumps(_make_single_dataset_payload("pii_anon_benchmark")))
         ds2.write_text(json.dumps(_make_single_dataset_payload("other_dataset")))
 
         combined = self._aggregate(
-            {"pii_anon_benchmark_v1": ds1, "other_dataset": ds2},
+            {"pii_anon_benchmark": ds1, "other_dataset": ds2},
         )
 
         assert combined["report_schema_version"] == "2026-02-19.v3"
-        assert set(combined["datasets_evaluated"]) == {"pii_anon_benchmark_v1", "other_dataset"}
+        assert set(combined["datasets_evaluated"]) == {"pii_anon_benchmark", "other_dataset"}
         assert "by_dataset" in combined
-        assert "pii_anon_benchmark_v1" in combined["by_dataset"]
+        assert "pii_anon_benchmark" in combined["by_dataset"]
         assert "other_dataset" in combined["by_dataset"]
         assert "cross_dataset_summary" in combined
         assert "systems" in combined["cross_dataset_summary"]
@@ -185,7 +185,7 @@ class TestRenderBenchmarkSummaryV3:
     def test_render_cross_dataset_analysis(self) -> None:
         mod = self._load_render_module()
         combined = {
-            "datasets_evaluated": ["pii_anon_benchmark_v1", "other_dataset"],
+            "datasets_evaluated": ["pii_anon_benchmark", "other_dataset"],
             "cross_dataset_summary": {
                 "systems": [
                     {
@@ -196,10 +196,10 @@ class TestRenderBenchmarkSummaryV3:
                         "recall_average": 0.90,
                         "latency_p50_ms_average": 12.0,
                         "docs_per_hour_average": 1900.0,
-                        "best_f1_dataset": "pii_anon_benchmark_v1",
+                        "best_f1_dataset": "pii_anon_benchmark",
                         "worst_f1_dataset": "other_dataset",
                         "per_dataset": {
-                            "pii_anon_benchmark_v1": {"f1": 0.9, "samples": 100},
+                            "pii_anon_benchmark": {"f1": 0.9, "samples": 100},
                             "other_dataset": {"f1": 0.8, "samples": 80},
                         },
                     },
@@ -215,7 +215,7 @@ class TestRenderBenchmarkSummaryV3:
         assert "### Interpretation" in md
         assert "pii-anon" in md
         # Check interpretation mentions key patterns.
-        assert "`pii_anon_benchmark_v1`" in md
+        assert "`pii_anon_benchmark`" in md
         assert "`other_dataset`" in md
 
 
@@ -266,12 +266,12 @@ class TestRunSoftResilience:
         just the successful datasets."""
         mod = self._load_suite_module()
         ds1 = tmp_path / "ds1.json"
-        ds1.write_text(json.dumps(_make_single_dataset_payload("pii_anon_benchmark_v1")))
+        ds1.write_text(json.dumps(_make_single_dataset_payload("pii_anon_benchmark")))
 
         # Only one dataset — should produce a valid combined report.
         combined = mod._aggregate_dataset_reports(
-            {"pii_anon_benchmark_v1": ds1},
+            {"pii_anon_benchmark": ds1},
         )
         assert combined["report_schema_version"] == "2026-02-19.v3"
-        assert combined["datasets_evaluated"] == ["pii_anon_benchmark_v1"]
+        assert combined["datasets_evaluated"] == ["pii_anon_benchmark"]
         assert len(combined["cross_dataset_summary"]["systems"]) > 0

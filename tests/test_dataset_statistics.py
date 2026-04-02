@@ -211,7 +211,7 @@ class TestValidateDatasetCoverage:
         assert len(report["coverage_gaps"]) == 0
 
     def test_small_dataset_fails(self):
-        """Test that small dataset (<50K) fails."""
+        """Test that small dataset (<151K) fails."""
         records = [
             EvalBenchmarkRecord(
                 record_id=f"test_{i}",

@@ -9,12 +9,12 @@ This ledger links user-facing claims to reproducible evidence generation steps.
 - Acceptance: README benchmark section matches generated summary exactly
 
 ## Claim: Competitor comparison includes top OSS baselines
-- Command: `python scripts/run_competitor_benchmark.py --dataset pii_anon_benchmark_v1 --output-json benchmark-results.json --output-csv benchmark-raw.csv`
+- Command: `python scripts/run_competitor_benchmark.py --dataset pii_anon_benchmark --output-json benchmark-results.json --output-csv benchmark-raw.csv`
 - Artifact: `benchmark-results.json`, `benchmark-raw.csv`
 - Acceptance: Four systems are present (`pii-anon`, `presidio`, `scrubadub`, `llm_guard`) with explicit availability diagnostics
 
 ## Claim: Fusion strategies are comparable with reproducible metrics
-- Command: `pii-anon evaluate --dataset pii_anon_benchmark_v1 --output json`
+- Command: `pii-anon evaluate --dataset pii_anon_benchmark --output json`
 - Artifact: CI job output `evaluate` command logs
 - Acceptance: Non-empty strategy table + winner strategy
 

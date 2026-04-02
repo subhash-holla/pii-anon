@@ -1,0 +1,41 @@
+{
+  "version": "v2",
+  "profiles": [
+    {
+      "profile": "short_chat",
+      "objective": "speed",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    },
+    {
+      "profile": "long_document",
+      "objective": "accuracy",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    },
+    {
+      "profile": "structured_form_accuracy",
+      "objective": "accuracy",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    },
+    {
+      "profile": "structured_form_latency",
+      "objective": "speed",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    },
+    {
+      "profile": "log_lines",
+      "objective": "speed",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    },
+    {
+      "profile": "multilingual_mix",
+      "objective": "accuracy",
+      "languages": ["en", "es", "fr", "de", "it", "pt", "nl", "ja", "ar", "hi", "zh", "ko"],
+      "required": true
+    }
+  ]
+}

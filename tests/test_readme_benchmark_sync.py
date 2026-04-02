@@ -196,7 +196,7 @@ def test_readme_benchmark_sync_fails_when_floor_gate_is_false(tmp_path) -> None:
     report = tmp_path / "report.json"
     report.write_text(
         (
-            '{"report_schema_version":"2026-02-15.v2","dataset":"pii_anon_benchmark_v1",'
+            '{"report_schema_version":"2026-02-15.v2","dataset":"pii_anon_benchmark",'
             '"dataset_source":"package-only",'
             '"floor_pass":false,"qualification_gate_pass":true,'
             '"expected_competitors":["presidio"],"available_competitors":["presidio"],'
@@ -238,7 +238,7 @@ def test_readme_benchmark_sync_fails_when_mit_gate_is_false(tmp_path) -> None:
     report = tmp_path / "report.json"
     report.write_text(
         (
-            '{"report_schema_version":"2026-02-15.v2","dataset":"pii_anon_benchmark_v1",'
+            '{"report_schema_version":"2026-02-15.v2","dataset":"pii_anon_benchmark",'
             '"dataset_source":"package-only",'
             '"floor_pass":true,"qualification_gate_pass":false,'
             '"expected_competitors":["presidio"],"available_competitors":[],"unavailable_competitors":{"presidio":"unavailable"},'
@@ -280,7 +280,7 @@ def test_readme_benchmark_sync_accepts_v3_schema(tmp_path) -> None:
     report = tmp_path / "report.json"
     report.write_text(
         (
-            '{"report_schema_version":"2026-02-19.v3","dataset":"pii_anon_benchmark_v1",'
+            '{"report_schema_version":"2026-02-19.v3","dataset":"pii_anon_benchmark",'
             '"dataset_source":"package-only",'
             '"floor_pass":true,"qualification_gate_pass":true,'
             '"expected_competitors":["presidio"],"available_competitors":["presidio"],'
@@ -324,11 +324,11 @@ def test_readme_benchmark_sync_accepts_v3_combined_report(tmp_path) -> None:
 
     combined = {
         "report_schema_version": "2026-02-19.v3",
-        "datasets_evaluated": ["pii_anon_benchmark_v1"],
+        "datasets_evaluated": ["pii_anon_benchmark"],
         "by_dataset": {
-            "pii_anon_benchmark_v1": {
+            "pii_anon_benchmark": {
                 "report_schema_version": "2026-02-19.v3",
-                "dataset": "pii_anon_benchmark_v1",
+                "dataset": "pii_anon_benchmark",
                 "dataset_source": "package-only",
                 "floor_pass": True,
                 "qualification_gate_pass": True,

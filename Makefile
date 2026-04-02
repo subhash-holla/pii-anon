@@ -19,12 +19,18 @@ export PATH := $(if $(wildcard $(DOCKER_DESKTOP_DIR)),$(DOCKER_DESKTOP_DIR):$(PA
 BENCH_IMAGE ?= pii-anon-bench:latest
 
 EVAL_DATA_DIR ?= ../pii-anon-eval-data
-BENCH_DATASET ?= pii_anon_benchmark_v1
-BENCH_MATRIX ?= src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json
+BENCH_DATASET ?= pii_anon_benchmark
+BENCH_MATRIX ?= src/pii_anon/benchmarks/matrix/use_case_matrix.json
 BENCH_ARTIFACTS ?= artifacts/benchmarks
 BENCH_WORKDIR ?= .publish-suite
 BENCH_WARMUP ?= 100
 BENCH_RUNS ?= 3
+
+# Swarm training configuration
+SWARM_DATASETS ?= pii_anon_eval
+SWARM_MAX_RECORDS ?= 10000
+SWARM_KFOLD ?= 5
+SWARM_WORKERS ?= 4
 
 PORTABLE_SUITE_FLAGS = \
 	--dataset $(BENCH_DATASET) \
@@ -62,11 +68,11 @@ CANONICAL_SUITE_FLAGS = \
 	--no-enforce-publish-claims \
 	--validate-readme-sync
 
-.PHONY: bootstrap install-dev lint type test perf build twine-check package-size benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup readme-benchmark-check cli-smoke docs-smoke all
+.PHONY: bootstrap install-dev setup-swarm lint type test perf build twine-check package-size train-swarm benchmark-full benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup readme-benchmark-check cli-smoke docs-smoke all
 
 bootstrap:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -e .[dev,cli,crypto,engines]
+	$(PYTHON) -m pip install -e '.[dev,cli,crypto,engines]'
 
 install-dev: bootstrap
 
@@ -173,6 +179,44 @@ benchmark-canonical-windows:
 		-e TOKENIZERS_PARALLELISM=false \
 		-v "$$PWD":/work -v "$$(cd $(EVAL_DATA_DIR) && pwd)":/eval-data -w /work $(BENCH_IMAGE) \
 		bash -lc "pip install -q --no-cache-dir --no-deps -e /eval-data/ && pip install -q --no-cache-dir --no-deps -e '.[datasets]' && python scripts/run_publish_grade_suite.py --reuse-current-env --install-no-deps $(CANONICAL_SUITE_FLAGS)"
+
+# ── High-Level Automation Targets ──────────────────────────────────────
+
+# One-time setup for swarm training: install local packages + swarm deps.
+# Run this before train-swarm on a fresh checkout.
+#   make setup-swarm
+setup-swarm:
+	$(PYTHON) -m pip install --upgrade pip setuptools wheel
+	$(PYTHON) -m pip install -e $(EVAL_DATA_DIR)
+	@command -v brew >/dev/null 2>&1 && brew list libomp >/dev/null 2>&1 || { echo "Installing libomp (required by XGBoost on macOS)..."; brew install libomp; }
+	$(PYTHON) -m pip install -e '.[dev,cli,crypto,benchmark,datasets,swarm-ml,swarm-train]'
+	$(PYTHON) -m spacy download en_core_web_sm
+	$(PYTHON) -c "import stanza; stanza.download('en')"
+	$(PYTHON) -c "from gliner import GLiNER; GLiNER.from_pretrained('knowledgator/gliner-pii-base-v1.0')"
+	@echo ""
+	@echo "Setup complete. Run:  make train-swarm"
+
+# Train the swarm offering and deploy artifacts.
+# Output: ~/.pii_anon/swarm/ (ds_params.json, temperature.json, etc.)
+#
+# Usage:
+#   make train-swarm                              # 10K records, 5-fold CV
+#   make train-swarm SWARM_MAX_RECORDS=0           # ALL records (unlimited)
+#   make train-swarm SWARM_KFOLD=3                 # 3-fold CV (faster)
+#   make train-swarm SWARM_KFOLD=10                # 10-fold CV (more robust)
+#   make train-swarm SWARM_KFOLD=1                 # No CV (fastest, single holdout)
+#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy,conll2003  # multiple datasets
+#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+train-swarm:
+	$(PYTHON) scripts/train_swarm.py --datasets $(SWARM_DATASETS) --max-records $(SWARM_MAX_RECORDS) --kfold $(SWARM_KFOLD) --workers $(SWARM_WORKERS)
+
+# Run the full benchmark on M1 Mac and update all documentation.
+# This is the single command to run before a release.
+# Output: benchmark-results.json, updated README, updated docs/benchmark-summary.md
+benchmark-full:
+	$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto
+
+# ── Utility Targets ───────────────────────────────────────────────────
 
 readme-benchmark-check:
 	$(PYTHON) scripts/check_readme_benchmark.py --readme README.md --summary docs/benchmark-summary.md --report-json benchmark-results.json

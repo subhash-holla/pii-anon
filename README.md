@@ -5,7 +5,7 @@
 [![PyPI Version](https://img.shields.io/pypi/v/pii-anon.svg)](https://pypi.org/project/pii-anon/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-2273-brightgreen.svg)](#quality-and-testing)
+[![Tests](https://img.shields.io/badge/tests-2336-brightgreen.svg)](#quality-and-testing)
 
 [![Built with AI Agents](https://img.shields.io/badge/Built_with-AI_Agents-d946ef.svg)](#acknowledgements)
 
@@ -17,20 +17,20 @@
 
 | Offering | Best For | F1 | Latency |
 |---|---|---|---|
-| **pii-anon** | Speed-sensitive pipelines (streaming, real-time) | 0.79 | <1 ms/record |
-| **pii-anon-swarm** | Maximum accuracy (compliance, batch ETL) | 0.65 | ~90 ms/record |
+| **pii-anon** | Speed-sensitive pipelines (streaming, real-time) | 0.76 | <1 ms/record |
+| **pii-anon-swarm** | Maximum recall (compliance, batch ETL) | 0.61 | ~97 ms/record |
 
-Both outperform Presidio (F1=0.45) and Scrubadub (F1=0.36) on the 117,000+ record pii_anon_benchmark evaluation. pii-anon also outperforms GLiNER (F1=0.76).
+Both outperform Presidio (F1=0.50) and Scrubadub (F1=0.33) on the 151,000+ record pii_anon_benchmark evaluation. pii-anon-swarm achieves the highest recall (82%) of any system tested.
 
-**pii-anon** uses a fast regex engine with checksum validators (Luhn, IBAN mod-97, ABA routing), context-aware confidence scoring, and deny-lists — delivering sub-millisecond detection across 20 entity types with zero external dependencies.
+**pii-anon** uses a fast regex engine with checksum validators (Luhn, IBAN mod-97, ABA routing), context-aware confidence scoring, and deny-lists — delivering sub-millisecond detection across 22 entity types with zero external dependencies.
 
-**pii-anon-swarm** fuses regex with Presidio, Scrubadub, spaCy, Stanza, and GLiNER through a Mixture-of-Experts architecture: per-entity-type routing with calibrated weights, weighted voting, and corroboration filtering. The swarm achieves the highest recall (84%) of any system tested.
+**pii-anon-swarm** uses a four-layer pipeline: regex fast-pass for high-confidence structured PII, heterogeneous NER engines (GLiNER, Presidio) with redundancy pruning, Dawid-Skene Bayesian aggregation with a trained XGBoost meta-learner, and corroboration filtering with checksum validation. Trainable on industry datasets (AI4Privacy, CoNLL-2003) alongside pii-anon-eval-data.
 
 **6 transformation strategies** — pseudonymization with key rotation, tokenization (HMAC/AES-SIV), redaction, generalization, synthetic replacement, or differential privacy (ε-DP) — all with audit trails and deterministic linking for long-context entity tracking.
 
 **6 compliance templates** (HIPAA Safe Harbor, GDPR Pseudo/Anon, CCPA, Minimal Risk, Maximum Privacy) validate your entity detection against real regulatory requirements. Know instantly whether your coverage meets compliance standards.
 
-**Enterprise-grade evaluation framework** with 50+ metrics, 117,000+ synthetic evaluation records (100% CC0/CC-BY-4.0), and a composite Elo-based ranking system that captures the full picture: detection accuracy, privacy, utility, fairness, and performance.
+**Enterprise-grade evaluation framework** with 50+ metrics, 151,000+ synthetic evaluation records (100% CC0/CC-BY-4.0), and a composite Elo-based ranking system that captures the full picture: detection accuracy, privacy, utility, fairness, and performance.
 
 **Sub-millisecond latency** with constant-memory streaming — process Kafka, Spark, or Beam pipelines without building specialized infrastructure. Async/sync dual APIs.
 
@@ -47,7 +47,7 @@ Or with optional integrations:
 ```bash
 pip install pii-anon[cli,crypto]          # CLI + cryptography
 pip install pii-anon[benchmark]           # + all competitor engines (for benchmarking)
-pip install pii-anon[datasets]            # + 117K evaluation dataset
+pip install pii-anon[datasets]            # + 151K+ evaluation dataset
 pip install pii-anon[benchmark,cli,crypto,datasets,dev]  # Full stack
 ```
 
@@ -140,50 +140,49 @@ governance = engine.evaluate_governance("your-system", thresholds=GovernanceThre
 
 ## Accuracy Objective (profiles: long_document, structured_form_accuracy, multilingual_mix)
 
-Benchmark dataset: `pii_anon_benchmark_v1`
+Benchmark dataset: `pii_anon_benchmark`
 Warm-up samples/system: `100`. Measured runs/system: `3`.
 
 | System | Status | Composite | F1 | 95% CI | Precision | Recall | p50 Latency (ms) | Docs/hour | Elo |
 |---|---|---:|---:|---|---:|---:|---:|---:|---:|
-| gliner | available | 0.6810 | 0.763 | — | 0.908 | 0.658 | 79.586 | 36506.58 | 0 |
-| pii-anon | available | 0.8000 | 0.845 | — | 0.868 | 0.823 | 8.007 | 329390.99 | 0 |
-| pii-anon-swarm | available | 0.5873 | 0.648 | — | 0.528 | 0.839 | 90.378 | 33003.58 | 0 |
-| presidio | available | 0.4749 | 0.453 | — | 0.401 | 0.521 | 14.245 | 137200.71 | 0 |
-| scrubadub | available | 0.5342 | 0.357 | — | 0.872 | 0.225 | 0.224 | 9980506.31 | 0 |
+| pii-anon | available | 0.7734 | 0.816 | — | 0.834 | 0.799 | 10.252 | 270049.59 | 0 |
+| pii-anon-swarm | available | 0.5560 | 0.611 | — | 0.488 | 0.818 | 96.540 | 29572.25 | 0 |
+| gliner | available | 0.6797 | 0.766 | — | 0.912 | 0.661 | 86.212 | 33285.70 | 0 |
+| presidio | available | 0.5122 | 0.496 | — | 0.407 | 0.635 | 15.278 | 111932.54 | 0 |
+| scrubadub | available | 0.5166 | 0.333 | — | 0.860 | 0.207 | 0.241 | 8988393.13 | 0 |
 
 Strengths for `pii-anon`:
-- composite_score: within 5% of best (0.800 vs best 0.800).
-- precision: within 5% of best (0.868 vs best 0.908).
-- recall: within 5% of best (0.823 vs best 0.839).
-- f1: within 5% of best (0.845 vs best 0.845).
+- composite_score: within 5% of best (0.773 vs best 0.773).
+- recall: within 5% of best (0.799 vs best 0.818).
+- f1: within 5% of best (0.816 vs best 0.816).
 
 Weaknesses for `pii-anon`:
-- docs_per_hour: more than 10% below best (329390.990 vs best 9980506.310).
-- latency_p50_ms: more than 10% slower than best (8.007 vs best 0.224).
+- docs_per_hour: more than 10% below best (270049.590 vs best 8988393.130).
+- latency_p50_ms: more than 10% slower than best (10.252 vs best 0.241).
 
 This section is generated from benchmark artifacts.
 ## Speed Objective (profiles: short_chat, structured_form_latency, log_lines)
 
-Benchmark dataset: `pii_anon_benchmark_v1`
+Benchmark dataset: `pii_anon_benchmark`
 Warm-up samples/system: `100`. Measured runs/system: `3`.
 
 | System | Status | Composite | F1 | 95% CI | Precision | Recall | p50 Latency (ms) | Docs/hour | Elo |
 |---|---|---:|---:|---|---:|---:|---:|---:|---:|
-| pii-anon | available | 0.8129 | 0.792 | — | 0.768 | 0.818 | 0.346 | 3791089.96 | 1588 |
-| pii-anon-swarm | available | 0.5873 | 0.648 | — | 0.528 | 0.839 | 90.385 | 33306.11 | 1483 |
-| gliner | available | 0.6810 | 0.763 | — | 0.908 | 0.658 | 79.627 | 36873.26 | 1534 |
-| presidio | available | 0.4753 | 0.453 | — | 0.401 | 0.521 | 14.332 | 142615.45 | 1428 |
-| scrubadub | available | 0.5282 | 0.357 | — | 0.872 | 0.225 | 0.224 | 5642522.18 | 1454 |
+| pii-anon | available | 0.7834 | 0.758 | — | 0.724 | 0.796 | 0.395 | 3228447.23 | 1583 |
+| pii-anon-swarm | available | 0.5556 | 0.611 | — | 0.488 | 0.818 | 97.236 | 29711.85 | 1470 |
+| gliner | available | 0.6797 | 0.766 | — | 0.912 | 0.661 | 86.244 | 33622.11 | 1539 |
+| presidio | available | 0.5126 | 0.496 | — | 0.407 | 0.635 | 15.100 | 117127.02 | 1448 |
+| scrubadub | available | 0.5101 | 0.333 | — | 0.860 | 0.207 | 0.243 | 5088632.90 | 1448 |
 
 Strengths for `pii-anon`:
-- composite_score: within 5% of best (0.813 vs best 0.813).
-- recall: within 5% of best (0.818 vs best 0.839).
-- f1: within 5% of best (0.792 vs best 0.792).
+- composite_score: within 5% of best (0.783 vs best 0.783).
+- recall: within 5% of best (0.796 vs best 0.818).
+- f1: within 5% of best (0.758 vs best 0.766).
 
 Weaknesses for `pii-anon`:
-- precision: more than 10% below best (0.768 vs best 0.908).
-- docs_per_hour: more than 10% below best (3791089.960 vs best 5642522.180).
-- latency_p50_ms: more than 10% slower than best (0.346 vs best 0.224).
+- precision: more than 10% below best (0.724 vs best 0.912).
+- docs_per_hour: more than 10% below best (3228447.230 vs best 5088632.900).
+- latency_p50_ms: more than 10% slower than best (0.395 vs best 0.243).
 
 This section is generated from benchmark artifacts.
 
@@ -197,62 +196,37 @@ Profile floor-gate results:
 
 ### Statistical Significance
 
-Evaluated on **106,855** records. Minimum detectable effect (MDE) at α=0.05, power=0.80: **0.0018** F1 points.
+Evaluated on **140,855** records. Minimum detectable effect (MDE) at α=0.05, power=0.80: **0.0016** F1 points.
 
 | System | F1 | 95% CI | Samples |
 |---|---:|---|---:|
-| pii-anon | 0.792 | [0.784, 0.786] | 106,855 |
-| pii-anon-swarm | 0.648 | [0.646, 0.647] | 106,855 |
-| gliner | 0.763 | [0.759, 0.761] | 106,855 |
-| presidio | 0.453 | [0.404, 0.407] | 106,855 |
-| scrubadub | 0.357 | [0.354, 0.357] | 106,855 |
+| pii-anon | 0.758 | [0.758, 0.760] | 140,855 |
+| pii-anon-swarm | 0.611 | [0.614, 0.615] | 140,855 |
+| gliner | 0.766 | [0.767, 0.769] | 140,855 |
+| presidio | 0.496 | [0.522, 0.524] | 140,855 |
+| scrubadub | 0.333 | [0.340, 0.342] | 140,855 |
 
 Pairwise comparisons (paired bootstrap, n=10,000 resamples):
 
 | Comparison | ΔF1 | p-value | Significant | Effect Size |
 |---|---:|---:|---|---|
-| pii-anon-swarm vs gliner | -0.1138 | 0.4990 | n.s. | medium (d=-0.767) |
-| pii-anon vs gliner | +0.0245 | 0.5020 | n.s. | negligible (d=+0.142) |
-| pii-anon-swarm vs scrubadub | +0.2907 | 0.5035 | n.s. | large (d=+1.592) |
-| pii-anon vs presidio | +0.3791 | 0.5055 | n.s. | large (d=+1.793) |
-| pii-anon-swarm vs presidio | +0.2408 | 0.5067 | n.s. | large (d=+1.250) |
-| pii-anon vs scrubadub | +0.4290 | 0.5095 | n.s. | large (d=+2.120) |
+| pii-anon-swarm vs scrubadub | +0.2735 | 0.4922 | n.s. | large (d=+1.482) |
+| pii-anon vs gliner | -0.0090 | 0.4951 | n.s. | negligible (d=-0.055) |
+| pii-anon-swarm vs presidio | +0.0910 | 0.4988 | n.s. | medium (d=+0.551) |
+| pii-anon vs presidio | +0.2356 | 0.4995 | n.s. | large (d=+1.269) |
+| pii-anon-swarm vs gliner | -0.1536 | 0.4996 | n.s. | large (d=-1.089) |
+| pii-anon vs scrubadub | +0.4181 | 0.5004 | n.s. | large (d=+2.057) |
 
 *Method: paired bootstrap significance test (Berg-Kirkpatrick et al., 2012). Effect sizes: Cohen's d (small=0.2, medium=0.5, large=0.8).*
+
 
 <!-- BENCHMARK_SUMMARY_END -->
 
 See [Benchmark Methodology](#benchmark-methodology) for details.
 
-### Per-Entity Recall: Broadest Coverage in the Field
+### Per-Entity Recall
 
-Both pii-anon offerings detect **20 entity types** with non-zero recall — more than any competitor. Here is the head-to-head recall comparison from the pii_anon_benchmark evaluation:
-
-| Entity Type | pii-anon | pii-anon-swarm | GLiNER | Presidio | Scrubadub |
-|---|:---:|:---:|:---:|:---:|:---:|
-| PERSON_NAME | **80.5%** | **80.5%** | 56.4% | 63.4% | 0% |
-| EMAIL_ADDRESS | **100%** | **100%** | 99.4% | **100%** | 84.9% |
-| PHONE_NUMBER | 91.3% | **98.7%** | 98.5% | 57.2% | 57.2% |
-| ADDRESS | **100%** | **100%** | 98.7% | 0% | 0% |
-| US_SSN | 90.0% | **100%** | 65.1% | **100%** | 90.0% |
-| DATE_OF_BIRTH | **89.2%** | **89.2%** | 88.4% | 0% | 0% |
-| EMPLOYEE_ID | **100%** | **100%** | 0% | 0% | 0% |
-| BANK_ACCOUNT | **100%** | **100%** | 52.6% | 78.4% | 0% |
-| ORGANIZATION | **100%** | **100%** | 0% | 0% | 0% |
-| CREDIT_CARD | **100%** | **100%** | 82.8% | 12.6% | 0% |
-| MEDICAL_RECORD_NUMBER | **100%** | **100%** | 0% | 0% | 0% |
-| PASSPORT | **100%** | **100%** | 92.3% | 0% | 0% |
-| USERNAME | **100%** | **100%** | 94.8% | 0% | 0% |
-| MAC_ADDRESS | **100%** | **100%** | 0% | 0% | 0% |
-| IP_ADDRESS | **100%** | **100%** | **100%** | **100%** | 0% |
-| DRIVERS_LICENSE | **100%** | **100%** | 18.6% | 0% | 0% |
-| NATIONAL_ID | **77.0%** | **77.0%** | 3.5% | 0% | 0% |
-| ROUTING_NUMBER | **100%** | **100%** | 0% | 0% | 0% |
-| LOCATION | **100%** | **100%** | 0% | 0% | 0% |
-| LICENSE_PLATE | **100%** | **100%** | 0% | 0% | 0% |
-| **Overall Recall** | **91.0%** | **92.3%** | 66.7% | 51.1% | 22.4% |
-
-pii-anon and pii-anon-swarm are the **only** systems that detect all 20 entity types in this benchmark. GLiNER detects 13 types, Presidio detects 7 types, Scrubadub detects 4.
+Per-entity-type precision, recall, and F1 are available in `artifacts/benchmarks/benchmark-results.json` after running `make benchmark-full`. The benchmark evaluates 22 entity types across all 5 systems.
 
 ---
 
@@ -262,7 +236,7 @@ pii-anon and pii-anon-swarm are the **only** systems that detect all 20 entity t
 
 **52 Languages, 17 Writing Systems** — Resource-level classification ensures fair cross-lingual evaluation. High-resource languages (English, Spanish, French, Chinese, Japanese, Arabic) with medium and low-resource coverage for emerging markets.
 
-**Modular Detection Engine** — pii-anon's regex engine uses checksums (Luhn, IBAN mod-97, ABA routing, VIN check-digit, DEA), context-aware confidence scoring, and entity-type-specific allow/deny lists to suppress false positives. pii-anon-swarm adds Presidio and Scrubadub through a Mixture-of-Experts fusion layer with per-entity-type routing and corroboration filtering.
+**Modular Detection Engine** — pii-anon's regex engine uses checksums (Luhn, IBAN mod-97, ABA routing, VIN check-digit), context-aware confidence scoring, and entity-type-specific allow/deny lists to suppress false positives. pii-anon-swarm adds a four-layer pipeline: regex fast-pass, heterogeneous NER (GLiNER, Presidio), Dawid-Skene Bayesian aggregation with a trained XGBoost meta-learner, and corroboration-filtered validation.
 
 **Deterministic Pseudonymization** — Same entity always maps to the same token within a scope. Cryptographically secure (AES-SIV compatible) with pluggable key management, rotation, and re-identification audit trails.
 
@@ -297,7 +271,7 @@ print(f"Composite: {score.score:.4f}")  # 0.6233
 
 # Run Elo tournament
 engine = PIIRateEloEngine()
-engine.run_round_robin({"pii-anon": 0.792, "pii-anon-swarm": 0.648, "gliner": 0.763})
+engine.run_round_robin({"pii-anon": 0.758, "pii-anon-swarm": 0.611, "gliner": 0.766})
 for r in engine.get_leaderboard():
     print(f"  {r.system_name}: Elo={r.rating:.0f}")
 
@@ -401,10 +375,10 @@ The composite score normalizes latency via `1/(1+(lat/100ms)²)` and throughput 
 
 ## Quality & Testing
 
-- **2273 tests** covering detection, evaluation, composite scoring, governance, ingestion, and research rigor
+- **2336 tests** covering detection, evaluation, composite scoring, governance, ingestion, and research rigor
 - **Zero required dependencies** (only pydantic)
 - **Strict CI gates**: lint (ruff), type check (mypy), coverage (85%+), build, packaging, performance SLAs
-- **117,000+ record evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 52 languages and 48 entity types
+- **151,000+ record evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 12 languages and 22 entity types
 - **Reproducible benchmarks** with deterministic seeds and strict span matching
 
 ---

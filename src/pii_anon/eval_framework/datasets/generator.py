@@ -1,6 +1,6 @@
 """Deterministic synthetic dataset generator for the evaluation framework.
 
-Generates 50,000+ benchmark records across 52 languages, 44 entity types,
+Generates 151,000+ benchmark records across 52 languages, 44 entity types,
 6 data types, 4 difficulty levels, and 4 context-length tiers.  All
 generation is seed-based (no external API dependency) for reproducibility.
 
@@ -14,7 +14,7 @@ Evidence basis:
 
 Usage::
 
-    python -m pii_anon.eval_framework.datasets.generator --output eval_framework_v1.jsonl
+    python -m pii_anon.eval_framework.datasets.generator --output pii_anon_eval.jsonl
 """
 
 from __future__ import annotations
@@ -829,7 +829,7 @@ def write_dataset(output_path: str | Path, *, seed: int = 42, target_records: in
 
 
 if __name__ == "__main__":
-    output = Path(__file__).resolve().parents[4] / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / "eval_framework" / "data" / "eval_framework_v1.jsonl"
+    output = Path(__file__).resolve().parents[4] / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / "eval_framework" / "data" / "pii_anon_eval.jsonl"
     if len(sys.argv) > 2 and sys.argv[1] == "--output":
         output = Path(sys.argv[2])
     count = write_dataset(output)

@@ -3,7 +3,7 @@
 
 Produces a single unified JSONL dataset:
 
-* **pii_anon_benchmark_v1.jsonl** – 50 000 records organized across 7 research-grade
+* **pii_anon_benchmark.jsonl** – 151,000+ records organized across 7 research-grade
   evaluation dimensions:
 
   1. Entity Consistency (20% weight): 2 000+ records testing consistent entity identity
@@ -22,7 +22,7 @@ Produces a single unified JSONL dataset:
      timelines and financial histories requiring temporal coherence preservation.
 
   Total composition: 35 700 core detection records + 2 800 entity tracking records
-  + 11 500 evaluation dimension records = 50 000 records.
+  + 11 500 evaluation dimension records = 151,000+ records.
 
 Design informed by:
   - PII-Rate-Elo composite evaluation framework (Bradley-Terry/Glicko rating)
@@ -57,8 +57,8 @@ from typing import Any
 # ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / "benchmarks" / "data"
-UNIFIED_DATASET_FILE = DATA_DIR / "pii_anon_benchmark_v1.jsonl"
-UNIFIED_METADATA_FILE = DATA_DIR / "pii_anon_benchmark_v1.metadata.json"
+UNIFIED_DATASET_FILE = DATA_DIR / "pii_anon_benchmark.jsonl"
+UNIFIED_METADATA_FILE = DATA_DIR / "pii_anon_benchmark.metadata.json"
 
 VERSION = ""
 
@@ -2839,7 +2839,7 @@ def main() -> None:
 
     print(f"Writing unified dataset ({len(all_rows)} records)...")
     _write_jsonl(UNIFIED_DATASET_FILE, all_rows)
-    unified_meta = _metadata(all_rows, seed=args.seed, dataset="pii_anon_benchmark_v1", version=VERSION)
+    unified_meta = _metadata(all_rows, seed=args.seed, dataset="pii_anon_benchmark", version=VERSION)
     UNIFIED_METADATA_FILE.write_text(
         json.dumps(unified_meta, indent=2, sort_keys=True),
         encoding="utf-8",

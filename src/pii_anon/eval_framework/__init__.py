@@ -11,7 +11,7 @@ PII anonymization and pseudonymization systems.  It covers:
 * **Utility metrics** (format preservation, semantic preservation, privacy-utility trade-off)
 * **Fairness metrics** (cross-language, cross-entity-type, cross-difficulty, cross-script)
 * **Standards compliance** (NIST SP 800-122, GDPR, ISO 27701, HIPAA, CCPA)
-* **50,000-record benchmark dataset** spanning all languages and entity types
+* **151,000+-record benchmark dataset** spanning all languages and entity types
 
 Quick start::
 

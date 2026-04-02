@@ -61,7 +61,7 @@ def _prepare_lightweight_benchmark(monkeypatch) -> None:
 def test_competitor_benchmark_returns_all_systems(monkeypatch) -> None:
     _prepare_lightweight_benchmark(monkeypatch)
     report = compare_competitors(
-        dataset="pii_anon_benchmark_v1",
+        dataset="pii_anon_benchmark",
         warmup_samples=1,
         measured_runs=1,
         max_samples=2,
@@ -88,8 +88,8 @@ def test_competitor_benchmark_returns_all_systems(monkeypatch) -> None:
 
 def test_competitor_benchmark_is_reproducible_on_metrics(monkeypatch) -> None:
     _prepare_lightweight_benchmark(monkeypatch)
-    first = compare_competitors(dataset="pii_anon_benchmark_v1", warmup_samples=1, measured_runs=1, max_samples=2, enable_parallel=False)
-    second = compare_competitors(dataset="pii_anon_benchmark_v1", warmup_samples=1, measured_runs=1, max_samples=2, enable_parallel=False)
+    first = compare_competitors(dataset="pii_anon_benchmark", warmup_samples=1, measured_runs=1, max_samples=2, enable_parallel=False)
+    second = compare_competitors(dataset="pii_anon_benchmark", warmup_samples=1, measured_runs=1, max_samples=2, enable_parallel=False)
 
     first_core = next(item for item in first.systems if item.system == "pii-anon")
     second_core = next(item for item in second.systems if item.system == "pii-anon")

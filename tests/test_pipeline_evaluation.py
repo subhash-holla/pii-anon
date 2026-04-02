@@ -8,7 +8,7 @@ def test_evaluate_pipeline_returns_metrics() -> None:
     orchestrator = PIIOrchestrator(token_key="k")
     report = evaluate_pipeline(
         orchestrator,
-        dataset="pii_anon_benchmark_v1",
+        dataset="pii_anon_benchmark",
         transform_mode="pseudonymize",
         max_samples=5,
     )
@@ -22,7 +22,7 @@ def test_evaluate_pipeline_supports_anonymize_mode() -> None:
     orchestrator = PIIOrchestrator(token_key="k")
     report = evaluate_pipeline(
         orchestrator,
-        dataset="pii_anon_benchmark_v1",
+        dataset="pii_anon_benchmark",
         transform_mode="anonymize",
         max_samples=3,
     )

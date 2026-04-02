@@ -143,7 +143,7 @@ class EvalBenchmarkRecord:
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DEFAULT_DATASET = "pii_anon_eval_v1"
-_FALLBACK_DATASET = "eval_framework_v1"
+_FALLBACK_DATASET = "pii_anon_eval"
 DatasetSource = Literal["auto", "package-only"]
 
 
@@ -390,7 +390,7 @@ def load_eval_dataset(
     ----------
     name:
         Dataset filename (without ``.jsonl``).  Defaults to ``pii_anon_eval_v1``
-        (the unified dataset), falling back to ``eval_framework_v1``
+        (the unified dataset), falling back to ``pii_anon_eval``
         for backward compatibility.
     language:
         Filter by ISO 639-1 code.

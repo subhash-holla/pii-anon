@@ -58,13 +58,13 @@
   "python_executable": "/Users/subhashholla/Development/pii_anonymize_pseudonymize/pii-anon-core/pii-anon-code/.venv/bin/python",
   "python_version": "3.12.12",
   "ready": true,
-  "require_all_competitors": true,
-  "require_native_competitors": true,
+  "require_all_competitors": false,
+  "require_native_competitors": false,
   "schema_version": "2026-02-16.v1",
   "shared_memory_ok": true,
   "shared_memory_path": "posix_shm (darwin)",
   "shared_memory_reason": "ok (macOS uses kernel shm_open)",
-  "strict_runtime": true,
-  "timestamp_utc": "2026-03-22T18:12:35Z",
+  "strict_runtime": false,
+  "timestamp_utc": "2026-03-29T13:06:03Z",
   "unavailable_competitors": {}
 }

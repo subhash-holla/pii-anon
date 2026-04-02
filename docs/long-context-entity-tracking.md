@@ -8,7 +8,7 @@ Large files and streams frequently mention the same real person through multiple
 - short alias (`Jack`)
 - contact mention (`jackdavis@example.com`)
 
-`pii-anon` v1.0.0 adds continuity linkage so these variants can be replaced consistently within a scope.
+`pii-anon` adds continuity linkage so these variants can be replaced consistently within a scope.
 
 ## Scope model
 

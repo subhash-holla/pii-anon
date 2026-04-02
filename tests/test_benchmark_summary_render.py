@@ -8,7 +8,7 @@ import sys
 def test_render_benchmark_summary_contains_strengths_and_weaknesses(tmp_path) -> None:
     payload = {
         "report_schema_version": "2026-02-19.v3",
-        "dataset": "pii_anon_benchmark_v1",
+        "dataset": "pii_anon_benchmark",
         "dataset_source": "package-only",
         "warmup_samples": 100,
         "measured_runs": 3,
@@ -98,7 +98,7 @@ def test_render_benchmark_summary_contains_strengths_and_weaknesses(tmp_path) ->
 def test_render_benchmark_summary_requires_floor_pass(tmp_path) -> None:
     payload = {
         "report_schema_version": "2026-02-19.v3",
-        "dataset": "pii_anon_benchmark_v1",
+        "dataset": "pii_anon_benchmark",
         "dataset_source": "package-only",
         "warmup_samples": 1,
         "measured_runs": 1,
@@ -140,7 +140,7 @@ def test_render_benchmark_summary_requires_floor_pass(tmp_path) -> None:
 def test_render_benchmark_summary_requires_mit_gate_pass(tmp_path) -> None:
     payload = {
         "report_schema_version": "2026-02-19.v3",
-        "dataset": "pii_anon_benchmark_v1",
+        "dataset": "pii_anon_benchmark",
         "dataset_source": "package-only",
         "warmup_samples": 1,
         "measured_runs": 1,
@@ -181,7 +181,7 @@ def test_render_benchmark_summary_requires_mit_gate_pass(tmp_path) -> None:
 
 def test_render_benchmark_summary_rejects_legacy_schema(tmp_path) -> None:
     payload = {
-        "dataset": "pii_anon_benchmark_v1",
+        "dataset": "pii_anon_benchmark",
         "warmup_samples": 1,
         "measured_runs": 1,
         "floor_pass": True,
@@ -212,7 +212,7 @@ def test_render_benchmark_summary_rejects_legacy_schema(tmp_path) -> None:
 def test_render_benchmark_summary_uses_objective_specific_profile_rows(tmp_path) -> None:
     payload = {
         "report_schema_version": "2026-02-19.v3",
-        "dataset": "pii_anon_benchmark_v1",
+        "dataset": "pii_anon_benchmark",
         "dataset_source": "package-only",
         "warmup_samples": 100,
         "measured_runs": 3,

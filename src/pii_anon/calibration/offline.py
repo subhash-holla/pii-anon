@@ -31,7 +31,7 @@ class OfflineCalibrationConfig:
         Override path for ``CalibrationStore``.
     """
 
-    dataset: str = "pii_anon_benchmark_v1"
+    dataset: str = "pii_anon_benchmark"
     max_samples: int | None = None
     min_entity_samples: int = 10
     store_path: str | None = None

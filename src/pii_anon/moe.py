@@ -12,6 +12,7 @@ Architecture (inspired by Mixtral 8x7B):
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -245,10 +246,7 @@ class MoERouter:
                 # Best expert was not in top-K; swap it in
                 selected[-1] = (best_id, scores[0][1])
 
-        # Apply softmax normalization
-        import math
-
-        # Compute exp(score) for each
+        # Apply softmax normalization — compute exp(score) for each
         exp_scores = [(eid, math.exp(score)) for eid, score in selected]
         total = sum(es for _, es in exp_scores)
 
@@ -380,13 +378,15 @@ class MoEFusionStrategy(FusionStrategy):
         floor_weight = self.min_expert_weight
 
         merged: list[EnsembleFinding] = []
+        routed_cache: dict[str, dict[str, float]] = {}
         for cluster in clusters:
             entity_type = cluster[0].entity_type
 
-            # Get routed experts for this entity type
-            routed = self.router.route(entity_type)
-            # Build a dict of routed expert ID -> weight
-            routed_dict = dict(routed) if routed else {}
+            # Get routed experts for this entity type (cached per entity type).
+            if entity_type not in routed_cache:
+                routed = self.router.route(entity_type)
+                routed_cache[entity_type] = dict(routed) if routed else {}
+            routed_dict = routed_cache[entity_type]
 
             # Compute weighted sum — ALL experts contribute (routed get
             # full weight, non-routed get floor weight).

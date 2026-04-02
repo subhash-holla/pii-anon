@@ -25,7 +25,7 @@ class PipelineEvaluationReport:
 def evaluate_pipeline(
     orchestrator: PIIOrchestrator,
     *,
-    dataset: str = "pii_anon_benchmark_v1",
+    dataset: str = "pii_anon_benchmark",
     mode: str = "weighted_consensus",
     transform_mode: Literal["pseudonymize", "anonymize"] = "pseudonymize",
     language: str | None = None,

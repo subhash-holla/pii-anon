@@ -209,6 +209,9 @@ class AsyncPIIOrchestrator:
 
         # Per-instance fusion strategy cache (avoids rebuilding per detect call).
         self._fusion_cache: dict[tuple[object, ...], FusionStrategy] = {}
+        # Cached capabilities and engine lookup (invalidated on registry changes).
+        self._capabilities_cache: dict[str, dict[str, Any]] | None = None
+        self._engine_by_id_cache: dict[str, Any] | None = None
 
     @classmethod
     def from_config_path(
@@ -377,8 +380,10 @@ class AsyncPIIOrchestrator:
         dict[str, dict[str, Any]]
             Per-engine capability info (languages, streaming support, etc.).
         """
+        if self._capabilities_cache is not None:
+            return self._capabilities_cache
         report = self.registry.capabilities_report()
-        return {
+        self._capabilities_cache = {
             adapter_id: {
                 "native_dependency": caps.native_dependency,
                 "dependency_available": caps.dependency_available,
@@ -388,6 +393,7 @@ class AsyncPIIOrchestrator:
             }
             for adapter_id, caps in report.items()
         }
+        return self._capabilities_cache
 
     async def run(
         self,
@@ -585,9 +591,8 @@ class AsyncPIIOrchestrator:
             findings_batches.append(findings)
             fusion_audit.extend(audits)
 
-        flat = [item for batch in findings_batches for item in batch]
-        # Filter out phantom entity types from NER engines (CARDINAL, GPE, etc.)
-        flat = [f for f in flat if f.entity_type in SUPPORTED_ENTITY_TYPES]
+        # Flatten and filter phantom entity types in a single pass.
+        flat = [f for batch in findings_batches for f in batch if f.entity_type in SUPPORTED_ENTITY_TYPES]
         return flat, fusion_audit, boundary_trace, plan
 
     async def _detect_segmented_field(
@@ -847,7 +852,7 @@ class AsyncPIIOrchestrator:
         payload: Payload,
         profile: ProcessingProfileSpec,
     ) -> ExecutionPlan:
-        capabilities = dict(self.capabilities())
+        capabilities = dict(self.capabilities())  # shallow copy — we may pop entries below
         external_ids = {"spacy-ner-compatible", "stanza-ner-compatible"}
         policy = self.config.competitor_policy
         runtime_external_allowed = (
@@ -877,10 +882,12 @@ class AsyncPIIOrchestrator:
         return plan
 
     def _engines_for_plan(self, plan: ExecutionPlan) -> list[EngineAdapter]:
-        engines = self.registry.list_engines(include_disabled=False)
-        by_id = {engine.adapter_id: engine for engine in engines}
+        if self._engine_by_id_cache is None:
+            engines = self.registry.list_engines(include_disabled=False)
+            self._engine_by_id_cache = {engine.adapter_id: engine for engine in engines}
+        by_id = self._engine_by_id_cache
         selected = [by_id[engine_id] for engine_id in plan.engine_ids if engine_id in by_id]
-        return selected or engines
+        return selected or list(by_id.values())
 
     def _merge_with_audit(
         self,

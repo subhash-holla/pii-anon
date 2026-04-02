@@ -10,7 +10,7 @@
 - `PIIOrchestrator.capabilities()`
 - `PIIOrchestrator.discover_engines()`
 
-## Profile fields (v1.0.0)
+## Profile fields
 
 `ProcessingProfileSpec` adds:
 
@@ -19,7 +19,7 @@
 - `entity_tracking_enabled`: enable/disable alias continuity linking
 - `use_case` and `objective`: profile-aware policy routing hints
 
-## Config schema additions (v1.0.0)
+## Config schema additions
 
 `CoreConfig` adds:
 

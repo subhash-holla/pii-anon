@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 
@@ -25,7 +26,7 @@ class IdentityLedger:
         self._counter_by_scope: dict[str, int] = {}
         self._clusters_by_family: dict[str, dict[str, dict[str, ClusterState]]] = {}
         self._max_scopes = max_scopes
-        self._scope_order: list[str] = []
+        self._scope_order: deque[str] = deque()
 
     def all_clusters(self, scope: str) -> list[ClusterState]:
         return list(self._clusters_by_scope.get(scope, {}).values())
@@ -65,7 +66,7 @@ class IdentityLedger:
         if scope not in self._clusters_by_scope:
             self._scope_order.append(scope)
             if self._max_scopes is not None and len(self._scope_order) > self._max_scopes:
-                evict = self._scope_order.pop(0)
+                evict = self._scope_order.popleft()
                 self.clear_scope(evict)
         count = self._counter_by_scope.get(scope, 0) + 1
         self._counter_by_scope[scope] = count

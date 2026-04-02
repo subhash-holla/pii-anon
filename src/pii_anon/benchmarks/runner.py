@@ -19,7 +19,7 @@ class BenchmarkSummary:
 def run_benchmark(
     orchestrator: PIIOrchestrator,
     *,
-    dataset: str = "pii_anon_benchmark_v1",
+    dataset: str = "pii_anon_benchmark",
     mode: str = "weighted_consensus",
     max_samples: int | None = None,
 ) -> BenchmarkSummary:

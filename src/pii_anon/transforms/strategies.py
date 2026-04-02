@@ -28,6 +28,8 @@ from pii_anon.transforms.base import (
     TransformStrategy,
 )
 
+_HONORIFICS: frozenset[str] = frozenset({"mr", "mrs", "ms", "dr", "prof", "sir", "rev"})
+
 
 # ── 1. Placeholder Strategy ──────────────────────────────────────────────
 
@@ -376,12 +378,9 @@ class GeneralizationStrategy(TransformStrategy):
             return "[NAME]"
 
         result = []
-        # Common honorifics to preserve
-        honorifics = {"mr", "mrs", "ms", "dr", "prof", "sir", "rev"}
-
         for part in parts:
             cleaned = part.rstrip(".,")
-            if cleaned.lower() in honorifics:
+            if cleaned.lower() in _HONORIFICS:
                 result.append(part)
             elif part and part[0].isalpha():
                 result.append(f"{part[0].upper()}.")
@@ -687,6 +686,7 @@ class SyntheticReplacementStrategy(TransformStrategy):
             "DATE": self._synthetic_date,
         }
         self._seed_cache: dict[tuple[str, str, str], int] = {}
+        self._seed_cache_max = 4096
 
     def transform(
         self,
@@ -708,11 +708,13 @@ class SyntheticReplacementStrategy(TransformStrategy):
         )
 
     def _derive_seed(self, key: str, scope: str, plaintext: str) -> int:
-        """Deterministic seed from key + scope + plaintext (cached)."""
+        """Deterministic seed from key + scope + plaintext (bounded cache)."""
         cache_key = (key, scope, plaintext)
         cached = self._seed_cache.get(cache_key)
         if cached is not None:
             return cached
+        if len(self._seed_cache) >= self._seed_cache_max:
+            self._seed_cache.clear()
         raw = f"{key}|{scope}|{plaintext}".encode("utf-8")
         digest = hmac.new(key.encode("utf-8"), raw, hashlib.sha256).digest()
         seed = int(struct.unpack(">Q", digest[:8])[0])
@@ -727,8 +729,7 @@ class SyntheticReplacementStrategy(TransformStrategy):
         last = last_pool[(seed >> 16) % len(last_pool)]
         # Try to match structure: if input has honorific, preserve format
         parts = plaintext.split()
-        honorifics = {"mr", "mrs", "ms", "dr", "prof", "sir", "rev"}
-        if parts and parts[0].rstrip(".,").lower() in honorifics:
+        if parts and parts[0].rstrip(".,").lower() in _HONORIFICS:
             return f"{parts[0]} {first} {last}"
         if len(parts) == 1:
             return first
@@ -872,6 +873,7 @@ class PerturbationStrategy(TransformStrategy):
             "DATE": self._perturb_date,
         }
         self._seed_cache: dict[tuple[str, int, str], int] = {}
+        self._seed_cache_max = 4096
 
     def transform(
         self,
@@ -903,6 +905,8 @@ class PerturbationStrategy(TransformStrategy):
         cached = self._seed_cache.get(cache_key)
         if cached is not None:
             return cached
+        if len(self._seed_cache) >= self._seed_cache_max:
+            self._seed_cache.clear()
         raw = f"{context.scope}|{context.mention_index}|{context.plaintext}".encode()
         seed = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big")
         self._seed_cache[cache_key] = seed

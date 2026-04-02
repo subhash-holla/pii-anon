@@ -82,7 +82,7 @@ class DominanceVerifier:
 
     def verify(
         self,
-        dataset: str = "pii_anon_benchmark_v1",
+        dataset: str = "pii_anon_benchmark",
         *,
         max_samples: int | None = None,
     ) -> DominanceReport:

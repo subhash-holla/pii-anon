@@ -135,7 +135,7 @@ def _render_why_pii_anon(combined: dict[str, Any]) -> str:
     languages = 52  # From the spec
     lines.append("**For ML researchers:** Benchmarked at scale on diverse data.")
     lines.append(
-        f"Evaluated on {num_datasets} datasets spanning {languages} languages with 50,000+ records, "
+        f"Evaluated on {num_datasets} datasets spanning {languages} languages with 151,000+ records, "
         "including adversarial tests (boundary conditions, obfuscation, encoding) and multiple data types."
     )
     lines.append("")
@@ -248,7 +248,7 @@ def _render_limitations(combined: dict[str, Any]) -> str:
         "",
     ]
 
-    lines.append("- **Multilingual nuances:** Performance varies by language. eval_framework_v1 includes 52 languages; some low-resource languages may have degraded accuracy.")
+    lines.append("- **Multilingual nuances:** Performance varies by language. pii_anon_eval includes 52 languages; some low-resource languages may have degraded accuracy.")
     lines.append("")
 
     lines.append("- **Boundary conditions:** Adversarial tests (obfuscation, encoding tricks) may reduce recall. Not a replacement for rule-based blocklists for known sensitive data.")

@@ -87,8 +87,8 @@ def resolve_benchmark_dataset_path(
     # v1.1 layout: pii_anon_datasets/data/pii_anon.jsonl.gz  (canonical name)
     base_dirs = [Path("benchmarks") / "data", Path("data")]
 
-    # Dataset name mapping: pii_anon_benchmark_v1 -> pii_anon (v1.1 canonical name)
-    _V11_NAME_MAP = {"pii_anon_benchmark_v1": "pii_anon"}
+    # Dataset name mapping: pii_anon_benchmark -> pii_anon (v1.1 canonical name)
+    _V11_NAME_MAP = {"pii_anon_benchmark": "pii_anon"}
     name_variants = [name]
     if name in _V11_NAME_MAP:
         name_variants.append(_V11_NAME_MAP[name])
@@ -150,14 +150,14 @@ def _validate_label(record_id: str, text: str, label: dict[str, Any]) -> dict[st
     return out
 
 
-def _is_v11_schema(row: dict[str, Any]) -> bool:
-    """Detect pii-anon-eval-data extended schema (uses 'annotations' instead of 'labels')."""
+def _is_annotations_schema(row: dict[str, Any]) -> bool:
+    """Detect pii-anon-eval-data schema (uses 'annotations' instead of 'labels')."""
     return "annotations" in row and "labels" not in row
 
 
 # Entity type mapping from pii-anon-eval-data names to the canonical benchmark names
 # used by the pii-anon detection engine and competitor_compare evaluation.
-_V11_ENTITY_TYPE_MAP: dict[str, str] = {
+_EVAL_DATA_ENTITY_TYPE_MAP: dict[str, str] = {
     "SOCIAL_SECURITY_NUMBER": "US_SSN",
     "STREET_ADDRESS": "ADDRESS",
     "ORGANIZATION_NAME": "ORGANIZATION",
@@ -171,10 +171,11 @@ _V11_ENTITY_TYPE_MAP: dict[str, str] = {
     "SOCIAL_MEDIA_HANDLE": "USERNAME",
     "VEHICLE_IDENTIFICATION_NUMBER": "VIN",
     "CREDIT_CARD_NUMBER": "CREDIT_CARD",
-    "LATITUDE_LONGITUDE": "GPS_COORDINATES",
-    "TIMESTAMP": "DATE_TIME",
+    "CREDIT_CARD_FRAGMENT": "CREDIT_CARD",
+    "LATITUDE_LONGITUDE": "_BENCHMARK_IGNORE",
+    "TIMESTAMP": "_BENCHMARK_IGNORE",
     "POSTAL_CODE": "ADDRESS",
-    "SWIFT_BIC_CODE": "IBAN",
+    "SWIFT_BIC_CODE": "_BENCHMARK_IGNORE",
     "HEALTH_INSURANCE_ID": "MEDICAL_RECORD_NUMBER",
     "DEVICE_IDENTIFIER": "MAC_ADDRESS",
     "TAX_ID": "NATIONAL_ID",
@@ -182,10 +183,10 @@ _V11_ENTITY_TYPE_MAP: dict[str, str] = {
 }
 
 
-def _normalize_v11_annotation(annotation: dict[str, Any]) -> dict[str, Any]:
-    """Convert an extended annotation to the label format expected by BenchmarkRecord."""
+def _normalize_annotation(annotation: dict[str, Any]) -> dict[str, Any]:
+    """Convert a pii-anon-eval-data annotation to the label format expected by BenchmarkRecord."""
     entity_type = annotation.get("entity_type", "")
-    entity_type = _V11_ENTITY_TYPE_MAP.get(entity_type, entity_type)
+    entity_type = _EVAL_DATA_ENTITY_TYPE_MAP.get(entity_type, entity_type)
     label: dict[str, Any] = {
         "entity_type": entity_type,
         "start": annotation["start"],
@@ -205,11 +206,11 @@ def _normalize_row(row: dict[str, Any], index: int) -> BenchmarkRecord:
     if not text:
         raise ValueError(f"dataset row `{record_id}` has empty text")
 
-    # Handle extended schema: 'annotations' with richer structure
-    if _is_v11_schema(row):
+    # Handle pii-anon-eval-data schema: 'annotations' with richer structure
+    if _is_annotations_schema(row):
         annotations_raw = list(row.get("annotations", []))
         labels = [
-            _validate_label(record_id, text, _normalize_v11_annotation(ann))
+            _validate_label(record_id, text, _normalize_annotation(ann))
             for ann in annotations_raw
         ]
     else:
@@ -255,7 +256,7 @@ def _normalize_row(row: dict[str, Any], index: int) -> BenchmarkRecord:
 
 
 def load_benchmark_dataset(
-    name: str = "pii_anon_benchmark_v1",
+    name: str = "pii_anon_benchmark",
     *,
     split: Literal["synthetic", "curated_public"] | None = None,
     source: DatasetSource = "auto",
@@ -263,7 +264,7 @@ def load_benchmark_dataset(
     try:
         path = _dataset_file(name, source=source)
     except FileNotFoundError:
-        if name == "pii_anon_benchmark_v1":
+        if name == "pii_anon_benchmark":
             raise
         defaults = list(_DEFAULT_DATASET)
         if split is None:
@@ -283,7 +284,7 @@ def load_benchmark_dataset(
     return records
 
 
-def summarize_dataset(name: str = "pii_anon_benchmark_v1") -> dict[str, Any]:
+def summarize_dataset(name: str = "pii_anon_benchmark") -> dict[str, Any]:
     rows = load_benchmark_dataset(name)
     by_language: dict[str, int] = {}
     by_source: dict[str, int] = {}
@@ -309,7 +310,7 @@ def summarize_dataset(name: str = "pii_anon_benchmark_v1") -> dict[str, Any]:
 
 
 def load_use_case_matrix(path: str | None = None) -> list[UseCaseProfile]:
-    matrix_path = _matrix_file("use_case_matrix.v1.json") if path is None else Path(path)
+    matrix_path = _matrix_file("use_case_matrix.json") if path is None else Path(path)
     payload = json.loads(matrix_path.read_text(encoding="utf-8"))
     profiles_raw = payload.get("profiles", [])
     if not isinstance(profiles_raw, list) or not profiles_raw:

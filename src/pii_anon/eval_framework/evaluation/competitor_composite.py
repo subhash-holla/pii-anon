@@ -10,7 +10,7 @@ Usage::
     from pii_anon.evaluation import compare_competitors
     from pii_anon.eval_framework.evaluation.competitor_composite import build_leaderboard
 
-    report = compare_competitors(dataset="pii_anon_benchmark_v1")
+    report = compare_competitors(dataset="pii_anon_benchmark")
     leaderboard = build_leaderboard(report)
     print(leaderboard.to_markdown())
 """

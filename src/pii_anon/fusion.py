@@ -315,6 +315,7 @@ class CalibratedMajorityFusion(FusionStrategy):
 
     def __init__(self, min_consensus: int = 2) -> None:
         self.min_consensus = min_consensus
+        self._weighted_fusion = WeightedConsensusFusion()
 
     def merge(self, findings: list[EngineFinding]) -> list[EnsembleFinding]:
         """Merge findings by location and filter by consensus threshold.
@@ -330,7 +331,7 @@ class CalibratedMajorityFusion(FusionStrategy):
             Findings found by at least ``min_consensus`` engines, with
             weighted-average confidence.
         """
-        weighted = WeightedConsensusFusion().merge(findings)
+        weighted = self._weighted_fusion.merge(findings)
         return [finding for finding in weighted if len(finding.engines) >= self.min_consensus]
 
 
@@ -505,6 +506,9 @@ def build_fusion(
             performance_floor=True,
             min_expert_weight=0.15,
         )
+    if mode == "swarm":
+        from pii_anon.swarm import SwarmFusionStrategy
+        return SwarmFusionStrategy()
     if mode in _CUSTOM_FACTORIES:
         return _CUSTOM_FACTORIES[mode](weights, min_consensus)
     raise FusionError(f"Unknown fusion mode `{mode}`")
