@@ -3,9 +3,9 @@
 pii-anon's detection pipeline is built on pluggable engine adapters. You can add your own detection engine to either offering:
 
 - **pii-anon** uses the built-in regex engine only (for sub-millisecond speed)
-- **pii-anon-swarm** fuses multiple engines through Mixture-of-Experts routing
+- **pii-anon-swarm** uses a four-layer pipeline: regex fast-pass, heterogeneous NER, Dawid-Skene Bayesian aggregation with XGBoost meta-learner, and corroboration-filtered validation
 
-This guide shows how to build a custom engine, register it with the ensemble, and tune its MoE weights.
+This guide shows how to build a custom engine, register it with the swarm, and tune its expert weights.
 
 ---
 

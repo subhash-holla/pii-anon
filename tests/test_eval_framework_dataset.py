@@ -4,7 +4,7 @@ Validates:
 - Dataset schema (EvalBenchmarkRecord)
 - Dataset loading and filtering
 - Dataset summary statistics
-- Generated dataset integrity (50K records)
+- Generated dataset integrity (151K+ records)
 """
 
 from __future__ import annotations
@@ -72,17 +72,17 @@ class TestEvalBenchmarkRecord:
 
 # The load_eval_dataset function takes a dataset *name* (not path),
 # and resolves it relative to its internal _DATA_DIR.
-_DATASET_NAME = "eval_framework_v1"
+_DATASET_NAME = "pii_anon_eval"
 
 
 class TestDatasetLoading:
-    """Load the generated 50K-record dataset."""
+    """Load the generated 151K+-record dataset."""
 
     @pytest.fixture(autouse=True)
     def _check_dataset_exists(self) -> None:
         dataset_file = resolve_eval_dataset_path(_DATASET_NAME)
         if dataset_file is None or not os.path.exists(dataset_file):
-            pytest.skip("Dataset file not found (expected at eval_framework_v1.jsonl)")
+            pytest.skip("Dataset file not found (expected at pii_anon_eval.jsonl)")
 
     def test_load_full_dataset(self) -> None:
         records = load_eval_dataset(_DATASET_NAME)
@@ -132,7 +132,7 @@ class TestDatasetSummary:
 
 
 def test_eval_package_only_resolution_requires_package(monkeypatch: pytest.MonkeyPatch) -> None:
-    path = resolve_eval_path("eval_framework_v1", source="package-only")
+    path = resolve_eval_path("pii_anon_eval", source="package-only")
     if path is None:
         pytest.skip("package-only eval dataset not available in this environment")
 
@@ -141,5 +141,5 @@ def test_eval_package_only_resolution_requires_package(monkeypatch: pytest.Monke
         "files",
         lambda _name: (_ for _ in ()).throw(ModuleNotFoundError("missing package")),
     )
-    missing = resolve_eval_path("eval_framework_v1", source="package-only")
+    missing = resolve_eval_path("pii_anon_eval", source="package-only")
     assert missing is None

@@ -81,7 +81,7 @@ def test_cli_compare_competitors_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class _Report:
         report_schema_version = "2026-02-19.v3"
-        dataset = "pii_anon_benchmark_v1"
+        dataset = "pii_anon_benchmark"
         dataset_source = "package-only"
         warmup_samples = 1
         measured_runs = 1
@@ -106,7 +106,7 @@ def test_cli_compare_competitors_json(monkeypatch: pytest.MonkeyPatch) -> None:
         [
             "compare-competitors",
             "--dataset",
-            "pii_anon_benchmark_v1",
+            "pii_anon_benchmark",
             "--warmup-samples",
             "1",
             "--measured-runs",

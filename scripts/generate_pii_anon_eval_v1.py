@@ -14,7 +14,7 @@ Design informed by:
 - Evidence: Sweeney 2002 (k-anonymity), Gebru et al. 2021 (datasheets),
   Cochran 1977 (sampling), TAB 2022, PII-Bench 2025, RAT-Bench 2025
 
-Total target: ~61K records (50K legacy + 11K newly generated)
+Total target: ~151K+ records
 
 Usage:
     python scripts/generate_pii_anon_eval_v1.py --output /path/to/output --seed 42
@@ -345,7 +345,7 @@ def _normalize_legacy_record(row: dict[str, Any], dataset_origin: str, index: in
 
     Args:
         row: Raw record from legacy dataset
-        dataset_origin: Source identifier (e.g., "eval_framework_v1")
+        dataset_origin: Source identifier (e.g., "pii_anon_eval")
         index: Record index (for ID generation)
 
     Returns:
@@ -1464,13 +1464,13 @@ def main():
         legacy_paths = [
             (
                 ROOT.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets"
-                / "eval_framework" / "data" / "eval_framework_v1.jsonl",
-                "eval_framework_v1",
+                / "eval_framework" / "data" / "pii_anon_eval.jsonl",
+                "pii_anon_eval",
             ),
             (
                 ROOT.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets"
-                / "benchmarks" / "data" / "pii_anon_benchmark_v1.jsonl",
-                "pii_anon_benchmark_v1",
+                / "benchmarks" / "data" / "pii_anon_benchmark.jsonl",
+                "pii_anon_benchmark",
             ),
         ]
 

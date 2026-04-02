@@ -60,7 +60,7 @@ You have three repos. The main library repo (`pii-anon`) contains both the sourc
 |---|---|---|
 | `pii-anon-code/` | `subhash-holla/pii-anon` | Library source (`src/`), tests (`tests/`), CI, docs, benchmarks |
 | `pii-anon-doc/` | `subhash-holla/pii-anon-doc` | Standalone documentation site |
-| `pii-anon-eval-data/` | `subhash-holla/pii-anon-eval-data` | `pii-anon-datasets` Python package (JSONL benchmark data: pii_anon_benchmark_v1, eval_framework_v1) |
+| `pii-anon-eval-data/` | `subhash-holla/pii-anon-eval-data` | `pii-anon-datasets` Python package (JSONL benchmark data: pii_anon_benchmark, pii_anon_eval) |
 
 ### 2.1 Create the GitHub repos (first time only)
 
@@ -117,23 +117,28 @@ cd ~/projects/pii-anon/pii-anon-code
 python3.12 -m venv .venv
 source .venv/bin/activate
 
-# Upgrade pip
+# One-command setup: installs local eval-data, all deps, and NLP models
+make setup-swarm
+```
+
+Or manually step by step:
+
+```bash
 pip install --upgrade pip setuptools wheel
 
 # Install pii-anon-datasets from the local eval-data repo FIRST
-# (it isn't on PyPI yet, so pip can't resolve it otherwise)
 pip install -e ../pii-anon-eval-data/
 
 # Install PyTorch CPU-only FIRST (LLM Guard, GLiNER depend on it)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# Now install pii-anon with all extras including benchmark competitors
-pip install -e ".[dev,cli,crypto,benchmark,datasets]"
+# Install pii-anon with all extras (quote brackets for zsh)
+pip install -e '.[dev,cli,crypto,benchmark,datasets,swarm-ml,swarm-train]'
 ```
 
-The `benchmark` extra installs all three competitor engines (Presidio, scrubadub, GLiNER) plus their transitive dependencies (spaCy, Stanza, transformers, tqdm). PyTorch must be installed first because pip cannot resolve it from the CPU-only index automatically.
+> **zsh note:** Always quote the extras brackets — `pip install 'pii-anon[swarm-train]'` not `pip install pii-anon[swarm-train]`. Unquoted brackets cause `zsh: no matches found`.
 
-**Note:** The `datasets` extra requires `pii-anon-datasets>=1.0.0`. Until that package is published to PyPI, you must install it from the local `pii-anon-eval-data/` repo first. Once it's on PyPI, the single `pip install -e ".[dev,cli,crypto,benchmark,datasets]"` line will work on its own.
+**Note:** The `datasets` extra requires `pii-anon-datasets`. Until that package is published to PyPI, you must install it from the local `pii-anon-eval-data/` repo first. Once it's on PyPI, the single `pip install -e ".[dev,cli,crypto,benchmark,datasets]"` line will work on its own.
 
 ### 2.4 Download NLP models
 
@@ -181,7 +186,7 @@ The dataset resolution order is: installed `pii_anon_datasets` package → `PII_
 
 ```bash
 # Quick health check
-pii-anon version        # Should print 1.0.0
+pii-anon version        # Should print the installed version
 pii-anon health --output json
 
 # Verify competitor engines load for benchmarking
@@ -192,1395 +197,236 @@ You should see `presidio`, `scrubadub`, and `gliner` all reported as available. 
 
 ---
 
-## Part 3: Running All Tests
+## Part 3: Quality Gates
 
-### 3.1 Run the full test suite with coverage
+Run the full CI pipeline locally before anything else:
 
 ```bash
 cd ~/projects/pii-anon/pii-anon-code
-
-# Tests live in tests/ — pytest discovers them via pyproject.toml testpaths
-python3 -m pytest tests/ \
-    --cov=pii_anon \
-    --cov-report=term-missing \
-    --cov-fail-under=85 \
-    -v
-```
-
-Expected result: **2197+ tests passing**, coverage around **87%**, well above the 85% gate.
-
-### 3.2 Run individual test categories
-
-```bash
-# Research rigor enhancements (dataset generator, bootstrap CI, Cohen's kappa, etc.)
-python3 -m pytest tests/test_research_rigor_enhancements.py -v --no-cov
-
-# File ingestion (CSV, JSON, JSONL, TXT readers/writers)
-python3 -m pytest tests/test_ingestion_*.py -v --no-cov
-
-# Streaming chunker (large-text splitting)
-python3 -m pytest tests/test_streaming_chunker.py -v --no-cov
-
-# Composite scoring and governance gates
-python3 -m pytest tests/test_composite_scoring.py tests/test_governance_thresholds.py -v --no-cov
-
-# Benchmark pipeline (summary rendering, competitor comparison)
-python3 -m pytest tests/test_benchmark_summary_render.py tests/test_competitor_compare_unit.py -v --no-cov
-
-# Multi-dataset benchmark tests
-python3 -m pytest tests/test_multi_dataset_benchmark.py -v --no-cov
-
-# Performance SLA tests (excluded from the default run; run them separately)
-python3 -m pytest tests/performance/ -m performance --no-cov -v
-```
-
-### 3.3 Run lint and type checks
-
-```bash
-make lint    # ruff check src tests
-make type    # mypy src/pii_anon
-```
-
-### 3.4 Run the entire CI pipeline locally
-
-```bash
 make all
 ```
 
-This runs in order: lint, type check, test suite, performance SLAs, build, twine check, package size check, CLI smoke test, and docs smoke test.
+This runs: lint (ruff) → type check (mypy) → test suite (2301+ tests, 85%+ coverage) → performance SLAs → build → twine check → package size check → CLI smoke test.
 
-### 3.5 Verify the build artifacts
+If any step fails, fix it before continuing.
+
+---
+
+## Part 4: Train the Swarm
+
+Train the pii-anon-swarm offering. This produces Dawid-Skene confusion matrices, temperature scaling parameters, and informativeness scores.
 
 ```bash
-make build          # Builds sdist + wheel into dist/
-make twine-check    # Validates the packages
-make package-size   # Ensures wheel stays under 1.5 MB
+# Quick training (10K records, 5-fold CV, ~5 min)
+make train-swarm
+
+# Train on ALL pii-anon-eval-data records (0 = unlimited)
+make train-swarm SWARM_MAX_RECORDS=0
+
+# Faster iteration: 3-fold CV
+make train-swarm SWARM_KFOLD=3
+
+# No CV (fastest, single holdout split)
+make train-swarm SWARM_KFOLD=1
+
+# More robust: 10-fold CV
+make train-swarm SWARM_KFOLD=10
+
+# Train on multiple datasets
+make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy,conll2003
+
+# Full production training: all datasets, all records, 5-fold CV
+make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy,conll2003 SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+```
+
+The training pipeline:
+1. Loads training data (0 = all records, >0 = cap per dataset)
+2. Runs stratified K-fold cross-validation (entity type distribution preserved across folds)
+3. For each fold: trains Dawid-Skene, temperature scaling, informativeness; evaluates on held-out test fold
+4. Reports per-fold and mean F1/precision/recall with standard deviation
+5. Retrains final model on ALL data (not just one fold's training set)
+6. Deploys final artifacts to `~/.pii_anon/swarm/`
+
+The K-fold results are saved in `manifest.json` so you can review per-fold performance.
+
+Verify training succeeded:
+
+```bash
+ls ~/.pii_anon/swarm/
+# Should contain: ds_params.json, temperature.json, informativeness.json, manifest.json
+cat ~/.pii_anon/swarm/manifest.json | python -m json.tool
 ```
 
 ---
 
-## Part 4: Running the Full Competitor Evaluation
+## Part 5: Run the Full Benchmark
 
-### 4.1 Preflight check
-
-```bash
-cd ~/projects/pii-anon/pii-anon-code
-
-pii-anon benchmark-preflight \
-    --strict-runtime \
-    --require-all-competitors \
-    --require-native-competitors \
-    --output json
-```
-
-All four competitors should show as available.
-
-### 4.2 Portable benchmark (quick, no strict gates)
+Run the complete competitor evaluation and update all documentation:
 
 ```bash
-make benchmark-portable
+make benchmark-full
 ```
 
-This runs the evaluation with relaxed flags against the default single dataset. Results land in `artifacts/benchmarks/`.
+This runs `scripts/run_full_benchmark.py` which:
+1. Verifies all competitor engines are available (preflight check)
+2. Runs pii-anon, pii-anon-swarm, GLiNER, Presidio, and Scrubadub against pii-anon-eval-data
+3. Renders the benchmark summary markdown
+4. Updates the README benchmark section (between `<!-- BENCHMARK_SUMMARY_START -->` and `<!-- BENCHMARK_SUMMARY_END -->` markers)
+5. Renders the complex mode pseudonymization example
+6. Validates that the README stays in sync with the benchmark data
 
-### 4.3 Profile-filtered benchmark (single profile)
+For a quick benchmark (faster, fewer records):
 
 ```bash
-python3 scripts/run_competitor_benchmark.py \
-    --dataset pii_anon_benchmark_v1 \
-    --profiles short_chat \
-    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
-    --output-json artifacts/benchmarks/benchmark-results.json
+python scripts/run_full_benchmark.py --max-samples 5000
 ```
 
-Evaluates only the specified profile(s) and writes a checkpoint. Useful for parallelizing across profiles or debugging a single profile. Supports multiple profiles: `--profiles short_chat long_document`.
-
-### 4.4 Merge-only mode (combine profile checkpoints)
-
-```bash
-python3 scripts/run_competitor_benchmark.py \
-    --merge-only \
-    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
-    --output-json artifacts/benchmarks/benchmark-results.json
-```
-
-Skips evaluation entirely — reads all per-profile checkpoint files from the checkpoint directory and produces the final merged report artifacts. Use this after parallel profile runs have completed.
-
-### 4.5 Canonical benchmark (publication-grade, all gates enforced)
-
-On an Apple Silicon Mac, the fastest path runs natively without Docker (~2-3x faster than the Docker path):
-
-```bash
-# First time only — install all benchmark dependencies natively:
-make benchmark-native-setup
-
-# Run the canonical benchmark natively on ARM64:
-make benchmark-canonical-macos-native
-```
-
-Alternatively, for full Docker-based reproducibility (slower due to Rosetta x86_64 emulation):
-
-```bash
-make benchmark-canonical-macos
-```
-
-Both targets run the full suite with strict runtime checks, floor gates, and README sync validation.
-
-If you're on an Intel Mac:
-
-```bash
-make benchmark-canonical
-```
-
-#### Resuming an interrupted benchmark run
-
-The canonical benchmark automatically saves **per-profile checkpoints** to `artifacts/benchmarks/checkpoints/<dataset>/` as each profile completes. If the run is interrupted (machine restart, Docker crash, `Ctrl+C`), simply re-run the same `make` command:
-
-```bash
-# Just re-run — completed profiles are loaded from checkpoint
-make benchmark-canonical-macos
-```
-
-The pipeline will detect existing checkpoint files, skip already-completed profiles (crediting their work to the progress bar), and continue from where it left off. This can save hours on long runs where slow systems (like `gliner`) take a long time per profile.
-
-To **force a fresh run** (discarding checkpoints), delete the checkpoint directory first:
-
-```bash
-rm -rf artifacts/benchmarks/checkpoints/
-make benchmark-canonical-macos
-```
-
-You can also pass `--checkpoint-dir` explicitly when running the suite script directly:
-
-```bash
-python scripts/run_publish_grade_suite.py \
-    --checkpoint-dir /tmp/my-checkpoints \
-    ...other flags...
-```
-
-### 4.6 Cloud benchmark (fastest option)
-
-Running the canonical benchmark on a cloud VM is the fastest way to get publication-grade results. A benchmark that takes 4-5 days locally (Docker/Rosetta) or 1.5-2 days natively on a MacBook Pro can complete in 6-12 hours on a cloud instance with enough cores.
-
-#### Cloud provider recommendations
-
-| Provider | Instance | Arch | vCPUs | RAM | On-Demand $/hr | Spot $/hr | Est. Runtime | Est. Cost (spot) |
-|---|---|---|---|---|---|---|---|---|
-| **AWS** | **c7g.8xlarge** | ARM64 (Graviton3) | 32 | 64 GB | ~$1.16 | ~$0.35 | 8-10h | **$3-4** |
-| **AWS** | **c8g.8xlarge** | ARM64 (Graviton4) | 32 | 64 GB | ~$1.28 | ~$0.38 | 6-8h | **$2-3** |
-| AWS | c7g.16xlarge | ARM64 (Graviton3) | 64 | 128 GB | ~$2.32 | ~$0.70 | 5-7h | $4-5 |
-| GCP | c4a-standard-32 | ARM64 (Axion) | 32 | 128 GB | ~$1.32 | ~$0.40 | 8-10h | $3-4 |
-| Hetzner | CAX41 | ARM64 (Ampere) | 16 | 32 GB | ~€0.038 | N/A | 16-20h | **€0.60-0.76** |
-
-**Recommended: AWS c7g.8xlarge or c8g.8xlarge spot instance.** Best balance of speed and cost. Graviton ARM64 runs the same Python/NumPy/PyTorch code natively without emulation, 32 vCPUs give up to 12 parallel workers (memory-aware scaling), and spot pricing makes a full canonical run cost $2-4. Use us-east-1 for lowest spot prices.
-
-**Budget option: Hetzner CAX41.** At €0.038/hr (~$0.04/hr), a full run costs under €1 total. However, with only 16 vCPUs and 32 GB RAM, it takes 16-20h. Still faster than local Docker on Apple Silicon, and by far the cheapest option.
-
-#### Cost comparison: cloud vs. local
-
-| Approach | Wall-Clock Time | Hardware Cost | Electricity | Total Cost |
-|---|---|---|---|---|
-| Local: Docker on M1 Pro (Rosetta) | 4-5 days | $0 (owned) | ~$3-5 | ~$3-5 |
-| Local: Native on M1 Pro | 1.5-2 days | $0 (owned) | ~$1.5-3 | ~$1.5-3 |
-| Local: Native on Mac Studio M2 Ultra | 18-24h | $0 (owned) | ~$1-2 | ~$1-2 |
-| **Cloud: AWS c7g.8xlarge spot** | **8-10h** | **$3-4** | $0 | **$3-4** |
-| **Cloud: AWS c8g.8xlarge spot** | **6-8h** | **$2-3** | $0 | **$2-3** |
-| Cloud: Hetzner CAX41 | 16-20h | €0.60-0.76 | $0 | **<$1** |
-
-Cloud wins on speed even when native macOS is available. A spot c8g.8xlarge cuts wall-clock time from 1.5-2 days to 6-8 hours for ~$3 — worth it when iterating on benchmark results. Hetzner wins on pure cost if you can wait 16-20 hours.
-
-#### Step-by-step: AWS (recommended)
-
-**One-time setup (from your Mac):**
-
-1. **Install the AWS CLI:**
-
-```bash
-brew install awscli
-aws configure
-# Enter: AWS Access Key ID, Secret Access Key, region (us-east-1), output format (json)
-```
-
-Your IAM user needs `AmazonEC2FullAccess` permissions. Attach it via the AWS Console: IAM > Users > your-user > Add permissions > Attach policies directly > AmazonEC2FullAccess.
-
-2. **Create an SSH key pair:**
-
-```bash
-aws ec2 create-key-pair \
-    --key-name pii-anon-bench \
-    --query 'KeyMaterial' \
-    --output text > ~/.ssh/pii-anon-bench.pem
-chmod 400 ~/.ssh/pii-anon-bench.pem
-```
-
-3. **Create a security group for SSH access:**
-
-```bash
-aws ec2 create-security-group \
-    --group-name pii-anon-bench-sg \
-    --description "SSH access for benchmark runs"
-# Note the GroupId from the output (e.g., sg-0abc123...)
-
-aws ec2 authorize-security-group-ingress \
-    --group-id <your-group-id> \
-    --protocol tcp \
-    --port 22 \
-    --cidr 0.0.0.0/0
-```
-
-**Launch and run the benchmark:**
-
-4. **Find the latest Ubuntu 22.04 ARM64 AMI:**
-
-```bash
-aws ec2 describe-images \
-    --owners 099720109477 \
-    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*" \
-    --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
-    --output text
-```
-
-The owner ID `099720109477` is Canonical's (Ubuntu's) official AWS account.
-
-5. **Launch an ARM64 spot instance:**
-
-```bash
-aws ec2 run-instances \
-    --image-id <ami-from-step-4> \
-    --instance-type c7g.8xlarge \
-    --instance-market-options '{"MarketType":"spot","SpotOptions":{"SpotInstanceType":"one-time"}}' \
-    --key-name pii-anon-bench \
-    --security-group-ids <sg-from-step-3> \
-    --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=pii-anon-benchmark}]'
-```
-
-6. **Get the public IP** (wait ~30 seconds for the instance to start):
-
-```bash
-aws ec2 describe-instances \
-    --filters "Name=tag:Name,Values=pii-anon-benchmark" "Name=instance-state-name,Values=running,pending" \
-    --query 'Reservations[0].Instances[0].[InstanceId,PublicIpAddress]' \
-    --output text
-```
-
-7. **SSH in:**
-
-```bash
-ssh -i ~/.ssh/pii-anon-bench.pem ubuntu@<instance-ip>
-```
-
-8. **Install Python 3.12 and clone repos** (on the cloud VM):
-
-```bash
-# Ubuntu 22.04 ships Python 3.10; add deadsnakes PPA for 3.12
-sudo apt-get update && sudo apt-get install -y software-properties-common
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-get update
-sudo apt-get install -y python3.12 python3.12-venv python3.12-dev git
-
-# Clone both repos
-git clone https://github.com/subhash-holla/pii-anon.git pii-anon-code
-git clone https://github.com/subhash-holla/pii-anon-eval-data.git
-```
-
-9. **Run the benchmark:**
-
-**Sequential mode** (default — simpler, lower memory):
-
-```bash
-cd pii-anon-code
-PYTHON=python3.12 bash scripts/run_cloud_benchmark.sh
-```
-
-The script creates a virtual environment, installs all dependencies, downloads NLP models, and runs the full canonical suite. Progress is logged to stdout at 1-minute intervals. On c7g.8xlarge the benchmark uses up to 12 parallel workers (memory-aware scaling: RAM_GB / 4, capped at 12). Duration: 3-4 days.
-
-**Parallel mode** (recommended on c7g.8xlarge with 64 GB RAM — ~5-6× faster):
-
-```bash
-cd pii-anon-code
-PYTHON=python3.12 bash scripts/run_cloud_benchmark.sh --parallel
-```
-
-This evaluates all 6 profiles in parallel (one process per profile), then merges results. Each process loads its own NLP models (~10 GB each, ~60 GB total). Duration: 4-8 hours instead of 3-4 days.
-
-You can also limit parallelism on smaller VMs: `BENCH_WORKERS=3 bash scripts/run_cloud_benchmark.sh --parallel` runs 3 profiles at a time (2 batches of 3). Per-profile logs go to `artifacts/benchmarks/logs/`.
-
-**Running overnight (auto-shutdown):** Append a shutdown command so the instance stops when the benchmark finishes (avoids paying for idle hours):
-
-```bash
-cd pii-anon-code
-PYTHON=python3.12 bash scripts/run_cloud_benchmark.sh --parallel; sudo shutdown -h now
-```
-
-A stopped instance still has its EBS volume attached (~$0.08/GB/month, pennies for 50 GB). Terminate it in the morning to stop all charges.
-
-10. **Download artifacts when done** (from your Mac):
-
-```bash
-# Create a local directory for the results
-mkdir -p ~/projects/pii-anon/cloud-benchmark-results
-
-# Download all benchmark artifacts
-scp -i ~/.ssh/pii-anon-bench.pem -r \
-    ubuntu@<instance-ip>:~/pii-anon-code/artifacts/benchmarks/ \
-    ~/projects/pii-anon/cloud-benchmark-results/
-```
-
-If the instance was auto-stopped (shutdown), start it first to download:
-
-```bash
-aws ec2 start-instances --instance-ids <instance-id>
-# Wait ~30 seconds, then get the new public IP:
-aws ec2 describe-instances \
-    --instance-ids <instance-id> \
-    --query 'Reservations[0].Instances[0].PublicIpAddress' \
-    --output text
-# Download, then terminate
-```
-
-11. **Terminate the instance** (important -- stop all charges!):
-
-```bash
-aws ec2 terminate-instances --instance-ids <instance-id>
-```
-
-12. **Integrate results locally** (update README and docs on your Mac):
-
-The cloud VM produced the benchmark JSON artifacts. The rendering and README integration steps are lightweight and run locally -- they only need the JSON files, not the dataset.
-
-```bash
-cd ~/projects/pii-anon/pii-anon-code
-
-# Copy cloud artifacts into the local artifacts directory
-cp -r ~/projects/pii-anon/cloud-benchmark-results/* artifacts/benchmarks/
-
-# Render the benchmark summary and update README
-python3 scripts/render_benchmark_summary.py \
-    --input-json artifacts/benchmarks/benchmark-results.json \
-    --output-markdown artifacts/benchmarks/benchmark-summary.md \
-    --update-readme README.md
-
-# Render complex mode example and update README
-python3 scripts/render_complex_mode_example.py \
-    --output-markdown docs/complex-mode-example.md \
-    --update-readme README.md
-
-# If you ran a multi-dataset benchmark (benchmark-combined.json exists):
-# python3 scripts/render_marketing_narrative.py \
-#     --input-json artifacts/benchmarks/benchmark-combined.json \
-#     --output-markdown artifacts/benchmarks/marketing-narrative.md \
-#     --update-readme README.md
-
-# Validate everything is in sync
-python3 scripts/check_readme_benchmark.py \
-    --readme README.md \
-    --summary artifacts/benchmarks/benchmark-summary.md \
-    --complex-summary docs/complex-mode-example.md \
-    --report-json artifacts/benchmarks/benchmark-results.json
-```
-
-**What runs locally vs. what needs the cloud:**
-
-| Step | Runs Locally? | Needs Dataset? |
-|---|---|---|
-| Render benchmark summary | Yes | No (uses JSON artifacts) |
-| Render complex mode example | Yes | No (uses hardcoded demo) |
-| Render marketing narrative | Yes | No (uses JSON artifacts) |
-| Validate README sync | Yes | No (compares markdown files) |
-| Run competitor benchmark | No | Yes (needs 50K-record dataset) |
-| Run continuity benchmark | No | Yes (needs dataset) |
-
-After the validation passes, commit the updated README and artifacts:
-
-```bash
-git add README.md docs/complex-mode-example.md artifacts/benchmarks/
-git commit -m "Update benchmark results from cloud run
-
-- Canonical benchmark on AWS c7g.8xlarge (ARM64 Graviton3)
-- All 6 profiles passed, all competitors evaluated
-- README benchmark section updated"
-git push origin main
-```
-
-#### Step-by-step: Hetzner (budget option)
-
-1. **Create a CAX41 server** via the [Hetzner Cloud Console](https://console.hetzner.cloud/) or CLI:
-
-```bash
-hcloud server create \
-    --name pii-anon-bench \
-    --type cax41 \
-    --image ubuntu-22.04 \
-    --ssh-key your-key \
-    --location nbg1
-```
-
-2. **SSH in, install Python 3.12, clone, and run:**
-
-```bash
-ssh root@<server-ip>
-apt-get update && apt-get install -y software-properties-common
-add-apt-repository -y ppa:deadsnakes/ppa
-apt-get update
-apt-get install -y python3.12 python3.12-venv python3.12-dev git
-git clone https://github.com/subhash-holla/pii-anon.git pii-anon-code
-git clone https://github.com/subhash-holla/pii-anon-eval-data.git
-cd pii-anon-code
-PYTHON=python3.12 bash scripts/run_cloud_benchmark.sh
-```
-
-3. **Download artifacts and delete the server:**
-
-```bash
-scp -r root@<server-ip>:~/pii-anon-code/artifacts/benchmarks/ ./cloud-benchmark-results/
-hcloud server delete pii-anon-bench
-```
-
-#### Using checkpoint/resume on cloud
-
-The benchmark saves per-profile checkpoints to `artifacts/benchmarks/checkpoints/`. If a spot instance is interrupted, simply launch a new instance, clone the repos, restore the artifacts directory, and re-run the script -- completed profiles are automatically skipped.
-
-```bash
-# Before launching: upload previous partial results
-scp -i ~/.ssh/pii-anon-bench.pem -r ./cloud-benchmark-results/checkpoints/ ubuntu@<new-ip>:~/pii-anon-code/artifacts/benchmarks/
-
-# Then re-run — will resume from last checkpoint
-cd pii-anon-code
-PYTHON=python3.12 bash scripts/run_cloud_benchmark.sh
-```
-
-#### Tips for fastest cloud runs
-
-- **Use `--parallel` mode** -- On c7g.8xlarge (64 GB RAM), `--parallel` evaluates all 6 profiles concurrently, cutting wall time from 3-4 days to 4-8 hours. Cost is actually *lower* because you pay for fewer instance-hours.
-- **Use spot/preemptible instances** -- 60-70% cheaper than on-demand, and the checkpoint system handles interruptions.
-- **Pick ARM64 over x86** -- Graviton/Axion instances are 20-40% cheaper with better per-core performance for Python workloads.
-- **Use gp3 SSD storage** -- The benchmark is CPU-bound, but fast storage helps with model loading. 50 GB gp3 is sufficient.
-- **Check spot pricing across regions** -- us-east-1 and us-west-2 typically have the lowest spot prices.
-- **Worker scaling** -- On a 64 GB RAM cloud VM, the benchmark auto-detects 12 parallel workers (RAM_GB / 4, capped at 12). In `--parallel` mode each profile gets its own process with ~5-6 within-profile threads. The `BENCH_WORKERS` env var controls how many profiles run concurrently (default: 6).
-- **Don't over-provision** -- 32 vCPUs is the sweet spot for c7g.8xlarge. With 12 workers, cores beyond 32 provide diminishing returns. 64 GB RAM handles 12 concurrent NLP model instances comfortably.
-
-### 4.7 Quick CLI evaluation (no Makefile needed)
-
-```bash
-pii-anon compare-competitors \
-    --dataset pii_anon_benchmark_v1 \
-    --warmup-samples 50 \
-    --measured-runs 3 \
-    --include-end-to-end \
-    --require-all-competitors \
-    --require-native-competitors \
-    --enforce-floors \
-    --output json
-```
-
-To evaluate specific profiles in parallel (one per process):
-
-```bash
-# Run each profile independently
-python3 scripts/run_competitor_benchmark.py \
-    --dataset pii_anon_benchmark_v1 \
-    --profiles short_chat \
-    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
-    --warmup-samples 50 \
-    --measured-runs 3
-
-# After all profiles complete, merge into a final report
-python3 scripts/run_competitor_benchmark.py \
-    --merge-only \
-    --checkpoint-dir artifacts/benchmarks/checkpoints/pii_anon_benchmark_v1 \
-    --output-json benchmark-results.json \
-    --output-csv benchmark-raw.csv \
-    --output-floor-report floor-gate-report.md
-```
-
-The `--profiles` flag accepts one or more profile names from the use-case matrix (e.g., `short_chat`, `long_document`, `structured_form_accuracy`). The `--merge-only` flag skips evaluation and produces the final report from per-profile checkpoints.
-
-### 4.8 Evaluation framework assessment
-
-```bash
-pii-anon eval-framework \
-    --dataset eval_framework_v1 \
-    --max-records 5000 \
-    --output json
-```
-
-### 4.9 Understanding benchmark output columns
-
-The benchmark summary table includes these columns per system:
-
-- **Composite** — Weighted score combining accuracy (β-weighted F1 from precision/recall) and operational metrics (latency, throughput, entity coverage).
-- **F1 / Precision / Recall** — Standard detection accuracy metrics computed against ground-truth labels.
-- **p50 Latency (ms)** — Median per-document detection latency.
-- **Docs/hour** — Throughput extrapolated from total elapsed time.
-- **Elo** — Tournament rating from 3-round round-robin using composite scores.
-- **Per-entity precision/recall** — Breakdown by entity type (in JSON artifacts, not in summary table).
-- **Entity coverage** — Count of entity types with non-zero recall vs total types in ground truth.
-
-The benchmark evaluates `pii-anon` (auto mode) and `pii-anon-swarm` (mixture-of-experts mode with per-entity-type expert weights) alongside all competitor systems. The ensemble mode uses weighted consensus fusion with entity-level specialization derived from comparative evaluation data.
-
-When multiple datasets are evaluated, the combined report (`benchmark-combined.json`) adds a cross-dataset summary with sample-weighted averages per system and a per-system F1 breakdown by dataset. The rendered markdown includes an interpretation section explaining what it means to succeed on one dataset but fall short on another.
-
-### 4.10 Regenerate the README benchmark section
-
-After a benchmark run, update the docs and verify they stay in sync:
-
-```bash
-# Single-dataset mode (original behavior)
-python3 scripts/render_benchmark_summary.py \
-    --input-json benchmark-results.json \
-    --output-markdown docs/benchmark-summary.md \
-    --require-floor-pass
-
-# Multi-dataset mode (pass combined report + per-dataset reports)
-python3 scripts/render_benchmark_summary.py \
-    --input-json artifacts/benchmarks/benchmark-combined.json \
-    --input-json artifacts/benchmarks/benchmark-results-pii_anon_benchmark_v1.json \
-    --input-json artifacts/benchmarks/benchmark-results-eval_framework_v1.json \
-    --output-markdown docs/benchmark-summary.md
-
-python3 scripts/render_complex_mode_example.py
-
-python3 scripts/check_readme_benchmark.py \
-    --readme README.md \
-    --summary docs/benchmark-summary.md \
-    --complex-summary docs/complex-mode-example.md \
-    --report-json benchmark-results.json
-```
+The benchmark produces these artifacts:
+
+| File | Description |
+|------|-------------|
+| `benchmark-results.json` | Raw results for all systems |
+| `benchmark-raw.csv` | Per-record results |
+| `floor-gate-report.md` | Pass/fail per use-case profile |
+| `artifacts/benchmarks/floor-baseline.json` | Floor baseline for regression detection |
+| `docs/benchmark-summary.md` | Rendered markdown summary |
+| `README.md` | Updated benchmark section |
+
+### Understanding the results
+
+The benchmark evaluates 5 systems across 6 use-case profiles (3 accuracy, 3 speed):
+
+| System | Type | Description |
+|--------|------|-------------|
+| **pii-anon** | Core | Fast regex engine with checksum validators |
+| **pii-anon-swarm** | Premium | Four-layer pipeline (regex + NER + Dawid-Skene + meta-learner) |
+| **GLiNER** | Competitor | Zero-shot transformer NER |
+| **Presidio** | Competitor | Microsoft PII detection framework |
+| **Scrubadub** | Competitor | Rule-based PII scrubbing |
+
+Key metrics reported:
+- **F1 / Precision / Recall** — entity-level with strict span matching
+- **Composite** — pii-rate-elo weighted score (F1 50%, P 15%, R 15%, latency 10%, throughput 10%)
+- **Elo** — tournament rating from round-robin on composite scores
+- **Bootstrap 95% CI** — confidence intervals from 1000 resamples
+- **Per-entity F1** — breakdown by entity type (in JSON artifacts)
 
 ---
 
-## Part 5: Pushing to GitHub
 
-### 5.1 Push the main library
+## Part 6: Push to GitHub
 
 ```bash
 cd ~/projects/pii-anon/pii-anon-code
 
-# Check what's changed
 git status
 git diff --stat
 
-# Stage and commit
 git add -A
-git commit -m "v1.0.1: Production release with mixture-of-experts ensemble and configurable parameters
-
-- 36 PII entity types with context-aware confidence scoring and checksum validation
-- Multi-engine mixture-of-experts ensemble (regex, Presidio, scrubadub, spaCy, stanza)
-- Per-entity-type expert weights for optimal engine specialization
-- Modular regex engine with declarative PatternSpec registry
-- All assumed defaults exposed as configurable parameters (confidence, fusion, risk, router)
-- Composite scoring (β-weighted F1 composition + governance gates)
-- PII-Rate-Elo tournament ratings with per-entity precision and entity coverage
-- Parallel profile evaluation with checkpoint/resume and merge-only mode
-- Sync engine fast-path bypassing asyncio overhead for single-engine benchmarks
-- 10K-record evaluation dataset with 52-language taxonomy support
-- Bootstrap CI, paired significance testing, Cohen's kappa
-- Context-preserving pseudonymization with entity linking
-- File ingestion (CSV, JSON, JSONL, TXT) and streaming chunker
-- 2197 tests at 87% code coverage
-- NIST, GDPR, ISO, HIPAA, CCPA, PCI-DSS compliance validation"
-
-git branch -M main
-git push -u origin main
+git commit -m "Release: pii-anon with swarm pipeline and updated benchmarks"
+git push origin main
 ```
 
-### 5.2 Push the documentation repo
+Push the other repos if they changed:
 
 ```bash
+# Datasets repo
+cd ~/projects/pii-anon/pii-anon-eval-data
+git add -A && git commit -m "Update benchmark datasets" && git push origin main
+
+# Documentation repo
 cd ~/projects/pii-anon/pii-anon-doc
-git add -A
-git commit -m "v1.0.0: Documentation for pii-anon release"
-git branch -M main
-git push -u origin main
-```
-
-### 5.3 Push the datasets repo
-
-```bash
-cd ~/projects/pii-anon/pii-anon-eval-data
-git add -A
-git commit -m "v1.0.0: Benchmark datasets for pii-anon evaluation
-
-- pii_anon_benchmark_v1 dataset (50,000 records, 22 entity types, 12 languages, 7 evaluation dimensions)
-- eval_framework_v1 dataset (50,000 records, 52 languages)"
-
-git branch -M main
-git push -u origin main
-```
-
-### 5.4 Tag releases
-
-```bash
-cd ~/projects/pii-anon/pii-anon-code
-git tag -a v1.0.0 -m "v1.0.0: First public release"
-git push origin v1.0.0
-
-cd ~/projects/pii-anon/pii-anon-eval-data
-git tag -a v1.0.0 -m "v1.0.0: Benchmark datasets"
-git push origin v1.0.0
-```
-
-### 5.5 Create GitHub Releases
-
-```bash
-cd ~/projects/pii-anon/pii-anon-code
-gh release create v1.0.0 \
-    --title "pii-anon v1.0.0" \
-    --notes "First public release. See README for full details. Documentation: https://github.com/subhash-holla/pii-anon-doc"
-
-cd ~/projects/pii-anon/pii-anon-eval-data
-gh release create v1.0.0 \
-    --title "pii-anon-datasets v1.0.0" \
-    --notes "Benchmark datasets for pii-anon evaluation. Install independently or auto-included with pii-anon[datasets]."
-
-cd ~/projects/pii-anon/pii-anon-doc
-gh release create v1.0.0 \
-    --title "pii-anon Documentation v1.0.0" \
-    --notes "Comprehensive documentation for pii-anon library, evaluation framework, and benchmarks."
-```
-
-### 5.6 Configure GitHub Actions for Trusted Publishing (OIDC)
-
-The CI workflows in `.github/workflows/release.yml` use **Trusted Publishing (OIDC)** via `pypa/gh-action-pypi-publish` for secure, keyless authentication to PyPI and TestPyPI.
-
-#### Step 1: Create PyPI and TestPyPI OIDC tokens
-
-**TestPyPI OIDC Setup:**
-
-1. Go to https://test.pypi.org/manage/account/#api-tokens
-2. Click "Add API token"
-3. Token name: `pii-anon-oidc`
-4. Scope: "Project" → select/create `pii-anon-datasets` and `pii-anon` projects (or use entire account for first setup)
-5. **Important:** Choose "OIDC" as the token type (not API token)
-6. Trusted publishers: Add your GitHub repository (`subhash-holla/pii-anon`)
-7. Copy and save the token
-
-**PyPI OIDC Setup:**
-
-1. Go to https://pypi.org/manage/account/#api-tokens
-2. Click "Add API token"
-3. Token name: `pii-anon-oidc`
-4. Scope: "Project" → select/create `pii-anon-datasets` and `pii-anon` projects
-5. **Important:** Choose "OIDC" as the token type
-6. Trusted publishers: Add `subhash-holla/pii-anon`
-7. Copy and save the token
-
-Alternatively, if OIDC isn't available yet, you can use repository secrets instead (see fallback option below).
-
-#### Step 2: Create GitHub repository secrets (Optional fallback)
-
-If your PyPI/TestPyPI accounts don't support OIDC yet, you can use API tokens instead:
-
-```bash
-cd ~/projects/pii-anon/pii-anon-code
-
-# Set the TestPyPI token
-gh secret set TEST_PYPI_API_TOKEN
-
-# Set the PyPI token
-gh secret set PYPI_API_TOKEN
-```
-
-Each command will prompt you to paste the token. See Part 6.2 for how to generate API tokens.
-
-#### Step 3: Create GitHub Environments
-
-Create two GitHub Environments for the workflow:
-
-1. Go to https://github.com/subhash-holla/pii-anon/settings/environments
-2. Create environment `testpypi`
-   - Add repository secret `TEST_PYPI_API_TOKEN` if using API tokens (optional, OIDC preferred)
-3. Create environment `pypi`
-   - Add repository secret `PYPI_API_TOKEN` if using API tokens (optional, OIDC preferred)
-   - (Optional) Add a "Required reviewers" protection rule for safety on production releases
-
-**OIDC Advantages:**
-- No credentials stored in GitHub
-- Time-limited tokens (15 minutes)
-- Automatic token refresh
-- Audit trail through GitHub Actions
-
-**Workflow Behavior:**
-- Tags like `v1.0.0-rc1` → publishes to TestPyPI (requires `testpypi` environment)
-- Tags like `v1.0.0` (no `-rc`) → publishes to PyPI (requires `pypi` environment)
-- Manual dispatch via Actions UI can target either TestPyPI or PyPI
-
----
-
-## Part 6: Publishing to TestPyPI
-
-### 6.1 Create your TestPyPI and PyPI accounts (if needed)
-
-If you don't already have accounts, register at both (use the same email for simplicity):
-
-- TestPyPI: https://test.pypi.org/account/register/
-- PyPI: https://pypi.org/account/register/
-
-Enable 2FA on both accounts for security.
-
-### 6.2 Create API tokens (fallback option if not using OIDC)
-
-If you're not using OIDC (see Part 5.6), you'll need API tokens for local uploads or as GitHub repository secrets.
-
-**TestPyPI:**
-
-1. Go to https://test.pypi.org/manage/account/#api-tokens
-2. Click "Add API token"
-3. Token name: `pii-anon-upload`
-4. Scope: "Entire account" (first upload) — you can scope it to the project later
-5. Copy the token (starts with `pypi-`)
-
-**PyPI:** Same process at https://pypi.org/manage/account/#api-tokens
-
-**Note:** OIDC is preferred for GitHub Actions (see Part 5.6). API tokens are mainly needed for local `twine` uploads.
-
-### 6.3 Configure ~/.pypirc for local uploads
-
-```bash
-cat > ~/.pypirc << 'EOF'
-[distutils]
-index-servers =
-    pypi
-    testpypi
-
-[pypi]
-username = __token__
-password = pypi-YOUR_PYPI_TOKEN_HERE
-
-[testpypi]
-repository = https://test.pypi.org/legacy/
-username = __token__
-password = pypi-YOUR_TESTPYPI_TOKEN_HERE
-EOF
-
-chmod 600 ~/.pypirc
-```
-
-Replace the placeholder tokens with the real ones you generated.
-
-### 6.4 Build the packages
-
-Build in the correct order — datasets first, since the main library depends on it:
-
-```bash
-# Build pii-anon-datasets
-cd ~/projects/pii-anon/pii-anon-eval-data
-rm -rf dist/ build/ src/*.egg-info
-python3 -m build --outdir dist
-twine check dist/*
-
-# Build pii-anon
-cd ~/projects/pii-anon/pii-anon-code
-rm -rf dist/ build/ src/*.egg-info
-python3 -m build --outdir dist
-twine check dist/*
-python3 scripts/check_package_size.py --dist-dir dist --max-wheel-mb 1.5 --package-name pii_anon
-```
-
-**Verify versions match in both projects:**
-- `pii-anon-code/pyproject.toml` → `version = "1.0.0"`
-- `pii-anon-eval-data/pyproject.toml` → `version = "1.0.0"`
-- Both should have matching version numbers for the release
-
-### 6.5 Upload to TestPyPI
-
-Upload datasets first since the main library depends on it:
-
-```bash
-# Upload pii-anon-datasets
-cd ~/projects/pii-anon/pii-anon-eval-data
-twine upload --repository testpypi dist/*
-
-# Upload pii-anon
-cd ~/projects/pii-anon/pii-anon-code
-twine upload --repository testpypi dist/*
+git add -A && git commit -m "Update documentation" && git push origin main
 ```
 
 ---
 
-## Part 6.5+ Distribution Artifacts for v1.0.0 Release
+## Part 7: Tag and Publish
 
-Before verification, understand what artifacts are being released:
-
-### Artifact Overview
-
-| Artifact | Repository | Package | Destination | Access |
-|---|---|---|---|---|
-| **pii-anon library** | `pii-anon-code` | `pii-anon` | PyPI | `pip install pii-anon` |
-| **Evaluation datasets** | `pii-anon-eval-data` | `pii-anon-datasets` | PyPI | `pip install pii-anon-datasets` or auto-included via `pip install pii-anon[datasets]` |
-| **Documentation** | `pii-anon-doc` | (static docs) | GitHub | https://github.com/subhash-holla/pii-anon-doc |
-| **GitHub Releases** | All 3 repos | (release notes) | GitHub | GitHub Releases for each repo |
-
-### Dataset Availability for Evaluation
-
-The `pii-anon-datasets` package provides JSONL benchmark data for anyone running evaluations. It's distributed via PyPI and can be accessed in three ways:
-
-#### Option 1: Auto-included with pii-anon[datasets] (Recommended)
+### 7.1 Create the release tag
 
 ```bash
-# Installs both pii-anon and pii-anon-datasets automatically
-pip install "pii-anon[datasets]"
-```
-
-This is the easiest approach for users who want evaluation capability out-of-the-box.
-
-#### Option 2: Install datasets separately
-
-```bash
-# Install just the datasets package
-pip install pii-anon-datasets
-
-# Then import and use in your code
-from pii_anon.eval_framework import load_dataset
-dataset = load_dataset('pii_anon_benchmark_v1')
-```
-
-This is useful for evaluation-only workflows that don't need the full pii-anon library.
-
-#### Option 3: Access via environment variable (development/offline)
-
-```bash
-# During development or in environments without PyPI access
-export PII_ANON_DATASET_ROOT=/path/to/pii-anon-eval-data/src/pii_anon_datasets/data
-python your_eval_script.py
-```
-
-### Dataset Resolution Order
-
-When pii-anon looks for evaluation data, it checks in this order:
-
-1. **Installed `pii_anon_datasets` package** (from PyPI or local install)
-2. **`PII_ANON_DATASET_ROOT` environment variable** (if set)
-3. **Sibling `pii-anon-eval-data/` repo** (local development)
-4. **Monorepo fallback** (legacy layout)
-
-This allows both production (PyPI) and development (local repo) workflows.
-
-### Documentation Links
-
-The main `pii-anon` repository references the documentation repo:
-
-- **Primary docs:** https://github.com/subhash-holla/pii-anon-doc
-- **In pyproject.toml:** `Documentation = "https://github.com/subhash-holla/pii-anon-doc"`
-- **In README.md:** Link to detailed docs in the doc repo
-- **In GitHub Release:** Release notes include link to documentation
-
-Ensure the `pii-anon-doc` repo is fully updated before the v1.0.0 release with:
-- Complete API documentation
-- Evaluation framework guide
-- Benchmark setup and interpretation
-- Entity type registry
-- Compliance mapping (GDPR, HIPAA, NIST, etc.)
-
----
-
-## Part 7: Verifying on TestPyPI
-
-### 7.1 Install in a clean environment
-
-```bash
-python3 -m venv /tmp/pii-anon-test-env
-source /tmp/pii-anon-test-env/bin/activate
-pip install --upgrade pip
-
-# Install datasets first from TestPyPI
-pip install --index-url https://test.pypi.org/simple/ \
-    --extra-index-url https://pypi.org/simple/ \
-    pii-anon-datasets
-
-# Then install main library with datasets extra (includes datasets dependency)
-pip install --index-url https://test.pypi.org/simple/ \
-    --extra-index-url https://pypi.org/simple/ \
-    "pii-anon[cli,datasets]"
-```
-
-The `--extra-index-url` fallback is essential — TestPyPI won't have `pydantic`, `typer`, and other transitive dependencies.
-
-**Verification of dataset auto-inclusion:**
-
-```bash
-# Verify pii-anon-datasets is installed as a dependency
-pip show pii-anon
-# Should list "pii-anon-datasets" in the Requires field
-
-# Verify dataset access
-python3 -c "from pii_anon.eval_framework import load_dataset; \
-    ds = load_dataset('pii_anon_benchmark_v1'); \
-    print(f'Dataset loaded: {len(ds)} records')"
-```
-
-### 7.2 Run smoke tests
-
-```bash
-# Version check
-python3 -c "import pii_anon; print(f'Version: {pii_anon.__version__}')"
-# Should print: Version: 1.0.0
-
-# CLI smoke
-pii-anon version
-pii-anon health --output json
-
-# Detection
-pii-anon detect "Contact alice@example.com and call 415-555-0100"
-
-# Orchestrator
-python3 -c "
-from pii_anon import PIIOrchestrator
-from pii_anon.types import ProcessingProfileSpec, SegmentationPlan
-orch = PIIOrchestrator(token_key='test-key')
-result = orch.run(
-    {'text': 'Contact alice@example.com and 555-12-3456'},
-    profile=ProcessingProfileSpec(profile_id='default', mode='weighted_consensus', language='en'),
-    segmentation=SegmentationPlan(enabled=False),
-    scope='etl', token_version=1,
-)
-print('Findings:', len(result['ensemble_findings']))
-print('Output:', result['transformed_payload'][:80])
-"
-
-# Evaluation framework
-python3 -c "
-from pii_anon.eval_framework import PII_TAXONOMY, SUPPORTED_LANGUAGES, EVIDENCE_REGISTRY
-print(f'Entity types: {len(PII_TAXONOMY)}')
-print(f'Languages: {len(SUPPORTED_LANGUAGES)}')
-print(f'Research references: {len(EVIDENCE_REGISTRY)}')
-"
-
-# Composite scoring
-python3 -c "
-from pii_anon.eval_framework import compute_composite
-score = compute_composite(f1=0.612, precision=0.580, recall=0.647, latency_ms=6.942, docs_per_hour=514300)
-print(f'Composite: {score.score:.4f}')
-print(f'Tier 1 (accuracy): {score.tier1_score:.4f}')
-print(f'Tier 2 (operational): {score.tier2_score:.4f}')
-"
-
-# Governance thresholds
-python3 -c "
-from pii_anon.eval_framework import GovernanceThresholds, evaluate_governance
-thresholds = GovernanceThresholds()
-result = evaluate_governance(f1=0.90, precision=0.91, recall=0.88, latency_p50_ms=20.0, docs_per_hour=12000)
-print(f'Governance pass: {result.passed}')
-print(f'Checks: {len(result.checks)}')
-"
-```
-
-### 7.3 Verify on the TestPyPI website
-
-```bash
-open https://test.pypi.org/project/pii-anon/
-open https://test.pypi.org/project/pii-anon-datasets/
-```
-
-Check: README renders correctly, version shows 1.0.0, classifiers and project links are right.
-
-### 7.4 Clean up
-
-```bash
-deactivate
-rm -rf /tmp/pii-anon-test-env
-```
-
----
-
-## Part 8: Promoting to PyPI (Production)
-
-Only proceed here after TestPyPI verification passes cleanly.
-
-### 8.1 Option A: Upload manually with twine
-
-```bash
-# Datasets first
-cd ~/projects/pii-anon/pii-anon-eval-data
-twine upload dist/*
-
-# Main library
 cd ~/projects/pii-anon/pii-anon-code
-twine upload dist/*
+
+# Tag with the version from pyproject.toml
+VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+git tag -a "v${VERSION}" -m "pii-anon ${VERSION}"
+git push origin "v${VERSION}"
 ```
 
-### 8.2 Option B: Trigger via GitHub Actions (Recommended with OIDC)
+The `v*` tag push triggers the `publish-release` GitHub Action which:
+1. Runs quality gates (ruff, mypy, pytest, performance SLAs)
+2. Builds the wheel and sdist
+3. Publishes to PyPI (for `v*` tags without `-rc`)
 
-If you set up the environments in Part 5.6, pushing a version tag triggers the release workflow automatically.
-
-**Automatic (tag-based):**
+### 7.2 Tag the datasets repo
 
 ```bash
-# In pii-anon-code repo
-git tag v1.0.0-rc1
-git push origin v1.0.0-rc1
-# → Automatically publishes to TestPyPI
-
-# Later, when ready for production:
-git tag v1.0.0
-git push origin v1.0.0
-# → Automatically publishes to PyPI
+cd ~/projects/pii-anon/pii-anon-eval-data
+git tag -a "v${VERSION}" -m "pii-anon-datasets ${VERSION}"
+git push origin "v${VERSION}"
 ```
 
-**Manual (workflow dispatch):**
-
-1. Go to https://github.com/subhash-holla/pii-anon/actions/workflows/release.yml
-2. Click "Run workflow"
-3. Choose target environment: `testpypi` or `pypi`
-4. Click "Run workflow"
-
-The workflow will:
-- Build the package (runs full test suite, benchmarks, and validations)
-- Publish to the chosen PyPI registry using OIDC (or API token fallback)
-- Verify package integrity and README rendering
-
-**For pii-anon-datasets:** The datasets package is published separately. Each repo (`pii-anon-code` and `pii-anon-eval-data`) can be released independently or together, depending on whether the datasets change.
-
-### 8.3 Verify on PyPI
+### 7.3 Create GitHub Releases
 
 ```bash
-python3 -m venv /tmp/pii-anon-prod-verify
-source /tmp/pii-anon-prod-verify/bin/activate
-pip install --upgrade pip
+cd ~/projects/pii-anon/pii-anon-code
+gh release create "v${VERSION}" --title "pii-anon ${VERSION}" \
+    --notes "See README for details."
 
-# Install from production PyPI
+cd ~/projects/pii-anon/pii-anon-eval-data
+gh release create "v${VERSION}" --title "pii-anon-datasets ${VERSION}" \
+    --notes "Benchmark datasets for pii-anon evaluation."
+```
+
+---
+
+## Part 8: Verify on PyPI
+
+```bash
+# Create a clean venv and install from PyPI
+python3.12 -m venv /tmp/pii-anon-verify && source /tmp/pii-anon-verify/bin/activate
 pip install "pii-anon[cli,datasets]"
 
-# Run the same smoke tests from Part 7.2
-python3 -c "import pii_anon; print(f'Version: {pii_anon.__version__}')"
+# Smoke tests
 pii-anon version
 pii-anon health --output json
-pii-anon detect "Contact alice@example.com and call 415-555-0100"
+pii-anon detect "Contact alice@example.com"
 
-# Verify dataset is included and working
-python3 -c "from pii_anon.eval_framework import load_dataset; \
-    ds = load_dataset('pii_anon_benchmark_v1'); \
-    print(f'Dataset accessible: {len(ds)} records')"
+# Verify dataset is accessible
+python -c "import pii_anon_datasets; print(f'Records: {len(pii_anon_datasets.load_dataset())}')"
 
-deactivate
-rm -rf /tmp/pii-anon-prod-verify
-```
-
-### 8.4 Verify on the PyPI website
-
-```bash
-open https://pypi.org/project/pii-anon/
-open https://pypi.org/project/pii-anon-datasets/
+# Clean up
+deactivate && rm -rf /tmp/pii-anon-verify
 ```
 
 ---
 
-## Quick Reference Checklist
+## Release Checklist
 
 ```
-1. MAC SETUP
-   [ ] Homebrew, Python 3.12, Git, gh CLI installed
-   [ ] gh auth login completed
+1. SETUP
+   [ ] Python 3.12 venv activated
+   [ ] All dependencies installed (pip install -e ".[dev,cli,crypto,benchmark,datasets]")
+   [ ] NLP models downloaded (spaCy, Stanza, GLiNER)
 
-2. REPO SETUP
-   [ ] Three GitHub repos created (pii-anon, pii-anon-doc, pii-anon-eval-data)
-   [ ] Local folders cloned or linked to remotes
-   [ ] venv created and activated
-   [ ] PyTorch CPU installed, then pip install -e ".[dev,cli,crypto,benchmark,datasets]" succeeded
-   [ ] NLP models downloaded (spaCy en_core_web_sm, Stanza en, GLiNER)
-   [ ] pii-anon benchmark-preflight shows all 3 competitors
-
-3. DOCUMENTATION (pii-anon-doc repo)
-   [ ] API documentation complete and current
-   [ ] Evaluation framework guide up-to-date
-   [ ] Benchmark setup and interpretation documented
-   [ ] Entity type registry documented
-   [ ] Compliance mapping (GDPR, HIPAA, NIST, PCI-DSS, CCPA, ISO) complete
-   [ ] All examples working and tested
-   [ ] README links to documentation repo
-
-4. TESTS
+2. QUALITY GATES
    [ ] make all passes (lint + type + tests + perf + build + checks)
-   [ ] 2197+ tests passing, ~87% coverage, 85% gate met
 
-5. EVALUATION
-   [ ] make benchmark-portable (or benchmark-canonical-macos for full gates)
-   [ ] All 3 competitors evaluated (presidio, scrubadub, gliner)
-   [ ] Both pii-anon and pii-anon-swarm evaluated
-   [ ] All datasets evaluated (pii_anon_benchmark_v1, eval_framework_v1)
-   [ ] Cross-dataset combined report reviewed (benchmark-combined.json)
-   [ ] Ensemble MoE weights verified (per-entity-type specialization)
-   [ ] Results reviewed in artifacts/benchmarks/
+3. SWARM TRAINING
+   [ ] make train-swarm completes successfully
+   [ ] Artifacts deployed to ~/.pii_anon/swarm/
+   [ ] manifest.json shows expected datasets and F1
 
-6. VERSION SYNC
-   [ ] pii-anon-code/pyproject.toml → version = "1.0.0"
-   [ ] pii-anon-eval-data/pyproject.toml → version = "1.0.0"
-   [ ] pii-anon-code/src/pii_anon/__init__.py → __version__ = "1.0.0"
-   [ ] pii-anon-code/pyproject.toml dependencies → pii-anon-datasets>=1.0.0
+4. BENCHMARK
+   [ ] make benchmark-full completes successfully
+   [ ] README benchmark section updated automatically
+   [ ] benchmark-results.json produced
+   [ ] Results reviewed (pii-anon and pii-anon-swarm both outperform competitors)
 
-7. GITHUB
-   [ ] All three repos pushed to main (pii-anon-code, pii-anon-doc, pii-anon-eval-data)
-   [ ] Tags created for both packages (v1.0.0 in both pii-anon-code and pii-anon-eval-data)
-   [ ] GitHub Releases created for all three repos with descriptive notes
-   [ ] Documentation links included in release notes
-   [ ] OIDC/Trusted Publishing configured (Part 5.6)
-   [ ] Environments created (testpypi, pypi) with OIDC or API token secrets
-
-8. BUILD & VALIDATION
-   [ ] Both packages built in order: pii-anon-datasets, then pii-anon
-   [ ] twine check dist/* passes for both packages
-   [ ] Package sizes validated (pii-anon wheel < 1.5 MB)
-
-9. TESTPYPI
-   [ ] pii-anon-datasets uploaded to TestPyPI
-   [ ] pii-anon uploaded to TestPyPI
-   [ ] Installed in clean venv from TestPyPI with [cli,datasets] extras
-   [ ] Smoke tests pass:
-      - import pii_anon (check version is 1.0.0)
-      - pii-anon CLI commands work (version, health, detect)
-      - Dataset auto-included and accessible via load_dataset()
-      - Orchestrator works
-      - Eval framework works
-      - Composite scoring works
-      - Governance thresholds work
-   [ ] TestPyPI project pages look correct for both packages
-   [ ] README renders without errors on TestPyPI
-
-10. PYPI (only after TestPyPI is verified)
-    [ ] pii-anon-datasets uploaded to PyPI
-    [ ] pii-anon uploaded to PyPI
-    [ ] Installed in clean venv from PyPI with [cli,datasets] extras
-    [ ] All smoke tests from step 9 pass on production PyPI
-    [ ] pypi.org project pages look correct for both packages
-    [ ] Users can install with: pip install "pii-anon[datasets]"
-    [ ] Users can install just datasets with: pip install pii-anon-datasets
-
-11. POST-RELEASE
-    [ ] Monitor for any issues reported on GitHub
-    [ ] Update links/references in related projects
-    [ ] Announce release (email list, social media, etc.)
-    [ ] Archive benchmark results
+5. PUBLISH
+   [ ] All repos pushed to GitHub
+   [ ] Version tag created and pushed
+   [ ] GitHub Action publish-release triggered
+   [ ] PyPI package installable and smoke tests pass
 ```
-
----
-
-## Part 9: Complete v1.0.0 Artifact Checklist
-
-After all publishing steps are complete, verify that all v1.0.0 artifacts are available and accessible:
-
-### Artifacts to Verify
-
-#### 1. PyPI Artifacts
-
-**pii-anon library:**
-```bash
-# Visit https://pypi.org/project/pii-anon/
-# Verify:
-# - Version: 1.0.0
-# - Package size: wheel < 1.5 MB, reasonable sdist size
-# - README renders correctly
-# - Project URLs point to:
-#   - Homepage: https://github.com/subhash-holla/pii-anon
-#   - Documentation: https://github.com/subhash-holla/pii-anon-doc
-#   - Repository: https://github.com/subhash-holla/pii-anon
-#   - Issues: https://github.com/subhash-holla/pii-anon/issues
-# - Classifiers include: Development Status :: 5 - Production/Stable
-# - Dependencies list: pydantic>=2.8
-# - Optional dependencies (datasets) available in extras
-
-pip install "pii-anon[cli,datasets]" --dry-run
-# Should resolve successfully
-```
-
-**pii-anon-datasets package:**
-```bash
-# Visit https://pypi.org/project/pii-anon-datasets/
-# Verify:
-# - Version: 1.0.0
-# - README shows datasets available
-# - Project URLs point to:
-#   - Homepage: https://github.com/subhash-holla/pii-anon-eval-data
-#   - Repository: https://github.com/subhash-holla/pii-anon-eval-data
-# - Classifiers include: Development Status :: 5 - Production/Stable
-
-pip install pii-anon-datasets --dry-run
-# Should resolve successfully
-```
-
-#### 2. GitHub Releases
-
-**pii-anon library release:**
-```bash
-# Visit https://github.com/subhash-holla/pii-anon/releases/tag/v1.0.0
-# Verify:
-# - Tag: v1.0.0
-# - Release title: "pii-anon v1.0.0"
-# - Release notes include link to documentation: https://github.com/subhash-holla/pii-anon-doc
-# - No release assets needed (packages on PyPI, not GitHub)
-```
-
-**pii-anon-datasets release:**
-```bash
-# Visit https://github.com/subhash-holla/pii-anon-eval-data/releases/tag/v1.0.0
-# Verify:
-# - Tag: v1.0.0
-# - Release title: "pii-anon-datasets v1.0.0"
-# - Release notes mention installation via pip and auto-inclusion with pii-anon[datasets]
-```
-
-**pii-anon-doc release:**
-```bash
-# Visit https://github.com/subhash-holla/pii-anon-doc/releases/tag/v1.0.0
-# Verify:
-# - Tag: v1.0.0
-# - Release title: "pii-anon Documentation v1.0.0"
-# - Release notes include overview of documentation content
-```
-
-#### 3. Documentation
-
-**pii-anon-doc repository:**
-```bash
-# Visit https://github.com/subhash-holla/pii-anon-doc
-# Verify main branch contains:
-# - API reference documentation
-# - Evaluation framework guide
-# - Benchmark setup and interpretation
-# - Entity type registry
-# - Compliance mapping documentation
-# - Usage examples
-# - Architecture diagrams
-```
-
-### Integration Verification
-
-Test the full integration workflow:
-
-```bash
-# Test 1: Fresh install with datasets
-python3 -m venv /tmp/final-check
-source /tmp/final-check/bin/activate
-pip install --upgrade pip
-
-pip install "pii-anon[cli,datasets]"
-
-# Verify library works
-pii-anon version  # Should print: 1.0.0
-pii-anon capabilities --output json | head -50
-
-# Verify datasets are included
-python3 << 'EOF'
-from pii_anon.eval_framework import load_dataset
-datasets = ['pii_anon_benchmark_v1', 'eval_framework_v1']
-for ds_name in datasets:
-    try:
-        ds = load_dataset(ds_name)
-        print(f"✓ {ds_name}: {len(ds)} records")
-    except Exception as e:
-        print(f"✗ {ds_name}: {e}")
-EOF
-
-deactivate
-
-# Test 2: Datasets-only install
-python3 -m venv /tmp/datasets-only
-source /tmp/datasets-only/bin/activate
-pip install --upgrade pip
-
-pip install pii-anon-datasets
-
-python3 << 'EOF'
-from pii_anon_datasets import get_dataset_path
-path = get_dataset_path('pii_anon_benchmark_v1')
-print(f"✓ Dataset path accessible: {path}")
-EOF
-
-deactivate
-
-# Test 3: Verify documentation link
-python3 << 'EOF'
-import pii_anon
-# Check that metadata points to documentation
-import importlib.metadata
-meta = importlib.metadata.metadata('pii-anon')
-doc_url = meta.get('Project-URL', '').split(',')
-print(f"✓ Documentation URL available in package metadata")
-EOF
-
-rm -rf /tmp/final-check /tmp/datasets-only
-```
-
-### Distribution Accessibility Summary
-
-After v1.0.0 release, users can access the artifacts via:
-
-1. **Library (pii-anon):** `pip install pii-anon[datasets]` from PyPI
-2. **Datasets (pii-anon-datasets):**
-   - Via PyPI: `pip install pii-anon-datasets`
-   - Auto-included: `pip install pii-anon[datasets]`
-3. **Documentation:** https://github.com/subhash-holla/pii-anon-doc (GitHub repo)
-4. **GitHub Releases:** All three repos have v1.0.0 releases with notes
-
----
-
-## Troubleshooting
-
-**`gh repo create` says "already exists":**
-That's fine. The repo is already set up — just make sure your local remote points to it: `git remote -v`. If not, run `git remote add origin https://github.com/subhash-holla/pii-anon.git`.
-
-**`git push` is rejected (non-fast-forward):**
-If the remote has content you don't have locally: `git pull --rebase origin main` first, resolve any conflicts, then push again.
-
-**"spaCy model not found" during Presidio evaluation:**
-Run `python3 -m spacy download en_core_web_sm`. If that fails behind a firewall, download manually from the spaCy releases page and install with `pip install /path/to/en_core_web_sm-x.x.x.tar.gz`.
-
-**"stanza model not found":**
-Run `python3 -c "import stanza; stanza.download('en')"`. Models download to `~/stanza_resources/`.
-
-**`Failed to build thinc` / `Failed to build spacy`:**
-This means your Python version is too new for pre-built wheels. spaCy and thinc need **Python 3.12 or lower**. Fix: `deactivate && rm -rf .venv && python3.12 -m venv .venv && source .venv/bin/activate` then re-run the install steps.
-
-**TestPyPI `pip install` fails on dependencies:**
-Always use `--extra-index-url https://pypi.org/simple/` so pip can find transitive dependencies (pydantic, typer, etc.) on real PyPI.
-
-**"Package already exists" on PyPI or TestPyPI:**
-You cannot overwrite a published version. Bump the version in both `pyproject.toml` and `src/pii_anon/__init__.py`, rebuild, and re-upload.
-
-**Docker not found (canonical macOS benchmark):**
-Install Docker Desktop: `brew install --cask docker`. Start Docker Desktop from Applications. The canonical benchmark uses Docker to run on linux/amd64 for reproducibility on Apple Silicon.
-
-**`docker` command runs a Node.js tool instead of Docker Engine:**
-If you see errors referencing `node_modules/docker/` or `highlight.js`, you have an npm package called `docker` (a documentation generator) shadowing the real Docker CLI. Fix: `npm uninstall -g docker`. Verify with `which docker` — it should point to `/usr/local/bin/docker` or `/opt/homebrew/bin/docker`, not an nvm path. Alternatively, override the path: `make benchmark-canonical-macos DOCKER=/opt/homebrew/bin/docker`.
-
-**Docker benchmark is very slow on Apple Silicon:**
-Use `make benchmark-canonical-macos-native` instead — it runs natively on ARM64 without Rosetta emulation and is 2-3x faster. If you must use Docker, ensure Docker Desktop → Settings → General → "Use Rosetta for x86_64/amd64 emulation on Apple Silicon" is enabled. Allocate at least 8 GB RAM and 4 CPUs to Docker (Settings → Resources).
-
-**tqdm progress bar not rendering in Docker:**
-The Makefile passes `-e TERM=$(TERM)` and `-e PYTHONUNBUFFERED=1` to Docker. If progress bars still don't render, try `TERM=xterm make benchmark-canonical-macos`.
-
-**`pip install gliner` fails with build errors:**
-GLiNER requires a C compiler for some transitive deps. On macOS, ensure Xcode command line tools are installed: `xcode-select --install`. If the build still fails, try `pip install --no-build-isolation gliner`.
-
-**Coverage below 85%:**
-The `pyproject.toml` enforces `--cov-fail-under=85`. Current coverage is ~90%. If it drops, run `python3 -m pytest tests/ --cov=pii_anon --cov-report=html` and open `htmlcov/index.html` to inspect uncovered lines.
-
-**GitHub Actions release workflow fails:**
-Check that both environment secrets (`TEST_PYPI_API_TOKEN`, `PYPI_API_TOKEN`) are set and that the `testpypi` and `pypi` environments exist in your repo settings. If using OIDC, verify trusted publishers are configured correctly in PyPI/TestPyPI account settings.
-
-**Documentation repo release:**
-The `pii-anon-doc` repo doesn't publish packages to PyPI (it contains static documentation). To release it:
-
-```bash
-cd ~/projects/pii-anon/pii-anon-doc
-git add -A
-git commit -m "v1.0.0: Documentation update for pii-anon release"
-git branch -M main
-git push -u origin main
-git tag -a v1.0.0 -m "v1.0.0: Complete documentation for pii-anon library and evaluation framework"
-git push origin v1.0.0
-gh release create v1.0.0 \
-    --title "pii-anon Documentation v1.0.0" \
-    --notes "Comprehensive documentation for pii-anon library, evaluation framework, and benchmarks. See README for content overview."
-```
-
-The documentation repo is primarily accessed via GitHub (https://github.com/subhash-holla/pii-anon-doc), not PyPI.
-
-**"Inconsistent versions across repos":**
-If PyPI publishes succeed but versions are inconsistent, verify:
-- `pii-anon-code/pyproject.toml` version matches git tag
-- `pii-anon-eval-data/pyproject.toml` version matches git tag
-- Both packages list matching versions in dependencies (e.g., `pii-anon-datasets>=1.0.0`)
-- `pii-anon-code/src/pii_anon/__init__.py` has `__version__ = "1.0.0"`
-
-Rebuild and re-upload if there's a mismatch.

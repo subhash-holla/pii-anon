@@ -38,7 +38,7 @@ from .schema import EvalBenchmarkRecord, VALID_DIMENSION_TAGS, DIMENSION_WEIGHTS
 
 # ---------------------------------------------------------------------------
 # Sample Size Guidance: Target records per dimension
-# Based on ~50K total corpus with weighted allocation.
+# Based on ~151K total corpus with weighted allocation.
 # Reference: Cochran (1977), TAB (2022) benchmark design
 # ---------------------------------------------------------------------------
 
@@ -386,9 +386,9 @@ def validate_dataset_coverage(records: list[EvalBenchmarkRecord]) -> dict[str, A
         statistical_power = float('inf')
 
     # ── Generate recommendation ────────────────────────────────────────────
-    if total < 50000:
+    if total < 151000:
         recommendation = "FAIL"
-        reason = f"Total records ({total}) below minimum threshold (50K)"
+        reason = f"Total records ({total}) below minimum threshold (151K)"
     elif not dimension_adequacy:
         recommendation = "CONDITIONAL"
         reason = "Some dimensions below 90% of target coverage"

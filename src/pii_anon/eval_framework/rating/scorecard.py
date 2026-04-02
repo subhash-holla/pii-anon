@@ -99,7 +99,7 @@ class BenchmarkScorecard:
     Attributes
     ----------
     benchmark_name:
-        Identifier for the benchmark (e.g., "pii_anon_benchmark_v1_v1").
+        Identifier for the benchmark (e.g., "pii_anon_benchmark").
     dataset_name:
         Dataset used for evaluation.
     system_scorecards:

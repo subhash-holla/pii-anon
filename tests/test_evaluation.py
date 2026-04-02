@@ -27,7 +27,7 @@ def test_strategy_evaluator_returns_winner(monkeypatch: pytest.MonkeyPatch) -> N
     evaluator = StrategyEvaluator(orch)
     report = evaluator.compare_strategies(
         ["weighted_consensus", "union_high_recall"],
-        dataset="pii_anon_benchmark_v1",
+        dataset="pii_anon_benchmark",
     )
     assert report.winner in {"weighted_consensus", "union_high_recall"}
     assert len(report.results) == 2

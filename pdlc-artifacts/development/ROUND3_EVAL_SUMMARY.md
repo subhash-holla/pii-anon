@@ -13,7 +13,7 @@ This evaluation re-assesses the pii-anon project after bug fixes, focusing on:
 **Output:** `/sessions/dreamy-blissful-gauss/mnt/pii-anon-core/pii-anon-code/pdlc-artifacts/development/round3-eval.txt`
 
 ## Dataset
-- **Target:** 200 records (every 250th record from pii_anon_benchmark_v1)
+- **Target:** 200 records (every 250th record from pii_anon_benchmark)
 - **Actual:** Synthetic dataset of 200 records (pii-anon-datasets package not installed)
 - **Ground Truth Labels:** 142 entity labels across 11 entity types
 
@@ -82,7 +82,7 @@ The synthetic dataset generated for this evaluation is simple and doesn't includ
 - Difficult-to-detect semantic entities (names in various contexts)
 - Full range of structured PII patterns from real-world data
 
-**For production validation**, use the actual pii_anon_benchmark_v1 dataset by installing:
+**For production validation**, use the actual pii_anon_benchmark dataset by installing:
 ```bash
 pip install pii-anon-datasets
 ```
@@ -114,4 +114,4 @@ pip install pii-anon-datasets
 python round3_eval.py
 ```
 
-The script will automatically load pii_anon_benchmark_v1 if the dataset package is installed.
+The script will automatically load pii_anon_benchmark if the dataset package is installed.

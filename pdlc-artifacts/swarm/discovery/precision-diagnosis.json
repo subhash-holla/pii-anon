@@ -1,0 +1,601 @@
+{
+  "n_records": 100,
+  "n_gold_labels": 690,
+  "regex": {
+    "tp": 651,
+    "fp": 114,
+    "fn": 39,
+    "precision": 0.851,
+    "recall": 0.9435,
+    "f1": 0.8948
+  },
+  "swarm": {
+    "tp": 659,
+    "fp": 495,
+    "fn": 31,
+    "precision": 0.5711,
+    "recall": 0.9551,
+    "f1": 0.7148
+  },
+  "per_entity_regex": {
+    "ADDRESS": {
+      "tp": 71,
+      "fp": 0,
+      "fn": 0
+    },
+    "BANK_ACCOUNT": {
+      "tp": 14,
+      "fp": 0,
+      "fn": 0
+    },
+    "CREDIT_CARD": {
+      "tp": 11,
+      "fp": 0,
+      "fn": 0
+    },
+    "DATE_OF_BIRTH": {
+      "tp": 17,
+      "fp": 14,
+      "fn": 0
+    },
+    "DRIVERS_LICENSE": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 0
+    },
+    "EMAIL_ADDRESS": {
+      "tp": 102,
+      "fp": 0,
+      "fn": 0
+    },
+    "EMPLOYEE_ID": {
+      "tp": 15,
+      "fp": 3,
+      "fn": 0
+    },
+    "IP_ADDRESS": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0
+    },
+    "LICENSE_PLATE": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 0
+    },
+    "LOCATION": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0
+    },
+    "MAC_ADDRESS": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "MEDICAL_RECORD_NUMBER": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0
+    },
+    "NATIONAL_ID": {
+      "tp": 2,
+      "fp": 1,
+      "fn": 0
+    },
+    "ORGANIZATION": {
+      "tp": 48,
+      "fp": 39,
+      "fn": 2
+    },
+    "PASSPORT": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "PERSON_NAME": {
+      "tp": 184,
+      "fp": 12,
+      "fn": 37
+    },
+    "PHONE_NUMBER": {
+      "tp": 80,
+      "fp": 42,
+      "fn": 0
+    },
+    "ROUTING_NUMBER": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0
+    },
+    "USERNAME": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0
+    },
+    "US_SSN": {
+      "tp": 65,
+      "fp": 2,
+      "fn": 0
+    }
+  },
+  "per_entity_swarm": {
+    "ADDRESS": {
+      "tp": 71,
+      "fp": 17,
+      "fn": 0
+    },
+    "BANK_ACCOUNT": {
+      "tp": 14,
+      "fp": 16,
+      "fn": 0
+    },
+    "CREDIT_CARD": {
+      "tp": 11,
+      "fp": 9,
+      "fn": 0
+    },
+    "DATE_OF_BIRTH": {
+      "tp": 17,
+      "fp": 20,
+      "fn": 0
+    },
+    "DRIVERS_LICENSE": {
+      "tp": 4,
+      "fp": 7,
+      "fn": 0
+    },
+    "EMAIL_ADDRESS": {
+      "tp": 102,
+      "fp": 112,
+      "fn": 0
+    },
+    "EMPLOYEE_ID": {
+      "tp": 15,
+      "fp": 0,
+      "fn": 0
+    },
+    "IP_ADDRESS": {
+      "tp": 5,
+      "fp": 11,
+      "fn": 0
+    },
+    "LICENSE_PLATE": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0
+    },
+    "LOCATION": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0
+    },
+    "MAC_ADDRESS": {
+      "tp": 8,
+      "fp": 1,
+      "fn": 0
+    },
+    "MEDICAL_RECORD_NUMBER": {
+      "tp": 7,
+      "fp": 1,
+      "fn": 0
+    },
+    "NATIONAL_ID": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0
+    },
+    "ORGANIZATION": {
+      "tp": 48,
+      "fp": 11,
+      "fn": 2
+    },
+    "PASSPORT": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 0
+    },
+    "PERSON_NAME": {
+      "tp": 192,
+      "fp": 115,
+      "fn": 29
+    },
+    "PHONE_NUMBER": {
+      "tp": 80,
+      "fp": 93,
+      "fn": 0
+    },
+    "ROUTING_NUMBER": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0
+    },
+    "USERNAME": {
+      "tp": 7,
+      "fp": 6,
+      "fn": 0
+    },
+    "US_SSN": {
+      "tp": 65,
+      "fp": 76,
+      "fn": 0
+    }
+  },
+  "engine_fp_attribution": {
+    "gliner-compatible": {
+      "EMAIL_ADDRESS": 102,
+      "PERSON_NAME": 102,
+      "US_SSN": 48,
+      "PHONE_NUMBER": 80,
+      "IP_ADDRESS": 11,
+      "CREDIT_CARD": 9,
+      "USERNAME": 6,
+      "DATE_OF_BIRTH": 20,
+      "ADDRESS": 17,
+      "BANK_ACCOUNT": 10,
+      "DRIVERS_LICENSE": 7
+    },
+    "presidio-compatible": {
+      "EMAIL_ADDRESS": 102,
+      "PERSON_NAME": 102,
+      "US_SSN": 68,
+      "PHONE_NUMBER": 78,
+      "BANK_ACCOUNT": 16,
+      "IP_ADDRESS": 5,
+      "ADDRESS": 17,
+      "DRIVERS_LICENSE": 7,
+      "MEDICAL_RECORD_NUMBER": 1,
+      "MAC_ADDRESS": 1
+    },
+    "scrubadub-compatible": {
+      "EMAIL_ADDRESS": 102,
+      "US_SSN": 64,
+      "PHONE_NUMBER": 44
+    },
+    "regex-oss": {
+      "PERSON_NAME": 13,
+      "ORGANIZATION": 11,
+      "PHONE_NUMBER": 6,
+      "US_SSN": 2
+    }
+  },
+  "fp_examples": [
+    {
+      "record_id": "CUR-026659",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 40,
+      "end": 65,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "ike Becker, E-Mail: heike.becker59@outlook.de, Telefon: +1 (459) "
+    },
+    {
+      "record_id": "CUR-026659",
+      "entity_type": "PERSON_NAME",
+      "start": 18,
+      "end": 30,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "Mitarbeiterdaten: Heike Becker, E-Mail: heike.beck"
+    },
+    {
+      "record_id": "CUR-026659",
+      "entity_type": "US_SSN",
+      "start": 122,
+      "end": 133,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "ersicherungsnummer: 659-29-9659. Adresse: 6959 Dogw"
+    },
+    {
+      "record_id": "CUR-026659",
+      "entity_type": "PHONE_NUMBER",
+      "start": 76,
+      "end": 93,
+      "engines": [
+        "gliner-compatible"
+      ],
+      "context": "utlook.de, Telefon: +1 (459) 413-5567. Sozialversicherung"
+    },
+    {
+      "record_id": "SYN-010165",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 133,
+      "end": 156,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "d, PA 20165. Email: rthompson@starklabs.com. Phone: +1 (765) 95"
+    },
+    {
+      "record_id": "SYN-010165",
+      "entity_type": "PERSON_NAME",
+      "start": 9,
+      "end": 24,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "Employee Rachel Thompson (ID: EMP-20165) at "
+    },
+    {
+      "record_id": "SYN-010165",
+      "entity_type": "US_SSN",
+      "start": 68,
+      "end": 79,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "rdyne Systems. SSN: 365-95-2165. Address: 365 Maple"
+    },
+    {
+      "record_id": "SYN-010165",
+      "entity_type": "PHONE_NUMBER",
+      "start": 165,
+      "end": 182,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "arklabs.com. Phone: +1 (765) 955-7145. Device id MAC: 6a:"
+    },
+    {
+      "record_id": "SYN-010165",
+      "entity_type": "IP_ADDRESS",
+      "start": 199,
+      "end": 216,
+      "engines": [
+        "gliner-compatible"
+      ],
+      "context": "145. Device id MAC: 6a:1f:89:f3:c7:31."
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 56,
+      "end": 83,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "holas Walker\nEmail: nicholas.walker10@gmail.com\nPhone: +1 (510) 770"
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 661,
+      "end": 688,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "ion will be sent to nicholas.walker10@gmail.com. Is there anything "
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "PERSON_NAME",
+      "start": 33,
+      "end": 48,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "t #58310\n\nCustomer: Nicholas Walker\nEmail: nicholas.wal"
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "PHONE_NUMBER",
+      "start": 91,
+      "end": 108,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "10@gmail.com\nPhone: +1 (510) 770-1030\nAccount: 10108030\n\n"
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "BANK_ACCOUNT",
+      "start": 118,
+      "end": 126,
+      "engines": [
+        "presidio-compatible"
+      ],
+      "context": ") 770-1030\nAccount: 10108030\n\n[Nicholas]: Hi, I "
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "US_SSN",
+      "start": 394,
+      "end": 398,
+      "engines": [
+        "gliner-compatible"
+      ],
+      "context": "sing the SSN ending 9310. Let me look into t"
+    },
+    {
+      "record_id": "SYN-008310",
+      "entity_type": "CREDIT_CARD",
+      "start": 441,
+      "end": 460,
+      "engines": [
+        "gliner-compatible"
+      ],
+      "context": "transaction on card 4000-0000-0030-7470.\n\n[Nicholas]: Thank"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 514,
+      "end": 541,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "349 and my email is janet.hall73@protonmail.com.\n\nThe witness, Jame"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 614,
+      "end": 639,
+      "engines": [
+        "scrubadub-compatible"
+      ],
+      "context": "unt. Witness can be reached at james.phillips@protonmail.com."
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 625,
+      "end": 654,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "s can be reached at james.phillips@protonmail.com."
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "PERSON_NAME",
+      "start": 50,
+      "end": 60,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "o. 32873\n\nDeponent: Janet Hall, residing at 2973 H"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "PERSON_NAME",
+      "start": 234,
+      "end": 244,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "cord.\nA: My name is Janet Hall. Some colleagues ca"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "US_SSN",
+      "start": 401,
+      "end": 412,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "security number?\nA: 273-93-3873.\n\nQ: Can you confir"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "PHONE_NUMBER",
+      "start": 483,
+      "end": 497,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "Yes, my phone is +1 (673) 311-2349 and my email is jan"
+    },
+    {
+      "record_id": "SYN-002873",
+      "entity_type": "USERNAME",
+      "start": 300,
+      "end": 312,
+      "engines": [
+        "gliner-compatible"
+      ],
+      "context": " my email handle is janet.hall73.\n\nQ: What is your d"
+    },
+    {
+      "record_id": "SYN-026328",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 44,
+      "end": 72,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "ng Mueller, E-Mail: wolfgang.mueller28@gmail.com, Telefon: +1 (928) "
+    },
+    {
+      "record_id": "SYN-026328",
+      "entity_type": "PERSON_NAME",
+      "start": 18,
+      "end": 34,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "Mitarbeiterdaten: Wolfgang Mueller, E-Mail: wolfgang.m"
+    },
+    {
+      "record_id": "SYN-026328",
+      "entity_type": "US_SSN",
+      "start": 129,
+      "end": 140,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "ersicherungsnummer: 328-58-9328. Adresse: 6628 Spru"
+    },
+    {
+      "record_id": "SYN-026328",
+      "entity_type": "PHONE_NUMBER",
+      "start": 83,
+      "end": 100,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "gmail.com, Telefon: +1 (928) 496-1264. Sozialversicherung"
+    },
+    {
+      "record_id": "CUR-014517",
+      "entity_type": "EMAIL_ADDRESS",
+      "start": 346,
+      "end": 370,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible",
+        "scrubadub-compatible"
+      ],
+      "context": "t meeting. Contact: lisa.ramirez17@yahoo.com, +1 (317) 219-9721."
+    },
+    {
+      "record_id": "CUR-014517",
+      "entity_type": "PERSON_NAME",
+      "start": 0,
+      "end": 12,
+      "engines": [
+        "gliner-compatible",
+        "presidio-compatible"
+      ],
+      "context": "Lisa Ramirez submitted the quart"
+    }
+  ]
+}

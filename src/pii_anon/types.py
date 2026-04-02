@@ -34,6 +34,8 @@ FusionMode = (
         "weighted_consensus",
         "calibrated_majority",
         "intersection_consensus",
+        "mixture_of_experts",
+        "swarm",
     ]
     | str
 )

@@ -37,7 +37,7 @@ def test_fill_template_creates_valid_label_offsets() -> None:
 
 
 def test_write_dataset_writes_jsonl_records(tmp_path) -> None:
-    out = tmp_path / "eval_framework_v1.jsonl"
+    out = tmp_path / "pii_anon_eval.jsonl"
     count = dataset_generator.write_dataset(out, seed=7, target_records=140)
     assert count > 0
     assert out.exists()

@@ -106,7 +106,7 @@ def main():
     print("COMPREHENSIVE PER-SEGMENT EVALUATION: pii-anon & pii-anon-swarm")
     print("=" * 90)
 
-    records = load_benchmark_dataset("pii_anon_benchmark_v1")
+    records = load_benchmark_dataset("pii_anon_benchmark")
     print(f"\nDataset: {len(records)} records")
 
     # Build detectors

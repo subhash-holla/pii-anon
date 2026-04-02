@@ -170,7 +170,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run publish-grade benchmark suite (build/install/preflight/benchmark/continuity/docs-sync)"
     )
-    parser.add_argument("--dataset", default="pii_anon_benchmark_v1")
+    parser.add_argument("--dataset", default="pii_anon_benchmark")
     # Multi-dataset: overrides --dataset when provided (legacy, rarely needed).
     parser.add_argument(
         "--datasets",
@@ -179,12 +179,12 @@ def main() -> None:
         help=(
             "Evaluate against multiple datasets. "
             "Overrides --dataset when provided. "
-            "Example: --datasets pii_anon_benchmark_v1"
+            "Example: --datasets pii_anon_benchmark"
         ),
     )
     parser.add_argument(
         "--matrix",
-        default="src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json",
+        default="src/pii_anon/benchmarks/matrix/use_case_matrix.json",
     )
     parser.add_argument("--warmup-samples", type=int, default=100)
     parser.add_argument("--measured-runs", type=int, default=3)

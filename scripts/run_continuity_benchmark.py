@@ -97,7 +97,7 @@ def _evaluate_tracking_dataset(
 ) -> dict[str, Any]:
     if progress_hook:
         progress_hook("phase: tracking dataset load start")
-    all_records = load_benchmark_dataset("pii_anon_benchmark_v1")
+    all_records = load_benchmark_dataset("pii_anon_benchmark")
     records = [r for r in all_records if r.scenario_id.startswith("continuity_")]
     if progress_hook:
         progress_hook(f"phase: tracking dataset load complete (records={len(records)})")

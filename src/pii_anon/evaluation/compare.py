@@ -77,7 +77,7 @@ class StrategyEvaluator:
         self,
         strategies: list[str],
         *,
-        dataset: str = "pii_anon_benchmark_v1",
+        dataset: str = "pii_anon_benchmark",
         max_workers: int | None = None,
     ) -> StrategyEvaluationReport:
         records = load_benchmark_dataset(dataset)

@@ -544,7 +544,7 @@ def _auto_cleanup_old_artifacts(*output_paths: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run competitor benchmark and write report artifacts")
-    parser.add_argument("--dataset", default="pii_anon_benchmark_v1")
+    parser.add_argument("--dataset", default="pii_anon_benchmark")
     parser.add_argument("--warmup-samples", type=int, default=100)
     parser.add_argument("--measured-runs", type=int, default=3)
     parser.add_argument("--max-samples", type=int, default=0)
@@ -776,7 +776,7 @@ def main() -> None:
     required_profiles_passed = all(
         profile.floor_pass for profile in report.profiles if profile.profile in required_profiles
     ) if required_profiles else False
-    default_matrix_path = (Path("src") / "pii_anon" / "benchmarks" / "matrix" / "use_case_matrix.v1.json").resolve()
+    default_matrix_path = (Path("src") / "pii_anon" / "benchmarks" / "matrix" / "use_case_matrix.json").resolve()
     canonical_claim_run = bool(
         matrix_path is not None
         and matrix_path.resolve() == default_matrix_path

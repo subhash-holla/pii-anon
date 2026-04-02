@@ -2994,7 +2994,7 @@ def _load_checkpoint(
 
 def compare_competitors(
     *,
-    dataset: str = "pii_anon_benchmark_v1",
+    dataset: str = "pii_anon_benchmark",
     dataset_source: DatasetSource = "auto",
     warmup_samples: int = 100,
     measured_runs: int = 3,
@@ -3142,7 +3142,7 @@ def compare_competitors(
     # system-level parallelism (tiers + competitors in one pool) is
     # used when ``enable_parallel=True``, which already saturates CPU
     # cores.  Profile-level parallelism was removed because spawning
-    # multiple heavy worker processes (each loading 50K records + NLP
+    # multiple heavy worker processes (each loading 151K+ records + NLP
     # models via the ``spawn`` context) exceeded Docker cgroup memory
     # limits, causing ``BrokenProcessPool`` crashes.
     #
@@ -3281,7 +3281,7 @@ def compare_competitors(
 def merge_profile_checkpoints(
     *,
     checkpoint_dir: str,
-    dataset: str = "pii_anon_benchmark_v1",
+    dataset: str = "pii_anon_benchmark",
     dataset_source: DatasetSource = "auto",
     warmup_samples: int = 100,
     measured_runs: int = 3,

@@ -45,7 +45,7 @@ def test_cli_tokenize_benchmark_and_evaluate_commands(runner, monkeypatch: pytes
     assert tok.exit_code == 0
     assert '"token"' in tok.stdout
 
-    bench = runner.invoke(app, ["benchmark", "--dataset", "pii_anon_benchmark_v1", "--max-samples", "5", "--output", "json"])
+    bench = runner.invoke(app, ["benchmark", "--dataset", "pii_anon_benchmark", "--max-samples", "5", "--output", "json"])
     assert bench.exit_code == 0
     assert '"docs_per_hour"' in bench.stdout
 
@@ -73,7 +73,7 @@ def test_cli_tokenize_benchmark_and_evaluate_commands(runner, monkeypatch: pytes
         cli,
         "evaluate_pipeline",
         lambda *args, **kwargs: PipelineEvaluationReport(
-            dataset="pii_anon_benchmark_v1",
+            dataset="pii_anon_benchmark",
             samples=5,
             transform_mode="pseudonymize",
             precision=1.0,
@@ -87,7 +87,7 @@ def test_cli_tokenize_benchmark_and_evaluate_commands(runner, monkeypatch: pytes
     )
     pipe = runner.invoke(app, ["evaluate-pipeline", "--max-samples", "5", "--output", "json"])
     assert pipe.exit_code == 0
-    assert '"dataset": "pii_anon_benchmark_v1"' in pipe.stdout
+    assert '"dataset": "pii_anon_benchmark"' in pipe.stdout
 
     class FakeBatch:
         records_evaluated = 10

@@ -85,7 +85,7 @@
     }
   },
   "eval_framework": {
-    "dataset": "eval_framework_v1",
+    "dataset": "pii_anon_eval",
     "records_evaluated": 500,
     "micro_f1": 1.0,
     "micro_precision": 1.0,

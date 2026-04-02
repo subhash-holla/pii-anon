@@ -23,14 +23,14 @@ pii-anon detect "User Jack Davis email jackdavis@example.com" --transform-mode a
 ```bash
 pii-anon evaluate \
   --strategies weighted_consensus,union_high_recall,intersection_consensus \
-  --dataset pii_anon_benchmark_v1 \
+  --dataset pii_anon_benchmark \
   --output json
 ```
 
 4. Compare against competitor baselines:
 
 ```bash
-pii-anon compare-competitors --dataset pii_anon_benchmark_v1 --output json
+pii-anon compare-competitors --dataset pii_anon_benchmark --output json
 ```
 
 5. Run continuity gate on long-context dataset:

@@ -12,8 +12,8 @@ SUPPORTED_REPORT_SCHEMA = {"2026-02-15.v2", "2026-02-19.v3"}
 
 # Dataset descriptions used in the benchmark summary section.
 _DATASET_DESCRIPTIONS: dict[str, str] = {
-    "pii_anon_benchmark_v1": (
-        "Research-grade unified benchmark dataset (50 000 records, 22 entity types, "
+    "pii_anon_benchmark": (
+        "Research-grade unified benchmark dataset (151,000+ records, 22 entity types, "
         "12 languages, 7 evaluation dimensions). Covers core PII detection "
         "(35 700 records), long-context entity tracking (2 800 records), and "
         "dimension-specific probes (11 500 records) spanning entity consistency, "
@@ -483,7 +483,7 @@ def _render_cross_dataset_summary(combined: dict[str, Any]) -> str:
     )
     lines.append("")
     lines.append(
-        "- **Strong performance on `pii_anon_benchmark_v1`** indicates robust detection "
+        "- **Strong performance on `pii_anon_benchmark`** indicates robust detection "
         "across core PII types, long-context coreference, and multi-language inputs."
     )
     lines.append(

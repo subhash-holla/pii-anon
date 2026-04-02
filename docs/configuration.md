@@ -48,7 +48,7 @@ auto_discover_engines: true              # Auto-discover entry-point plugins
 # ─── Engine Configuration ───────────────────────────────────
 # Each engine can be enabled/disabled and weighted independently.
 # pii-anon (speed offering) uses only regex-oss.
-# pii-anon-swarm uses all enabled engines fused through MoE.
+# pii-anon-swarm uses the four-layer swarm pipeline.
 engines:
   regex-oss:
     enabled: true
@@ -84,6 +84,20 @@ moe:
   performance_floor: true                # Guarantee: ensemble >= best expert
   min_expert_weight: 0.15               # Floor weight for non-routed experts
   iou_threshold: 0.5                    # Span overlap threshold for clustering
+
+# ─── Swarm (Four-Layer Pipeline) ───────────────────────
+# Activated via ProcessingProfileSpec(mode="swarm")
+swarm:
+  fast_pass_threshold: 0.90              # Regex confidence above this bypasses NER
+  iou_threshold: 0.3                     # Span overlap threshold for clustering
+  corroboration_min: 2                   # Min engines for semantic types (PERSON, ORG)
+  corroboration_override_threshold: 0.85 # Meta-learner score that overrides corroboration
+  similarity_threshold: 0.85             # Jaccard threshold for engine pruning
+  max_engines: 4                         # Maximum NER engines activated
+  emission_threshold: 0.50               # Minimum meta-score to emit a finding
+  meta_learner_path: null                # Path to trained XGBoost model (.ubj)
+  ds_params_path: null                   # Path to Dawid-Skene params (.json)
+  calibration_path: null                 # Path to temperature calibration (.json)
 
 # ─── Confidence Scoring (Regex Engine) ──────────────────────
 confidence:

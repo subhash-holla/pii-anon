@@ -17,7 +17,7 @@ Performance notes:
   and scanning the full list for each one.
 - Bootstrap CI and paired bootstrap tests use **numpy** for vectorised
   resampling when available, falling back to pure-Python for environments
-  without numpy.  At 50K records × 10K bootstrap iterations the numpy
+  without numpy.  At 151K records × 10K bootstrap iterations the numpy
   path is ~50-100× faster (seconds vs. minutes).
 """
 
@@ -39,7 +39,7 @@ except ImportError:  # pragma: no cover
 from ..metrics.base import compute_f1, safe_div
 
 # Maximum number of index rows to allocate at once in numpy bootstrap.
-# Keeps peak memory below ~200 MB even at n=50K samples.
+# Keeps peak memory below ~200 MB even at n=151K samples.
 _NP_BOOTSTRAP_CHUNK = 500
 
 

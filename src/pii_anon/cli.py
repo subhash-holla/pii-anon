@@ -241,7 +241,7 @@ def create_app() -> Any:
             "weighted_consensus,union_high_recall,intersection_consensus",
             help="Comma-separated fusion strategies",
         ),
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         token_key: str = typer.Option("dev-key", help="Tokenization key"),
         config: str | None = typer.Option(None, help="Path to JSON/YAML config file"),
         output: str = typer.Option("json", help="Output format: json|text"),
@@ -265,7 +265,7 @@ def create_app() -> Any:
 
     @app.command("evaluate-pipeline")
     def evaluate_pipeline_command(
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         mode: str = typer.Option("weighted_consensus", help="Fusion mode"),
         transform_mode: str = typer.Option("pseudonymize", help="Transform mode: anonymize|pseudonymize"),
         language: str | None = typer.Option(None, help="Optional language filter"),
@@ -292,7 +292,7 @@ def create_app() -> Any:
 
     @app.command("eval-framework")
     def eval_framework_command(
-        dataset: str = typer.Option("eval_framework_v1", help="Evaluation framework dataset identifier"),
+        dataset: str = typer.Option("pii_anon_eval", help="Evaluation framework dataset identifier"),
         language: str | None = typer.Option(None, help="Optional language filter"),
         difficulty: str | None = typer.Option(None, help="Optional difficulty filter"),
         adversarial_only: bool = typer.Option(False, help="Evaluate adversarial records only"),
@@ -330,7 +330,7 @@ def create_app() -> Any:
     @app.command("benchmark")
     def benchmark(
         mode: str = typer.Option("weighted_consensus", help="Fusion mode"),
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         max_samples: int = typer.Option(0, help="Optional sample cap for faster dry-runs (0 means full dataset)"),
         token_key: str = typer.Option("dev-key", help="Tokenization key"),
         config: str | None = typer.Option(None, help="Path to JSON/YAML config file"),
@@ -350,7 +350,7 @@ def create_app() -> Any:
 
     @app.command("compare-competitors")
     def compare_competitors_command(
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         warmup_samples: int = typer.Option(100, help="Warm-up samples per system"),
         measured_runs: int = typer.Option(3, help="Measured runs per system"),
         max_samples: int = typer.Option(0, help="Optional sample cap for faster dry-runs (0 means full dataset)"),
@@ -464,9 +464,9 @@ def create_app() -> Any:
 
     @app.command("benchmark-publish-suite")
     def benchmark_publish_suite(
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         matrix: str = typer.Option(
-            "src/pii_anon/benchmarks/matrix/use_case_matrix.v1.json",
+            "src/pii_anon/benchmarks/matrix/use_case_matrix.json",
             help="Use-case matrix path for canonical run",
         ),
         warmup_samples: int = typer.Option(100, help="Warm-up samples per system"),
@@ -568,7 +568,7 @@ def create_app() -> Any:
 
     @app.command("calibrate-offline")
     def calibrate_offline(
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         max_samples: int = typer.Option(0, help="Optional sample cap (0 means full dataset)"),
         min_entity_samples: int = typer.Option(5, help="Minimum samples per entity type for calibration"),
         store_path: str | None = typer.Option(None, help="Custom calibration store path"),
@@ -610,7 +610,7 @@ def create_app() -> Any:
 
     @app.command("verify-dominance")
     def verify_dominance(
-        dataset: str = typer.Option("pii_anon_benchmark_v1", help="Benchmark dataset identifier"),
+        dataset: str = typer.Option("pii_anon_benchmark", help="Benchmark dataset identifier"),
         max_samples: int = typer.Option(0, help="Optional sample cap (0 means full dataset)"),
         token_key: str = typer.Option("dev-key", help="Tokenization key"),
         config: str | None = typer.Option(None, help="Path to JSON/YAML config file"),

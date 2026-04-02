@@ -12,7 +12,7 @@ benchmark dataset using:
 Usage::
 
     python scripts/run_composite_evaluation.py
-    python scripts/run_composite_evaluation.py --dataset eval_framework_v1 --max-samples 50000
+    python scripts/run_composite_evaluation.py --dataset pii_anon_eval --max-samples 50000
     python scripts/run_composite_evaluation.py --output-dir results/composite
 """
 
@@ -95,7 +95,7 @@ def _build_scorecards(
     """Assemble SystemScorecard objects and pack into BenchmarkScorecard."""
     benchmark = BenchmarkScorecard(
         benchmark_name="pii-anon composite evaluation",
-        dataset_name="eval_framework_v1",
+        dataset_name="pii_anon_eval",
     )
     for sys_result in systems:
         cs = composite_scores.get(sys_result.system)
@@ -121,7 +121,7 @@ def _build_scorecards(
 
 def run_evaluation(
     *,
-    dataset: str = "eval_framework_v1",
+    dataset: str = "pii_anon_eval",
     max_samples: int | None = None,
     warmup_samples: int = 50,
     measured_runs: int = 1,
@@ -294,8 +294,8 @@ def main() -> None:
         description="Run composite metric evaluation for pii-anon"
     )
     parser.add_argument(
-        "--dataset", default="eval_framework_v1",
-        help="Benchmark dataset name (default: eval_framework_v1)",
+        "--dataset", default="pii_anon_eval",
+        help="Benchmark dataset name (default: pii_anon_eval)",
     )
     parser.add_argument(
         "--max-samples", type=int, default=None,
