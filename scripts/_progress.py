@@ -85,7 +85,7 @@ class ProgressTracker:
         self._phase_start = self._t_start
         self._render(force=True)
 
-        if self._heartbeat_enabled and not self._is_tty:
+        if self._heartbeat_enabled:
             def _beat() -> None:
                 while not self._stop_event.wait(timeout=self._refresh_s):
                     self._render(force=True)
@@ -223,6 +223,7 @@ class ProgressTracker:
             total_s = f"{self._total:,}" if self._total else "?"
             line = (
                 f"\r  {bar} {pct:6.2f}% | {int(self._completed):,}/{total_s} | "
+                f"{_format_elapsed(elapsed)} elapsed | "
                 f"{self._rate_ema:.0f} u/s | ETA {_format_elapsed(eta_s)} | "
                 f"{self._phase}"
             )

@@ -148,6 +148,93 @@ retrain procedure. The `manifest.json` records the set of engines the
 artifacts were trained against — the loader rejects an artifact whose
 engine set has drifted from the current registry.
 
+### Industry-leading engines you can plug in
+
+The `pii-anon` swarm already bundles `regex-oss`, Presidio, GLiNER,
+Stanza, spaCy, and LLM Guard out of the box. The pii-rate-elo paper
+evaluation pipeline exercises three additional modern PII detectors
+that are trivially pluggable via the same `EngineAdapter` interface.
+All three are MIT/Apache licensed, but each comes with a different
+dependency / license footprint — register them only when you want
+the swarm to include them in Dawid-Skene + meta-learner fusion:
+
+| Engine | Paper / model | Strengths | Dependency notes |
+|---|---|---|---|
+| **Piiranha** | `iiiorg/piiranha-v1-detect-personal-information` — DeBERTa-v3-base 2024 | High single-model F1 (~0.97 in-distribution) across 17 entity types, 6 languages | Requires `transformers` + ~440 MB model weights; CUDA optional |
+| **Flair NER** | `flair/ner-english-large` — transformer-based SequenceTagger | Strong English NER (PER / LOC / ORG) with span offsets; robust on long documents | Requires `flair` + PyTorch; CUDA optional |
+| **Gretel GLiNER-bi** | `gretelai/gretel-gliner-bi-base-v1.0` — multilingual GLiNER | Zero-shot across 9+ languages; good for domain-specific label sets | Requires `gliner` + `transformers`; already installed if you have the base `[engines]` extra |
+
+To wire one up, subclass `EngineAdapter` and register it via any of
+the three paths in the previous section. A minimal Piiranha adapter:
+
+```python
+from pii_anon.engines.base import EngineAdapter
+from pii_anon.types import EngineFinding, Payload
+
+_PIIRANHA_TO_CANONICAL = {
+    "I-GIVENNAME": "PERSON_NAME", "I-SURNAME": "PERSON_NAME",
+    "I-EMAIL": "EMAIL_ADDRESS", "I-TELEPHONENUM": "PHONE_NUMBER",
+    "I-SOCIALNUM": "US_SSN", "I-CREDITCARDNUMBER": "CREDIT_CARD",
+    "I-DATEOFBIRTH": "DATE_OF_BIRTH", "I-STREET": "ADDRESS",
+    # ... map the remaining BIO labels to your taxonomy
+}
+
+class PiiranhaAdapter(EngineAdapter):
+    adapter_id = "piiranha"
+    native_dependency = "transformers"
+    supported_entity_types = set(_PIIRANHA_TO_CANONICAL.values())
+
+    def initialize(self, config):
+        from transformers import pipeline
+        self._ner = pipeline(
+            "token-classification",
+            model="iiiorg/piiranha-v1-detect-personal-information",
+            aggregation_strategy="simple",
+        )
+
+    def detect(self, payload: Payload, context: dict) -> list[EngineFinding]:
+        text = payload.get("text", "")
+        findings = []
+        for ent in self._ner(text):
+            canonical = _PIIRANHA_TO_CANONICAL.get(ent["entity_group"])
+            if not canonical:
+                continue
+            findings.append(EngineFinding(
+                entity_type=canonical,
+                confidence=float(ent["score"]),
+                span_start=int(ent["start"]),
+                span_end=int(ent["end"]),
+                engine_id=self.adapter_id,
+                language=context.get("language", "en"),
+            ))
+        return findings
+```
+
+Pin the engine past the Layer 2 pruner and retrain the swarm with it
+in the pool:
+
+```python
+from pii_anon import PIIOrchestrator
+from pii_anon.swarm import SwarmConfig
+
+orch = PIIOrchestrator(
+    token_key="...",
+    swarm_config=SwarmConfig(force_include_engines=("piiranha",)),
+)
+orch.register_engine(PiiranhaAdapter(enabled=True))
+```
+
+```bash
+make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy_400k,tab,meddocan \
+                 SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+```
+
+After retraining, Dawid-Skene knows Piiranha's confusion matrix,
+temperature scaling calibrates its logits, and the XGBoost meta-learner
+gives it weight based on its demonstrated F1 on your training mix.
+See [pii-rate-elo.md](pii-rate-elo.md) for the full algorithm and
+[swarm-architecture.md](swarm-architecture.md) for the retrain cadence.
+
 ---
 
 ## Workflow 2 — Train the swarm on your own data

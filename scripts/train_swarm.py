@@ -19,12 +19,19 @@ import argparse
 import json
 import logging
 import math
+import os
 import random
 import sys
 import time
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+# Quiet HF tokenizer chatter that otherwise breaks the in-place progress bar.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+warnings.filterwarnings("ignore", message="Asking to truncate to max_length.*")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -108,6 +115,39 @@ def _process_single_record(
     return record_votes, record_confs
 
 
+_WORKER_ENGINES: list[Any] | None = None
+
+
+def _get_worker_engines() -> list[Any]:
+    """Lazily init engines once per worker process and cache them.
+
+    Without this, every batch rebuilds the orchestrator and reloads all
+    NER models (~15-30s wasted per batch, scaled by worker count).
+    """
+    global _WORKER_ENGINES
+    if _WORKER_ENGINES is None:
+        # Re-apply the same quieting inside the worker process — env vars
+        # are inherited but warnings filters and logging levels are not.
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+        warnings.filterwarnings("ignore", message="Asking to truncate to max_length.*")
+        for _noisy in (
+            "presidio_analyzer", "presidio_anonymizer", "presidio-analyzer",
+            "presidio_analyzer.nlp_engine", "presidio_analyzer.analyzer_engine",
+            "presidio_analyzer.recognizer_registry",
+            "stanza", "gliner", "transformers", "sentence_transformers", "pii_anon",
+        ):
+            logging.getLogger(_noisy).setLevel(logging.ERROR)
+        from pii_anon import PIIOrchestrator
+        orch = PIIOrchestrator(token_key="swarm-worker")
+        all_engines = orch._async.registry.list_engines(include_disabled=True)
+        for engine in all_engines:
+            if engine.dependency_available() and not engine.enabled:
+                engine.enabled = True
+        _WORKER_ENGINES = [e for e in all_engines if e.enabled]
+    return _WORKER_ENGINES
+
+
 def _process_batch(
     batch: list[tuple[str, str]], engine_ids_to_use: list[str],
 ) -> list[tuple[dict[str, str], dict[str, list[float]]]]:
@@ -116,13 +156,7 @@ def _process_batch(
     Runs in a worker process with its own engine instances.
     Uses only JSON-serializable types for safe cross-process transfer.
     """
-    from pii_anon import PIIOrchestrator
-    orch = PIIOrchestrator(token_key="swarm-worker")
-    all_engines = orch._async.registry.list_engines(include_disabled=True)
-    for engine in all_engines:
-        if engine.dependency_available() and not engine.enabled:
-            engine.enabled = True
-    engines = [e for e in all_engines if e.enabled]
+    engines = _get_worker_engines()
 
     results = []
     for text, language in batch:
@@ -182,10 +216,14 @@ def _run_engines_on_records(
         return annotations, engine_confidences
 
     # Parallel path: split into batches for worker processes.
-    logger.debug("  Using %d worker processes (batch parallelism)", max_workers)
+    # Small batches so workers return frequently; otherwise the bar is
+    # silent for many minutes at a time.  With a 7-engine swarm (incl.
+    # GLiNER at ~200-500ms/rec), 100 records/batch returns every ~30-60s
+    # after warmup — the right granularity for a 60s-refresh bar.  IPC
+    # overhead with more batches is negligible (<10KB per round-trip).
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
-    batch_size = max(50, len(records) // (max_workers * 4))
+    batch_size = min(100, max(25, len(records) // (max_workers * 20)))
     batches: list[list[tuple[str, str]]] = []
     current_batch: list[tuple[str, str]] = []
     for rec in records:
@@ -196,11 +234,22 @@ def _run_engines_on_records(
     if current_batch:
         batches.append(current_batch)
 
+    logger.debug(
+        "  Process-pool: %d records in %d batches of ~%d (workers=%d)",
+        len(records), len(batches), batch_size, max_workers,
+    )
+    progress.set_message(
+        f"{phase_name} (spawning {max_workers} workers, "
+        f"each loads NER models ~15-30s)"
+    )
+
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         future_to_batch = {
             executor.submit(_process_batch, batch, engine_ids): i
             for i, batch in enumerate(batches)
         }
+        batches_done = 0
+        n_batches = len(batches)
         for future in as_completed(future_to_batch):
             batch_results = future.result()
             for votes, confs in batch_results:
@@ -209,6 +258,10 @@ def _run_engines_on_records(
                 for eid, cs in confs.items():
                     engine_confidences[eid].extend(cs)
                 progress.advance()
+            batches_done += 1
+            progress.set_message(
+                f"{phase_name} ({batches_done}/{n_batches} batches)"
+            )
 
     return annotations, engine_confidences
 
@@ -329,14 +382,18 @@ def main() -> None:
         t_load = time.time()
         from pii_anon.swarm_datasets import load_training_data
         dataset_names = [d.strip() for d in args.datasets.split(",")]
+        cap_str = f"up to {max_records:,}/ds" if max_records else "unlimited"
+        logger.info("Loading datasets %s (%s)...", dataset_names, cap_str)
         records = load_training_data(datasets=dataset_names, max_records_per_dataset=max_records)
         if not records:
             logger.error("No training data loaded. Install pii-anon-datasets or check dataset names.")
             sys.exit(1)
         load_elapsed = time.time() - t_load
+        logger.info("Loaded %d records in %s", len(records), format_elapsed(load_elapsed))
 
         # ── Initialize engines ────────────────────────────────────────────
         t_init = time.time()
+        logger.info("Initializing orchestrator (loading NER models, ~10-30s)...")
         from pii_anon import PIIOrchestrator
         orch = PIIOrchestrator(token_key="swarm-training")
         all_engines = orch._async.registry.list_engines(include_disabled=True)
@@ -346,6 +403,8 @@ def main() -> None:
         engines = [e for e in all_engines if e.enabled]
         engine_ids = [e.adapter_id for e in engines]
         init_elapsed = time.time() - t_init
+        logger.info("Initialized %d engines in %s: %s",
+                    len(engines), format_elapsed(init_elapsed), engine_ids)
 
         # ── Compute weighted total_work for 0.01% overall accuracy ────────
         # records_work: every record pass through engines (fold train + eval + final retrain)
@@ -364,10 +423,15 @@ def main() -> None:
         total_work = load_work + records_work + finalize_work
 
         # Pre-credit the load phase (it completed before the bar was built).
+        # heartbeat=True → bar refreshes on an interval even if no advance()
+        # fires (e.g. during worker model-load warmup). Short interval so
+        # the "elapsed" counter visibly ticks forward.
         progress = ProgressTracker(
             total_work, label="Swarm Training",
-            refresh_s=60.0, initial_completed=load_work,
+            refresh_s=15.0, initial_completed=load_work,
+            heartbeat=True,
         )
+        progress.start()
         progress.phase_log.append(
             f"[{load_work / total_work * 100:6.2f}%] Loaded {len(records):,} records "
             f"from {dataset_names} ({format_elapsed(load_elapsed)})"

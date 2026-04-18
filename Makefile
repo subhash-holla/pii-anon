@@ -217,14 +217,32 @@ endif
 # Train the swarm offering and deploy artifacts.
 # Output: ~/.pii_anon/swarm/ (ds_params.json, temperature.json, etc.)
 #
+# Available training datasets — all opt-in via SWARM_DATASETS (comma-separated):
+#
+#   pii_anon_eval     canonical synthetic corpus (v1.3.0: ~160K records,
+#                     60 langs, Tier 3 behavioral signals)
+#   ai4privacy        AI4Privacy PII-Masking-200k (8 langs, 229 PII classes)
+#   ai4privacy_400k   AI4Privacy PII-Masking-400k (17 langs, 54 classes —
+#                     newer superset, needs HF datasets)
+#   conll2003         CoNLL-2003 English NER baseline
+#   tab               Text Anonymization Benchmark (Pilan 2022, 1.2K
+#                     European Court documents, peer-reviewed)
+#   meddocan          MEDDOCAN (Marimon 2019) — Spanish clinical PHI,
+#                     33K annotations, adds non-English clinical coverage
+#
+# Opt-in datasets (ai4privacy_400k, tab, meddocan) mirror the dataset mix
+# used by the pii-rate-elo paper-submission evaluation so training data
+# stays aligned with the evaluation reference.
+#
 # Usage:
 #   make train-swarm                              # 10K records, 5-fold CV
 #   make train-swarm SWARM_MAX_RECORDS=0           # ALL records (unlimited)
 #   make train-swarm SWARM_KFOLD=3                 # 3-fold CV (faster)
 #   make train-swarm SWARM_KFOLD=10                # 10-fold CV (more robust)
 #   make train-swarm SWARM_KFOLD=1                 # No CV (fastest, single holdout)
-#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy,conll2003  # multiple datasets
-#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy_400k,conll2003
+#   make train-swarm SWARM_DATASETS=pii_anon_eval,ai4privacy_400k,tab,meddocan \
+#                    SWARM_MAX_RECORDS=0 SWARM_KFOLD=5    # paper-aligned mix
 train-swarm:
 	$(PYTHON) scripts/train_swarm.py --datasets $(SWARM_DATASETS) --max-records $(SWARM_MAX_RECORDS) --kfold $(SWARM_KFOLD) --workers $(SWARM_WORKERS)
 

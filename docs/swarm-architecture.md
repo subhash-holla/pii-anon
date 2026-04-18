@@ -82,12 +82,48 @@ agreement clamps false positives without hurting common-case recall.
 
 ## Training data flow
 
+### Available datasets
+
+Every entry is opt-in via `SWARM_DATASETS` (comma-separated list on the
+Make / CLI). The first three ship out-of-the-box; the remaining three
+mirror the mix used by the pii-rate-elo paper-submission evaluation, so
+training data stays aligned with the evaluation reference — they require
+`pip install 'pii-anon[swarm-train]'` for the HuggingFace `datasets`
+dependency but are otherwise zero-config.
+
+| Dataset | Source | Records | Languages | Best for |
+|---|---|---:|---:|---|
+| `pii_anon_eval` | Our canonical benchmark (v1.3.0) | ~160K | 60 | General coverage + Tier 3 behavioral-signal annotations |
+| `ai4privacy` | AI4Privacy PII-Masking-200k | 200K | 8 | Industry-standard PII labels |
+| `conll2003` | CoNLL-2003 English NER | 22K | 1 | NER baseline (PER / LOC / ORG) |
+| `ai4privacy_400k` | AI4Privacy PII-Masking-400k (2024) | 400K | 17 | Broadest language coverage + newer entity types (passport, VIN, crypto wallets) |
+| `tab` | Text Anonymization Benchmark (Pilan 2022) | 1,268 | en | Real-world legal text, peer-reviewed manual annotations |
+| `meddocan` | MEDDOCAN (Marimon 2019) | 1,000 | es | Spanish clinical PHI — adds non-English clinical coverage |
+
+The recommended paper-aligned mix for a production retrain:
+
+```bash
+make train-swarm \
+    SWARM_DATASETS=pii_anon_eval,ai4privacy_400k,tab,meddocan \
+    SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+```
+
+This spans 60+ languages, 100K+ annotations per major entity type,
+synthetic + peer-reviewed + real-world-legal + clinical-Spanish — the
+same training distribution the pii-rate-elo research paper uses for its
+reference evaluation.
+
+### Pipeline
+
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │  swarm_datasets.load_training_data(datasets, max_records)          │
 │    ├ load_pii_anon_data()         — v1.3.0 canonical (~160K recs)  │
-│    ├ load_ai4privacy()            — industry labels                │
-│    └ load_conll2003()             — NER baseline                   │
+│    ├ load_ai4privacy()            — AI4Privacy 200k                │
+│    ├ load_ai4privacy_400k()       — AI4Privacy 400k (2024, 17 lg) │
+│    ├ load_tab()                   — Text Anonymization Benchmark   │
+│    ├ load_meddocan()              — Spanish clinical PHI           │
+│    └ load_conll2003()             — CoNLL-2003 NER                 │
 │                         │                                          │
 │                         ▼                                          │
 │  list[TrainingRecord]  (Tier 3 fields: behavioral_signal_density,  │

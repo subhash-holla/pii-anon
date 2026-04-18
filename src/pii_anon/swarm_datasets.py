@@ -6,6 +6,7 @@ mapping their entity type labels to the pii-anon canonical taxonomy.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,18 +119,143 @@ TAXONOMY_MAP: dict[str, dict[str, str]] = {
         "MISC": "_IGNORE",
     },
     "tab": {
+        # Text Anonymization Benchmark (Pilan et al. 2022, arXiv:2202.00443) —
+        # curated European Court of Human Rights documents.  Mapping
+        # mirrors the pii-rate-elo paper pipeline's converter so training
+        # pools stay aligned with the evaluation reference.
         "PERSON": "PERSON_NAME",
+        "PER": "PERSON_NAME",
+        "NAME": "PERSON_NAME",
+        "DEM": "PERSON_NAME",            # demographic marker
         "LOCATION": "LOCATION",
+        "LOC": "LOCATION",
+        "CITY": "LOCATION",
+        "COUNTRY": "LOCATION",
+        "GPE": "LOCATION",
         "ORGANIZATION": "ORGANIZATION",
+        "ORG": "ORGANIZATION",
+        "INSTITUTION": "ORGANIZATION",
+        "COMPANY": "ORGANIZATION",
         "DATE": "DATE_OF_BIRTH",
+        "DATETIME": "DATE_OF_BIRTH",
+        "TIME": "DATE_OF_BIRTH",
         "PHONE": "PHONE_NUMBER",
         "EMAIL": "EMAIL_ADDRESS",
         "URL": "_IGNORE",
         "ID": "NATIONAL_ID",
+        "CODE": "NATIONAL_ID",
+        "MISC": "_IGNORE",
         "CREDIT_CARD": "CREDIT_CARD",
         "FINANCIAL": "BANK_ACCOUNT",
         "HEALTH": "MEDICAL_RECORD_NUMBER",
         "QUANTITY": "_IGNORE",
+        "ADDRESS": "ADDRESS",
+        "STREET": "ADDRESS",
+    },
+    "meddocan": {
+        # MEDDOCAN (IberLEF 2019, Marimon et al.) — Spanish clinical PHI.
+        # ~33K PHI annotations across 29 entity types aligned with HIPAA.
+        # Adds non-English clinical coverage our English synthetic
+        # corpora don't give us.
+        "NOMBRE_SUJETO_ASISTENCIA": "PERSON_NAME",
+        "NOMBRE_PERSONAL_SANITARIO": "PERSON_NAME",
+        "FAMILIARES_SUJETO_ASISTENCIA": "PERSON_NAME",
+        "NOMBRE_INSTITUCION": "ORGANIZATION",
+        "INSTITUCION": "ORGANIZATION",
+        "HOSPITAL": "ORGANIZATION",
+        "CENTRO_SALUD": "ORGANIZATION",
+        "EDAD_SUJETO_ASISTENCIA": "_IGNORE",      # age — not a direct identifier in our taxonomy
+        "FECHAS": "DATE_OF_BIRTH",
+        "TERRITORIO": "LOCATION",
+        "PAIS": "LOCATION",
+        "PROFESION": "_IGNORE",
+        "ID_SUJETO_ASISTENCIA": "MEDICAL_RECORD_NUMBER",
+        "ID_ASEGURAMIENTO": "MEDICAL_RECORD_NUMBER",
+        "ID_CONTACTO_ASISTENCIAL": "MEDICAL_RECORD_NUMBER",
+        "ID_EMPLEO_PERSONAL_SANITARIO": "EMPLOYEE_ID",
+        "ID_TITULACION_PERSONAL_SANITARIO": "EMPLOYEE_ID",
+        "NUMERO_TELEFONO": "PHONE_NUMBER",
+        "NUMERO_FAX": "PHONE_NUMBER",
+        "CORREO_ELECTRONICO": "EMAIL_ADDRESS",
+        "DIRECCION": "ADDRESS",
+        "CALLE": "ADDRESS",
+        "SEXO_SUJETO_ASISTENCIA": "_IGNORE",
+        "OTRO_NUMERO_IDENTIF": "NATIONAL_ID",
+    },
+    "ai4privacy_400k": {
+        # AI4Privacy PII-Masking-400k (2024) — 17 languages, 54 entity
+        # types.  Superset of the 200k release; includes post-2023
+        # additions (passport, VIN, crypto wallets).  Mapping mirrors
+        # the paper pipeline so our training pool stays consistent with
+        # the evaluation reference.
+        "FIRSTNAME": "PERSON_NAME",
+        "LASTNAME": "PERSON_NAME",
+        "MIDDLENAME": "PERSON_NAME",
+        "FULLNAME": "PERSON_NAME",
+        "NAME": "PERSON_NAME",
+        "PREFIX": "_IGNORE",
+        "TITLE": "_IGNORE",
+        "DISPLAYNAME": "USERNAME",
+        "ACCOUNTNAME": "USERNAME",
+        "USERNAME": "USERNAME",
+        "EMAIL": "EMAIL_ADDRESS",
+        "PHONE_NUMBER": "PHONE_NUMBER",
+        "PHONEIMEI": "_IGNORE",
+        "URL": "_IGNORE",
+        "STREETADDRESS": "ADDRESS",
+        "BUILDINGNUM": "ADDRESS",
+        "SECONDARYADDRESS": "ADDRESS",
+        "ZIPCODE": "ADDRESS",
+        "CITY": "LOCATION",
+        "STATE": "LOCATION",
+        "COUNTRY": "LOCATION",
+        "COUNTY": "LOCATION",
+        "ORDINALDIRECTION": "LOCATION",
+        "NEARBYGPSCOORDINATE": "LOCATION",
+        "COMPANYNAME": "ORGANIZATION",
+        "COMPANYSUFFIX": "ORGANIZATION",
+        "JOBAREA": "_IGNORE",
+        "JOBTITLE": "_IGNORE",
+        "JOBDESCRIPTOR": "_IGNORE",
+        "JOBTYPE": "_IGNORE",
+        "DATE": "DATE_OF_BIRTH",
+        "DOB": "DATE_OF_BIRTH",
+        "TIME": "DATE_OF_BIRTH",
+        "AGE": "_IGNORE",
+        "SSN": "US_SSN",
+        "SOCIALSECURITYNUMBER": "US_SSN",
+        "CREDITCARDNUMBER": "CREDIT_CARD",
+        "CREDITCARDCVV": "_IGNORE",
+        "CREDITCARDISSUER": "_IGNORE",
+        "IBAN": "IBAN",
+        "BIC": "_IGNORE",
+        "ACCOUNTNUMBER": "BANK_ACCOUNT",
+        "AMOUNT": "_IGNORE",
+        "CURRENCY": "_IGNORE",
+        "CURRENCYCODE": "_IGNORE",
+        "CURRENCYNAME": "_IGNORE",
+        "CURRENCYSYMBOL": "_IGNORE",
+        "PIN": "_IGNORE",
+        "PASSWORD": "_IGNORE",
+        "MASKEDNUMBER": "NATIONAL_ID",
+        "IP": "IP_ADDRESS",
+        "IPADDRESS": "IP_ADDRESS",
+        "IPV4": "IP_ADDRESS",
+        "IPV6": "IP_ADDRESS",
+        "MAC": "MAC_ADDRESS",
+        "USERAGENT": "_IGNORE",
+        "PASSPORTNUMBER": "PASSPORT",
+        "DRIVERLICENSE": "DRIVERS_LICENSE",
+        "VEHICLEVIN": "VIN",
+        "VEHICLEVRM": "VIN",
+        "BITCOINADDRESS": "CRYPTO_WALLET",
+        "ETHEREUMADDRESS": "CRYPTO_WALLET",
+        "LITECOINADDRESS": "CRYPTO_WALLET",
+        "IMEI": "_IGNORE",
+        "GENDER": "_IGNORE",
+        "SEX": "_IGNORE",
+        "EYECOLOR": "_IGNORE",
+        "HEIGHT": "_IGNORE",
     },
     "bigcode": {
         "EMAIL": "EMAIL_ADDRESS",
@@ -350,6 +476,273 @@ def load_conll2003(max_records: int | None = None) -> list[TrainingRecord]:
     return records
 
 
+# ── Industry-reference datasets — loaders ported from the paper pipeline ──
+# These mirror the dataset mix used by the pii-rate-elo paper-submission
+# evaluation (``../pii-anon-research-paper/pii-rate-elo-pipeline``).
+# Adding them to the training pool keeps the swarm's training
+# distribution aligned with the reference evaluation corpus:
+#
+#   pii_anon_eval       — our canonical synthetic benchmark (v1.3.0)
+#   ai4privacy_400k     — 400K records, 17 languages, 54 entity types
+#                         (2024 superset of the 200k release)
+#   tab                 — Text Anonymization Benchmark (Pilan et al. 2022) —
+#                         1,268 European Court of Human Rights documents
+#                         with peer-reviewed manual annotations
+#   meddocan            — MEDDOCAN (Marimon et al., IberLEF 2019) —
+#                         Spanish clinical PHI benchmark, adds
+#                         non-English clinical coverage
+#
+# All three are optional HuggingFace loads — they log a warning and
+# return ``[]`` when ``datasets`` is missing or the HF hub is unreachable,
+# so they are safe to include in the default ``SWARM_DATASETS`` list.
+
+
+def load_ai4privacy_400k(max_records: int | None = None) -> list[TrainingRecord]:
+    """Load AI4Privacy PII-Masking-400k (2024 release, 17 languages).
+
+    Superset of ``load_ai4privacy`` (the 200k release).  Uses the same
+    schema — each row has ``source_text`` plus a ``privacy_mask`` JSON
+    list of ``{label, start, end, value}`` triples — so the span-parsing
+    logic of the 200k loader is reused via delegation.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        logger.warning(
+            "HuggingFace datasets not installed; skipping ai4privacy_400k. "
+            "Install with: pip install 'pii-anon[swarm-train]'"
+        )
+        return []
+
+    try:
+        ds = load_dataset("ai4privacy/pii-masking-400k", split="train")
+    except Exception as exc:
+        logger.warning("Failed to load ai4privacy_400k: %s", exc)
+        return []
+
+    records: list[TrainingRecord] = []
+    for i, row in enumerate(ds):
+        if max_records is not None and i >= max_records:
+            break
+        text = str(row.get("source_text") or row.get("text") or "")
+        if not text:
+            continue
+        # The 400k release uses ``privacy_mask`` (JSON-list).  Older rows
+        # may carry ``span_labels`` or raw ``labels`` — accept all three.
+        raw_masks = row.get("privacy_mask") or row.get("span_labels") or row.get("labels") or []
+        if isinstance(raw_masks, str):
+            try:
+                raw_masks = json.loads(raw_masks)
+            except (json.JSONDecodeError, TypeError):
+                raw_masks = []
+        labels: list[dict[str, Any]] = []
+        for mask in raw_masks or []:
+            if not isinstance(mask, dict):
+                continue
+            raw_type = str(
+                mask.get("label") or mask.get("entity_type") or ""
+            ).strip()
+            if not raw_type:
+                continue
+            mapped = map_entity_type("ai4privacy_400k", raw_type)
+            if mapped in ("_IGNORE", ""):
+                continue
+            try:
+                start = int(mask["start"])
+                end = int(mask["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if start < 0 or end <= start or end > len(text):
+                continue
+            labels.append({"entity_type": mapped, "start": start, "end": end})
+
+        records.append(TrainingRecord(
+            record_id=str(row.get("record_id") or f"ai4privacy-400k-{i}"),
+            text=text,
+            labels=labels,
+            language=str(row.get("language", "en")),
+            source_dataset="ai4privacy_400k",
+        ))
+    logger.info("Loaded %d records from ai4privacy_400k", len(records))
+    return records
+
+
+def load_tab(max_records: int | None = None) -> list[TrainingRecord]:
+    """Load the Text Anonymization Benchmark (TAB — Pilan et al., 2022).
+
+    ~1,268 court documents from the European Court of Human Rights with
+    high-quality manual PII annotations.  Peer-reviewed, citable, and
+    complements synthetic benchmarks with real-world legal text.
+
+    HuggingFace: ``ildpil/text-anonymization-benchmark`` (primary) with
+    a fallback to the ``mattmdjaga`` mirror.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        logger.warning(
+            "HuggingFace datasets not installed; skipping TAB. "
+            "Install with: pip install 'pii-anon[swarm-train]'"
+        )
+        return []
+
+    ds = None
+    for hf_path in (
+        "ildpil/text-anonymization-benchmark",
+        "mattmdjaga/text-anonymization-benchmark-train",
+    ):
+        try:
+            ds = load_dataset(hf_path, split="train")
+            logger.info("Loaded TAB from %s", hf_path)
+            break
+        except Exception as exc:
+            logger.debug("TAB load from %s failed: %s", hf_path, exc)
+    if ds is None:
+        logger.warning("All TAB HuggingFace paths failed; skipping")
+        return []
+
+    records: list[TrainingRecord] = []
+    for i, row in enumerate(ds):
+        if max_records is not None and i >= max_records:
+            break
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        mentions = row.get("entity_mentions") or []
+        if not isinstance(mentions, list):
+            continue
+        labels: list[dict[str, Any]] = []
+        for mention in mentions:
+            if not isinstance(mention, dict):
+                continue
+            raw_type = str(mention.get("entity_type") or "").strip()
+            if not raw_type:
+                continue
+            mapped = map_entity_type("tab", raw_type)
+            if mapped in ("_IGNORE", ""):
+                continue
+            raw_start = mention.get("start_offset", mention.get("start", -1))
+            raw_end = mention.get("end_offset", mention.get("end", -1))
+            if raw_start is None or raw_end is None:
+                continue
+            try:
+                start = int(raw_start)
+                end = int(raw_end)
+            except (TypeError, ValueError):
+                continue
+            if start < 0 or end <= start or end > len(text):
+                continue
+            labels.append({"entity_type": mapped, "start": start, "end": end})
+
+        records.append(TrainingRecord(
+            record_id=str(row.get("doc_id") or f"tab-{i}"),
+            text=text,
+            labels=labels,
+            language=str(row.get("language", "en")),
+            source_dataset="tab",
+        ))
+    logger.info("Loaded %d records from TAB", len(records))
+    return records
+
+
+def load_meddocan(max_records: int | None = None) -> list[TrainingRecord]:
+    """Load MEDDOCAN (Marimon et al., IberLEF 2019) — Spanish clinical PHI.
+
+    ~1,000 synthetic Spanish clinical case reports with ~33K PHI
+    annotations across 29 entity types aligned with HIPAA.  Adds
+    non-English clinical coverage the synthetic corpora don't give us.
+
+    Requires the ``bigbio`` extension for the HuggingFace schema.  Falls
+    back silently when unavailable — meddocan is an opt-in addition to
+    the default training pool, not a hard requirement.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        logger.warning(
+            "HuggingFace datasets not installed; skipping MEDDOCAN. "
+            "Install with: pip install 'pii-anon[swarm-train]'"
+        )
+        return []
+
+    ds = None
+    for hf_path, kwargs in (
+        ("bigbio/meddocan", {"name": "meddocan_bigbio_kb"}),
+        ("bigbio/meddocan", {}),
+    ):
+        try:
+            ds = load_dataset(hf_path, split="train", **kwargs)
+            logger.info("Loaded MEDDOCAN from %s (%s)", hf_path, kwargs or "default")
+            break
+        except Exception as exc:
+            logger.debug("MEDDOCAN load from %s failed: %s", hf_path, exc)
+    if ds is None:
+        logger.warning(
+            "MEDDOCAN load failed — requires pip install 'bigbio' or a "
+            "local BRAT-format copy.  Skipping."
+        )
+        return []
+
+    records: list[TrainingRecord] = []
+    for i, row in enumerate(ds):
+        if max_records is not None and i >= max_records:
+            break
+        # BigBio ``bigbio_kb`` schema: passages[].text is the body,
+        # entities[] have .type + .offsets[[start, end]].  Fall back to
+        # plain ``text`` / ``annotations`` when the schema is flat.
+        passages = row.get("passages") or []
+        if passages:
+            text = " ".join(
+                str(p.get("text", [""])[0]) if isinstance(p.get("text"), list)
+                else str(p.get("text", ""))
+                for p in passages
+            )
+        else:
+            text = str(row.get("text") or "")
+        if not text:
+            continue
+
+        entities = row.get("entities") or row.get("annotations") or []
+        labels: list[dict[str, Any]] = []
+        for ent in entities:
+            if not isinstance(ent, dict):
+                continue
+            raw_type = str(ent.get("type") or ent.get("entity_type") or "").strip()
+            if not raw_type:
+                continue
+            mapped = map_entity_type("meddocan", raw_type)
+            if mapped in ("_IGNORE", ""):
+                continue
+            # BigBio offsets: list of [start, end] pairs (multi-span
+            # entities exist); use the outer envelope.
+            offsets = ent.get("offsets")
+            if isinstance(offsets, list) and offsets:
+                try:
+                    start = int(offsets[0][0])
+                    end = int(offsets[-1][1])
+                except (IndexError, TypeError, ValueError):
+                    continue
+            else:
+                try:
+                    start = int(ent["start"])
+                    end = int(ent["end"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+            if start < 0 or end <= start or end > len(text):
+                continue
+            labels.append({"entity_type": mapped, "start": start, "end": end})
+
+        records.append(TrainingRecord(
+            record_id=str(row.get("id") or row.get("document_id") or f"meddocan-{i}"),
+            text=text,
+            labels=labels,
+            language="es",
+            source_dataset="meddocan",
+        ))
+    logger.info("Loaded %d records from MEDDOCAN", len(records))
+    return records
+
+
 # ── Bring-your-own-data: generic JSONL loader ───────────────────────────────
 
 def load_jsonl(
@@ -485,7 +878,10 @@ def load_jsonl(
 DATASET_LOADERS: dict[str, Any] = {
     "pii_anon_eval": load_pii_anon_data,
     "ai4privacy": load_ai4privacy,
+    "ai4privacy_400k": load_ai4privacy_400k,
     "conll2003": load_conll2003,
+    "tab": load_tab,
+    "meddocan": load_meddocan,
 }
 
 
