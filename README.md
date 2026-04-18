@@ -1,36 +1,34 @@
 # pii-anon
 
-**An open-source PII detection and anonymization library for Python — built for LLM pipelines, streaming data, and regulatory compliance.**
+**An open-source PII detection, anonymization, and evaluation library for Python — built for LLM pipelines, streaming data, regulatory compliance, and rigorous system benchmarking.**
 
 [![PyPI Version](https://img.shields.io/pypi/v/pii-anon.svg)](https://pypi.org/project/pii-anon/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-2336-brightgreen.svg)](#quality-and-testing)
+[![Tests](https://img.shields.io/badge/tests-2437-brightgreen.svg)](#quality-and-testing)
 
 [![Built with AI Agents](https://img.shields.io/badge/Built_with-AI_Agents-d946ef.svg)](#acknowledgements)
 
 ---
 
-## Why pii-anon?
+## Three tools, one library
 
-**Two offerings, one library.** pii-anon ships with two detection modes designed for different trade-offs:
+`pii-anon` ships three offerings — each a first-class citizen, each on the same benchmark:
 
-| Offering | Best For | F1 | Latency |
+| | What it is | When to use | Headline |
 |---|---|---|---|
-| **pii-anon** | Speed-sensitive pipelines (streaming, real-time) | 0.76 | <1 ms/record |
-| **pii-anon-swarm** | Maximum recall (compliance, batch ETL) | 0.61 | ~97 ms/record |
+| 🏃 **`pii-anon`** | Fast regex + checksum engine (Luhn, IBAN mod-97, ABA) | Streaming / real-time / LLM pre-processing | **F1=0.76**, **0.4 ms/record** — 3M docs/hour |
+| 🐝 **`pii-anon-swarm`** | Four-layer fusion: regex fast-pass + NER (GLiNER, Presidio) + Dawid-Skene Bayesian + XGBoost meta-learner | Maximum recall (compliance, batch ETL, DSAR) | **Recall=0.82** — highest of any system tested |
+| 📊 **`pii-rate-elo`** | Academic-grade evaluation framework — composite metric + Glicko-style Elo + floor gates + Tier 3 re-identification resistance | Benchmarking *any* PII pipeline (ours, yours, a vendor's, a research paper's) | Head-to-head scoring against 5 baselines in 60 seconds |
 
-Both outperform Presidio (F1=0.50) and Scrubadub (F1=0.33) on the 151,000+ record pii_anon_benchmark evaluation. pii-anon-swarm achieves the highest recall (82%) of any system tested.
-
-**pii-anon** uses a fast regex engine with checksum validators (Luhn, IBAN mod-97, ABA routing), context-aware confidence scoring, and deny-lists — delivering sub-millisecond detection across 22 entity types with zero external dependencies.
-
-**pii-anon-swarm** uses a four-layer pipeline: regex fast-pass for high-confidence structured PII, heterogeneous NER engines (GLiNER, Presidio) with redundancy pruning, Dawid-Skene Bayesian aggregation with a trained XGBoost meta-learner, and corroboration filtering with checksum validation. Trainable on industry datasets (AI4Privacy, CoNLL-2003) alongside pii-anon-eval-data.
+Both detectors outperform Presidio (F1=0.50) and Scrubadub (F1=0.33) on the 159,891-record `pii-anon-datasets` benchmark.
+`pii-rate-elo` is the evaluation framework that produced those numbers — and it works on *any* detector, not just ours (see [evaluate-your-pipeline.md](docs/evaluate-your-pipeline.md)).
 
 **6 transformation strategies** — pseudonymization with key rotation, tokenization (HMAC/AES-SIV), redaction, generalization, synthetic replacement, or differential privacy (ε-DP) — all with audit trails and deterministic linking for long-context entity tracking.
 
-**6 compliance templates** (HIPAA Safe Harbor, GDPR Pseudo/Anon, CCPA, Minimal Risk, Maximum Privacy) validate your entity detection against real regulatory requirements. Know instantly whether your coverage meets compliance standards.
+**6 compliance templates** (HIPAA Safe Harbor, GDPR Pseudo/Anon, CCPA, Minimal Risk, Maximum Privacy) validate your entity detection against real regulatory requirements.
 
-**Enterprise-grade evaluation framework** with 50+ metrics, 151,000+ synthetic evaluation records (100% CC0/CC-BY-4.0), and a composite Elo-based ranking system that captures the full picture: detection accuracy, privacy, utility, fairness, and performance.
+**Tier 3-aware benchmark dataset** — 159,891 synthetic records (100% CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, with behavioral-signal annotations and Re-identification Resistance Scores (RRS) per record, aligned with Lermen et al. 2026 (LLM-based deanonymization).
 
 **Sub-millisecond latency** with constant-memory streaming — process Kafka, Spark, or Beam pipelines without building specialized infrastructure. Async/sync dual APIs.
 
@@ -47,7 +45,7 @@ Or with optional integrations:
 ```bash
 pip install pii-anon[cli,crypto]          # CLI + cryptography
 pip install pii-anon[benchmark]           # + all competitor engines (for benchmarking)
-pip install pii-anon[datasets]            # + 151K+ evaluation dataset
+pip install pii-anon[datasets]            # + 159,891-record Tier 3 evaluation dataset
 pip install pii-anon[benchmark,cli,crypto,datasets,dev]  # Full stack
 ```
 
@@ -246,39 +244,90 @@ Per-entity-type precision, recall, and F1 are available in `artifacts/benchmarks
 
 ---
 
-## Composite Scoring: The PII-Rate-Elo Metric
+## The pii-rate-elo Evaluation Framework
 
-Traditional benchmarks fail to capture the full picture. pii-anon ships with a **two-tier composite system** and **Elo tournament** that ranks systems across detection accuracy, privacy, utility, fairness, and performance — all at once.
+Reporting F1 alone paints a misleading picture. `pii-rate-elo` is the evaluation framework built into `pii-anon` — it scores PII pipelines on a **single, composite, pairwise-comparable scale** that combines detection quality, operational cost, privacy guarantees, and (optionally) resistance to LLM-era re-identification attacks.
 
-**Tier 1 — Competitive Benchmark** (all systems, 6 metrics):
-- F1 Score (50%), Precision (15%), Recall (15%), Latency (10%), Throughput (10%), Entity Coverage (optional)
+**Three tiers:**
+- **Tier 1** — Detection (F1, F2-for-privacy, P, R) + efficiency (latency, throughput, entity coverage)
+- **Tier 2** — Privacy, utility, fairness — sourced from the full eval pipeline
+- **Tier 3** — Re-identification Resistance Score (RRS), Quasi-Identifier Coverage (QIC), Behavioral Signal Leakage (BSL) — models LLM-era adversaries per Lermen et al. 2026
 
-**Tier 2 — Full Evaluation** (optional, 7 dimensions):
-- Privacy (ASR, MIA AUC, canary exposure, k-anonymity, ε-DP)
-- Utility (format/semantic preservation, information loss)
-- Fairness (cross-language, cross-entity, cross-script equity)
+**Deployment profiles** pick the right weight mix for the use case: `standard`, `high_security` (finance / health / legal — 60% re-ID resistance weight), or `high_throughput` (streaming / log redaction — 40% operational weight). Full custom configs are also supported.
 
-**Elo Tournament** — Every pair of systems plays a "match" with adaptive K-factor and Glicko-style Rating Deviation. A single leaderboard emerges that captures all trade-offs.
+**Glicko-style Elo** — pairwise round-robin with Rating Deviation gives both point ratings *and* 95% CIs, so you know when two systems are *actually* distinguishable.
 
-**Governance Gates** — Configurable deployment thresholds: minimum Elo rating (default R > 1500), maximum Rating Deviation (default RD < 100), minimum match count.
+**Floor gates** — catastrophic-weakness guards that cap the composite when any must-have threshold (F1, privacy, fairness, coverage) is missed.
+
+See [docs/pii-rate-elo.md](docs/pii-rate-elo.md) for the full algorithm reference.
 
 ```python
-from pii_anon.eval_framework import compute_composite, PIIRateEloEngine, GovernanceThresholds
+from pii_anon.eval_framework import (
+    compute_composite, CompositeConfig, PIIRateEloEngine, GovernanceThresholds,
+)
 
-# Compute Tier 1 composite
-score = compute_composite(f1=0.612, precision=0.58, recall=0.65, latency_ms=6.9, docs_per_hour=514_000)
-print(f"Composite: {score.score:.4f}")  # 0.6233
+# Composite with a deployment preset
+cfg = CompositeConfig.for_deployment("high_security")
+score = compute_composite(
+    f1=0.758, precision=0.724, recall=0.795,
+    latency_ms=0.4, docs_per_hour=3_064_895,
+    config=cfg,
+)
+print(f"Composite: {score.score:.4f}")
 
-# Run Elo tournament
+# Elo tournament + governance check
 engine = PIIRateEloEngine()
-engine.run_round_robin({"pii-anon": 0.758, "pii-anon-swarm": 0.611, "gliner": 0.766})
-for r in engine.get_leaderboard():
-    print(f"  {r.system_name}: Elo={r.rating:.0f}")
-
-# Check governance readiness
-result = engine.evaluate_governance("pii-anon", thresholds=GovernanceThresholds())
-print(f"Production-ready: {result.passed}")
+engine.run_round_robin({"pii-anon": 0.782, "pii-anon-swarm": 0.555, "gliner": 0.680})
+print(engine.tournament_summary()["rankings"])
+print(engine.evaluate_governance("pii-anon", thresholds=GovernanceThresholds()))
 ```
+
+---
+
+## Evaluate Your Own PII Pipeline
+
+`pii-rate-elo` isn't locked to our detectors. Give it a callable and it produces a full leaderboard that splices your system against the published baselines (`pii-anon`, `pii-anon-swarm`, Presidio, GLiNER, Scrubadub) — **without requiring you to install any competitor packages**. The baselines come from a committed artifact.
+
+```python
+from pii_anon.eval_framework import evaluate_external_system, load_baseline_leaderboard
+
+def my_detector(text: str):
+    # Return iterable of (entity_type, start, end) tuples.
+    ...
+
+result = evaluate_external_system(
+    my_detector,
+    system_name="my-detector",
+    max_records=2_000,
+    deployment_profile="high_security",
+)
+
+leaderboard = load_baseline_leaderboard().with_scorecard(result.scorecard)
+print(leaderboard.to_markdown())
+```
+
+Example output:
+
+```
+| Rank | System          | Composite | F1     | Latency | Throughput  | Elo  | RD  |
+|------|-----------------|-----------|--------|---------|-------------|------|-----|
+| 1    | my-detector     | 0.791     | 0.812  |  4.1ms  |     876,420 | 1580 | 247 |
+| 2    | pii-anon        | 0.782     | 0.758  |  0.4ms  |   3,064,895 | 1552 | 247 |
+| 3    | gliner          | 0.680     | 0.766  | 86.2ms  |      33,605 | 1533 | 247 |
+```
+
+Or from the CLI:
+
+```bash
+pii-anon rate-elo \
+    --predictor my_pkg.detector:predict \
+    --system-name my-detector \
+    --max-records 2000 \
+    --deployment-profile high_security \
+    --artifact-dir ./my-eval-results
+```
+
+The full end-to-end guide — adapter examples (spaCy, REST endpoint), Tier 3 evaluation, CI gating, and troubleshooting — lives in [docs/evaluate-your-pipeline.md](docs/evaluate-your-pipeline.md).
 
 ---
 
@@ -375,25 +424,37 @@ The composite score normalizes latency via `1/(1+(lat/100ms)²)` and throughput 
 
 ## Quality & Testing
 
-- **2336 tests** covering detection, evaluation, composite scoring, governance, ingestion, and research rigor
+- **2437 tests** covering detection, evaluation, composite scoring, governance, external-system evaluation, swarm extension workflows, ingestion, and research rigor
 - **Zero required dependencies** (only pydantic)
 - **Strict CI gates**: lint (ruff), type check (mypy), coverage (85%+), build, packaging, performance SLAs
-- **151,000+ record evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 12 languages and 22 entity types
+- **159,891 record Tier 3 evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, 2,500 paired personas, and per-record RRS annotations
 - **Reproducible benchmarks** with deterministic seeds and strict span matching
 
 ---
 
 ## Documentation
 
-- `docs/quickstart.md` — Get started in 5 minutes
-- `docs/configuration.md` — Configuration reference
-- `docs/engine-plugin-guide.md` — Add custom detection engines
-- `docs/api-reference.md` — Full API documentation
-- `docs/tutorial-llm-pipeline.md` — LLM pipeline integration tutorial
-- `docs/long-context-entity-tracking.md` — Entity linking across long documents
-- `artifacts/benchmarks/` — Benchmark results and artifacts (auto-generated)
-- `docs/evidence-ledger.md` — Research evidence backing each design decision
-- `docs/dependencies-and-platforms.md` — OS-specific setup
+**Detection**
+- [docs/quickstart.md](docs/quickstart.md) — Get started in 5 minutes
+- [docs/configuration.md](docs/configuration.md) — Configuration reference
+- [docs/swarm-architecture.md](docs/swarm-architecture.md) — Four-layer swarm pipeline, Tier 3 training, retrain procedure
+- [docs/extend-swarm.md](docs/extend-swarm.md) — **Plug your own engine into the swarm; retrain on your own labeled PII data**
+- [docs/engine-plugin-guide.md](docs/engine-plugin-guide.md) — Full EngineAdapter reference
+- [docs/tutorial-llm-pipeline.md](docs/tutorial-llm-pipeline.md) — LLM pipeline integration tutorial
+- [docs/long-context-entity-tracking.md](docs/long-context-entity-tracking.md) — Entity linking across long documents
+- [docs/autoresearch-integration.md](docs/autoresearch-integration.md) — Iterate on the library with the autoresearch loop
+
+**Evaluation (pii-rate-elo)**
+- [docs/pii-rate-elo.md](docs/pii-rate-elo.md) — Algorithm reference (composite, Elo, floor gates, Tier 3)
+- [docs/evaluate-your-pipeline.md](docs/evaluate-your-pipeline.md) — End-to-end guide to scoring your own detector
+- [docs/benchmark-summary.md](docs/benchmark-summary.md) — Latest published leaderboard (auto-generated)
+
+**Reference**
+- [docs/api-reference.md](docs/api-reference.md) — Full API documentation
+- [docs/evidence-ledger.md](docs/evidence-ledger.md) — Research evidence backing each design decision
+- [docs/dependencies-and-platforms.md](docs/dependencies-and-platforms.md) — OS-specific setup
+- [docs/release-guide.md](docs/release-guide.md) — Release workflow (training, benchmarking, publishing)
+- [artifacts/benchmarks/](artifacts/benchmarks/) — Benchmark results and artifacts (auto-generated)
 
 ---
 

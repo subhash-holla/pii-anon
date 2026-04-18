@@ -55,7 +55,44 @@ jobs:
           jupyter nbconvert \
             --to notebook \
             --execute notebooks/quickstart.ipynb \
-            --output /tmp/quickstart.executed.ipynb
+            --output ${{ runner.temp }}/quickstart.executed.ipynb
+
+  # Cross-platform sanity: confirm the package installs and the CLI
+  # behaves correctly on macOS and Windows before we ship wheels to
+  # PyPI. The full test matrix only runs on Linux for speed, so this
+  # job is the guard against accidental path / encoding / subprocess
+  # regressions on non-Linux platforms.
+  cross-platform-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,cli,crypto]
+
+      - name: Ruff + mypy
+        run: |
+          ruff check src tests
+          mypy src/pii_anon
+
+      - name: Core test suite (no performance, no competitor engines)
+        run: pytest -m "not performance"
+
+      - name: CLI smoke test
+        run: |
+          pii-anon version
+          pii-anon health --output json
+          pii-anon capabilities --output json
 
   python-3-14-experimental:
     runs-on: ubuntu-latest

@@ -38,120 +38,12 @@ for _noisy in (
 ):
     logging.getLogger(_noisy).setLevel(logging.ERROR)
 
-# Add src to path for development installs
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+# Add src to path for development installs; _progress is a sibling script module.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_SCRIPTS_DIR.parent / "src"))
+sys.path.insert(0, str(_SCRIPTS_DIR))
 
-
-# ── Progress Tracker ────────────────────────────────────────────────────
-
-
-class ProgressTracker:
-    """High-fidelity progress indicator with 0.01% granularity.
-
-    Tracks progress across the entire training pipeline as one unified bar.
-    Estimates ETA based on observed throughput with exponential smoothing.
-    """
-
-    def __init__(self, total_records: int, label: str = "Training") -> None:
-        self._total = total_records
-        self._completed = 0
-        self._label = label
-        self._t_start = time.time()
-        self._last_print = 0.0
-        self._rate_ema = 0.0  # exponential moving average of rec/s
-        self._phase = ""
-        self._phase_start = 0.0
-        self._phase_completed = 0
-        self._phase_total = 0
-
-    def set_phase(self, name: str, phase_total: int) -> None:
-        """Start a new phase (e.g., 'Fold 1/3 train', 'Final retrain')."""
-        self._phase = name
-        self._phase_start = time.time()
-        self._phase_completed = 0
-        self._phase_total = phase_total
-
-    def _format_eta(self, eta_s: float) -> str:
-        if eta_s >= 3600:
-            return f"{eta_s / 3600:.1f}h"
-        if eta_s >= 60:
-            return f"{eta_s / 60:.1f}m"
-        return f"{eta_s:.0f}s"
-
-    def _format_elapsed(self, s: float) -> str:
-        if s >= 3600:
-            return f"{s / 3600:.1f}h"
-        if s >= 60:
-            return f"{s / 60:.1f}m"
-        return f"{s:.0f}s"
-
-    def advance(self, n: int = 1) -> None:
-        """Mark n records as completed. Updates the in-place progress bar."""
-        self._completed += n
-        self._phase_completed += n
-
-        elapsed = time.time() - self._t_start
-        if elapsed <= 0:
-            return
-
-        # Compute rate.
-        rate = self._completed / elapsed
-        if self._rate_ema <= 0:
-            self._rate_ema = rate
-        else:
-            self._rate_ema = 0.95 * self._rate_ema + 0.05 * rate
-
-        now = time.time()
-        # Update the bar at most every 0.3s (avoids flickering).
-        if now - self._last_print < 0.3:
-            return
-        self._last_print = now
-
-        pct = self._completed / self._total * 100 if self._total > 0 else 0
-        remaining = self._total - self._completed
-        eta_s = remaining / self._rate_ema if self._rate_ema > 0 else 0
-
-        bar_width = 30
-        filled = int(bar_width * pct / 100)
-        bar = "\u2588" * filled + "\u2591" * (bar_width - filled)
-
-        # Single overwriting line.
-        line = (
-            f"\r  {bar} {pct:6.2f}% | {self._completed:,}/{self._total:,} | "
-            f"{self._rate_ema:.0f} rec/s | ETA {self._format_eta(eta_s)} | "
-            f"{self._phase}"
-        )
-        # Pad to clear previous longer lines.
-        sys.stderr.write(line.ljust(120))
-        sys.stderr.flush()
-
-        # Log a summary line once per minute (on a new line so it persists in scrollback).
-        if not hasattr(self, "_last_summary") or now - self._last_summary >= 60:
-            self._last_summary = now
-            sys.stderr.write("\n")
-            logger.info(
-                "[%5.2f%%] %s — %s elapsed, %s remaining, %.0f rec/s",
-                pct, self._phase, self._format_elapsed(elapsed),
-                self._format_eta(eta_s), self._rate_ema,
-            )
-
-    def finish_phase(self, message: str = "") -> None:
-        """Mark current phase as complete. Prints a permanent summary line."""
-        phase_elapsed = time.time() - self._phase_start
-        pct = self._completed / self._total * 100 if self._total > 0 else 0
-        sys.stderr.write("\n")
-        sys.stderr.flush()
-        if message:
-            logger.info("[%5.2f%%] %s (%s)", pct, message, self._format_elapsed(phase_elapsed))
-
-    def finish(self) -> None:
-        """Mark the entire pipeline as complete."""
-        elapsed = time.time() - self._t_start
-        sys.stderr.write("\n")
-        sys.stderr.flush()
-        logger.info("Pipeline complete: %s records in %s (%.1f rec/s)",
-                    f"{self._completed:,}", self._format_elapsed(elapsed),
-                    self._completed / max(elapsed, 1))
+from _progress import ProgressTracker, format_elapsed  # noqa: E402
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -278,8 +170,8 @@ def _run_engines_on_records(
 
     if not use_mp:
         if max_workers > 1 and len(records) < min_records_for_mp:
-            logger.info("  Dataset too small for multiprocessing (%d < %d); using sequential",
-                        len(records), min_records_for_mp)
+            logger.debug("  Dataset too small for multiprocessing (%d < %d); using sequential",
+                         len(records), min_records_for_mp)
         for rec in records:
             votes, confs = _process_single_record(rec, engines)
             if votes:
@@ -290,7 +182,7 @@ def _run_engines_on_records(
         return annotations, engine_confidences
 
     # Parallel path: split into batches for worker processes.
-    logger.info("  Using %d worker processes (batch parallelism)", max_workers)
+    logger.debug("  Using %d worker processes (batch parallelism)", max_workers)
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
     batch_size = max(50, len(records) // (max_workers * 4))
@@ -425,132 +317,180 @@ def main() -> None:
     random.seed(args.seed)
     t_start = time.time()
 
-    # ── Load data ─────────────────────────────────────────────────────
-    logger.info("Loading training data...")
-    from pii_anon.swarm_datasets import load_training_data
-    dataset_names = [d.strip() for d in args.datasets.split(",")]
-    records = load_training_data(datasets=dataset_names, max_records_per_dataset=max_records)
-    if not records:
-        logger.error("No training data loaded. Install pii-anon-datasets or check dataset names.")
-        sys.exit(1)
-    logger.info("Loaded %d records from %s", len(records), dataset_names)
+    # Silence info-level noise from pii_anon modules so the progress line
+    # stays the only visible output during the run. Warnings/errors still
+    # surface. This is restored in a `finally` below.
+    pii_anon_logger = logging.getLogger("pii_anon")
+    _prev_level = pii_anon_logger.level
+    pii_anon_logger.setLevel(logging.WARNING)
 
-    # ── Initialize engines ────────────────────────────────────────────
-    logger.info("Initializing detection engines...")
-    from pii_anon import PIIOrchestrator
-    orch = PIIOrchestrator(token_key="swarm-training")
-    all_engines = orch._async.registry.list_engines(include_disabled=True)
-    for engine in all_engines:
-        if engine.dependency_available() and not engine.enabled:
-            engine.enabled = True
-            logger.info("  Enabled engine: %s", engine.adapter_id)
-    engines = [e for e in all_engines if e.enabled]
-    engine_ids = [e.adapter_id for e in engines]
-    logger.info("Parallel workers: %d", workers)
-    logger.info("Active engines (%d): %s", len(engines), engine_ids)
-
-    # ── Compute total work for progress tracking ──────────────────────
-    # Each record is processed once per: K fold trains + K fold evals + 1 final retrain
-    # Fold train size ≈ records * (k-1)/k, fold eval size ≈ records / k (capped at 500)
-    if k > 1:
-        fold_train_size = int(len(records) * (k - 1) / k)
-        fold_eval_size = min(500, int(len(records) / k))
-        total_work = k * (fold_train_size + fold_eval_size) + len(records)  # K folds + final retrain
-    else:
-        holdout_size = min(500, max(1, int(len(records) * 0.15)))
-        total_work = len(records) + holdout_size  # retrain + holdout eval
-
-    progress = ProgressTracker(total_work, label="Swarm Training")
-    logger.info("Total work: %d record-passes (%d-fold CV + final retrain)", total_work, k)
-
-    # ── K-fold cross-validation ───────────────────────────────────────
-    fold_results: list[dict[str, float]] = []
-    if k > 1:
-        folds = _stratified_kfold_split(records, k=k, seed=args.seed)
-
-        for fold_i, (fold_train, fold_test) in enumerate(folds):
-            # Train on this fold.
-            fold_annotations, fold_confidences = _run_engines_on_records(
-                fold_train, engines, progress, f"Fold {fold_i + 1}/{k} train",
-                max_workers=workers,
-            )
-            progress.finish_phase(
-                f"Fold {fold_i + 1}/{k} train: {len(fold_train)} records, "
-                f"{len(fold_annotations)} annotations"
-            )
-
-            fold_ds, fold_temp, fold_info = _train_artifacts(fold_annotations, fold_confidences)
-
-            # Evaluate on this fold.
-            f1, prec, rec = _evaluate_fold(
-                fold_test, engines, fold_ds, fold_temp, fold_info, output_dir,
-                progress, f"Fold {fold_i + 1}/{k} eval",
-                max_workers=workers,
-            )
-            fold_results.append({"fold": fold_i + 1, "f1": f1, "precision": prec, "recall": rec})
-            progress.finish_phase(f"Fold {fold_i + 1}/{k} eval: F1={f1:.4f} P={prec:.4f} R={rec:.4f}")
-
-        mean_f1 = sum(r["f1"] for r in fold_results) / k
-        std_f1 = math.sqrt(sum((r["f1"] - mean_f1) ** 2 for r in fold_results) / k)
-        mean_p = sum(r["precision"] for r in fold_results) / k
-        mean_r = sum(r["recall"] for r in fold_results) / k
-        logger.info("CV summary: F1=%.4f +/- %.4f  P=%.4f  R=%.4f", mean_f1, std_f1, mean_p, mean_r)
-    else:
-        mean_f1 = mean_p = mean_r = std_f1 = 0.0
-
-    # ── Final training on ALL data ────────────────────────────────────
-    all_annotations, all_confidences = _run_engines_on_records(
-        records, engines, progress, "Final retrain (all data)",
-        max_workers=workers,
-    )
-    progress.finish_phase(f"Final retrain: {len(records)} records, {len(all_annotations)} annotations")
-
-    ds, temp_scaler, info_scorer = _train_artifacts(all_annotations, all_confidences)
-    ds.save(output_dir / "ds_params.json")
-    temp_scaler.save(output_dir / "temperature.json")
-    info_scorer.save(output_dir / "informativeness.json")
-
-    # ── XGBoost ───────────────────────────────────────────────────────
     try:
-        import xgboost  # noqa: F401
-        logger.info("XGBoost available; meta-learner uses logistic fallback until trained on pipeline output.")
-    except Exception as exc:
-        logger.info("XGBoost not available (%s). Logistic fallback active.", type(exc).__name__)
+        # ── Load data ─────────────────────────────────────────────────────
+        t_load = time.time()
+        from pii_anon.swarm_datasets import load_training_data
+        dataset_names = [d.strip() for d in args.datasets.split(",")]
+        records = load_training_data(datasets=dataset_names, max_records_per_dataset=max_records)
+        if not records:
+            logger.error("No training data loaded. Install pii-anon-datasets or check dataset names.")
+            sys.exit(1)
+        load_elapsed = time.time() - t_load
 
-    # ── Final metrics ─────────────────────────────────────────────────
-    if k > 1 and fold_results:
-        final_f1, final_p, final_r = mean_f1, mean_p, mean_r
-    else:
-        random.shuffle(records)
-        holdout_n = max(1, int(len(records) * 0.15))
-        holdout = records[-holdout_n:]
-        final_f1, final_p, final_r = _evaluate_fold(
-            holdout, engines, ds, temp_scaler, info_scorer, output_dir,
-            progress, "Holdout eval",
+        # ── Initialize engines ────────────────────────────────────────────
+        t_init = time.time()
+        from pii_anon import PIIOrchestrator
+        orch = PIIOrchestrator(token_key="swarm-training")
+        all_engines = orch._async.registry.list_engines(include_disabled=True)
+        for engine in all_engines:
+            if engine.dependency_available() and not engine.enabled:
+                engine.enabled = True
+        engines = [e for e in all_engines if e.enabled]
+        engine_ids = [e.adapter_id for e in engines]
+        init_elapsed = time.time() - t_init
+
+        # ── Compute weighted total_work for 0.01% overall accuracy ────────
+        # records_work: every record pass through engines (fold train + eval + final retrain)
+        # load_work:    ~2% of total, credited up-front since load already finished
+        # finalize_work: ~1% of total, advanced during artifact save
+        if k > 1:
+            fold_train_size = int(len(records) * (k - 1) / k)
+            fold_eval_size = min(500, int(len(records) / k))
+            records_work = k * (fold_train_size + fold_eval_size) + len(records)
+        else:
+            holdout_size = min(500, max(1, int(len(records) * 0.15)))
+            records_work = len(records) + holdout_size
+
+        load_work = max(100, len(records) // 50)
+        finalize_work = max(100, records_work // 100)
+        total_work = load_work + records_work + finalize_work
+
+        # Pre-credit the load phase (it completed before the bar was built).
+        progress = ProgressTracker(
+            total_work, label="Swarm Training",
+            refresh_s=60.0, initial_completed=load_work,
+        )
+        progress.phase_log.append(
+            f"[{load_work / total_work * 100:6.2f}%] Loaded {len(records):,} records "
+            f"from {dataset_names} ({format_elapsed(load_elapsed)})"
+        )
+        progress.phase_log.append(
+            f"[{load_work / total_work * 100:6.2f}%] Initialized {len(engines)} engines: "
+            f"{engine_ids} ({format_elapsed(init_elapsed)})"
+        )
+        progress.set_phase("Starting training", 0)
+
+        # ── K-fold cross-validation ───────────────────────────────────────
+        fold_results: list[dict[str, float]] = []
+        if k > 1:
+            folds = _stratified_kfold_split(records, k=k, seed=args.seed)
+
+            for fold_i, (fold_train, fold_test) in enumerate(folds):
+                fold_annotations, fold_confidences = _run_engines_on_records(
+                    fold_train, engines, progress, f"Fold {fold_i + 1}/{k} train",
+                    max_workers=workers,
+                )
+                progress.finish_phase(
+                    f"Fold {fold_i + 1}/{k} train: {len(fold_train)} records, "
+                    f"{len(fold_annotations)} annotations"
+                )
+
+                fold_ds, fold_temp, fold_info = _train_artifacts(fold_annotations, fold_confidences)
+
+                f1, prec, rec = _evaluate_fold(
+                    fold_test, engines, fold_ds, fold_temp, fold_info, output_dir,
+                    progress, f"Fold {fold_i + 1}/{k} eval",
+                    max_workers=workers,
+                )
+                fold_results.append({"fold": fold_i + 1, "f1": f1, "precision": prec, "recall": rec})
+                progress.finish_phase(
+                    f"Fold {fold_i + 1}/{k} eval: F1={f1:.4f} P={prec:.4f} R={rec:.4f}"
+                )
+
+            mean_f1 = sum(r["f1"] for r in fold_results) / k
+            std_f1 = math.sqrt(sum((r["f1"] - mean_f1) ** 2 for r in fold_results) / k)
+            mean_p = sum(r["precision"] for r in fold_results) / k
+            mean_r = sum(r["recall"] for r in fold_results) / k
+            progress.phase_log.append(
+                f"[{progress._completed / progress._total * 100:6.2f}%] "
+                f"CV summary: F1={mean_f1:.4f} +/- {std_f1:.4f}  P={mean_p:.4f}  R={mean_r:.4f}"
+            )
+        else:
+            mean_f1 = mean_p = mean_r = std_f1 = 0.0
+
+        # ── Final training on ALL data ────────────────────────────────────
+        all_annotations, all_confidences = _run_engines_on_records(
+            records, engines, progress, "Final retrain (all data)",
             max_workers=workers,
         )
-        progress.finish_phase(f"Holdout eval: F1={final_f1:.4f}")
+        progress.finish_phase(
+            f"Final retrain: {len(records)} records, {len(all_annotations)} annotations"
+        )
 
-    progress.finish()
+        ds, temp_scaler, info_scorer = _train_artifacts(all_annotations, all_confidences)
 
-    # ── Save manifest ─────────────────────────────────────────────────
-    manifest: dict[str, Any] = {
-        "trained_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "datasets_used": dataset_names,
-        "total_records": len(records),
-        "engines": engine_ids,
-        "kfold": k,
-        "cv_results": fold_results,
-        "final_f1": round(final_f1, 4),
-        "final_precision": round(final_p, 4),
-        "final_recall": round(final_r, 4),
-        "temperatures": dict(temp_scaler._temps),
-        "seed": args.seed,
-    }
-    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        # ── Save artifacts ────────────────────────────────────────────────
+        progress.set_phase("Saving artifacts", finalize_work)
+        save_step = max(1, finalize_work // 5)
 
+        ds.save(output_dir / "ds_params.json")
+        progress.advance(save_step)
+        temp_scaler.save(output_dir / "temperature.json")
+        progress.advance(save_step)
+        info_scorer.save(output_dir / "informativeness.json")
+        progress.advance(save_step)
+
+        try:
+            import xgboost  # noqa: F401
+            xgboost_note = "XGBoost available; logistic fallback until trained on pipeline output"
+        except Exception as exc:
+            xgboost_note = f"XGBoost not available ({type(exc).__name__}); logistic fallback active"
+
+        # ── Final metrics ─────────────────────────────────────────────────
+        if k > 1 and fold_results:
+            final_f1, final_p, final_r = mean_f1, mean_p, mean_r
+        else:
+            random.shuffle(records)
+            holdout_n = max(1, int(len(records) * 0.15))
+            holdout = records[-holdout_n:]
+            final_f1, final_p, final_r = _evaluate_fold(
+                holdout, engines, ds, temp_scaler, info_scorer, output_dir,
+                progress, "Holdout eval",
+                max_workers=workers,
+            )
+            progress.finish_phase(f"Holdout eval: F1={final_f1:.4f}")
+
+        # ── Save manifest ─────────────────────────────────────────────────
+        manifest: dict[str, Any] = {
+            "trained_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "datasets_used": dataset_names,
+            "total_records": len(records),
+            "engines": engine_ids,
+            "kfold": k,
+            "cv_results": fold_results,
+            "final_f1": round(final_f1, 4),
+            "final_precision": round(final_p, 4),
+            "final_recall": round(final_r, 4),
+            "temperatures": dict(temp_scaler._temps),
+            "seed": args.seed,
+        }
+        (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+        # Close out finalize phase (reach 100.00% exactly).
+        remaining_finalize = finalize_work - 3 * save_step
+        if remaining_finalize > 0:
+            progress.advance(remaining_finalize)
+        progress.finish_phase(f"Saved artifacts to {output_dir}; {xgboost_note}")
+        progress.finish()
+    finally:
+        pii_anon_logger.setLevel(_prev_level)
+
+    # ── End-of-run output ─────────────────────────────────────────────────
     elapsed_total = time.time() - t_start
-    print("\n" + "=" * 60)
+    print("── Training Log " + "─" * 44)
+    for entry in progress.phase_log:
+        print(f"  {entry}")
+    print("─" * 60)
+    print()
+    print("=" * 60)
     print("  pii-anon-swarm Training Complete")
     print("=" * 60)
     print(f"  Datasets:   {', '.join(dataset_names)}")

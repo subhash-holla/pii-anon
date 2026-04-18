@@ -7,6 +7,11 @@ pii-anon's detection pipeline is built on pluggable engine adapters. You can add
 
 This guide shows how to build a custom engine, register it with the swarm, and tune its expert weights.
 
+> **See also**: [extend-swarm.md](extend-swarm.md) packages this guide with the
+> bring-your-own-data retrain workflow into a single user-facing walkthrough.
+> Read it first if you're a new integrator looking for "how do I customize the
+> swarm for my use case"; come back here for the full adapter reference.
+
 ---
 
 ## Step 1: Implement the Adapter
@@ -261,3 +266,54 @@ registry.register_expert(ExpertSpec(
 | `capabilities()` | On demand (introspection) | No |
 | `shutdown()` | Application teardown | No |
 | `dependency_available()` | Pre-flight checks | No |
+
+---
+
+## Pinning Your Engine Past the Layer 2 Pruner
+
+`pii-anon-swarm`'s Layer 2 greedy set-cover pruner drops engines whose
+detected entity-type set has Jaccard similarity ≥ 0.85 with a
+higher-ranked engine. `regex-oss` is pinned implicitly because its
+checksum validators are stronger than the heuristic. Pin your custom
+engine the same way via
+[`SwarmConfig.force_include_engines`](../src/pii_anon/swarm.py):
+
+```python
+from pii_anon import PIIOrchestrator
+from pii_anon.swarm import SwarmConfig
+
+orch = PIIOrchestrator(
+    token_key="...",
+    swarm_config=SwarmConfig(force_include_engines=("my-ner-engine",)),
+)
+orch.register_engine(MyNERAdapter(enabled=True))
+```
+
+Pinned engines bypass both the Jaccard check and the `max_engines` cap,
+so they always participate in fusion.
+
+---
+
+## Retraining the Swarm for Your Engine
+
+After registering a custom engine, you'll typically want to retrain the
+swarm so Dawid-Skene learns its confusion matrix, temperature scaling
+calibrates its logits, and the meta-learner learns per-engine weights.
+Without retraining, your engine participates via default weights (DS
+skips it, temperature = 1.0, informativeness = 0.5) — this is graceful
+degradation, not a failure.
+
+Retrain procedure, in order:
+
+1. Register your engine globally (any of the three paths above).
+2. Ensure benchmark data + your domain data are available — see
+   [extend-swarm.md § bring your own data](extend-swarm.md#workflow-2--train-the-swarm-on-your-own-data).
+3. Run `make train-swarm` — the script picks up the engine from the
+   registry and includes its findings in the training pool.
+4. Verify `~/.pii_anon/swarm/manifest.json` lists your engine under
+   `engines_trained`.
+5. Re-benchmark with `make benchmark-full` to see the before/after
+   leaderboard.
+
+See [swarm-architecture.md](swarm-architecture.md#retraining) for the full
+retrain pipeline and F2 threshold selection.

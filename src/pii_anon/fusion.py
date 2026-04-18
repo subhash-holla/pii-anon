@@ -257,7 +257,7 @@ class WeightedConsensusFusion(FusionStrategy):
         for cluster in clusters:
             weighted_sum = 0.0
             total_weight = 0.0
-            engines: list[str] = []
+            engines: set[str] = set()
             entity_type = cluster[0].entity_type
             # Collect all span boundaries for majority voting.
             # When engines disagree on exact boundaries, use the most common
@@ -272,7 +272,7 @@ class WeightedConsensusFusion(FusionStrategy):
                 weight = self._get_weight(item.engine_id, entity_type)
                 weighted_sum += item.confidence * weight
                 total_weight += weight
-                engines.append(item.engine_id)
+                engines.add(item.engine_id)
                 s = item.span_start or 0
                 e = item.span_end or 0
                 start_votes[s] = start_votes.get(s, 0.0) + weight
@@ -287,7 +287,7 @@ class WeightedConsensusFusion(FusionStrategy):
                 EnsembleFinding(
                     entity_type=representative.entity_type,
                     confidence=(weighted_sum / total_weight) if total_weight else 0.0,
-                    engines=sorted(set(engines)),
+                    engines=sorted(engines),
                     field_path=representative.field_path,
                     span_start=best_span_start,
                     span_end=best_span_end,

@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from itertools import combinations
 from typing import Any
 
 
@@ -321,6 +322,40 @@ class PIIRateEloEngine:
 
         return updates
 
+    def run_reidentification_tournament(
+        self,
+        rrs_scores: dict[str, float],
+    ) -> list[RatingUpdate]:
+        """Run Tier 3 adversarial round-robin for re-identification resistance.
+
+        Identical mechanics to :meth:`run_round_robin` but interprets the
+        input as Re-identification Resistance Scores (RRS ∈ [0, 1], higher
+        = harder to re-identify).  The match outcome is the sigmoid of the
+        RRS difference, so a system with higher resistance wins pairwise
+        matches.
+
+        This is the foundation of the "Red-Team vs. Blue-Team" extension
+        proposed in the recommendations: to get a single ranking that
+        captures BOTH detection quality AND resistance to LLM-based
+        re-identification, run two tournaments and combine the ratings,
+        or run one tournament using a composite score with Tier 3 weights
+        enabled (see ``CompositeConfig.for_deployment``).
+
+        Parameters
+        ----------
+        rrs_scores:
+            Mapping of system name → RRS score in [0, 1].
+
+        Returns
+        -------
+        list[RatingUpdate]
+            All rating updates from this tournament.
+
+        Reference: Lermen et al. (2026); recommendations-dataset-metric-
+        evolution.md (Part 2, Tier B item 4).
+        """
+        return self.run_round_robin(rrs_scores)
+
     def get_rating(self, name: str) -> EloRating | None:
         """Return the current rating for *name*, or ``None`` if unknown."""
         return self._ratings.get(name)
@@ -517,23 +552,21 @@ class PIIRateEloEngine:
 
         # Compute pairwise significance tests
         pairwise_significance: dict[str, dict[str, Any]] = {}
-        for i, rating_i in enumerate(leaderboard):
-            for j, rating_j in enumerate(leaderboard):
-                if i < j:
-                    name_i = rating_i.system_name
-                    name_j = rating_j.system_name
-                    rating_diff = abs(rating_i.rating - rating_j.rating)
+        for rating_i, rating_j in combinations(leaderboard, 2):
+            name_i = rating_i.system_name
+            name_j = rating_j.system_name
+            rating_diff = abs(rating_i.rating - rating_j.rating)
 
-                    # Significance threshold: 2 * sqrt(RD_i^2 + RD_j^2)
-                    rd_combined = 2.0 * math.sqrt(rating_i.rd ** 2 + rating_j.rd ** 2)
-                    significant = rating_diff > rd_combined
+            # Significance threshold: 2 * sqrt(RD_i^2 + RD_j^2)
+            rd_combined = 2.0 * math.sqrt(rating_i.rd ** 2 + rating_j.rd ** 2)
+            significant = rating_diff > rd_combined
 
-                    key = f"{name_i}_vs_{name_j}"
-                    pairwise_significance[key] = {
-                        "rating_diff": round(rating_diff, 2),
-                        "significance_threshold": round(rd_combined, 2),
-                        "significant": significant,
-                    }
+            key = f"{name_i}_vs_{name_j}"
+            pairwise_significance[key] = {
+                "rating_diff": round(rating_diff, 2),
+                "significance_threshold": round(rd_combined, 2),
+                "significant": significant,
+            }
 
         # Compute minimum distinguishable difference
         # This is the smallest difference that would be statistically significant
@@ -656,7 +689,10 @@ class GovernanceThresholds:
 
     Per Section 4.7 of the PII-Rate-Elo paper, systems must exceed a minimum
     Elo rating with sufficiently low Rating Deviation before being
-    considered production-grade.
+    considered production-grade.  Paper v10 extends this with an explicit
+    *industry-leadership bar* — the additional floor-gate thresholds a
+    system must clear to qualify as a next-generation benchmark leader
+    (see :meth:`industry_leadership`).
 
     Attributes
     ----------
@@ -672,6 +708,21 @@ class GovernanceThresholds:
     min_rating: float = 1500.0
     max_rd: float = 100.0
     min_matches: int = 6
+
+    @classmethod
+    def industry_leadership(cls) -> "GovernanceThresholds":
+        """Return the industry-leadership Elo/RD bar per paper v10.
+
+        Paper v10 §4.1.6 defines a stricter set of thresholds a system
+        must clear to qualify as an "industry leader" — tighter RD
+        (≤ 80, implying more samples / more confident ranking) and a
+        higher minimum Elo (1600).  Pair this with
+        :class:`~pii_anon.eval_framework.metrics.composite.FloorGateConfig`
+        presets that enforce ``F1 ≥ 0.60``, ``F2 ≥ 0.65``,
+        ``coverage ≥ 0.80``, ``fairness ≥ 0.50``, and
+        ``composite ≥ 0.75`` at the metric layer.
+        """
+        return cls(min_rating=1600.0, max_rd=80.0, min_matches=10)
 
     def to_dict(self) -> dict[str, float | int]:
         return {

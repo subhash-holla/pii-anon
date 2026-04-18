@@ -60,7 +60,7 @@ You have three repos. The main library repo (`pii-anon`) contains both the sourc
 |---|---|---|
 | `pii-anon-code/` | `subhash-holla/pii-anon` | Library source (`src/`), tests (`tests/`), CI, docs, benchmarks |
 | `pii-anon-doc/` | `subhash-holla/pii-anon-doc` | Standalone documentation site |
-| `pii-anon-eval-data/` | `subhash-holla/pii-anon-eval-data` | `pii-anon-datasets` Python package (JSONL benchmark data: pii_anon_benchmark, pii_anon_eval) |
+| `pii-anon-eval-data/` | `subhash-holla/pii-anon-eval-data` | `pii-anon-datasets` Python package (JSONL benchmark data — v1.3.0: 159,891 records, 63 entity types, 60 languages, Tier 3 behavioral signals) |
 
 ### 2.1 Create the GitHub repos (first time only)
 
@@ -180,7 +180,21 @@ pip install -e ../pii-anon-eval-data/
 export PII_ANON_DATASET_ROOT=/path/to/pii-anon-eval-data/src/pii_anon_datasets/data
 ```
 
-The dataset resolution order is: installed `pii_anon_datasets` package → `PII_ANON_DATASET_ROOT` env var → sibling `pii-anon-eval-data/` repo → monorepo layout fallback.
+The dataset resolution order is: installed `pii_anon_datasets` package → `PII_ANON_DATASET_ROOT` env var → sibling `pii-anon-eval-data/` repo → monorepo layout fallback. Both the canonical v1.1+ filename (`data/pii_anon.jsonl.gz`) and the legacy `eval_framework/data/pii_anon_eval_v1.jsonl.gz` layout are probed automatically.
+
+**Dataset v1.3.0 brings Tier 3 resources.** Every record now carries a
+`behavioral_signals` block, a per-record Re-identification Resistance Score
+(RRS), and an `anonymized_llm_sanitized` text variant. In addition, 2,500
+paired pseudonymous/real personas and ~4,500 ESRC-attack evaluation records
+are available for Tier 3 experiments. The loader
+(`pii_anon.eval_framework.datasets.schema.load_eval_dataset`) reads these
+fields into `EvalBenchmarkRecord` attributes (`behavioral_signal_density`,
+`re_identification_resistance_score`, `tier3_risk_level`, `is_paired_profile`,
+`esrc_attack_target`, `context_preservation`). These feed directly into the
+Tier 3 inputs of `compute_composite(...)`
+(`reidentification_recall`, `reidentification_precision`,
+`quasi_identifiers_removed`, `behavioral_signal_similarity`) — see
+`src/pii_anon/eval_framework/metrics/composite.py`.
 
 ### 2.6 Verify the dev environment
 
@@ -220,7 +234,7 @@ Train the pii-anon-swarm offering. This produces Dawid-Skene confusion matrices,
 # Quick training (10K records, 5-fold CV, ~5 min)
 make train-swarm
 
-# Train on ALL pii-anon-eval-data records (0 = unlimited)
+# Train on ALL pii-anon-eval-data records (0 = unlimited; v1.3.0 → ~160K)
 make train-swarm SWARM_MAX_RECORDS=0
 
 # Faster iteration: 3-fold CV
@@ -243,11 +257,18 @@ The training pipeline:
 1. Loads training data (0 = all records, >0 = cap per dataset)
 2. Runs stratified K-fold cross-validation (entity type distribution preserved across folds)
 3. For each fold: trains Dawid-Skene, temperature scaling, informativeness; evaluates on held-out test fold
-4. Reports per-fold and mean F1/precision/recall with standard deviation
+4. Reports per-fold and mean F1/precision/recall **and F2** with standard deviation
 5. Retrains final model on ALL data (not just one fold's training set)
-6. Deploys final artifacts to `~/.pii_anon/swarm/`
+6. Runs the F2 threshold sweep to pick `emission_threshold` (maximises F2 on held-out split, per paper v10)
+7. Deploys final artifacts to `~/.pii_anon/swarm/`
 
-The K-fold results are saved in `manifest.json` so you can review per-fold performance.
+The K-fold results — including the chosen F2 threshold and the
+21-feature `FEATURE_VERSION` — are saved in `manifest.json` so you can
+review per-fold performance. See
+[docs/swarm-architecture.md](swarm-architecture.md) for the full four-layer
+pipeline, Tier 3 sample-weighting rationale, and the when-to-retrain
+checklist. For iterating on configuration *before* a retrain, see
+[docs/autoresearch-integration.md](autoresearch-integration.md).
 
 Verify training succeeded:
 
@@ -306,7 +327,13 @@ The benchmark evaluates 5 systems across 6 use-case profiles (3 accuracy, 3 spee
 
 Key metrics reported:
 - **F1 / Precision / Recall** — entity-level with strict span matching
-- **Composite** — pii-rate-elo weighted score (F1 50%, P 15%, R 15%, latency 10%, throughput 10%)
+- **F2 (β=2)** — privacy-first detection score (recall weighted 2×, per TAB 2022)
+- **Composite** — pii-rate-elo weighted score; `CompositeConfig.f2_privacy_first()` and
+  `CompositeConfig.for_deployment(profile)` expose the recommended weight presets
+- **Tier 3 (optional)** — Re-identification Resistance Score (RRS), Quasi-Identifier
+  Coverage (QIC), Behavioral Signal Leakage (BSL); enabled when the benchmark
+  result forwards `reidentification_recall`, `quasi_identifiers_removed`, or
+  `behavioral_signal_similarity`
 - **Elo** — tournament rating from round-robin on composite scores
 - **Bootstrap 95% CI** — confidence intervals from 1000 resamples
 - **Per-entity F1** — breakdown by entity type (in JSON artifacts)
@@ -423,6 +450,10 @@ deactivate && rm -rf /tmp/pii-anon-verify
    [ ] README benchmark section updated automatically
    [ ] benchmark-results.json produced
    [ ] Results reviewed (pii-anon and pii-anon-swarm both outperform competitors)
+   [ ] pii-anon-datasets ≥ v1.3.0 installed (Tier 3 signals populated)
+   [ ] summarize_eval_dataset reports `avg_re_identification_resistance_score` (sanity check: non-null)
+   [ ] Swarm `manifest.json` shows `feature_version=2` and non-default `emission_threshold` (F2-selected)
+   [ ] Industry-leadership bar check: `FloorGateConfig.industry_leadership()` passes on the published `pii-anon` / `pii-anon-swarm` scorecards
 
 5. PUBLISH
    [ ] All repos pushed to GitHub

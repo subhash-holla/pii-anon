@@ -208,6 +208,9 @@ class TestTier1Composite:
             f1=0.8, precision=0.85, recall=0.75,
             latency_ms=50.0, docs_per_hour=2_000_000.0,
         )
+        # The composite must include at least these core Tier 1/Tier 2 keys.
+        # Tier 3 keys (reidentification_*, etc.) and f2_normalized are
+        # additional and always included for interpretability.
         expected_keys = {
             "f1_normalized", "precision_normalized", "recall_normalized",
             "latency_normalized", "throughput_normalized",
@@ -215,7 +218,7 @@ class TestTier1Composite:
             "privacy_normalized", "utility_normalized", "fairness_normalized",
             "tier1_score", "tier2_score",
         }
-        assert set(result.components.keys()) == expected_keys
+        assert expected_keys.issubset(result.components.keys())
 
 
 # ---------------------------------------------------------------------------

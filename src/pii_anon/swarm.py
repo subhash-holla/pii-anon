@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import os
+import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,10 +30,27 @@ STRUCTURED_TYPES = frozenset({
     "MEDICAL_RECORD_NUMBER", "NATIONAL_ID", "CRYPTO_WALLET",
 })
 
-# Semantic types that benefit from multi-engine corroboration.
+# Entity types that benefit from multi-engine corroboration in Layer 4.
+#
+# A finding survives the corroboration gate when either (a) at least
+# ``corroboration_min`` engines agree on it, or (b) its meta-score beats
+# ``corroboration_override_threshold`` (a single highly-confident engine
+# can override).  Types *not* listed here skip the gate entirely — that
+# is correct for deterministic structured formats (IBAN, SSN — Luhn /
+# mod-97 checksums are stronger than multi-engine votes) but a precision
+# hazard for semantic / regex-ambiguous types.
+#
+# ``EMAIL_ADDRESS`` and ``CREDIT_CARD`` were added after the v10 paper
+# evaluation flagged them as the lowest-precision swarm outputs (0.46 /
+# 0.48).  Their regex surface is permissive enough that NER engines
+# produce many single-engine false positives (e.g. MAC addresses matched
+# as emails, partial card fragments matched as CREDIT_CARD) which slip
+# past the meta-learner.  Requiring multi-engine agreement clamps those
+# down without hurting recall on the common case.
 SEMANTIC_TYPES = frozenset({
     "PERSON_NAME", "ORGANIZATION", "LOCATION", "DATE_OF_BIRTH",
     "ADDRESS", "USERNAME", "PHONE_NUMBER",
+    "EMAIL_ADDRESS", "CREDIT_CARD",
 })
 
 
@@ -63,6 +81,15 @@ class SwarmConfig:
     ds_params_path: str | None = None
     calibration_path: str | None = None
     emission_threshold: float = 0.50
+    #: Engine IDs that must survive the Layer 2 Jaccard pruner regardless
+    #: of entity-type overlap with higher-ranked engines.  ``regex-oss``
+    #: is always pinned implicitly because checksum validators are
+    #: stronger than set-cover heuristics; add your own engine IDs here
+    #: to guarantee they participate in the fusion even when their
+    #: detected type set is similar to an existing engine.  See
+    #: :doc:`/extend-swarm` for the "plug your own engine into the swarm"
+    #: workflow.
+    force_include_engines: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Auto-discover trained artifacts from the default location."""
@@ -86,7 +113,7 @@ class SwarmConfig:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
-@dataclass
+@dataclass(slots=True)
 class SpanCandidate:
     """Internal representation of a candidate span during aggregation."""
 
@@ -186,6 +213,8 @@ class DawidSkeneAggregator:
     ) -> None:
         self._confusion: dict[str, dict[str, dict[str, float]]] = confusion_matrices or {}
         self._priors: dict[str, float] = class_priors or {}
+        # Pre-computed frozenset of prior keys for fast union during inference.
+        self._prior_types: frozenset[str] = frozenset(self._priors)
 
     @property
     def is_trained(self) -> bool:
@@ -211,7 +240,8 @@ class DawidSkeneAggregator:
             best = counts.most_common(1)[0]
             return best[0], best[1] / max(len(engine_votes), 1)
 
-        all_types = set(self._priors.keys())
+        # Union of trained prior types with any additional types engines voted for.
+        all_types = set(self._prior_types)
         for etype in engine_votes.values():
             all_types.add(etype)
 
@@ -373,12 +403,20 @@ def _prune_redundant_findings(
     *,
     similarity_threshold: float = 0.85,
     max_engines: int = 4,
+    force_include_engines: tuple[str, ...] | frozenset[str] = (),
 ) -> list[EngineFinding]:
     """Remove findings from redundant engines using greedy set-cover.
 
     Engines are ranked by the number of distinct entity types they detected.
     Engines whose detected type set has Jaccard similarity >= threshold with
     an already-selected engine are pruned.
+
+    Pinned engines — ``regex-oss`` always, plus any listed in
+    *force_include_engines* — bypass the Jaccard check entirely.  This is
+    the extension hook for users who plug a custom detector into the
+    swarm (see :doc:`/extend-swarm`): name it in ``SwarmConfig.force_include_engines``
+    and its findings survive Layer 2 even when they overlap with an
+    existing engine.
     """
     # Group findings by engine.
     by_engine: dict[str, list[EngineFinding]] = {}
@@ -388,22 +426,37 @@ def _prune_redundant_findings(
     if len(by_engine) <= 1:
         return findings
 
+    pinned = frozenset({"regex-oss", *force_include_engines})
+
     # Compute each engine's detected entity type set.
     engine_types: dict[str, set[str]] = {
         eid: {f.entity_type for f in fs} for eid, fs in by_engine.items()
     }
 
-    # Greedy selection: pick engines maximizing coverage, skip redundant ones.
-    selected: list[str] = []
-    remaining = sorted(engine_types.keys(), key=lambda e: len(engine_types[e]), reverse=True)
+    # Pass 1: pin the always-include engines up-front.  Doing this
+    # *before* the coverage loop means the ``max_engines`` cap cannot
+    # consume a pinned engine's slot and leave it pruned — a user who
+    # pinned their detector must always see it in the fused output.
+    selected: list[str] = [eid for eid in engine_types if eid in pinned]
 
+    # Pass 2: greedy selection over the remaining engines, ranked by
+    # distinct-type count descending.  Pinned engines are excluded since
+    # they are already in.
+    remaining = sorted(
+        (eid for eid in engine_types if eid not in pinned),
+        key=lambda e: len(engine_types[e]),
+        reverse=True,
+    )
+
+    # ``max_engines`` caps only the *non-pinned* slots so a caller that
+    # pins many engines cannot accidentally smuggle unbounded extras
+    # past the cap.  We track non-pinned selections explicitly rather
+    # than subtracting set sizes, which miscounts when the caller pins
+    # more engines than ``max_engines``.
+    non_pinned_selected = 0
     for engine_id in remaining:
-        if len(selected) >= max_engines:
+        if non_pinned_selected >= max_engines:
             break
-        # Always keep regex-oss.
-        if engine_id == "regex-oss":
-            selected.append(engine_id)
-            continue
         # Check redundancy with already-selected engines.
         redundant = False
         for sel_id in selected:
@@ -413,6 +466,7 @@ def _prune_redundant_findings(
                 break
         if not redundant:
             selected.append(engine_id)
+            non_pinned_selected += 1
 
     selected_set = set(selected)
     return [f for f in findings if f.engine_id in selected_set]
@@ -547,6 +601,7 @@ class SwarmFusionStrategy(FusionStrategy):
             remaining,
             similarity_threshold=cfg.similarity_threshold,
             max_engines=cfg.max_engines,
+            force_include_engines=cfg.force_include_engines,
         )
 
         # ── Layer 3: Learned aggregation ──────────────────────────────────
@@ -635,9 +690,18 @@ class SwarmFusionStrategy(FusionStrategy):
         """Run Layer 3 aggregation on a single candidate."""
         assert self._temp_scaler is not None
         assert self._ds is not None
-        # 3b. Temperature-scale confidences.
-        for engine_id, f in candidate.engine_findings.items():
-            f.confidence = self._temp_scaler.scale(engine_id, f.confidence)
+        # 3b. Temperature-scale confidences.  The input ``EngineFinding``
+        # objects belong to the caller (they may be retained for audit
+        # / logging / retry), so we replace the dict entries with
+        # copies rather than mutating the originals — double-scaling on
+        # a retry would be a silent correctness bug.
+        candidate.engine_findings = {
+            engine_id: dataclasses.replace(
+                f,
+                confidence=self._temp_scaler.scale(engine_id, f.confidence),
+            )
+            for engine_id, f in candidate.engine_findings.items()
+        }
 
         # 3c. Dawid-Skene inference.
         engine_votes = {eid: f.entity_type for eid, f in candidate.engine_findings.items()}

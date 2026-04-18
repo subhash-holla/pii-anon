@@ -7,13 +7,15 @@ Provides sorted views of system scorecards with multiple output formats
 from __future__ import annotations
 
 import csv
+import dataclasses
 import io
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .scorecard import SystemScorecard
+from .elo import PIIRateEloEngine
+from .scorecard import BenchmarkScorecard, SystemScorecard
 
 
 @dataclass
@@ -95,6 +97,62 @@ class Leaderboard:
 
         lines.append("")
         return "\n".join(lines)
+
+    @classmethod
+    def from_benchmark_scorecard(
+        cls,
+        bench: BenchmarkScorecard,
+        *,
+        engine: PIIRateEloEngine | None = None,
+        sort_by: str = "elo",
+    ) -> "Leaderboard":
+        """Build a ranked leaderboard from a :class:`BenchmarkScorecard`.
+
+        If *engine* already has ratings (e.g. because the caller ran a
+        tournament beforehand), they are preserved; otherwise a fresh
+        round-robin is run on the scorecards' composite scores.
+
+        Parameters
+        ----------
+        bench:
+            Container of per-system scorecards.
+        engine:
+            Optional Elo engine carrying pre-computed ratings.
+        sort_by:
+            ``"elo"`` (default), ``"composite"``, or ``"f1"``.
+        """
+        # Copy scorecards before writing Elo ratings onto them.  The
+        # source ``BenchmarkScorecard`` may be handed in multiple times
+        # (e.g. to build two leaderboards with different sort keys) so
+        # mutating its stored objects would leak Elo state across calls
+        # and make a second tournament start from previously-updated
+        # ratings rather than the untrained 1500/350 defaults.
+        systems = [dataclasses.replace(sc) for sc in bench.system_scorecards.values()]
+
+        if engine is None:
+            engine = PIIRateEloEngine()
+            engine.run_round_robin(
+                {sc.system_name: sc.composite_score for sc in systems}
+            )
+
+        for sc in systems:
+            rating = engine.get_rating(sc.system_name)
+            if rating is not None:
+                sc.elo_rating = rating.rating
+                sc.elo_rd = rating.rd
+
+        board = cls(benchmark_name=bench.benchmark_name, systems=systems)
+        sort_fn = {
+            "elo": board.sort_by_elo,
+            "composite": board.sort_by_composite,
+            "f1": board.sort_by_f1,
+        }.get(sort_by)
+        if sort_fn is None:
+            raise ValueError(
+                f"sort_by must be 'elo', 'composite', or 'f1' (got {sort_by!r})"
+            )
+        sort_fn()
+        return board
 
     def to_csv(self) -> str:
         """Export leaderboard as CSV string."""

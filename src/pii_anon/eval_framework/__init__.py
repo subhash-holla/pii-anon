@@ -135,14 +135,22 @@ from .standards.compliance import (
 from .metrics.composite import (
     CompositeConfig,
     CompositeScore,
+    DeploymentProfile,
+    FloorGateConfig,
+    FloorGateResult,
     compute_composite,
     compute_composite_from_benchmark_result,
+    evaluate_floor_gates,
+    fbeta_score,
     normalize_attack_success_rate,
+    normalize_behavioral_signal_leakage,
     normalize_canary_exposure,
     normalize_entity_coverage,
     normalize_epsilon_dp,
     normalize_k_anonymity,
     normalize_mia_auc,
+    normalize_quasi_identifier_coverage,
+    normalize_reidentification_resistance,
 )
 
 # -- Rating engine ----------------------------------------------------------
@@ -156,6 +164,18 @@ from .rating import (
     LeaderboardExporter,
     RatingUpdate,
     SystemScorecard,
+)
+
+# -- External-system evaluation ---------------------------------------------
+# One-call API for scoring a user-supplied PII detector against our
+# benchmark and splicing the result into the baseline leaderboard.
+from .external_evaluator import (
+    BaselineLeaderboard,
+    ExternalEvaluationResult,
+    Predictor,
+    evaluate_external_system,
+    load_baseline_leaderboard,
+    resolve_predictor_path,
 )
 
 # -- Research references ----------------------------------------------------
@@ -234,14 +254,22 @@ __all__ = [
     # Composite metric
     "CompositeConfig",
     "CompositeScore",
+    "DeploymentProfile",
+    "FloorGateConfig",
+    "FloorGateResult",
     "compute_composite",
     "compute_composite_from_benchmark_result",
+    "evaluate_floor_gates",
+    "fbeta_score",
     "normalize_attack_success_rate",
+    "normalize_behavioral_signal_leakage",
     "normalize_canary_exposure",
     "normalize_entity_coverage",
     "normalize_epsilon_dp",
     "normalize_k_anonymity",
     "normalize_mia_auc",
+    "normalize_quasi_identifier_coverage",
+    "normalize_reidentification_resistance",
     # Rating engine
     "BenchmarkScorecard",
     "PIIRateEloEngine",
@@ -252,6 +280,13 @@ __all__ = [
     "LeaderboardExporter",
     "RatingUpdate",
     "SystemScorecard",
+    # External-system evaluation
+    "BaselineLeaderboard",
+    "ExternalEvaluationResult",
+    "Predictor",
+    "evaluate_external_system",
+    "load_baseline_leaderboard",
+    "resolve_predictor_path",
     # Research
     "EVIDENCE_REGISTRY",
     "ResearchReference",

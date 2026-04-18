@@ -327,6 +327,120 @@ def create_app() -> Any:
             output,
         )
 
+    @app.command("rate-elo")
+    def rate_elo_command(
+        predictor: str = typer.Option(
+            ...,
+            "--predictor",
+            "-p",
+            help="Python import path to the predictor, e.g. `my_pkg.det:predict`. "
+            "Callable takes `str`, returns iterable of `(entity_type, start, end)` tuples.",
+        ),
+        system_name: str = typer.Option(
+            "external-system",
+            "--system-name",
+            "-n",
+            help="Display name for the system in the leaderboard.",
+        ),
+        dataset: str = typer.Option(
+            "pii_anon",
+            help="Evaluation dataset identifier (v1.1+ canonical: `pii_anon`).",
+        ),
+        language: str | None = typer.Option(None, help="Optional BCP 47 language filter."),
+        max_records: int = typer.Option(
+            1_000,
+            help="Cap on evaluation records. `0` = entire dataset (~160K in v1.3.0).",
+        ),
+        warmup_records: int = typer.Option(
+            10, help="Records used to warm the predictor before latency measurement."
+        ),
+        deployment_profile: str | None = typer.Option(
+            None,
+            help="Preset weight mix: `standard`, `high_security`, or `high_throughput`.",
+        ),
+        baseline_artifact: str | None = typer.Option(
+            None,
+            help="Override path to benchmark-results.json (defaults to the checked-in artifact).",
+        ),
+        output: str = typer.Option("markdown", help="Output format: markdown|json|csv"),
+        artifact_dir: str | None = typer.Option(
+            None,
+            help="If set, writes scorecard.json + leaderboard.{md,json,csv} to this directory.",
+        ),
+        on_error: str = typer.Option(
+            "skip",
+            help="Predictor error handling: `skip` (default) or `raise`.",
+        ),
+    ) -> None:
+        """Score an external PII pipeline against the pii-anon benchmark.
+
+        Produces a pii-rate-elo leaderboard splicing the user system
+        against the checked-in baselines (pii-anon, pii-anon-swarm,
+        Presidio, GLiNER, Scrubadub) without requiring competitor
+        packages to be installed.
+        """
+        from pii_anon.eval_framework import (
+            DeploymentProfile,
+            LeaderboardExporter,
+            evaluate_external_system,
+            load_baseline_leaderboard,
+            resolve_predictor_path,
+        )
+
+        try:
+            predict_fn = resolve_predictor_path(predictor)
+        except (ValueError, AttributeError, ImportError, TypeError) as exc:
+            raise typer.BadParameter(f"could not resolve predictor `{predictor}`: {exc}")
+
+        profile: DeploymentProfile | None = None
+        if deployment_profile is not None:
+            if deployment_profile not in {"standard", "high_security", "high_throughput"}:
+                raise typer.BadParameter(
+                    f"invalid deployment_profile `{deployment_profile}`; "
+                    "expected standard | high_security | high_throughput"
+                )
+            profile = cast(DeploymentProfile, deployment_profile)
+
+        try:
+            result = evaluate_external_system(
+                predict_fn,
+                system_name=system_name,
+                dataset=dataset,
+                language=language,
+                max_records=max_records if max_records > 0 else None,
+                warmup_records=warmup_records,
+                deployment_profile=profile,
+                on_error=on_error,
+            )
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc))
+
+        baseline = load_baseline_leaderboard(baseline_artifact)
+        # `replace=True` is the default — repeated CLI runs with the same
+        # --system-name silently refresh the user's entry rather than
+        # failing on "already contains".
+        leaderboard = baseline.with_scorecard(result.scorecard)
+
+        if output == "markdown":
+            print(leaderboard.to_markdown())
+        elif output == "csv":
+            print(leaderboard.to_csv())
+        elif output == "json":
+            print(json.dumps({
+                "leaderboard": leaderboard.to_dict(),
+                "result": result.to_dict(),
+            }, indent=2))
+        else:
+            raise typer.BadParameter("output must be markdown | json | csv")
+
+        if artifact_dir:
+            out_dir = Path(artifact_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "scorecard.json").write_text(
+                json.dumps(result.to_dict(), indent=2), encoding="utf-8"
+            )
+            LeaderboardExporter.export(leaderboard, out_dir, formats=["json", "md", "csv"])
+
     @app.command("benchmark")
     def benchmark(
         mode: str = typer.Option("weighted_consensus", help="Fusion mode"),

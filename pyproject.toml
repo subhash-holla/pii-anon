@@ -4,12 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-anon"
-version = "1.3.0"
+version = "1.4.0"
 description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-authors = [{ name = "PII Platform Contributors" }]
+authors = [
+  { name = "PII Platform Contributors", email = "pii-anon@proton.me" },
+]
 keywords = [
   "pii",
   "privacy",
@@ -29,6 +31,9 @@ keywords = [
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -37,8 +42,12 @@ classifiers = [
   "Topic :: Security",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
 ]
-dependencies = ["pydantic>=2.8"]
+# Core dependency: pydantic v2.  Upper-bounded to v3 so a future breaking
+# release does not silently break installs; widen the bound explicitly
+# when pydantic 3 lands and we have validated compatibility.
+dependencies = ["pydantic>=2.8,<3"]
 
 [project.urls]
 Homepage = "https://github.com/subhash-holla/pii-anon"
@@ -116,6 +125,7 @@ pii_anon = [
   "benchmarks/matrix/*.json",
   "engines/expert_manifest_*.yaml",
   "engines/expert_manifest_*.json",
+  "eval_framework/baselines/*.json",
 ]
 
 [tool.pytest.ini_options]

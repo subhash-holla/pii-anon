@@ -305,11 +305,19 @@ class TestFeatureExtraction:
             corroboration_count=2,
         )
         features = extract_features(candidate, total_engines=6)
-        assert len(features) == 20
+        # Feature count bumped from 20 → 21 in FEATURE_VERSION=2 when
+        # the multilingual context-keyword feature was added to give
+        # the meta-learner non-English signal coverage.  Feature 21
+        # (``context_has_multilang_keywords``) defaults to 0.0 when the
+        # surrounding text is empty, as it is in this fixture.
+        from pii_anon.swarm_learner import FEATURE_VERSION
+        assert FEATURE_VERSION == 2
+        assert len(features) == 21
         assert all(isinstance(f, float) for f in features)
         assert features[0] == 0.95  # ds_confidence
         assert features[1] == 2.0   # corroboration_count
         assert features[7] == 1.0   # regex_detected
+        assert features[20] == 0.0  # context_has_multilang_keywords (no text supplied)
 
 
 # ── Taxonomy Mapping ───────────────────────────────────────────────────────

@@ -36,6 +36,11 @@ CONTEXT_WORDS: dict[str, set[str]] = {
     "CREDIT_CARD": {
         "credit", "card", "visa", "mastercard", "amex", "discover",
         "payment", "debit", "charge", "cc", "cardnumber",
+        # ES / FR / DE / PT
+        "tarjeta", "crédito", "credito", "carte", "crédit", "credit",
+        "kreditkarte", "karte", "cartão",
+        # ZH / JA
+        "信用卡", "クレジット", "カード",
     },
     "CREDIT_CARD_FRAGMENT": {
         "credit", "card", "visa", "mastercard", "amex", "discover",
@@ -45,9 +50,19 @@ CONTEXT_WORDS: dict[str, set[str]] = {
     "PHONE_NUMBER": {
         "call", "phone", "tel", "telephone", "mobile", "fax",
         "cell", "contact", "reach", "cellphone",
+        # ES / FR / DE / PT
+        "teléfono", "telefono", "móvil", "movil", "téléphone",
+        "portable", "telefon", "handy", "mobilnummer", "telefone",
+        # ZH / JA / KO / AR
+        "电话", "手机", "電話", "携帯", "전화", "هاتف", "جوال",
     },
     "EMAIL_ADDRESS": {
         "email", "mail", "e-mail", "contact", "send", "address",
+        # ES / FR / DE / PT
+        "correo", "electrónico", "electronico", "courriel",
+        "e-mail-adresse", "mail-adresse", "correio",
+        # ZH / JA / KO / AR
+        "邮箱", "电子邮件", "メール", "이메일", "بريد",
     },
     "IP_ADDRESS": {
         "ip", "host", "server", "network", "ipv4", "ipv6",
@@ -61,6 +76,16 @@ CONTEXT_WORDS: dict[str, set[str]] = {
     "PERSON_NAME": {
         "name", "person", "patient", "employee", "client",
         "member", "user", "resident", "beneficiary", "customer",
+        # ES / FR / DE / PT
+        "nombre", "persona", "paciente", "empleado", "cliente",
+        "nom", "personne", "employé", "employe",
+        "patient", "mitarbeiter", "kunde",
+        "nome", "pessoa", "paciente", "funcionário", "funcionario",
+        # ZH / JA / KO / AR
+        "姓名", "名字", "病人", "员工", "客户",
+        "氏名", "患者", "従業員", "顧客",
+        "이름", "환자", "직원",
+        "اسم", "مريض", "موظف",
     },
     "AGE": {
         "age", "aged", "years", "old", "born", "birthday",
@@ -113,6 +138,30 @@ CONTEXT_WORDS: dict[str, set[str]] = {
     "ADDRESS": {
         "address", "street", "avenue", "road", "boulevard",
         "suite", "apt", "apartment", "residence", "domicilio",
+        # ES / FR / DE / PT
+        "dirección", "direccion", "calle", "avenida", "carretera",
+        "adresse", "rue", "avenue", "boulevard", "domicile",
+        "straße", "strasse", "adresse", "anschrift", "wohnort",
+        "endereço", "endereco", "rua", "avenida",
+        # ZH / JA / KO / AR
+        "地址", "住址", "街道",
+        "住所", "番地",
+        "주소", "거리",
+        "عنوان", "شارع",
+    },
+    "LICENSE_PLATE": {
+        "plate", "license plate", "tag", "vehicle", "registration",
+        "car", "truck",
+        # ES / FR / DE / PT
+        "matrícula", "matricula", "placa", "patente",
+        "plaque", "immatriculation", "véhicule", "vehicule",
+        "kennzeichen", "nummernschild", "fahrzeug",
+        "matrícula", "placa",
+        # ZH / JA / KO / AR
+        "车牌", "车辆", "登记",
+        "ナンバー", "車両", "登録番号",
+        "번호판", "차량",
+        "لوحة", "مركبة", "تسجيل",
     },
 }
 

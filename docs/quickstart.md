@@ -85,10 +85,29 @@ pii-anon eval-framework --dataset pii_anon_eval --max-records 250 --output json
 pii-anon benchmark-preflight --output json
 pii-anon compare-competitors --dataset pii_anon_benchmark --dataset-source package-only --require-all-competitors --require-native-competitors --output json
 pii-anon benchmark-publish-suite --artifacts-dir artifacts/benchmarks --output json
-pii-anon benchmark-publish-suite --reuse-current-env --install-no-deps --output json
-pii-anon benchmark-publish-suite --no-strict-runtime --no-require-all-competitors --no-require-native-competitors --no-include-end-to-end --no-allow-core-native-engines --no-enforce-publish-claims --no-validate-readme-sync --dataset-source auto --output json
 ```
 
-For publish-grade metrics, run `benchmark-preflight` and `benchmark-publish-suite` on Linux or macOS.
+## Evaluate your own pipeline
+
+Score any PII detector against the benchmark and get a pii-rate-elo leaderboard alongside our baselines:
+
+```python
+from pii_anon.eval_framework import evaluate_external_system, load_baseline_leaderboard
+
+def my_detector(text: str):
+    return [("EMAIL_ADDRESS", 0, 17)]   # iterable of (entity_type, start, end)
+
+result = evaluate_external_system(my_detector, system_name="my-detector", max_records=500)
+print(load_baseline_leaderboard().with_scorecard(result.scorecard).to_markdown())
+```
+
+Or from the CLI (accepts `module:callable` paths):
+
+```bash
+pii-anon rate-elo --predictor my_pkg.detector:predict --max-records 2000 --deployment-profile high_security
+```
+
+Full guide: [evaluate-your-pipeline.md](evaluate-your-pipeline.md).
+Algorithm reference: [pii-rate-elo.md](pii-rate-elo.md).
 
 For extended documentation, PDLC artifacts, and composite metric methodology, see the [pii-anon-doc](https://github.com/subhash-holla/pii-anon-doc) repository.

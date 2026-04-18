@@ -81,6 +81,10 @@ _HONORIFICS = {
     "m",
 }
 
+# Pre-compiled pattern for alphabetic token extraction — ``extract_features``
+# runs once per mention and this pattern is invariant.
+_ALPHA_TOKEN_RE = re.compile(r"[A-Za-z]+")
+
 
 def link_findings(
     *,
@@ -283,7 +287,7 @@ def _extract_features(entity_type: str, mention_text: str) -> _Features:
     has_honorific = False
 
     # Extract alphabetic tokens for name-based features
-    raw_tokens = [item for item in re.findall(r"[A-Za-z]+", mention_text)]
+    raw_tokens = _ALPHA_TOKEN_RE.findall(mention_text)
     tokens = raw_tokens
     # Strip honorific prefix (Mr., Dr., etc.) to get the actual name tokens
     if raw_tokens and raw_tokens[0].lower() in _HONORIFICS:

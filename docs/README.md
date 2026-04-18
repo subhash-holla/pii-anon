@@ -6,14 +6,31 @@ For comprehensive documentation, PDLC artifacts, and research evidence, see the
 
 ## Contents
 
+### Detection (pii-anon + pii-anon-swarm)
+
 | Document | Description |
 |----------|-------------|
 | [quickstart.md](quickstart.md) | Get started in 5 minutes |
 | [configuration.md](configuration.md) | Configuration reference |
-| [api-reference.md](api-reference.md) | Full API documentation |
-| [engine-plugin-guide.md](engine-plugin-guide.md) | Add custom detection engines |
+| [swarm-architecture.md](swarm-architecture.md) | Four-layer swarm pipeline, Tier 3 training integration, retrain procedure |
+| [extend-swarm.md](extend-swarm.md) | **Plug your own engine into the swarm; retrain on your own labeled PII data** |
+| [engine-plugin-guide.md](engine-plugin-guide.md) | Full EngineAdapter reference (companion to extend-swarm) |
 | [tutorial-llm-pipeline.md](tutorial-llm-pipeline.md) | LLM pipeline integration tutorial |
 | [long-context-entity-tracking.md](long-context-entity-tracking.md) | Entity linking across long documents |
+| [autoresearch-integration.md](autoresearch-integration.md) | Iterate on the library with the autoresearch experiment loop |
+
+### Evaluation (pii-rate-elo)
+
+| Document | Description |
+|----------|-------------|
+| [pii-rate-elo.md](pii-rate-elo.md) | Algorithm reference — composite metric, Tier 1/2/3, Elo, floor gates, deployment profiles |
+| [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark |
+
+### Reference
+
+| Document | Description |
+|----------|-------------|
+| [api-reference.md](api-reference.md) | Full API documentation |
 | [dependencies-and-platforms.md](dependencies-and-platforms.md) | OS-specific setup and dependencies |
 | [evidence-ledger.md](evidence-ledger.md) | Research evidence backing each claim |
 | [release-guide.md](release-guide.md) | Local evaluation, testing, and release workflow |
