@@ -34,7 +34,11 @@ BENCH_WARMUP ?= 100
 BENCH_RUNS ?= 3
 
 # Swarm training configuration
-SWARM_DATASETS ?= pii_anon_eval
+# Default: pii-anon's canonical corpus + two industry leaders, mirroring
+# the dataset mix the pii-rate-elo research paper evaluates against.
+# Stratified sampling (by language) is applied per-dataset when
+# SWARM_MAX_RECORDS > 0 so capped runs preserve language diversity.
+SWARM_DATASETS ?= pii_anon_eval,ai4privacy_400k,tab
 SWARM_MAX_RECORDS ?= 10000
 SWARM_KFOLD ?= 5
 SWARM_WORKERS ?= 4

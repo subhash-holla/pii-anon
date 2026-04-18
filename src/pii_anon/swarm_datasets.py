@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -975,11 +976,154 @@ def _looks_like_path(name: str) -> bool:
     )
 
 
+#: Recommended default training-dataset mix — pii-anon's canonical
+#: synthetic corpus plus two industry-leading external corpora.  Mirrors
+#: the dataset mix used by the pii-rate-elo research paper's evaluation
+#: pipeline (see ``../pii-anon-research-paper/pii-rate-elo-pipeline``) so
+#: training and evaluation draw from the same distribution.  ``tab`` and
+#: ``ai4privacy_400k`` require ``pip install 'pii-anon[swarm-train]'``
+#: for the HuggingFace ``datasets`` dependency — they degrade gracefully
+#: (log a warning, contribute zero records) when that dep is absent.
+DEFAULT_SWARM_DATASETS: tuple[str, ...] = (
+    "pii_anon_eval",       # canonical pii-anon-datasets v1.3.0 (~160K, 60 langs)
+    "ai4privacy_400k",     # AI4Privacy 2024 (~400K, 17 langs, 54 entity types)
+    "tab",                 # Text Anonymization Benchmark (Pilan 2022, peer-reviewed)
+)
+
+
+def stratified_sample(
+    records: list[TrainingRecord],
+    n: int,
+    *,
+    strata_keys: tuple[str, ...] = ("language",),
+    seed: int = 42,
+) -> list[TrainingRecord]:
+    """Return ``n`` records stratified by *strata_keys*.
+
+    Each composite stratum (tuple of ``strata_keys`` values) receives a
+    share **proportional to its prevalence** in the input pool.  Small
+    strata are protected: every represented stratum gets at least one
+    record when ``n >= number_of_strata``.  When the input is smaller
+    than *n*, the full input is returned unchanged (no oversampling).
+
+    This is the primary tool for keeping capped training runs
+    representative — without it, ``SWARM_MAX_RECORDS=10000`` against a
+    60-language corpus collapses to English because the source ordering
+    is English-first.  With it, every language present in the pool
+    appears in the sample with approximately the same share as in the
+    source.
+
+    Parameters
+    ----------
+    records:
+        Input pool.
+    n:
+        Target sample size.  Must be non-negative.  ``0`` returns ``[]``.
+    strata_keys:
+        Record attributes used to define strata.  Default: ``("language",)``.
+        Pass ``("language", "source_dataset")`` for cross-dataset balance,
+        or ``("source_dataset",)`` to balance dataset contributions.
+    seed:
+        Random seed for reproducibility.
+    """
+    if n < 0:
+        raise ValueError(f"n must be non-negative (got {n})")
+    if n == 0 or not records:
+        return []
+    if n >= len(records):
+        return list(records)
+
+    # 1. Bucket records by composite stratum key.
+    buckets: dict[tuple[Any, ...], list[TrainingRecord]] = defaultdict(list)
+    for rec in records:
+        key = tuple(getattr(rec, k, None) for k in strata_keys)
+        buckets[key].append(rec)
+
+    # 2. Proportional allocation with a floor of 1 per stratum (when
+    #    budget allows) to protect rare strata from disappearing.
+    total = len(records)
+    alloc: dict[tuple[Any, ...], int] = {}
+    for key, bucket in buckets.items():
+        share = len(bucket) / total
+        raw = int(round(n * share))
+        # Guarantee at least one record per stratum when we have budget.
+        alloc[key] = max(1, raw) if n >= len(buckets) else raw
+
+    # 3. Adjust to hit exactly ``n`` — allocations can over/undershoot
+    #    due to rounding and the ``max(1, ...)`` floor.
+    diff = n - sum(alloc.values())
+    if diff != 0:
+        # Sort by (stratum size, key) so the largest strata absorb the
+        # over/undershoot first — deterministic ordering thanks to key.
+        ordered_keys = sorted(alloc, key=lambda k: (-len(buckets[k]), k))
+        idx = 0
+        while diff != 0 and ordered_keys:
+            key = ordered_keys[idx % len(ordered_keys)]
+            if diff > 0 and alloc[key] < len(buckets[key]):
+                alloc[key] += 1
+                diff -= 1
+            elif diff < 0 and alloc[key] > 0:
+                alloc[key] -= 1
+                diff += 1
+            idx += 1
+            if idx > 100_000:  # guardrail — should never fire
+                break
+
+    # 4. Sample within each stratum with a dedicated RNG.
+    import random as _random
+    rng = _random.Random(seed)
+    sampled: list[TrainingRecord] = []
+    for key in sorted(alloc):  # deterministic ordering across runs
+        take = min(alloc[key], len(buckets[key]))
+        if take <= 0:
+            continue
+        sampled.extend(rng.sample(buckets[key], take))
+    return sampled
+
+
+def summarize_training_pool(
+    records: list[TrainingRecord],
+) -> dict[str, Any]:
+    """Return a shape + distribution summary of *records*.
+
+    Covers: total count, per-dataset / per-language / per-entity-type
+    counts, label density stats.  Used by the training script to print a
+    human-readable pool report before kicking off engine passes so users
+    can spot-check that the sample is balanced before committing to a
+    multi-hour run.
+    """
+    total = len(records)
+    by_dataset: dict[str, int] = defaultdict(int)
+    by_language: dict[str, int] = defaultdict(int)
+    by_entity_type: dict[str, int] = defaultdict(int)
+    label_counts: list[int] = []
+    for rec in records:
+        by_dataset[rec.source_dataset or "unknown"] += 1
+        by_language[rec.language or "unknown"] += 1
+        n_labels = len(rec.labels)
+        label_counts.append(n_labels)
+        for lbl in rec.labels:
+            by_entity_type[lbl.get("entity_type", "unknown")] += 1
+
+    avg_labels = sum(label_counts) / total if total else 0.0
+    return {
+        "total_records": total,
+        "by_dataset": dict(sorted(by_dataset.items(), key=lambda kv: -kv[1])),
+        "by_language": dict(sorted(by_language.items(), key=lambda kv: -kv[1])),
+        "by_entity_type": dict(sorted(by_entity_type.items(), key=lambda kv: -kv[1])),
+        "avg_labels_per_record": round(avg_labels, 2),
+        "total_labels": sum(label_counts),
+        "records_without_labels": sum(1 for c in label_counts if c == 0),
+    }
+
+
 def load_training_data(
     datasets: list[str] | None = None,
     max_records_per_dataset: int | None = None,
     *,
     custom_taxonomy_name: str = "custom",
+    stratify_by: tuple[str, ...] | None = ("language",),
+    seed: int = 42,
 ) -> list[TrainingRecord]:
     """Load and combine training data from multiple sources.
 
@@ -996,29 +1140,62 @@ def load_training_data(
     Parameters
     ----------
     datasets:
-        List of names or paths.  ``None`` = all registered datasets.
+        List of names or paths.  ``None`` = the recommended
+        :data:`DEFAULT_SWARM_DATASETS` mix (pii-anon + 2 industry leaders).
     max_records_per_dataset:
-        Per-source cap; ``None`` = no cap.
+        Per-source cap; ``None`` = no cap.  When set, each dataset is
+        stratified-sampled down to the cap using *stratify_by* so a
+        multi-language corpus doesn't collapse to English-only after
+        capping (which is what happens if we just take the first N).
     custom_taxonomy_name:
         Taxonomy key used when dispatching a file-path entry to
         :func:`load_jsonl`.  Default ``"custom"`` — register your own
         via :func:`register_taxonomy` for domain vocabularies.
+    stratify_by:
+        Record attributes used for per-dataset stratified sampling when
+        *max_records_per_dataset* is set.  Default: ``("language",)``.
+        Pass ``None`` to disable stratification (take the first N as
+        returned by the source).
+    seed:
+        Seed for stratified sampling.
     """
     if datasets is None:
-        datasets = list(DATASET_LOADERS.keys())
+        datasets = list(DEFAULT_SWARM_DATASETS)
+
+    # When stratified sampling is active, load the full source and
+    # stratify down afterwards.  Naïve oversampling (3× max) would
+    # silently drop rare languages that appear at the tail of the
+    # source ordering (e.g. ai4privacy's 17th language lives past the
+    # first 30K rows).  Full-load costs one HF iteration pass per
+    # dataset — tens of seconds — which is negligible compared with
+    # hours of engine passes downstream.
+    if max_records_per_dataset and stratify_by:
+        loader_cap = None
+    else:
+        loader_cap = max_records_per_dataset
 
     all_records: list[TrainingRecord] = []
+    per_dataset_loaded: dict[str, int] = {}
+    per_dataset_final: dict[str, int] = {}
     for ds_name in datasets:
         if _looks_like_path(ds_name):
             try:
                 records = load_jsonl(
                     ds_name,
                     taxonomy_name=custom_taxonomy_name,
-                    max_records=max_records_per_dataset,
+                    max_records=loader_cap,
                 )
-                all_records.extend(records)
             except Exception as exc:
                 logger.warning("Failed to load JSONL path '%s': %s", ds_name, exc)
+                continue
+            per_dataset_loaded[ds_name] = len(records)
+            if max_records_per_dataset and stratify_by and len(records) > max_records_per_dataset:
+                records = stratified_sample(
+                    records, max_records_per_dataset,
+                    strata_keys=stratify_by, seed=seed,
+                )
+            per_dataset_final[ds_name] = len(records)
+            all_records.extend(records)
             continue
 
         loader = DATASET_LOADERS.get(ds_name)
@@ -1029,10 +1206,39 @@ def load_training_data(
             )
             continue
         try:
-            records = loader(max_records=max_records_per_dataset)
-            all_records.extend(records)
+            records = loader(max_records=loader_cap)
         except Exception as exc:
             logger.warning("Failed to load dataset '%s': %s", ds_name, exc)
+            continue
+        per_dataset_loaded[ds_name] = len(records)
+        if max_records_per_dataset and stratify_by and len(records) > max_records_per_dataset:
+            records = stratified_sample(
+                records, max_records_per_dataset,
+                strata_keys=stratify_by, seed=seed,
+            )
+        per_dataset_final[ds_name] = len(records)
+        all_records.extend(records)
 
-    logger.info("Total training records loaded: %d from %d datasets", len(all_records), len(datasets))
+    # Log a per-dataset breakdown so users see when a default dataset
+    # silently contributed zero records (usually means the HF `datasets`
+    # extra isn't installed).  The summary is advisory — the training
+    # run continues with whatever did load.
+    dataset_summary = ", ".join(
+        f"{name}={per_dataset_final.get(name, 0):,}" for name in datasets
+    )
+    logger.info(
+        "Total training records loaded: %d from %d datasets (%s)",
+        len(all_records), len(datasets), dataset_summary,
+    )
+    empty_datasets = [
+        name for name in datasets
+        if not _looks_like_path(name) and per_dataset_loaded.get(name, 0) == 0
+    ]
+    if empty_datasets:
+        logger.warning(
+            "Dataset(s) %s contributed zero records. "
+            "For the HuggingFace-backed datasets (ai4privacy_400k, tab, meddocan) "
+            "install with: pip install 'pii-anon[swarm-train]'.",
+            empty_datasets,
+        )
     return all_records

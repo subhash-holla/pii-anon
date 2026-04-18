@@ -351,9 +351,36 @@ def _train_artifacts(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train pii-anon-swarm pipeline")
-    parser.add_argument("--datasets", default="pii_anon_eval", help="Comma-separated dataset names")
-    parser.add_argument("--max-records", type=int, default=10000,
-                        help="Max records per dataset (0 = unlimited)")
+    parser.add_argument(
+        "--datasets",
+        default="pii_anon_eval,ai4privacy_400k,tab",
+        help=(
+            "Comma-separated dataset names or paths. "
+            "Default mix = pii-anon canonical + 2 industry leaders "
+            "(AI4Privacy-400K and TAB — mirrors the pii-rate-elo paper "
+            "evaluation corpus). "
+            "Other registered names: ai4privacy, conll2003, meddocan. "
+            "Paths ending in .jsonl[.gz] are loaded via load_jsonl."
+        ),
+    )
+    parser.add_argument(
+        "--max-records", type=int, default=10000,
+        help=(
+            "Stratified per-dataset cap (0 = unlimited). "
+            "When > 0, each dataset is sampled stratified by language so "
+            "capped runs preserve multilingual coverage."
+        ),
+    )
+    parser.add_argument(
+        "--stratify-by",
+        default="language",
+        help=(
+            "Comma-separated record attributes used for per-dataset "
+            "stratified sampling when --max-records is set. "
+            "Default 'language'; pass 'language,source_dataset' for "
+            "cross-dataset balance or empty string to disable."
+        ),
+    )
     parser.add_argument("--kfold", type=int, default=5, help="Number of cross-validation folds (1 = no CV)")
     parser.add_argument("--workers", type=int, default=4,
                         help="Parallel workers for engine execution (default 4, use 1 to disable)")
@@ -380,15 +407,51 @@ def main() -> None:
     try:
         # ── Load data ─────────────────────────────────────────────────────
         t_load = time.time()
-        from pii_anon.swarm_datasets import load_training_data
-        dataset_names = [d.strip() for d in args.datasets.split(",")]
-        cap_str = f"up to {max_records:,}/ds" if max_records else "unlimited"
+        from pii_anon.swarm_datasets import (
+            load_training_data,
+            summarize_training_pool,
+        )
+        dataset_names = [d.strip() for d in args.datasets.split(",") if d.strip()]
+        raw_strata = [s.strip() for s in (args.stratify_by or "").split(",") if s.strip()]
+        strata: tuple[str, ...] | None = tuple(raw_strata) if raw_strata else None
+        cap_str = f"up to {max_records:,}/ds, stratified by {strata}" if max_records and strata \
+            else (f"up to {max_records:,}/ds" if max_records else "unlimited")
         logger.info("Loading datasets %s (%s)...", dataset_names, cap_str)
-        records = load_training_data(datasets=dataset_names, max_records_per_dataset=max_records)
+        records = load_training_data(
+            datasets=dataset_names,
+            max_records_per_dataset=max_records,
+            stratify_by=strata,
+            seed=args.seed,
+        )
         if not records:
             logger.error("No training data loaded. Install pii-anon-datasets or check dataset names.")
             sys.exit(1)
         load_elapsed = time.time() - t_load
+
+        # Per-dataset / per-language / per-entity-type balance report —
+        # users should be able to see the training pool shape before
+        # committing to a multi-hour engine pass.
+        pool = summarize_training_pool(records)
+        print()
+        print("── Training pool summary " + "─" * 35)
+        print(f"  Total records:       {pool['total_records']:,}")
+        print(f"  Total labels:        {pool['total_labels']:,} "
+              f"(avg {pool['avg_labels_per_record']:.2f}/record)")
+        print("  By dataset:          "
+              + ", ".join(f"{k}={v:,}" for k, v in pool["by_dataset"].items()))
+        top_langs = list(pool["by_language"].items())[:8]
+        langs_str = ", ".join(f"{k}={v:,}" for k, v in top_langs)
+        more_langs = len(pool["by_language"]) - len(top_langs)
+        if more_langs > 0:
+            langs_str += f" (+{more_langs} more)"
+        print(f"  By language (top 8): {langs_str}")
+        top_types = list(pool["by_entity_type"].items())[:8]
+        print("  By entity type:      "
+              + ", ".join(f"{k}={v:,}" for k, v in top_types)
+              + (f" (+{len(pool['by_entity_type']) - len(top_types)} more)"
+                 if len(pool["by_entity_type"]) > len(top_types) else ""))
+        print(f"  Records w/o labels:  {pool['records_without_labels']:,}")
+        print("─" * 60)
         logger.info("Loaded %d records in %s", len(records), format_elapsed(load_elapsed))
 
         # ── Initialize engines ────────────────────────────────────────────
@@ -402,9 +465,35 @@ def main() -> None:
                 engine.enabled = True
         engines = [e for e in all_engines if e.enabled]
         engine_ids = [e.adapter_id for e in engines]
+
+        # Hard contract: ``regex-oss`` IS the pii-anon baseline detection
+        # engine — the deterministic regex + checksum engine that the
+        # library ships standalone.  It must be active in every swarm
+        # training run: it participates in Layer 1 fast-pass, gets a
+        # pinned slot past the Layer 2 Jaccard pruner, feeds Dawid-Skene
+        # with a per-engine confusion matrix, and contributes the
+        # ``regex_detected`` / ``regex_confidence`` / ``has_checksum_validation``
+        # features (#8, #9, #14) to the XGBoost meta-learner.  If it
+        # isn't here, the trained artifacts would miss the baseline
+        # entirely.
+        if "regex-oss" not in engine_ids:
+            logger.error(
+                "The pii-anon baseline engine (regex-oss) is not in the active "
+                "engine pool. Training would produce artifacts that miss the "
+                "baseline detector entirely. Aborting."
+            )
+            sys.exit(2)
         init_elapsed = time.time() - t_init
-        logger.info("Initialized %d engines in %s: %s",
-                    len(engines), format_elapsed(init_elapsed), engine_ids)
+        # Label the baseline explicitly so the run log makes its role
+        # unambiguous to anyone reading it.
+        annotated_ids = [
+            f"{eid} (pii-anon baseline)" if eid == "regex-oss" else eid
+            for eid in engine_ids
+        ]
+        logger.info(
+            "Initialized %d engines in %s: %s",
+            len(engines), format_elapsed(init_elapsed), annotated_ids,
+        )
 
         # ── Compute weighted total_work for 0.01% overall accuracy ────────
         # records_work: every record pass through engines (fold train + eval + final retrain)

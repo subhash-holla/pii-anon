@@ -55,6 +55,33 @@ see [quickstart.md](quickstart.md). For the evaluation framework, see
 Source: [src/pii_anon/swarm.py](../src/pii_anon/swarm.py),
 [src/pii_anon/swarm_learner.py](../src/pii_anon/swarm_learner.py).
 
+### The `regex-oss` baseline is `pii-anon` itself
+
+The `pii-anon` standalone offering — the fast regex + checksum engine
+that's exported as the default detector via `PIIOrchestrator` — ships
+inside the swarm under the engine ID **`regex-oss`**.  It is not a
+separate optional component: it's always active, always enabled (no
+third-party dependency), and has three privileged positions in the
+pipeline:
+
+1. **Layer 1 fast-pass** — any regex-oss finding above
+   `SwarmConfig.fast_pass_threshold` (default 0.90) is emitted
+   directly without entering fusion.  Luhn/mod-97/ABA checksums are
+   stronger evidence than multi-engine votes for structured PII, so
+   the swarm short-circuits on them.
+2. **Pinned past the Layer 2 Jaccard pruner** — `regex-oss` always
+   survives, regardless of overlap with other engines
+   (see [swarm.py's `_prune_redundant_findings`](../src/pii_anon/swarm.py)).
+3. **Feature slots in the XGBoost meta-learner** — features 8
+   (`regex_detected`), 9 (`regex_confidence`), and 14
+   (`has_checksum_validation`) are all derived exclusively from
+   `regex-oss` output.
+
+`scripts/train_swarm.py` asserts `"regex-oss"` is in the active engine
+pool before training starts and fails loud if it isn't — the baseline
+is a hard contract, not an optional add-on.  In the run log it appears
+as ``regex-oss (pii-anon baseline)`` so its role is unambiguous.
+
 ### SEMANTIC_TYPES — the corroboration gate
 
 Entity types with permissive regex surfaces (e.g. emails look like almost
@@ -100,18 +127,56 @@ dependency but are otherwise zero-config.
 | `tab` | Text Anonymization Benchmark (Pilan 2022) | 1,268 | en | Real-world legal text, peer-reviewed manual annotations |
 | `meddocan` | MEDDOCAN (Marimon 2019) | 1,000 | es | Spanish clinical PHI — adds non-English clinical coverage |
 
-The recommended paper-aligned mix for a production retrain:
+The **default mix** (what you get with no flags) is the first three
+rows above: `pii_anon_eval`, `ai4privacy_400k`, `tab`. That's our
+canonical corpus plus two industry leaders — the minimum mix the
+research paper evaluates against. `meddocan` is opt-in when you need
+Spanish clinical coverage.
 
 ```bash
+# Default: pii-anon eval + AI4Privacy-400K + TAB
+make train-swarm SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
+
+# Add Spanish clinical coverage
 make train-swarm \
     SWARM_DATASETS=pii_anon_eval,ai4privacy_400k,tab,meddocan \
     SWARM_MAX_RECORDS=0 SWARM_KFOLD=5
 ```
 
-This spans 60+ languages, 100K+ annotations per major entity type,
-synthetic + peer-reviewed + real-world-legal + clinical-Spanish — the
-same training distribution the pii-rate-elo research paper uses for its
-reference evaluation.
+### Stratified sampling
+
+When `SWARM_MAX_RECORDS > 0`, each dataset is sampled **stratified by
+language** before training kicks off. Without stratification, a
+`SWARM_MAX_RECORDS=10000` run against a 60-language corpus collapses
+to English because the source ordering is English-first. With it, the
+10K-record cap preserves the language distribution of the full pool.
+
+The default strata key is `language`. Override via `--stratify-by`:
+
+```bash
+# Balance across dataset sources as well as language
+python scripts/train_swarm.py \
+    --datasets pii_anon_eval,ai4privacy_400k,tab \
+    --max-records 10000 \
+    --stratify-by language,source_dataset
+```
+
+The implementation is
+[`swarm_datasets.stratified_sample(records, n, strata_keys, seed)`](../src/pii_anon/swarm_datasets.py):
+proportional allocation with a floor of 1 record per represented
+stratum, deterministic under a seed, no oversampling when the pool is
+already smaller than the target. The training script prints a pool
+summary (per-dataset / per-language / per-entity-type counts) before
+engine passes so you can spot-check balance before committing to a
+multi-hour run.
+
+`SWARM_MAX_RECORDS=0` (unlimited) skips stratification entirely — the
+full pool is used as-is. For the paper-aligned mix that's ~560K records
+across 60+ languages, mixing synthetic + peer-reviewed + real-world
+legal + (optionally) clinical Spanish — the same training distribution
+the pii-rate-elo research paper uses for its reference evaluation. Plan
+for a multi-hour K-fold CV run at that scale; drop `SWARM_KFOLD=3` or
+cap via `SWARM_MAX_RECORDS` if you need a faster iteration cycle.
 
 ### Pipeline
 
