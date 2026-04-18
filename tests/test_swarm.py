@@ -310,8 +310,11 @@ class TestFeatureExtraction:
         # the meta-learner non-English signal coverage.  Feature 21
         # (``context_has_multilang_keywords``) defaults to 0.0 when the
         # surrounding text is empty, as it is in this fixture.
+        # FEATURE_VERSION=3 adds distinct ENTITY_TYPE_ENCODING indices
+        # for the Phase 3 gap-closure types (feature vector shape
+        # unchanged at 21).
         from pii_anon.swarm_learner import FEATURE_VERSION
-        assert FEATURE_VERSION == 2
+        assert FEATURE_VERSION == 3
         assert len(features) == 21
         assert all(isinstance(f, float) for f in features)
         assert features[0] == 0.95  # ds_confidence

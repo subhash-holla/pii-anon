@@ -58,12 +58,15 @@ def test_semantic_types_preserves_original_entries():
 # FEATURE_VERSION — trained artifacts are keyed to a specific shape
 # ---------------------------------------------------------------------------
 
-def test_feature_version_is_bumped_to_two():
-    """v2 introduces feature 21 (multilingual context keywords).  The
-    version guards against loading v1 artifacts that would feed
-    mis-shaped vectors to XGBoost at inference time.
+def test_feature_version_is_bumped():
+    """Guards the artifact-shape contract across version bumps.
+
+    v2 introduced feature 21 (multilingual context keywords).
+    v3 added distinct ENTITY_TYPE_ENCODING indices for the Phase 3
+    paper-v11 gap-closure types (CVV / PIN / PASSWORD / COURT_CASE /
+    DOCKET / BAR / INVOICE / INSURANCE_POLICY / SALARY).
     """
-    assert FEATURE_VERSION == 2
+    assert FEATURE_VERSION >= 3
 
 
 # ---------------------------------------------------------------------------

@@ -89,6 +89,59 @@ pool before training starts and fails loud if it isn't — the baseline
 is a hard contract, not an optional add-on.  In the run log it appears
 as ``regex-oss (pii-anon baseline)`` so its role is unambiguous.
 
+### The baseline → swarm handoff contract
+
+Every baseline emission routes through one of three paths inside the
+swarm.  Which path depends on a single number: the regex's
+`base_confidence` relative to `SwarmConfig.fast_pass_threshold`
+(default 0.90) and whether the type is in `STRUCTURED_TYPES`.
+
+```
+                regex-oss fires
+                      │
+                      ▼
+        confidence ≥ 0.90 AND in STRUCTURED_TYPES?
+                      │
+               ┌──────┴──────┐
+              YES            NO
+               │              │
+               ▼              ▼
+     Layer 1 fast-pass   Layer 3 fusion
+     (emit directly)     (Dawid-Skene + meta-learner)
+                              │
+                              ▼
+                    entity in SEMANTIC_TYPES?
+                              │
+                       ┌──────┴──────┐
+                      YES            NO
+                       │              │
+                       ▼              ▼
+              Layer 4 corroboration   Emit
+              (need ≥2 engines)
+```
+
+**Fast-pass eligibility matrix** (what routes through which path):
+
+| Category | Example types | Path | Why |
+|---|---|---|---|
+| Checksum-validated | CREDIT_CARD, IBAN, US_SSN, VIN, ROUTING_NUMBER | Layer 1 fast-pass | Luhn / mod-97 / check-digit math is stronger than any ensemble vote |
+| Phase 3 keyword-gated | CVV, PIN, PASSWORD, COURT_CASE_NUMBER, DOCKET_NUMBER, BAR_NUMBER, INVOICE_NUMBER, INSURANCE_POLICY_NUMBER, SALARY | **Layer 1 fast-pass** | Regex requires the keyword adjacent to the captured group — structural guarantee on par with a checksum |
+| Semantic / ambiguous | PERSON_NAME, ORGANIZATION, LOCATION, DATE_OF_BIRTH, ADDRESS | Layer 3 fusion → Layer 4 corroboration gate | Open-vocabulary, regex hit alone is not authoritative |
+| Structural but permissive | EMAIL_ADDRESS, CREDIT_CARD (fragment cases) | Layer 3 fusion → Layer 4 corroboration gate | Regex surface matches too much without context; NER votes clamp precision |
+
+This matrix is the **integration contract** locked in by
+[`tests/test_swarm_baseline_integration.py`](../tests/test_swarm_baseline_integration.py):
+
+- Every Phase 3 type's weakest `PatternSpec.base_confidence` is ≥ 0.90.
+- Every Phase 3 type is in `STRUCTURED_TYPES`.
+- Every Phase 3 type has a distinct index in `ENTITY_TYPE_ENCODING`.
+- The `is_structured` feature (slot 13) fires for Phase 3 findings.
+- The `regex_detected` feature (slot 8) fires when regex-oss is the
+  sole contributor.
+
+A future refactor that widens a pattern and drops its confidence below
+0.90 will fail these tests before landing.
+
 ### Baseline coverage map — paper v11 §5.6
 
 Every entity type the baseline emits has a context gate, a validator,

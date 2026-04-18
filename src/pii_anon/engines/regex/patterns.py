@@ -1305,22 +1305,31 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         explanation="case-insensitive DOB with broader separators",
     ),
     # ── Phase 3: paper v11 gap-closure entity types ────────────────────
-    # All context-gated — the regex matches the numeric/literal shape
-    # and the surrounding ±50-char context provides the entity-type
-    # disambiguation.  Base confidence is set slightly below the
-    # checksum-validated types (which hit 0.93–0.99) because these
-    # rely on context keywords rather than structural checksums.
+    # All context-gated — the regex REQUIRES the keyword adjacent to the
+    # captured group, not merely in the ±50-char context window.  This
+    # regex-level gating is a structural guarantee on par with a checksum
+    # for credit cards or IBANs: a match cannot happen without the
+    # keyword, so false positives on random numeric content are
+    # architecturally impossible.
+    #
+    # Base confidence is therefore set to ≥0.90 so Phase 3 findings
+    # qualify for the swarm's Layer 1 fast-pass
+    # (``SwarmConfig.fast_pass_threshold = 0.90``) — the baseline
+    # catches these patterns and emits them directly without paying for
+    # NER fusion.  This is the paper v11 §5.6 recommendation: route
+    # rule-based detections through the fast path, let the mixture of
+    # experts handle the open-vocabulary tail.
     PatternSpec(
         entity_type="CVV",
         pattern=_CVV,
-        base_confidence=0.90,
+        base_confidence=0.92,
         group=1,
         explanation="regex cvv with card-context gate",
     ),
     PatternSpec(
         entity_type="PIN",
         pattern=_PIN,
-        base_confidence=0.88,
+        base_confidence=0.90,
         group=1,
         explanation="regex pin with auth-context gate",
     ),
@@ -1334,42 +1343,42 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
     PatternSpec(
         entity_type="COURT_CASE_NUMBER",
         pattern=_COURT_CASE,
-        base_confidence=0.88,
+        base_confidence=0.90,
         group=1,
         explanation="regex court case no. with legal-context gate",
     ),
     PatternSpec(
         entity_type="DOCKET_NUMBER",
         pattern=_DOCKET,
-        base_confidence=0.88,
+        base_confidence=0.90,
         group=1,
         explanation="regex docket no. with legal-context gate",
     ),
     PatternSpec(
         entity_type="BAR_NUMBER",
         pattern=_BAR_NUMBER,
-        base_confidence=0.88,
+        base_confidence=0.90,
         group=1,
         explanation="regex state bar identifier",
     ),
     PatternSpec(
         entity_type="INVOICE_NUMBER",
         pattern=_INVOICE,
-        base_confidence=0.85,
+        base_confidence=0.90,
         group=1,
         explanation="regex invoice reference",
     ),
     PatternSpec(
         entity_type="INSURANCE_POLICY_NUMBER",
         pattern=_INSURANCE_POLICY,
-        base_confidence=0.85,
+        base_confidence=0.90,
         group=1,
         explanation="regex insurance policy reference",
     ),
     PatternSpec(
         entity_type="SALARY",
         pattern=_SALARY,
-        base_confidence=0.86,
+        base_confidence=0.90,
         group=1,
         explanation="regex salary/compensation amount",
     ),

@@ -38,7 +38,15 @@ logger = logging.getLogger(__name__)
 #: Current meta-learner feature-vector version.  Persisted alongside the
 #: trained model and checked at load time to detect incompatibilities
 #: between training and inference code.
-FEATURE_VERSION: int = 2
+#:
+#: v3 adds distinct indices for the Phase 3 paper-v11 gap-closure types
+#: (CVV / PIN / PASSWORD / COURT_CASE_NUMBER / DOCKET_NUMBER / BAR_NUMBER /
+#: INVOICE_NUMBER / INSURANCE_POLICY_NUMBER / SALARY).  Previously they
+#: all fell into the catch-all bucket at index 23, meaning the XGBoost
+#: meta-learner could not differentiate a CVV finding from a BAR_NUMBER
+#: finding via this feature.  Retrained models bump feature_version=3
+#: to reject v2 artifacts.
+FEATURE_VERSION: int = 3
 
 # Canonical entity type → integer encoding for the meta-learner.
 ENTITY_TYPE_ENCODING: dict[str, int] = {
@@ -48,6 +56,11 @@ ENTITY_TYPE_ENCODING: dict[str, int] = {
     "DRIVERS_LICENSE": 12, "PASSPORT": 13, "NATIONAL_ID": 14, "IBAN": 15,
     "USERNAME": 16, "EMPLOYEE_ID": 17, "MEDICAL_RECORD_NUMBER": 18, "LOCATION": 19,
     "LICENSE_PLATE": 20, "VIN": 21, "CRYPTO_WALLET": 22,
+    # Phase 3 (paper v11 §5.6) — context-gated rule-based detections
+    # routed through the swarm's Layer 1 fast-pass.
+    "CVV": 23, "PIN": 24, "PASSWORD": 25,
+    "COURT_CASE_NUMBER": 26, "DOCKET_NUMBER": 27, "BAR_NUMBER": 28,
+    "INVOICE_NUMBER": 29, "INSURANCE_POLICY_NUMBER": 30, "SALARY": 31,
 }
 
 # PII context keywords for feature 17 — English subset, used for the

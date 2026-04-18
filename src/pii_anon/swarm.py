@@ -22,12 +22,41 @@ from pii_anon.types import EngineFinding, EnsembleFinding
 
 logger = logging.getLogger(__name__)
 
-# Entity types where regex checksum/format validation provides high precision.
+# Entity types where regex checksum OR regex-level keyword gating
+# provides high precision.  These types:
+#
+#   1. Are eligible for the swarm's Layer 1 fast-pass — when regex-oss
+#      emits them at confidence ≥ ``SwarmConfig.fast_pass_threshold``
+#      (default 0.90) the finding bypasses NER fusion entirely.
+#   2. Skip the Layer 4 corroboration gate — a single high-confidence
+#      regex detection is authoritative, no multi-engine vote required.
+#   3. Get the ``is_structured=1`` feature bit (slot 13) in the
+#      XGBoost meta-learner, so the model knows to trust them more.
+#
+# Two kinds of evidence qualify a type for this set:
+#
+#   * **Checksum-validated** — Luhn (CREDIT_CARD), mod-97 (IBAN), NHTSA
+#     check digit (VIN), weighted-sum (ROUTING_NUMBER), HMRC rules
+#     (UK_NI_NUMBER — admitted here as NATIONAL_ID alias).  The
+#     mathematical guarantee is stronger than any NER ensemble vote.
+#   * **Regex-level keyword gated** — the Phase 3 gap-closure types
+#     (CVV/PIN/PASSWORD/COURT_CASE_NUMBER/DOCKET_NUMBER/BAR_NUMBER/
+#     INVOICE_NUMBER/INSURANCE_POLICY_NUMBER/SALARY) require the keyword
+#     to appear adjacent to the captured group in the regex itself,
+#     not just somewhere in the ±50-char context window.  A random
+#     3-digit number cannot emit CVV; the regex simply won't match.
+#     That's a structural guarantee, not a statistical one, and merits
+#     the same fast-path treatment as checksum types.
 STRUCTURED_TYPES = frozenset({
+    # Checksum-validated
     "EMAIL_ADDRESS", "US_SSN", "CREDIT_CARD", "IBAN", "IP_ADDRESS",
     "MAC_ADDRESS", "ROUTING_NUMBER", "VIN", "DRIVERS_LICENSE",
     "PASSPORT", "BANK_ACCOUNT", "EMPLOYEE_ID", "LICENSE_PLATE",
     "MEDICAL_RECORD_NUMBER", "NATIONAL_ID", "CRYPTO_WALLET",
+    # Phase 3 — regex-level keyword-gated (paper v11 §5.6 gap closure)
+    "CVV", "PIN", "PASSWORD",
+    "COURT_CASE_NUMBER", "DOCKET_NUMBER", "BAR_NUMBER",
+    "INVOICE_NUMBER", "INSURANCE_POLICY_NUMBER", "SALARY",
 })
 
 # Entity types that benefit from multi-engine corroboration in Layer 4.
