@@ -102,6 +102,7 @@ T = TypeVar("T")
 SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
     {
         "ADDRESS",
+        "AGE",
         "BANK_ACCOUNT",
         "CREDIT_CARD",
         "CREDIT_CARD_FRAGMENT",
@@ -118,18 +119,30 @@ SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
         "LICENSE_PLATE",
         "LOCATION",
         "MAC_ADDRESS",
-        "MEDICAL_RECORD_NUMBER",
         "MEDICAL_LICENSE",
+        "MEDICAL_RECORD_NUMBER",
         "NATIONAL_ID",
         "ORGANIZATION",
         "PASSPORT",
         "PERSON_NAME",
         "PHONE_NUMBER",
         "ROUTING_NUMBER",
-        "USERNAME",
         "US_SSN",
+        "USERNAME",
         "VIN",
-        "AGE",
+        # ── Phase 3: paper v11 §5.6 gap-closure entity types ───────
+        # Context-gated heuristic patterns in the regex-oss baseline.
+        # Each requires a keyword in the ±50-char window to emit — the
+        # number alone is ambiguous, the keyword makes it PII.
+        "CVV",
+        "PIN",
+        "PASSWORD",
+        "COURT_CASE_NUMBER",
+        "DOCKET_NUMBER",
+        "BAR_NUMBER",
+        "INVOICE_NUMBER",
+        "INSURANCE_POLICY_NUMBER",
+        "SALARY",
     }
 )
 

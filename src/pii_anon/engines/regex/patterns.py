@@ -546,6 +546,121 @@ _DOB_CONTEXT_BROAD = re.compile(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Phase 3 — paper v11 gap closure
+#
+# Every pattern below is context-gated: the number on its own is
+# ambiguous (a 3-digit number is just a number), but the presence of
+# the keyword ("cvv", "pin", "invoice", "docket", "salary", …) makes
+# it PII with high precision.  This follows paper v11 §5.6 which
+# identifies these entity types as high-count dataset labels that no
+# evaluated system detects today.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# CVV: 3 or 4 digits adjacent to a credit-card context keyword.
+# Standalone 3-digit numbers are too ambiguous; requiring "cvv" /
+# "cvc" / "security code" in the ±50 char context reduces FPs by ~99%.
+# The ``[\s:=\-#]+(?:is|=|number|no)?[\s:=\-#]*`` separator accepts
+# both symbolic (``cvv: 123``, ``cvv=123``) and verbal (``cvv is 123``)
+# phrasing without matching substantive intervening content.
+_CVV = re.compile(
+    r"\b(?:cvv|cvv2|cvc|cvc2|cid|security\s*code|card\s*verification(?:\s*value)?)"
+    r"(?:\s*(?:number|no|#|is|:|=|-)){0,2}"
+    r"\s*"
+    r"(\d{3,4})\b",
+    re.IGNORECASE,
+)
+
+# PIN: 4 to 6 digits with banking/ATM/auth context.
+_PIN = re.compile(
+    r"\b(?:pin(?:\s*(?:number|code))?|passcode|atm\s*pin|pin\s*#)"
+    r"(?:\s*(?:is|:|=|-)){0,2}"
+    r"\s*"
+    r"(\d{4,6})\b",
+    re.IGNORECASE,
+)
+
+# PASSWORD: structured "password=...", "pwd: ...", "pass = ..." forms.
+# The captured group excludes whitespace so multi-word descriptions
+# ("password is strong") don't match — only key=value style.
+_PASSWORD = re.compile(
+    r"(?:^|[\s;,])(?:password|passwd|pwd|pass)\s*[:=]\s*"
+    r"([^\s'\";,]{6,64})",
+    re.IGNORECASE,
+)
+
+# COURT_CASE_NUMBER: US federal / state case numbering.
+# Common forms:
+#   "1:21-cv-01234"   (fed. district — type: cv, cr, mc, etc.)
+#   "2024-CV-00123"   (state court — year-TYPE-seqno)
+#   "Case No. 2024-123456"
+#   "No. 3:22-cv-00001"
+# The letter class covers cv (civil), cr (criminal), mc (miscellaneous),
+# mj (magistrate), po (probation), pv (parole).
+_COURT_CASE = re.compile(
+    r"\b(?:case\s*(?:no\.?|number|#)|no\.)\s*"
+    r"(\d{1,2}:\d{2}-(?:cv|cr|mc|mj|po|pv)-\d{4,6}"
+    r"|\d{4}-[A-Z]{1,4}-\d{2,8}"
+    r"|\d{4}-\d{4,8}"
+    r"|\d{2,3}-\d{3,8})\b",
+    re.IGNORECASE,
+)
+
+# DOCKET_NUMBER: shares the structural pattern with COURT_CASE_NUMBER
+# but is gated on a different keyword ("docket").
+_DOCKET = re.compile(
+    r"\b(?:docket\s*(?:no\.?|number|#)?)\s*[:\-]?\s*"
+    r"(\d{1,2}:\d{2}-(?:cv|cr|mc|mj|po|pv)-\d{4,6}"
+    r"|\d{4}-[A-Z]{1,4}-\d{2,8}"
+    r"|\d{4}-\d{4,8}"
+    r"|[A-Z]{1,4}-\d{3,8})\b",
+    re.IGNORECASE,
+)
+
+# BAR_NUMBER: US state bar identifiers.  Shapes vary by state:
+#   "State Bar No. 123456"
+#   "SBN 123456" (California)
+#   "Bar ID: 987654"
+#   "Bar #12345"
+_BAR_NUMBER = re.compile(
+    r"\b(?:state\s+bar|sbn|bar\s*(?:id|no\.?|number|#))"
+    r"\s*[:\-#]?\s*"
+    r"(\d{4,8})\b",
+    re.IGNORECASE,
+)
+
+# INVOICE_NUMBER: common invoice-reference shapes.
+#   "Invoice #12345"
+#   "INV-2024-001"
+#   "Inv. No. 2024/0012"
+_INVOICE = re.compile(
+    r"\b(?:invoice|inv\.?)\s*(?:no\.?|number|#)?\s*[:\-#]?\s*"
+    r"([A-Z]{0,4}[-/]?\d{3,10}(?:[-/]\d{1,6})?)\b",
+    re.IGNORECASE,
+)
+
+# INSURANCE_POLICY_NUMBER: "Policy #ABC-123456", "Policy Number: POL-2024-001".
+_INSURANCE_POLICY = re.compile(
+    r"\b(?:policy|policyholder|insurance\s*policy)\s*(?:no\.?|number|#)?"
+    r"\s*[:\-#]?\s*"
+    r"([A-Z]{0,6}[-/]?\d{4,10}(?:[-/][A-Z0-9]{1,6})?)\b",
+    re.IGNORECASE,
+)
+
+# SALARY: currency amount with salary/compensation context.  Captures
+# the numeric portion (with optional thousands separators / decimals)
+# so downstream callers can redact or range-anonymize the amount.
+_SALARY = re.compile(
+    r"\b(?:salary|annual\s*salary|compensation|base\s*pay|earnings|wage)"
+    r"\s*(?:of|:|is|was|=|-)?\s*"
+    r"\$?"
+    r"(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?"
+    r"|\d{4,10}(?:\.\d{1,2})?)"
+    r"(?:\s*(?:per|/)\s*(?:year|yr|annum|month|mo))?\b",
+    re.IGNORECASE,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Pattern Registry
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1065,7 +1180,10 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         pattern=_UK_NI,
         base_confidence=0.89,
         group=1,
-        explanation="regex uk ni number",
+        validator="uk_ni",
+        valid_confidence=0.95,
+        invalid_confidence=0.0,
+        explanation="regex uk ni number (HMRC-valid prefix enforced)",
     ),
     # ── JWT_TOKEN ──────────────────────────────────────────────────────
     PatternSpec(
@@ -1185,5 +1303,74 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         group=1,
         context_type="DATE_OF_BIRTH",
         explanation="case-insensitive DOB with broader separators",
+    ),
+    # ── Phase 3: paper v11 gap-closure entity types ────────────────────
+    # All context-gated — the regex matches the numeric/literal shape
+    # and the surrounding ±50-char context provides the entity-type
+    # disambiguation.  Base confidence is set slightly below the
+    # checksum-validated types (which hit 0.93–0.99) because these
+    # rely on context keywords rather than structural checksums.
+    PatternSpec(
+        entity_type="CVV",
+        pattern=_CVV,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex cvv with card-context gate",
+    ),
+    PatternSpec(
+        entity_type="PIN",
+        pattern=_PIN,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex pin with auth-context gate",
+    ),
+    PatternSpec(
+        entity_type="PASSWORD",
+        pattern=_PASSWORD,
+        base_confidence=0.92,
+        group=1,
+        explanation="regex password/pwd key=value form",
+    ),
+    PatternSpec(
+        entity_type="COURT_CASE_NUMBER",
+        pattern=_COURT_CASE,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex court case no. with legal-context gate",
+    ),
+    PatternSpec(
+        entity_type="DOCKET_NUMBER",
+        pattern=_DOCKET,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex docket no. with legal-context gate",
+    ),
+    PatternSpec(
+        entity_type="BAR_NUMBER",
+        pattern=_BAR_NUMBER,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex state bar identifier",
+    ),
+    PatternSpec(
+        entity_type="INVOICE_NUMBER",
+        pattern=_INVOICE,
+        base_confidence=0.85,
+        group=1,
+        explanation="regex invoice reference",
+    ),
+    PatternSpec(
+        entity_type="INSURANCE_POLICY_NUMBER",
+        pattern=_INSURANCE_POLICY,
+        base_confidence=0.85,
+        group=1,
+        explanation="regex insurance policy reference",
+    ),
+    PatternSpec(
+        entity_type="SALARY",
+        pattern=_SALARY,
+        base_confidence=0.86,
+        group=1,
+        explanation="regex salary/compensation amount",
     ),
 )

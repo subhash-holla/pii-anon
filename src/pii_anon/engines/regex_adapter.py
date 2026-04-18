@@ -84,12 +84,43 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 # that receive context penalties.
 _MIN_EMIT_CONFIDENCE: float = 0.50
 
+# ISO 3166-1 alpha-2 country codes — used by the ``swift_context``
+# validator to reject BIC-shaped strings whose country-code pair is
+# not a real jurisdiction (the regex surface is broad by design, so
+# this narrows it without a full NER pass).
+_ISO_3166_ALPHA_2: frozenset[str] = frozenset({
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS",
+    "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG",
+    "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT",
+    "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI",
+    "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY",
+    "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "EH",
+    "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB",
+    "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ",
+    "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT",
+    "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT",
+    "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP",
+    "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS",
+    "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH",
+    "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU",
+    "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI",
+    "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG",
+    "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA",
+    "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG",
+    "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST",
+    "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK",
+    "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG",
+    "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU",
+    "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+})
+
 _VALIDATORS: dict[str, Any] = {
     # Simple bool validators — callable, return True/False
     "ipv4": lambda text, _m: validators.is_valid_ipv4(text),
     "aba_routing": lambda text, _m: validators.is_valid_aba_routing(text),
     "vin": lambda text, _m: validators.is_valid_vin_check_digit(text),
     "npi": lambda text, _m: validators.is_valid_npi(text),
+    "uk_ni": lambda text, _m: validators.is_valid_uk_ni(text),
     "dea": lambda text, _m: validators.is_valid_dea_number(text),
     "phone": lambda text, _m: validators.is_valid_phone_number(text),
     # Custom handlers — need multi-step logic in _run_validator()
@@ -626,8 +657,19 @@ class RegexEngineAdapter(EngineAdapter):
             except (ValueError, AttributeError):
                 return 0, "", True
 
-        # ── SWIFT/BIC: require bank/wire context ───────────────────
+        # ── SWIFT/BIC: validate country code + require bank context ─
         if v == "swift_context":
+            # Strict BIC structure: 4 letters (bank) + 2 letters
+            # (ISO 3166-1 alpha-2 country) + 2 alphanumeric (location)
+            # + optional 3 alphanumeric (branch).  The pattern is
+            # permissive by design to catch BIC-like strings, so we
+            # harden it here: the country-code pair MUST be in the ISO
+            # alpha-2 set, otherwise the match is almost always noise
+            # (test fixtures, code IDs, etc.).
+            candidate = match.group(1) if match.groups() else match.group(0)
+            country_code = candidate[4:6] if len(candidate) >= 6 else ""
+            if country_code not in _ISO_3166_ALPHA_2:
+                return 0, "", True
             ctx = extract_context(value, span_start, span_end)
             if not has_context_words("IBAN", ctx):
                 return 0, "", True

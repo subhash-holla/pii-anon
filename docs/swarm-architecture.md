@@ -59,10 +59,17 @@ Source: [src/pii_anon/swarm.py](../src/pii_anon/swarm.py),
 
 The `pii-anon` standalone offering — the fast regex + checksum engine
 that's exported as the default detector via `PIIOrchestrator` — ships
-inside the swarm under the engine ID **`regex-oss`**.  It is not a
-separate optional component: it's always active, always enabled (no
-third-party dependency), and has three privileged positions in the
-pipeline:
+inside the swarm under the engine ID **`regex-oss`**.  It is a
+**precision-maximising, recall-sacrificing package of heuristics** that
+covers vanilla PII use cases consistently with high precision and
+sub-millisecond latency.  Users who just want the job done quickly
+with decent accuracy can rely on it standalone; the swarm layers
+mixture-of-experts NER on top to recover the edge cases the baseline
+intentionally doesn't chase.
+
+It is not a separate optional component: it's always active, always
+enabled (no third-party dependency), and has three privileged positions
+in the pipeline:
 
 1. **Layer 1 fast-pass** — any regex-oss finding above
    `SwarmConfig.fast_pass_threshold` (default 0.90) is emitted
@@ -81,6 +88,42 @@ pipeline:
 pool before training starts and fails loud if it isn't — the baseline
 is a hard contract, not an optional add-on.  In the run log it appears
 as ``regex-oss (pii-anon baseline)`` so its role is unambiguous.
+
+### Baseline coverage map — paper v11 §5.6
+
+Every entity type the baseline emits has a context gate, a validator,
+or both.  The emission decision tree:
+
+- **Structural shape + checksum** → high confidence (0.93–0.99). Luhn
+  on credit cards, mod-97 on IBAN, weighted sum on ABA routing,
+  Verhoeff on Aadhaar, NHTSA check digit on VIN, HMRC rules on UK NI.
+  These types survive the swarm's Layer 1 fast-pass at threshold 0.90.
+- **Structural shape + required adjacent keyword** → medium-high
+  confidence (0.85–0.92). The new Phase 3 gap-closure types — CVV, PIN,
+  PASSWORD, COURT_CASE_NUMBER, DOCKET_NUMBER, BAR_NUMBER,
+  INVOICE_NUMBER, INSURANCE_POLICY_NUMBER, SALARY — require a keyword
+  in the immediate regex neighbourhood (not just the ±50 char context
+  window).  This is what lets us emit CVV=123 without misfiring on
+  every 3-digit number on the internet.
+- **Shape with context boost** → confidence adjusted via ±50-char
+  window keyword check. Types in `HIGH_FP_TYPES` (US_SSN, PERSON_NAME,
+  LOCATION, ORGANIZATION, ADDRESS, PHONE_NUMBER, EMPLOYEE_ID,
+  IP_ADDRESS, EMAIL_ADDRESS, CREDIT_CARD_FRAGMENT, BANK_ACCOUNT, VIN,
+  LICENSE_PLATE, NATIONAL_ID) lose confidence when the context is
+  silent. Non-HIGH_FP types float at base confidence unchanged.
+
+**What the baseline doesn't chase** — and why the swarm exists:
+
+| Category | Example types | Why the baseline skips | Swarm layer that picks it up |
+|---|---|---|---|
+| Free-form names | PERSON_NAME in novel phrasing, aliased or abbreviated | No structural signature | GLiNER / Presidio NER |
+| Domain vocabulary | MEDICATION_NAME, HEALTH_CONDITION, JOB_TITLE | Open-vocabulary — no pattern can enumerate terms | Presidio with medical recognizer, GLiNER zero-shot |
+| Multi-paragraph inference | Entity tracking ("the patient", "Mr. X" referring back) | Rules see only local context | Dawid-Skene on engine-by-engine judgement + corroboration |
+| Behavioural quasi-identifiers | Writing style, interest signals (Tier 3) | Not in the rule surface at all | NER ensemble + Tier 3 scoring post-detection |
+
+This is the paper v11 §5.6 recommendation materialised: use rules for
+what rules are best at (structural, checksum-validated, keyword-gated)
+and let the expert ensemble handle the open-vocabulary tail.
 
 ### SEMANTIC_TYPES — the corroboration gate
 

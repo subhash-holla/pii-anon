@@ -435,3 +435,53 @@ def looks_like_address_phrase(
     if start > 0 and text[start - 1].isdigit():
         return True
     return False
+
+
+# ── UK National Insurance Number ─────────────────────────────────────
+# The HMRC spec prohibits specific prefix letters that could be
+# confused with digits (D, F, I, Q, U, V) and reserves the BG / GB /
+# KN / NK / NR / TN / ZZ prefix strings for administrative purposes.
+# The trailing suffix character must be A, B, C, or D.
+#
+# Reference: HMRC NIM39110 (National Insurance Manual).
+_UK_NI_FORBIDDEN_FIRST = frozenset("DFIQUV")
+_UK_NI_FORBIDDEN_SECOND = frozenset("DFIQUVO")
+_UK_NI_RESERVED_PREFIXES = frozenset({"BG", "GB", "KN", "NK", "NR", "TN", "ZZ"})
+_UK_NI_VALID_SUFFIXES = frozenset("ABCD")
+
+
+def is_valid_uk_ni(candidate: str) -> bool:
+    """Return True when *candidate* matches the HMRC NI-number rules.
+
+    Prefix restrictions:
+
+    * First letter must not be D, F, I, Q, U, V.
+    * Second letter must not be D, F, I, Q, U, V, O.
+    * The two-letter prefix must not be a reserved combination
+      (BG / GB / KN / NK / NR / TN / ZZ).
+
+    Suffix restriction: final character must be A, B, C, or D.
+
+    Middle: exactly six digits (with optional spaces in the candidate
+    string, since the regex surface accepts spaced forms).
+
+    Returns False on any structural violation.  Callers typically wire
+    this as an ``invalid_confidence=0.0`` pattern so matches that fail
+    the check are suppressed entirely rather than emitted at a lower
+    confidence tier.
+    """
+    normalized = candidate.replace(" ", "").upper()
+    if len(normalized) != 9:
+        return False
+    if normalized[0] not in _UK_NI_FORBIDDEN_FIRST and normalized[1] not in _UK_NI_FORBIDDEN_SECOND:
+        pass  # both allowed
+    else:
+        return False
+    if normalized[:2] in _UK_NI_RESERVED_PREFIXES:
+        return False
+    if normalized[-1] not in _UK_NI_VALID_SUFFIXES:
+        return False
+    middle = normalized[2:8]
+    if not middle.isdigit():
+        return False
+    return True

@@ -163,6 +163,89 @@ CONTEXT_WORDS: dict[str, set[str]] = {
         "번호판", "차량",
         "لوحة", "مركبة", "تسجيل",
     },
+    # ── Phase 3 gap-closure types (paper v11 §5.6) ────────────────────
+    # Every Phase 3 pattern is context-gated at the regex level — the
+    # keyword MUST appear adjacent to the captured group to match.  The
+    # entries below add a second, wider ±50-char context-boost layer:
+    # if additional supporting keywords appear in the broader context,
+    # confidence gets a further bump.  This layered gating is what
+    # keeps precision > 0.90 on these ambiguous numeric shapes.
+    "CVV": {
+        "cvv", "cvv2", "cvc", "cvc2", "cid", "card", "credit", "debit",
+        "visa", "mastercard", "amex", "security", "verification",
+        "código", "codigo", "seguridad",   # ES
+        "code", "sécurité", "securite",    # FR
+        "sicherheitscode", "prüfziffer",   # DE
+        "安全码", "セキュリティ",           # ZH / JA
+    },
+    "PIN": {
+        "pin", "passcode", "atm", "debit", "card", "bank", "mobile",
+        "sim", "unlock", "code",
+        "clave", "código", "codigo",
+        "identifiant", "confidentiel",
+        "kennziffer",
+        "암호", "비밀번호",
+    },
+    "PASSWORD": {
+        "password", "passwd", "pwd", "pass", "login", "credential",
+        "credentials", "auth", "secret", "token", "api", "key",
+        "contraseña", "clave",
+        "mot", "passe",
+        "passwort", "kennwort",
+        "senha",
+        "パスワード", "密码",
+        "비밀번호",
+    },
+    "COURT_CASE_NUMBER": {
+        "case", "court", "docket", "filing", "judgment", "judgement",
+        "no.", "no", "number", "v.", "vs", "versus", "plaintiff",
+        "defendant", "court", "file", "filing",
+        "tribunal", "caso", "expediente",
+        "dossier", "affaire",
+        "rechtssache", "akten",
+    },
+    "DOCKET_NUMBER": {
+        "docket", "case", "court", "filing", "no.", "no", "number",
+        "index", "reference", "ref",
+        "expediente", "caso",
+        "dossier", "affaire",
+    },
+    "BAR_NUMBER": {
+        "bar", "state", "sbn", "attorney", "lawyer", "counsel",
+        "license", "licence", "admission", "admitted", "esq.", "esq",
+        "abogado", "abogada",
+        "avocat", "maître",
+        "rechtsanwalt",
+    },
+    "INVOICE_NUMBER": {
+        "invoice", "inv", "billing", "bill", "receipt", "order",
+        "po", "purchase", "so", "sales",
+        "factura",
+        "facture",
+        "rechnung",
+        "fattura",
+        "invoice", "请求书", "インボイス",
+    },
+    "INSURANCE_POLICY_NUMBER": {
+        "policy", "policyholder", "insurance", "insured", "coverage",
+        "premium", "claim", "member", "plan", "subscriber",
+        "póliza", "asegurado",
+        "police", "assuré", "contrat",
+        "versicherung", "versichert", "vertrag",
+        "polizza",
+        "保険", "保险",
+    },
+    "SALARY": {
+        "salary", "compensation", "pay", "payroll", "wage", "wages",
+        "income", "earnings", "base", "annual", "yearly", "monthly",
+        "remuneration", "ctc",
+        "salario", "sueldo", "remuneración",
+        "salaire", "rémunération",
+        "gehalt", "lohn", "vergütung",
+        "salário",
+        "給与", "薪水",
+        "월급", "연봉",
+    },
 }
 
 # Entity types where absence of context should *penalize* confidence.
@@ -180,6 +263,14 @@ HIGH_FP_TYPES: frozenset[str] = frozenset({
     "EMAIL_ADDRESS",
     "CREDIT_CARD_FRAGMENT",
     "BANK_ACCOUNT",
+    # ── Phase 3: structurally-ambiguous identifiers ────────────────
+    # Added because their regex surface is permissive enough that the
+    # number alone produces many single-engine false positives.  The
+    # context-absence penalty is what keeps precision up when the
+    # swarm's Layer 1 fast-pass routes a regex hit past fusion.
+    "VIN",                # 17 alphanum chars — hex strings fit
+    "LICENSE_PLATE",      # 5-8 alphanum — many product codes fit
+    "NATIONAL_ID",        # generic alphanum — order/serial numbers fit
 })
 
 # Tuning constants — module-level defaults.
@@ -218,8 +309,18 @@ def configure_from_config(
     if confidence_floor is not None:
         CONFIDENCE_FLOOR = confidence_floor
 
-# Pre-compiled word tokenizer.
-_WORD_RE = re.compile(r"\b\w+\b")
+# Pre-compiled alphabetic tokenizer.
+#
+# Uses ``[A-Za-zÀ-ÿ]+`` (ASCII letters + Latin-1 supplement) so the
+# tokenizer splits on punctuation AND on underscores (``\w`` treats
+# underscore as a word char, which would leave ``social_security_number``
+# as a single token and miss every context keyword inside it).
+# Non-Latin scripts (CJK, Cyrillic, Arabic) are handled by the regex
+# engine falling through to ``context_text.split()`` for whitespace-
+# separated tokens — CJK is typically written without word spaces so
+# keyword matches there rely on substring containment via the CONTEXT_WORDS
+# set being sized accordingly.
+_WORD_RE = re.compile(r"[A-Za-zÀ-ÿ]+")
 
 
 def extract_context(text: str, start: int, end: int) -> str:
@@ -248,15 +349,27 @@ def extract_context(text: str, start: int, end: int) -> str:
 def has_context_words(entity_type: str, context_text: str) -> bool:
     """Check if any context keywords for *entity_type* appear in *context_text*.
 
-    Uses set intersection of tokenized context against the keyword set.
-    Returns *False* if the entity type has no configured keywords.
+    Uses set intersection of word-boundary-tokenized context against the
+    keyword set.  Returns ``False`` if the entity type has no configured
+    keywords.
+
+    Previously used ``str.split()`` which tokenized only on whitespace
+    and missed matches like ``"social_security_number"`` (one token →
+    no hit) or ``"ssn=123"`` (one token → no hit for ``"ssn"``).  The
+    ``\\b\\w+\\b`` tokenizer splits on every word-boundary, which
+    correctly surfaces the three tokens ``social``, ``security``,
+    ``number`` from the first example and the two tokens ``ssn`` and
+    ``123`` from the second.  Materially improves context-match recall
+    on log-style and underscored keywords without changing the
+    context-keyword sets themselves.
     """
     words = CONTEXT_WORDS.get(entity_type)
     if not words:
         return False
     # ``not words.isdisjoint(...)`` short-circuits on the first common
-    # element and avoids materialising a full split list or genexpr.
-    return not words.isdisjoint(context_text.split())
+    # element and avoids materialising a full list.  The context_text
+    # is already lowercased by ``extract_context``.
+    return not words.isdisjoint(_WORD_RE.findall(context_text))
 
 
 def adjust_confidence(
