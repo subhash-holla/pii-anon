@@ -109,10 +109,11 @@ class ProgressTracker:
                 self._stream.flush()
             except Exception:
                 pass
-        final_completed = self._completed if self._total else self._completed
+        final_completed = self._completed
+        final_pct = self._percent()
         rate = final_completed / max(elapsed, 1e-9)
         self.phase_log.append(
-            f"[100.00%] Pipeline complete: {int(final_completed):,} units in "
+            f"[{final_pct:6.2f}%] Pipeline complete: {int(final_completed):,} units in "
             f"{_format_elapsed(elapsed)} ({rate:.0f} units/s)"
         )
 

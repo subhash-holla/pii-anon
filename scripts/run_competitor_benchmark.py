@@ -5,13 +5,11 @@ import argparse
 import csv
 import hashlib
 import json
-import re
 import subprocess
 import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
-from threading import Event, Thread
 from typing import Any
 
 from pii_anon.evaluation import compare_competitors, run_benchmark_runtime_preflight
@@ -108,187 +106,34 @@ def _format_duration(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}"
 
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from _progress import ProgressTracker  # noqa: E402
+
+
 class _ProgressReporter:
-    """High-fidelity progress reporter with work-unit tracking.
+    """Thin adapter preserving the legacy TOTAL:/WORK: hook contract.
 
-    The evaluation pipeline emits structured progress messages:
-
-    - ``TOTAL:1234|message`` — declares total work units for 100%.
-    - ``WORK:100|message``   — increments completed work by 100 units.
-    - Plain messages          — info-only, no progress change.
-
-    Percentage is computed as ``work_done / total_work * 100``.
-
-    On TTYs, renders a **live single-line progress bar** (via rich) that
-    updates in-place at 0.01% granularity with a constantly-updating
-    ETA estimate.
-
-    On non-TTYs (Docker/CI), emits **exactly one aggregated line per
-    minute** via a heartbeat thread.  All ``__call__`` invocations only
-    update internal state; the heartbeat thread is the sole emitter.
-    This ensures a clean, predictable log regardless of how many
-    parallel workers are active.
-
-    Each non-TTY line includes a text progress bar, 0.01% percentage,
-    elapsed time, ETA, work-unit counts, and the latest status message.
+    Delegates rendering, refresh cadence, and TTY detection to the shared
+    :class:`scripts._progress.ProgressTracker`.  Kept as a separate class
+    so existing call sites (``reporter.start()`` / ``reporter.stop()`` /
+    ``reporter("TOTAL:N|msg")``) continue to work without changes.
     """
 
-    _RE_TOTAL = re.compile(r"^TOTAL:([\d.]+)\|(.*)$")
-    _RE_WORK = re.compile(r"^WORK:([\d.]+)\|(.*)$")
-
-    # Width of the ASCII progress bar (in characters).
-    _BAR_WIDTH = 30
-
     def __init__(self) -> None:
-        self._start_time = time.monotonic()
-        self._total_work = 0.0
-        self._work_done = 0.0
-        self._percent = 0.0
-        self._last_message = "starting"
-        self._stop = Event()
-        self._thread: Thread | None = None
-        self._is_tty = hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
-        # Rich live display for TTY mode.
-        self._live: Any = None
-
-    # ------------------------------------------------------------------
-    # ETA estimation
-    # ------------------------------------------------------------------
-    def _eta_seconds(self) -> float:
-        """Estimate remaining seconds from work-unit throughput."""
-        elapsed = time.monotonic() - self._start_time
-        if self._work_done <= 0 or elapsed <= 0 or self._total_work <= 0:
-            return -1.0
-        rate = self._work_done / elapsed
-        remaining = self._total_work - self._work_done
-        if remaining <= 0:
-            return 0.0
-        return remaining / rate
-
-    # ------------------------------------------------------------------
-    # Rendering — TTY (rich live display)
-    # ------------------------------------------------------------------
-    def _render_rich_str(self) -> str:
-        """Build a rich-markup progress line for the TTY live display."""
-        bar_width = 40
-        filled = int(bar_width * self._percent / 100.0)
-        bar_filled = "\u2588" * filled
-        bar_empty = "\u2591" * (bar_width - filled)
-        elapsed = time.monotonic() - self._start_time
-        eta = self._eta_seconds()
-        eta_str = _format_duration(eta) if eta >= 0 else "--:--"
-        return (
-            f"[cyan]{bar_filled}{bar_empty}[/cyan]  "
-            f"[bold green]{self._percent:6.2f}%[/bold green]  "
-            f"[dim]{_format_duration(elapsed)} elapsed[/dim]  "
-            f"[yellow]ETA {eta_str}[/yellow]  "
-            f"{self._last_message}"
+        self._tracker = ProgressTracker(
+            label="Benchmark", refresh_s=60.0, heartbeat=True,
         )
 
-    def _update_live(self) -> None:
-        """Update the rich live display if in TTY mode."""
-        if self._live is not None:
-            try:
-                from rich.text import Text
-                self._live.update(Text.from_markup(self._render_rich_str()))
-            except Exception:
-                pass
-
-    # ------------------------------------------------------------------
-    # Rendering — non-TTY (Docker/CI one-line-per-minute)
-    # ------------------------------------------------------------------
-    def _render_non_tty(self) -> None:
-        """Print a single aggregated progress line for Docker/CI logs.
-
-        Includes a text progress bar, 0.01% percentage, elapsed, ETA,
-        work-unit counts, and the latest status message.
-        """
-        filled = int(self._BAR_WIDTH * self._percent / 100.0)
-        bar = "\u2588" * filled + "\u2591" * (self._BAR_WIDTH - filled)
-
-        elapsed = time.monotonic() - self._start_time
-        eta = self._eta_seconds()
-        eta_str = _format_duration(eta) if eta >= 0 else "--:--"
-        work_str = (
-            f"{self._work_done:.0f}/{self._total_work:.0f}"
-            if self._total_work else "n/a"
-        )
-        _progress(
-            f"|{bar}| {self._percent:6.2f}% | "
-            f"{_format_duration(elapsed)} elapsed | "
-            f"ETA {eta_str} | "
-            f"work: {work_str} | "
-            f"{self._last_message}"
-        )
-
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
     def __call__(self, message: str) -> None:
-        total_match = self._RE_TOTAL.match(message)
-        work_match = self._RE_WORK.match(message)
-
-        if total_match:
-            self._total_work = float(total_match.group(1))
-            self._last_message = total_match.group(2)
-        elif work_match:
-            self._work_done += float(work_match.group(1))
-            self._last_message = work_match.group(2)
-            if self._total_work > 0:
-                self._percent = min(99.99, (self._work_done / self._total_work) * 100.0)
-        else:
-            self._last_message = message
-
-        # TTY mode: update the rich live display on every message.
-        # Non-TTY mode: state is updated above; the heartbeat thread
-        # handles all output so we never emit here.
-        if self._is_tty:
-            self._update_live()
+        self._tracker.hook_message(message)
 
     def start(self) -> None:
-        self._start_time = time.monotonic()
-        if self._is_tty:
-            try:
-                from rich.live import Live
-                from rich.text import Text
-                self._live = Live(
-                    Text.from_markup(self._render_rich_str()),
-                    console=None,
-                    refresh_per_second=4,
-                    transient=False,
-                )
-                self._live.start()
-            except ImportError:
-                # Fallback: rich not available, degrade to non-TTY mode.
-                self._is_tty = False
-        if not self._is_tty:
-            # Emit the initial state line immediately, then start a
-            # heartbeat thread that emits exactly one line per minute.
-            self._render_non_tty()
-
-            def _heartbeat() -> None:
-                while not self._stop.wait(timeout=60):
-                    self._render_non_tty()
-
-            self._thread = Thread(target=_heartbeat, daemon=True)
-            self._thread.start()
+        self._tracker.start()
 
     def stop(self) -> None:
-        self._stop.set()
-        self._percent = 100.0
-        self._last_message = "complete"
-        if self._live is not None:
-            try:
-                from rich.text import Text
-                self._live.update(Text.from_markup(self._render_rich_str()))
-                self._live.stop()
-            except Exception:
-                pass
-            self._live = None
-        else:
-            self._render_non_tty()
-        if self._thread is not None:
-            self._thread.join(timeout=2.0)
+        self._tracker.finish()
 
 
 def _update_readme_benchmark_section(

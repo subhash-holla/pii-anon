@@ -29,15 +29,42 @@ ROOT_DIR = SCRIPTS_DIR.parent
 ARTIFACTS_DIR = ROOT_DIR / "artifacts" / "benchmarks"
 README_PATH = ROOT_DIR / "README.md"
 
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from _progress import ProgressTracker, format_elapsed  # noqa: E402
 
-def run_step(description: str, cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess step with logging."""
+# How many suite steps contribute to the step-level progress bar.
+_TOTAL_STEPS = 6
+
+
+def run_step(
+    description: str,
+    cmd: list[str],
+    *,
+    check: bool = True,
+    tracker: ProgressTracker | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess step with logging.
+
+    If ``tracker`` is provided, the step's start is painted on the
+    single-line suite bar, the subprocess takes over the terminal for
+    its own in-place bar (if any), and on completion the step outcome is
+    appended to the tracker's phase log.
+    """
     print(f"\n{'=' * 60}")
     print(f"  {description}")
     print(f"{'=' * 60}")
     print(f"  Command: {' '.join(cmd)}")
     print()
+    if tracker is not None:
+        tracker.set_phase(description, phase_total=1)
+    t0 = time.monotonic()
     result = subprocess.run(cmd, cwd=str(ROOT_DIR), check=False, text=True)
+    elapsed = time.monotonic() - t0
+    if tracker is not None:
+        tracker.advance(1)
+        ok = "ok" if result.returncode == 0 else f"failed ({result.returncode})"
+        tracker.finish_phase(f"{description}: {ok}, {format_elapsed(elapsed)}")
     if check and result.returncode != 0:
         print(f"\nERROR: Step failed with exit code {result.returncode}")
         sys.exit(result.returncode)
@@ -60,12 +87,20 @@ def main() -> None:
 
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    tracker = ProgressTracker(
+        total_work=_TOTAL_STEPS,
+        label="Benchmark suite",
+        refresh_s=60.0,
+    )
+    tracker.start()
+
     # ── Step 1: Preflight check ───────────────────────────────────────
     if not args.skip_preflight:
         run_step(
             "Step 1/6: Benchmark preflight check",
             [python, str(SCRIPTS_DIR / "check_benchmark_runtime.py"),
              "--output-json", str(ARTIFACTS_DIR / "runtime-preflight.json")],
+            tracker=tracker,
         )
 
         # Report available engines
@@ -81,6 +116,8 @@ def main() -> None:
                 print("\n  WARNING: Not all competitors available. Benchmark may be incomplete.")
     else:
         print("\n  Skipping preflight check (--skip-preflight)")
+        tracker.advance(1)
+        tracker.finish_phase("Step 1/6: preflight skipped")
 
     # ── Step 2: Run competitor benchmark ──────────────────────────────
     bench_cmd = [
@@ -97,7 +134,7 @@ def main() -> None:
     if args.max_samples:
         bench_cmd.extend(["--max-samples", str(args.max_samples)])
 
-    run_step("Step 2/6: Running competitor benchmark", bench_cmd)
+    run_step("Step 2/6: Running competitor benchmark", bench_cmd, tracker=tracker)
 
     # ── Step 3: Render benchmark summary ──────────────────────────────
     run_step(
@@ -105,15 +142,19 @@ def main() -> None:
         [python, str(SCRIPTS_DIR / "render_benchmark_summary.py"),
          "--input-json", str(ARTIFACTS_DIR / "benchmark-results.json"),
          "--output-markdown", "docs/benchmark-summary.md"],
+        tracker=tracker,
     )
 
     # ── Step 4: Update README with benchmark results ──────────────────
     print(f"\n{'=' * 60}")
     print("  Step 4/6: Updating README benchmark section")
     print(f"{'=' * 60}")
+    tracker.set_phase("Step 4/6: Updating README benchmark section", phase_total=1)
 
+    step4_t0 = time.monotonic()
     readme_text = README_PATH.read_text(encoding="utf-8")
     summary_path = ROOT_DIR / "docs" / "benchmark-summary.md"
+    step4_outcome = "skipped"
     if summary_path.exists():
         summary_text = summary_path.read_text(encoding="utf-8")
         start_marker = "<!-- BENCHMARK_SUMMARY_START -->"
@@ -130,10 +171,33 @@ def main() -> None:
             )
             README_PATH.write_text(new_readme, encoding="utf-8")
             print("  README benchmark section updated.")
+            step4_outcome = "ok"
         else:
             print("  WARNING: Benchmark markers not found in README. Skipping update.")
     else:
         print("  WARNING: docs/benchmark-summary.md not found. Skipping README update.")
+    tracker.advance(1)
+    tracker.finish_phase(
+        f"Step 4/6: README update {step4_outcome}, "
+        f"{format_elapsed(time.monotonic() - step4_t0)}"
+    )
+
+    # ── Step 4b: Render the pii-rate-elo value-prop block ─────────────
+    # This is the "why composite over F1 alone" section.  Runs alongside
+    # the benchmark-summary update so the two marketing surfaces stay in
+    # sync after every benchmark.  Non-fatal if the markers are missing
+    # from README — the renderer logs a warning and exits cleanly.
+    value_script = SCRIPTS_DIR / "render_pii_rate_elo_value.py"
+    if value_script.exists():
+        run_step(
+            "Step 4b/6: Rendering pii-rate-elo value block",
+            [python, str(value_script),
+             "--input-json", str(ARTIFACTS_DIR / "benchmark-results.json"),
+             "--readme", "README.md",
+             "--output-markdown", str(ROOT_DIR / "docs" / "pii-rate-elo-value.md")],
+            check=False,
+            tracker=None,   # fold under Step 4's progress counter
+        )
 
     # ── Step 5: Render complex mode example ───────────────────────────
     complex_script = SCRIPTS_DIR / "render_complex_mode_example.py"
@@ -142,9 +206,12 @@ def main() -> None:
             "Step 5/6: Rendering complex mode example",
             [python, str(complex_script)],
             check=False,
+            tracker=tracker,
         )
     else:
         print("\n  Skipping complex mode example (script not found)")
+        tracker.advance(1)
+        tracker.finish_phase("Step 5/6: complex mode example skipped")
 
     # ── Step 6: Validate README sync ──────────────────────────────────
     check_script = SCRIPTS_DIR / "check_readme_benchmark.py"
@@ -156,14 +223,25 @@ def main() -> None:
              "--summary", "docs/benchmark-summary.md",
              "--report-json", str(ARTIFACTS_DIR / "benchmark-results.json")],
             check=False,
+            tracker=tracker,
         )
     else:
         print("\n  Skipping README sync check (script not found)")
+        tracker.advance(1)
+        tracker.finish_phase("Step 6/6: README sync check skipped")
+
+    tracker.finish()
 
     # ── Summary ───────────────────────────────────────────────────────
     elapsed = time.time() - t_start
     results_path = ARTIFACTS_DIR / "benchmark-results.json"
 
+    print()
+    print("── Suite Log " + "─" * 47)
+    for entry in tracker.phase_log:
+        print(f"  {entry}")
+    print("─" * 60)
+    print()
     print(f"\n{'=' * 60}")
     print("  Benchmark Complete")
     print(f"{'=' * 60}")

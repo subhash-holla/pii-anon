@@ -282,21 +282,46 @@ cat ~/.pii_anon/swarm/manifest.json | python -m json.tool
 
 ## Part 5: Run the Full Benchmark
 
-Run the complete competitor evaluation and update all documentation:
+### Pick the right entry point
+
+The Makefile exposes three benchmark entry points for different audiences:
+
+| Target | Audience | Reproducibility | Fails on missing competitors? |
+|---|---|---|---|
+| **`make benchmark-all`** | Library users / contributors on any OS | Best-effort — produces a partial leaderboard when competitor engines are missing | No — tolerates missing deps |
+| **`make benchmark-full`** | Release maintainer before a PyPI publish | Full suite, strict | Warns, doesn't fail |
+| **`make benchmark-canonical`** | Publish-grade canonical runs (every system installed) | Strict, reproducible environment | Yes — hard-fails |
+
+For most community users, `make benchmark-all` is the right call. It:
+
+1. Runs the preflight (available engines are reported)
+2. Benchmarks every available system against `pii-anon-datasets`
+3. Renders the benchmark summary into `docs/benchmark-summary.md`
+4. Updates the README `<!-- BENCHMARK_SUMMARY_START -->` block with the latest numbers
+5. Updates the README `<!-- PII_RATE_ELO_VALUE_START -->` block — the "why composite over F1 alone" narrative — via `scripts/render_pii_rate_elo_value.py`
+6. Renders the complex-mode pseudonymization example
+7. Validates the README / benchmark-summary sync
+
+Before starting, run the doctor to see what's installed:
 
 ```bash
-make benchmark-full
+make benchmark-doctor
 ```
 
-This runs `scripts/run_full_benchmark.py` which:
-1. Verifies all competitor engines are available (preflight check)
-2. Runs pii-anon, pii-anon-swarm, GLiNER, Presidio, and Scrubadub against pii-anon-eval-data
-3. Renders the benchmark summary markdown
-4. Updates the README benchmark section (between `<!-- BENCHMARK_SUMMARY_START -->` and `<!-- BENCHMARK_SUMMARY_END -->` markers)
-5. Renders the complex mode pseudonymization example
-6. Validates that the README stays in sync with the benchmark data
+It prints platform, Python path, and which competitor engines are available,
+so you can decide which benchmark target to run.
 
-For a quick benchmark (faster, fewer records):
+### Cross-platform matrix
+
+| Platform | Recommended entry | Notes |
+|---|---|---|
+| **Linux (Ubuntu 22.04+, Debian 12+)** | `make benchmark-all` | Cleanest path — manylinux wheels cover every dep. |
+| **macOS (Apple Silicon)** | `make benchmark-all` | Uses `benchmark-portable-macos`. Requires `brew install libomp` for XGBoost-in-swarm; handled by `make setup-swarm`. |
+| **macOS (Intel)** | `make benchmark-all` | Same as Apple Silicon. |
+| **Windows 11** | `make benchmark-all` | Uses `benchmark-portable-windows`. `py -3` is used in place of the venv Python — ensure Python 3.10+ is on PATH. If you hit spaCy wheel issues on 3.13+, drop to 3.12. |
+| **Canonical (reproducible for publishing)** | `make benchmark-canonical-macos-native` (Apple Silicon) or `make benchmark-canonical-linux` (Linux) | Both enforce the full competitor set and gate on floor checks. Docker-based `benchmark-canonical-macos` / `benchmark-canonical-windows` also available. |
+
+For a quick subset run during iteration:
 
 ```bash
 python scripts/run_full_benchmark.py --max-samples 5000
@@ -311,7 +336,8 @@ The benchmark produces these artifacts:
 | `floor-gate-report.md` | Pass/fail per use-case profile |
 | `artifacts/benchmarks/floor-baseline.json` | Floor baseline for regression detection |
 | `docs/benchmark-summary.md` | Rendered markdown summary |
-| `README.md` | Updated benchmark section |
+| `docs/pii-rate-elo-value.md` | Standalone "why composite over F1" block (for sharing / blog posts) |
+| `README.md` | Updated `<!-- BENCHMARK_SUMMARY_START -->` and `<!-- PII_RATE_ELO_VALUE_START -->` sections |
 
 ### Understanding the results
 

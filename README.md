@@ -222,6 +222,30 @@ Pairwise comparisons (paired bootstrap, n=10,000 resamples):
 
 See [Benchmark Methodology](#benchmark-methodology) for details.
 
+<!-- PII_RATE_ELO_VALUE_START -->
+
+## Why `pii-rate-elo` over plain F1?
+
+**F1 alone picks the wrong system.**  By F1, `gliner` looks like the winner (0.766 vs 0.758). By `pii-rate-elo` composite — which folds in latency, throughput, entity-type coverage, and (when available) Tier 3 re-identification resistance — `pii-anon` leads instead (0.782 vs 0.680). 2 of 5 systems swap ranks between the two views.
+
+| System | F1 | F1 Rank | Composite | Composite Rank | Δ Rank | p50 Latency | Throughput | Coverage |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| pii-anon | 0.758 | #2 | 0.782 | #1 | **+1** | 0.40 ms | 3.1M/hr | 22/29 |
+| gliner | 0.766 | #1 | 0.680 | #2 | **-1** | 86.24 ms | 34K/hr | 14/29 |
+| pii-anon-swarm | 0.611 | #3 | 0.555 | #3 | — | 98.58 ms | 29K/hr | 22/29 |
+| presidio | 0.496 | #4 | 0.513 | #4 | — | 14.76 ms | 119K/hr | 20/29 |
+| scrubadub | 0.333 | #5 | 0.509 | #5 | — | 0.25 ms | 4.8M/hr | 4/29 |
+
+
+### Where the rankings diverge
+
+- **gliner** drops **#1 → #2** (loses 1) — F1 0.766 looks strong, but its **86.2ms p50 latency** — 34K/hr is three orders of magnitude below the reference throughput, so the composite lands at 0.680.
+- **pii-anon** moves **#2 → #1** (gains 1) — F1 0.758 is middling, but its **0.40ms p50 latency** (3.1M/hr) pushes the composite to 0.782.
+
+**Δ Rank** = F1 rank − Composite rank.  Positive means the composite view promotes the system (it's operationally stronger than F1 suggests); negative means the composite view demotes it (it's paying for F1 with latency, missing entity types, or Tier 3 leakage).  See [docs/pii-rate-elo.md](docs/pii-rate-elo.md) for the full algorithm.
+
+<!-- PII_RATE_ELO_VALUE_END -->
+
 ### Per-Entity Recall
 
 Per-entity-type precision, recall, and F1 are available in `artifacts/benchmarks/benchmark-results.json` after running `make benchmark-full`. The benchmark evaluates 22 entity types across all 5 systems.

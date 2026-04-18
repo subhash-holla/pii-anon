@@ -1,7 +1,14 @@
 ifeq ($(OS),Windows_NT)
 VENV_PYTHON := .venv/Scripts/python.exe
+PLATFORM := windows
 else
 VENV_PYTHON := .venv/bin/python
+UNAME_S := $(shell uname -s 2>/dev/null)
+ifeq ($(UNAME_S),Darwin)
+PLATFORM := macos
+else
+PLATFORM := linux
+endif
 endif
 
 PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
@@ -68,7 +75,7 @@ CANONICAL_SUITE_FLAGS = \
 	--no-enforce-publish-claims \
 	--validate-readme-sync
 
-.PHONY: bootstrap install-dev setup-swarm lint type test perf build twine-check package-size train-swarm benchmark-full benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup readme-benchmark-check cli-smoke docs-smoke all
+.PHONY: bootstrap install-dev setup-swarm lint type test perf build twine-check package-size train-swarm benchmark-all benchmark-doctor benchmark-full benchmark compare-benchmark benchmark-preflight benchmark-publish-suite benchmark-portable benchmark-portable-macos benchmark-portable-linux benchmark-portable-windows benchmark-canonical benchmark-canonical-linux benchmark-canonical-macos benchmark-canonical-macos-native benchmark-canonical-cloud benchmark-canonical-windows benchmark-docker-build benchmark-native-setup readme-benchmark-check cli-smoke docs-smoke all
 
 bootstrap:
 	$(PYTHON) -m pip install --upgrade pip
@@ -185,16 +192,27 @@ benchmark-canonical-windows:
 # One-time setup for swarm training: install local packages + swarm deps.
 # Run this before train-swarm on a fresh checkout.
 #   make setup-swarm
+#
+# Platform notes:
+#   - macOS: libomp is required by XGBoost.  Installed via Homebrew if the
+#     user has it.  Otherwise the user is prompted to install it manually.
+#   - Linux: XGBoost ships manylinux wheels with OpenMP bundled; no extra step.
+#   - Windows: XGBoost ships with Visual C++ runtime; no extra step.
 setup-swarm:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
 	$(PYTHON) -m pip install -e $(EVAL_DATA_DIR)
-	@command -v brew >/dev/null 2>&1 && brew list libomp >/dev/null 2>&1 || { echo "Installing libomp (required by XGBoost on macOS)..."; brew install libomp; }
+ifeq ($(PLATFORM),macos)
+	@command -v brew >/dev/null 2>&1 && brew list libomp >/dev/null 2>&1 \
+		|| { command -v brew >/dev/null 2>&1 \
+		     && { echo "Installing libomp (required by XGBoost on macOS)..."; brew install libomp; } \
+		     || echo "WARNING: libomp missing and Homebrew not found. Install libomp manually or XGBoost will fail on import."; }
+endif
 	$(PYTHON) -m pip install -e '.[dev,cli,crypto,benchmark,datasets,swarm-ml,swarm-train]'
 	$(PYTHON) -m spacy download en_core_web_sm
 	$(PYTHON) -c "import stanza; stanza.download('en')"
 	$(PYTHON) -c "from gliner import GLiNER; GLiNER.from_pretrained('knowledgator/gliner-pii-base-v1.0')"
 	@echo ""
-	@echo "Setup complete. Run:  make train-swarm"
+	@echo "Setup complete (platform: $(PLATFORM)).  Run:  make train-swarm"
 
 # Train the swarm offering and deploy artifacts.
 # Output: ~/.pii_anon/swarm/ (ds_params.json, temperature.json, etc.)
@@ -215,6 +233,43 @@ train-swarm:
 # Output: benchmark-results.json, updated README, updated docs/benchmark-summary.md
 benchmark-full:
 	$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto
+
+# ── Cross-platform community benchmark ─────────────────────────────────
+# ``benchmark-all`` is the friendly entry-point for library users on any
+# OS.  It runs the full suite, tolerates missing competitor engines
+# (produces a partial leaderboard rather than failing), and updates both
+# the benchmark-summary section AND the pii-rate-elo value section in
+# the README.  Routed to the right underlying target based on the host
+# platform:
+#
+#   Linux:    benchmark-all → benchmark-portable-linux
+#   macOS:    benchmark-all → benchmark-portable-macos
+#   Windows:  benchmark-all → benchmark-portable-windows
+#
+# For publish-grade canonical runs (strict competitor set, reproducible
+# environment), use ``benchmark-canonical`` instead.
+benchmark-all:
+ifeq ($(PLATFORM),windows)
+	@$(MAKE) benchmark-portable-windows
+else ifeq ($(PLATFORM),macos)
+	@$(MAKE) benchmark-portable-macos
+else
+	@$(MAKE) benchmark-portable-linux
+endif
+	$(PYTHON) scripts/render_pii_rate_elo_value.py \
+		--input-json $(BENCH_ARTIFACTS)/benchmark-results.json \
+		--readme README.md
+
+# Print platform + environment diagnostics for users debugging a
+# benchmark failure on an unfamiliar OS.  Always safe to run.
+# Delegates to a Python script so the checks are portable and easy to
+# test — the Makefile layer would otherwise need shell-specific
+# ``try/except`` gymnastics that differ between POSIX sh and Windows cmd.
+benchmark-doctor:
+	@echo "Platform:        $(PLATFORM)"
+	@echo "Python:          $(PYTHON)"
+	@echo "Eval data dir:   $(EVAL_DATA_DIR)"
+	@$(PYTHON) scripts/benchmark_doctor.py --eval-data-dir "$(EVAL_DATA_DIR)"
 
 # ── Utility Targets ───────────────────────────────────────────────────
 
