@@ -44,6 +44,13 @@ BENCH_RUNS ?= 3
 # ``BENCH_MAX_SAMPLES=N`` for a specific cap.
 BENCH_MAX_SAMPLES ?= 5000
 
+# Heartbeat interval (seconds) for long-running benchmark steps.  The
+# parent emits ``[heartbeat] Step 2/6 — Xm elapsed, still running``
+# every ``BENCH_HEARTBEAT`` seconds so the user can confirm the
+# subprocess hasn't hung during silent phases.  Set to 0 to disable.
+# Default: 300 (5 minutes).
+BENCH_HEARTBEAT ?= 300
+
 # Swarm training configuration
 # Default: pii-anon's canonical corpus + two industry leaders, mirroring
 # the dataset mix the pii-rate-elo research paper evaluates against.
@@ -274,11 +281,11 @@ benchmark-full:
 	@if [ "$(BENCH_MAX_SAMPLES)" = "0" ]; then \
 		echo "⚠  BENCH_MAX_SAMPLES=0 (uncapped) — expect a multi-day run on a laptop."; \
 		echo "   For release-prep you typically want this; for iteration use BENCH_MAX_SAMPLES=5000."; \
-		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto; \
+		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto --heartbeat-interval $(BENCH_HEARTBEAT); \
 	else \
 		echo "Running capped benchmark: BENCH_MAX_SAMPLES=$(BENCH_MAX_SAMPLES) samples per profile."; \
 		echo "For uncapped publish-grade run: make benchmark-full BENCH_MAX_SAMPLES=0"; \
-		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto --max-samples $(BENCH_MAX_SAMPLES); \
+		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto --max-samples $(BENCH_MAX_SAMPLES) --heartbeat-interval $(BENCH_HEARTBEAT); \
 	fi
 
 # ── Cross-platform community benchmark ─────────────────────────────────

@@ -21,6 +21,7 @@ import argparse
 import json
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -36,6 +37,33 @@ from _progress import ProgressTracker, format_elapsed  # noqa: E402
 # How many suite steps contribute to the step-level progress bar.
 _TOTAL_STEPS = 6
 
+# Default heartbeat interval for long-running steps.  Five minutes gives
+# a usable "still alive" signal without flooding the log.  Override via
+# ``--heartbeat-interval`` on the CLI.
+_DEFAULT_HEARTBEAT_SECONDS = 300
+
+
+def _heartbeat_loop(
+    stop_event: threading.Event,
+    description: str,
+    interval_s: float,
+    start_time: float,
+) -> None:
+    """Emit a single-line 'still running' notice every *interval_s*.
+
+    Runs in a daemon thread alongside the long subprocess.  The child's
+    own progress bar (if any) prints to stdout; this heartbeat prints
+    to stderr on its own line so the two streams don't stomp each
+    other.  Stops cleanly when *stop_event* is set by the caller after
+    the subprocess returns.
+    """
+    while not stop_event.wait(timeout=interval_s):
+        elapsed = time.monotonic() - start_time
+        sys.stderr.write(
+            f"\n  [heartbeat] {description} — {format_elapsed(elapsed)} elapsed, still running\n"
+        )
+        sys.stderr.flush()
+
 
 def run_step(
     description: str,
@@ -43,6 +71,7 @@ def run_step(
     *,
     check: bool = True,
     tracker: ProgressTracker | None = None,
+    heartbeat_interval_s: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a subprocess step with logging.
 
@@ -50,6 +79,14 @@ def run_step(
     single-line suite bar, the subprocess takes over the terminal for
     its own in-place bar (if any), and on completion the step outcome is
     appended to the tracker's phase log.
+
+    If *heartbeat_interval_s* is non-None and positive, a daemon thread
+    prints ``[heartbeat] <description> — Xm elapsed, still running`` to
+    stderr every *heartbeat_interval_s* seconds for the duration of the
+    subprocess.  This is how the user gets proof-of-life during steps
+    whose sub-process output does not frequently print on its own —
+    see the benchmark Step 2 case where the child's progress bar may
+    sit at 0% for many minutes during engine initialisation.
     """
     print(f"\n{'=' * 60}")
     print(f"  {description}")
@@ -59,7 +96,32 @@ def run_step(
     if tracker is not None:
         tracker.set_phase(description, phase_total=1)
     t0 = time.monotonic()
-    result = subprocess.run(cmd, cwd=str(ROOT_DIR), check=False, text=True)
+
+    stop_heartbeat: threading.Event | None = None
+    heartbeat_thread: threading.Thread | None = None
+    if heartbeat_interval_s and heartbeat_interval_s > 0:
+        stop_heartbeat = threading.Event()
+        heartbeat_thread = threading.Thread(
+            target=_heartbeat_loop,
+            args=(stop_heartbeat, description, heartbeat_interval_s, t0),
+            daemon=True,
+            name="benchmark-heartbeat",
+        )
+        heartbeat_thread.start()
+
+    try:
+        result = subprocess.run(cmd, cwd=str(ROOT_DIR), check=False, text=True)
+    finally:
+        # Always stop the heartbeat, even if subprocess.run raised.
+        if stop_heartbeat is not None:
+            stop_heartbeat.set()
+            if heartbeat_thread is not None:
+                # join() with a short timeout — the thread checks the
+                # event at its next wakeup, which is bounded by the
+                # interval; we don't want to block exit if the caller
+                # picks a very long interval.
+                heartbeat_thread.join(timeout=1.0)
+
     elapsed = time.monotonic() - t0
     if tracker is not None:
         tracker.advance(1)
@@ -155,6 +217,18 @@ def main() -> None:
     parser.add_argument("--warmup", type=int, default=100, help="Warm-up samples per system")
     parser.add_argument("--runs", type=int, default=3, help="Measured runs per system")
     parser.add_argument("--python", default=sys.executable, help="Python executable")
+    parser.add_argument(
+        "--heartbeat-interval",
+        type=int,
+        default=_DEFAULT_HEARTBEAT_SECONDS,
+        help=(
+            "Seconds between 'still running' heartbeat messages emitted "
+            "during long-running steps.  0 disables heartbeats.  Default "
+            f"{_DEFAULT_HEARTBEAT_SECONDS} (5 minutes) — long enough not "
+            "to spam the log, short enough to confirm progress on a "
+            "multi-hour run."
+        ),
+    )
     args = parser.parse_args()
 
     python = args.python
@@ -242,7 +316,16 @@ def main() -> None:
     print("  Presidio recognizer warmup).")
     print()
 
-    run_step("Step 2/6: Running competitor benchmark", bench_cmd, tracker=tracker)
+    # Step 2 is the only step that routinely exceeds 5 minutes, so it's
+    # the only one that gets the heartbeat.  The shorter steps would
+    # interleave heartbeat output with their own terse completion
+    # lines for no benefit.
+    run_step(
+        "Step 2/6: Running competitor benchmark",
+        bench_cmd,
+        tracker=tracker,
+        heartbeat_interval_s=args.heartbeat_interval,
+    )
 
     # ── Step 3: Render benchmark summary ──────────────────────────────
     run_step(
