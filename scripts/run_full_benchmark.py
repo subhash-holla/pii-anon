@@ -71,6 +71,81 @@ def run_step(
     return result
 
 
+# Rough per-record latencies observed on a 2024 M-series MacBook
+# native-macOS path (ms/record, measured at warm cache).  Used only
+# for the up-front time estimate — real numbers come from the
+# benchmark itself.  The slowest system sets the profile wall-time
+# because all systems run in parallel per profile.
+_EST_MS_PER_RECORD = {
+    "pii-anon-core": 0.5,          # regex + checksum only
+    "pii-anon-swarm-e2e": 120.0,   # NER fusion + Dawid-Skene + meta-learner
+    "presidio": 15.0,
+    "scrubadub": 0.3,
+    "gliner": 90.0,
+}
+_EST_DEFAULT_DATASET_SIZE = 160_000
+_EST_PROFILE_COUNT = 6
+# Fixed per-profile startup cost (engine init, GLiNER model load,
+# Presidio recogniser warmup).  This is why every profile sits at
+# "0%" for 1-5 minutes even on tiny sample caps.
+_EST_PROFILE_STARTUP_SECONDS = 120.0
+
+
+def _print_volume_estimate(max_samples: int | None, warmup: int, runs: int) -> None:
+    """Print a human-readable work-volume + time estimate before launch.
+
+    The estimate models actual parallel execution: within a profile all
+    systems run concurrently, so wall-time is driven by the slowest
+    system (pii-anon-swarm / GLiNER) not the sum of all systems.
+    Profiles run sequentially, so total wall-time is ``profile_count ×
+    per_profile_wall``.
+
+    Without this estimate the benchmark looks "hung" for hours — users
+    have reported multi-hour waits with zero feedback.  Surface the
+    budget here so they can Ctrl-C before committing to an over-long
+    run.
+    """
+    per_profile_samples = max_samples if max_samples else _EST_DEFAULT_DATASET_SIZE
+    # Per-system per-profile record-operations: warmup is a one-shot
+    # pre-measurement pass; measured runs iterate the sample set.
+    per_system_ops = warmup + per_profile_samples * runs
+    # Wall-time per profile is dominated by the slowest system, since
+    # systems run in parallel.
+    slowest_ms = max(_EST_MS_PER_RECORD.values())
+    per_profile_seconds = (
+        _EST_PROFILE_STARTUP_SECONDS + per_system_ops * slowest_ms / 1000.0
+    )
+    total_est_seconds = _EST_PROFILE_COUNT * per_profile_seconds
+    total_est_minutes = total_est_seconds / 60.0
+    total_est_hours = total_est_seconds / 3600.0
+
+    print()
+    print("─" * 62)
+    print("  Benchmark run — work-volume estimate")
+    print("─" * 62)
+    cap_str = f"capped at {max_samples:,}/profile" if max_samples \
+        else f"uncapped ({_EST_DEFAULT_DATASET_SIZE:,}/profile default)"
+    print(f"  Samples:       {per_profile_samples:,} per profile ({cap_str})")
+    print(f"  Profiles:      {_EST_PROFILE_COUNT} (short_chat, long_document,")
+    print("                 structured_form_accuracy/latency, log_lines, multilingual_mix)")
+    print(f"  Passes/sample: {warmup} warmup + {runs} measured")
+    print(f"  Per-profile:   ~{per_profile_seconds / 60.0:.1f} min "
+          f"(dominated by slowest system: ~{slowest_ms:.0f} ms/record)")
+    if total_est_hours < 1.5:
+        print(f"  Total wall-time estimate: ~{total_est_minutes:.0f} min")
+    else:
+        print(f"  Total wall-time estimate: ~{total_est_hours:.1f} h")
+    if total_est_hours > 3.0:
+        print()
+        print("  ⚠  Estimated runtime exceeds 3 hours.  Consider:")
+        print("     - make benchmark-full BENCH_MAX_SAMPLES=5000   (~30-60 min)")
+        print("     - make benchmark-full BENCH_MAX_SAMPLES=1000   (~5-10 min)")
+        print("     - The run is NOT hung if Step 2's progress bar sits at 0%")
+        print("       for the first 1-5 minutes — engines are still loading.")
+    print("─" * 62)
+    print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full benchmark and update documentation")
     parser.add_argument("--max-samples", type=int, default=None, help="Limit benchmark samples (for fast runs)")
@@ -86,6 +161,22 @@ def main() -> None:
     t_start = time.time()
 
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Up-front work volume estimate ─────────────────────────────────
+    # Benchmarks regularly spawn parallel sub-processes whose per-record
+    # progress is invisible to this top-level tracker (a known
+    # limitation: subprocess stdout interleaves badly with the
+    # overwriting progress bar, so sub-process progress lines are
+    # dropped).  The surface effect is that Step 2 looks "hung" for
+    # hours when it's really grinding through millions of detections.
+    # Surfacing a work-volume estimate + time budget up-front turns a
+    # "is it hung?" question into a "is the estimate reasonable?"
+    # decision the user can make before committing to the run.
+    _print_volume_estimate(
+        max_samples=args.max_samples,
+        warmup=args.warmup,
+        runs=args.runs,
+    )
 
     tracker = ProgressTracker(
         total_work=_TOTAL_STEPS,
@@ -133,6 +224,23 @@ def main() -> None:
     ]
     if args.max_samples:
         bench_cmd.extend(["--max-samples", str(args.max_samples)])
+
+    # Step 2 is the long pole (typically 90%+ of total wall-time).
+    # The child emits its own single-line progress bar to stdout which
+    # the terminal renders directly; we just tell the user what to
+    # look for so a "still at 0%" line doesn't look like a freeze.
+    print()
+    print("  Step 2 is the long-running phase (runs all detection systems")
+    print(f"  against the benchmark dataset in parallel, {args.warmup} warmup + "
+          f"{args.runs} measured runs each).")
+    if args.max_samples:
+        print(f"  Sample cap active: {args.max_samples:,} records per profile.")
+    else:
+        print("  UNCAPPED run — full ~160K records per profile × 5 systems.")
+    print("  The child's own progress bar updates below; it may sit at")
+    print("  0% for 1-5 minutes while engines initialise (GLiNER model load,")
+    print("  Presidio recognizer warmup).")
+    print()
 
     run_step("Step 2/6: Running competitor benchmark", bench_cmd, tracker=tracker)
 

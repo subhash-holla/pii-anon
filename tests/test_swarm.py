@@ -245,14 +245,24 @@ class TestSwarmFusionStrategy:
         assert len(result) == 0
 
     def test_structured_type_single_engine_accepted(self) -> None:
+        """A STRUCTURED_TYPES type that is NOT also in SEMANTIC_TYPES
+        should emit without corroboration.
+
+        ``IBAN`` qualifies: it's in ``STRUCTURED_TYPES`` (mod-97 checksum
+        is authoritative) and NOT in ``SEMANTIC_TYPES`` (so the Layer 4
+        corroboration gate is skipped).  ``EMAIL_ADDRESS`` and
+        ``CREDIT_CARD`` are in BOTH sets — their permissive regex
+        surface warranted the corroboration gate even though they are
+        also structured — so they would (correctly) require
+        multi-engine agreement here.
+        """
         from pii_anon.swarm import SwarmConfig, SwarmFusionStrategy
         cfg = SwarmConfig(fast_pass_threshold=0.95, emission_threshold=0.3, corroboration_min=2)
         strategy = SwarmFusionStrategy(config=cfg)
         findings = [
-            EngineFinding("EMAIL_ADDRESS", 0.85, "text", 10, 30, None, "regex-oss", "en"),
+            EngineFinding("IBAN", 0.85, "text", 10, 30, None, "regex-oss", "en"),
         ]
         result = strategy.merge(findings)
-        # EMAIL_ADDRESS is structured → no corroboration required.
         assert len(result) == 1
 
     def test_multi_engine_agreement_accepted(self) -> None:

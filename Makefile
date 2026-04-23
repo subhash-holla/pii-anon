@@ -33,6 +33,17 @@ BENCH_WORKDIR ?= .publish-suite
 BENCH_WARMUP ?= 100
 BENCH_RUNS ?= 3
 
+# Default per-profile sample cap.  Without this, each of the 6
+# benchmark profiles iterates the full ~160K-record dataset × 5
+# systems × (warmup + measured runs), producing ~18M work units — a
+# multi-day run on a laptop and indistinguishable from "hung" in the
+# progress bar.  5K keeps every profile under ~15 minutes on a 2024
+# MacBook Pro and produces statistically stable estimates (95% CI
+# width ≈ 0.02 F1 at this sample size).  Override with
+# ``BENCH_MAX_SAMPLES=0`` for an uncapped publish-grade run, or with
+# ``BENCH_MAX_SAMPLES=N`` for a specific cap.
+BENCH_MAX_SAMPLES ?= 5000
+
 # Swarm training configuration
 # Default: pii-anon's canonical corpus + two industry leaders, mirroring
 # the dataset mix the pii-rate-elo research paper evaluates against.
@@ -253,8 +264,22 @@ train-swarm:
 # Run the full benchmark on M1 Mac and update all documentation.
 # This is the single command to run before a release.
 # Output: benchmark-results.json, updated README, updated docs/benchmark-summary.md
+#
+# Sample cap:
+#   - Default BENCH_MAX_SAMPLES=5000 completes in ~30-60 minutes.
+#   - BENCH_MAX_SAMPLES=0 runs the full ~160K-record dataset per
+#     profile (publish-grade; budget 1-2 days on a laptop).
+#   - Any other value passes through as --max-samples N.
 benchmark-full:
-	$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto
+	@if [ "$(BENCH_MAX_SAMPLES)" = "0" ]; then \
+		echo "⚠  BENCH_MAX_SAMPLES=0 (uncapped) — expect a multi-day run on a laptop."; \
+		echo "   For release-prep you typically want this; for iteration use BENCH_MAX_SAMPLES=5000."; \
+		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto; \
+	else \
+		echo "Running capped benchmark: BENCH_MAX_SAMPLES=$(BENCH_MAX_SAMPLES) samples per profile."; \
+		echo "For uncapped publish-grade run: make benchmark-full BENCH_MAX_SAMPLES=0"; \
+		$(PYTHON) scripts/run_full_benchmark.py --dataset $(BENCH_DATASET) --dataset-source auto --max-samples $(BENCH_MAX_SAMPLES); \
+	fi
 
 # ── Cross-platform community benchmark ─────────────────────────────────
 # ``benchmark-all`` is the friendly entry-point for library users on any

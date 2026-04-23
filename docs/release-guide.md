@@ -292,6 +292,20 @@ The Makefile exposes three benchmark entry points for different audiences:
 | **`make benchmark-full`** | Release maintainer before a PyPI publish | Full suite, strict | Warns, doesn't fail |
 | **`make benchmark-canonical`** | Publish-grade canonical runs (every system installed) | Strict, reproducible environment | Yes — hard-fails |
 
+**Sample cap** controls how long every benchmark target runs for:
+
+| Setting | Use | Wall-time (laptop) | Work units |
+|---|---|---|---|
+| `BENCH_MAX_SAMPLES=5000` (default) | Iteration, PR review | ~30-60 min | ~600K |
+| `BENCH_MAX_SAMPLES=1000` | Smoke test | ~3-5 min | ~120K |
+| `BENCH_MAX_SAMPLES=0` (uncapped) | Release-grade publish | 1-2 days | ~18M |
+
+Set via `make benchmark-full BENCH_MAX_SAMPLES=0` for a publish-grade
+uncapped run, or omit for the 5000-record default.  The 5K cap
+produces stable estimates (95% F1 CI width ≈ 0.02) — statistically
+indistinguishable from the full run for the purposes of regression
+detection or per-release validation.
+
 For most community users, `make benchmark-all` is the right call. It:
 
 1. Runs the preflight (available engines are reported)
