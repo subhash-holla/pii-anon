@@ -29,6 +29,11 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SCRIPTS_DIR.parent
 ARTIFACTS_DIR = ROOT_DIR / "artifacts" / "benchmarks"
 README_PATH = ROOT_DIR / "README.md"
+# Cross-process progress snapshot.  The child (competitor benchmark)
+# writes its ProgressTracker state here atomically; the parent's
+# heartbeat thread reads the file to emit meaningful progress updates.
+# Hidden-dotfile name so it doesn't land in committed artifact listings.
+STATE_FILE = ARTIFACTS_DIR / ".progress.json"
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -43,24 +48,100 @@ _TOTAL_STEPS = 6
 _DEFAULT_HEARTBEAT_SECONDS = 300
 
 
+def _format_eta_seconds(seconds: float) -> str:
+    """Convert an ETA-in-seconds to a human string.
+
+    Short windows use ``{X}m``; longer windows use ``{X}h{Y}m``.  The
+    existing ``format_elapsed`` helper already does this for the
+    elapsed case; we re-use it so the two fields render consistently.
+    """
+    if seconds < 0 or seconds != seconds:  # NaN
+        return "?"
+    return format_elapsed(seconds)
+
+
+def _read_progress_state(state_file: str) -> dict[str, float | int | str] | None:
+    """Read the child's progress snapshot.  Returns None on any failure.
+
+    The child writes atomically so we never see half-written JSON — but
+    we might still hit a race where the file doesn't exist yet (child
+    hasn't emitted its first render), or a disk/encoding glitch.  All
+    failures return None; the heartbeat loop falls back to a less
+    informative message rather than crashing.
+    """
+    try:
+        with open(state_file, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+
+
 def _heartbeat_loop(
     stop_event: threading.Event,
     description: str,
     interval_s: float,
     start_time: float,
+    state_file: str | None = None,
 ) -> None:
-    """Emit a single-line 'still running' notice every *interval_s*.
+    """Emit a meaningful progress heartbeat every *interval_s*.
 
-    Runs in a daemon thread alongside the long subprocess.  The child's
-    own progress bar (if any) prints to stdout; this heartbeat prints
-    to stderr on its own line so the two streams don't stomp each
-    other.  Stops cleanly when *stop_event* is set by the caller after
-    the subprocess returns.
+    When *state_file* is set and the child has written a valid
+    snapshot, emits a multi-field status:
+
+        [heartbeat] Step 2/6 — 1,234,567 / 18,777,444 records (6.5723%)
+                    rate 4,321 u/s — ETA 42m — elapsed 15m — phase "..."
+
+    When no state file (or no child writes yet), falls back to the
+    original "still running" form so the user still sees something.
+
+    When the child has not updated the state file in more than
+    ``2 × interval_s`` seconds, prints a suspected-hang notice.
     """
     while not stop_event.wait(timeout=interval_s):
-        elapsed = time.monotonic() - start_time
+        parent_elapsed = time.monotonic() - start_time
+        snap = _read_progress_state(state_file) if state_file else None
+
+        if snap is None:
+            # No snapshot yet — child still initialising or file write
+            # failed.  Fall back to the proof-of-life form.
+            sys.stderr.write(
+                f"\n  [heartbeat] {description} — "
+                f"{format_elapsed(parent_elapsed)} elapsed, child has not emitted a "
+                f"progress snapshot yet (engines still loading?)\n"
+            )
+            sys.stderr.flush()
+            continue
+
+        pct = float(snap.get("pct", 0.0))
+        completed = int(snap.get("completed", 0))
+        total = int(snap.get("total", 0))
+        rate = float(snap.get("rate_units_per_s", 0.0))
+        eta_s = float(snap.get("eta_seconds", 0.0))
+        elapsed_s = float(snap.get("elapsed_seconds", 0.0))
+        phase = str(snap.get("phase", ""))
+        wall_s = float(snap.get("updated_at_wall_s", 0.0))
+
+        # Staleness check — if the child hasn't written in
+        # 2x the heartbeat interval, surface the concern.
+        stale_threshold_s = 2 * interval_s
+        stale_s = (time.time() - wall_s) if wall_s > 0 else 0.0
+        stale_marker = ""
+        if stale_s > stale_threshold_s:
+            stale_marker = (
+                f" ⚠ child has not updated state in {format_elapsed(stale_s)} — "
+                "may be hung or stuck on a slow record"
+            )
+
+        # Multi-line block so the heartbeat is obviously distinct from
+        # the child's own in-place progress bar.
         sys.stderr.write(
-            f"\n  [heartbeat] {description} — {format_elapsed(elapsed)} elapsed, still running\n"
+            f"\n  [heartbeat] {description}\n"
+            f"              progress: {completed:,} / {total:,} "
+            f"({pct:.4f}%)\n"
+            f"              rate:     {rate:,.0f} units/s  "
+            f"elapsed: {format_elapsed(elapsed_s)}  "
+            f"ETA: {_format_eta_seconds(eta_s)}\n"
+            f"              phase:    {phase}{stale_marker}\n"
         )
         sys.stderr.flush()
 
@@ -72,6 +153,7 @@ def run_step(
     check: bool = True,
     tracker: ProgressTracker | None = None,
     heartbeat_interval_s: float | None = None,
+    state_file: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a subprocess step with logging.
 
@@ -81,12 +163,17 @@ def run_step(
     appended to the tracker's phase log.
 
     If *heartbeat_interval_s* is non-None and positive, a daemon thread
-    prints ``[heartbeat] <description> — Xm elapsed, still running`` to
-    stderr every *heartbeat_interval_s* seconds for the duration of the
-    subprocess.  This is how the user gets proof-of-life during steps
-    whose sub-process output does not frequently print on its own —
-    see the benchmark Step 2 case where the child's progress bar may
-    sit at 0% for many minutes during engine initialisation.
+    prints a progress heartbeat every *heartbeat_interval_s* seconds
+    for the duration of the subprocess.  When *state_file* is also
+    provided, the heartbeat reads the child's atomic JSON snapshot and
+    emits real completed/total/rate/ETA numbers at 0.01% fidelity.
+    Otherwise falls back to a proof-of-life "still running" message.
+
+    The child picks up the state-file path from the
+    ``PII_ANON_PROGRESS_FILE`` env var set here — any subprocess that
+    uses :class:`~_progress.ProgressTracker` will write JSON snapshots
+    to that path on every render without the caller having to pass
+    the path explicitly.
     """
     print(f"\n{'=' * 60}")
     print(f"  {description}")
@@ -97,20 +184,36 @@ def run_step(
         tracker.set_phase(description, phase_total=1)
     t0 = time.monotonic()
 
+    # Clear any stale state from a previous run so the first heartbeat
+    # doesn't report last run's completed count.
+    if state_file:
+        try:
+            Path(state_file).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    # Build the environment for the child so it knows where to write
+    # its progress snapshot.  Inherit the parent's environment.
+    env = dict(__import__("os").environ)
+    if state_file:
+        env["PII_ANON_PROGRESS_FILE"] = state_file
+
     stop_heartbeat: threading.Event | None = None
     heartbeat_thread: threading.Thread | None = None
     if heartbeat_interval_s and heartbeat_interval_s > 0:
         stop_heartbeat = threading.Event()
         heartbeat_thread = threading.Thread(
             target=_heartbeat_loop,
-            args=(stop_heartbeat, description, heartbeat_interval_s, t0),
+            args=(stop_heartbeat, description, heartbeat_interval_s, t0, state_file),
             daemon=True,
             name="benchmark-heartbeat",
         )
         heartbeat_thread.start()
 
     try:
-        result = subprocess.run(cmd, cwd=str(ROOT_DIR), check=False, text=True)
+        result = subprocess.run(
+            cmd, cwd=str(ROOT_DIR), check=False, text=True, env=env,
+        )
     finally:
         # Always stop the heartbeat, even if subprocess.run raised.
         if stop_heartbeat is not None:
@@ -319,12 +422,16 @@ def main() -> None:
     # Step 2 is the only step that routinely exceeds 5 minutes, so it's
     # the only one that gets the heartbeat.  The shorter steps would
     # interleave heartbeat output with their own terse completion
-    # lines for no benefit.
+    # lines for no benefit.  The child writes its ProgressTracker
+    # state to ``STATE_FILE`` on every render; the heartbeat reads
+    # that snapshot and emits real completed/total/rate/ETA values
+    # at 0.01% fidelity.
     run_step(
         "Step 2/6: Running competitor benchmark",
         bench_cmd,
         tracker=tracker,
         heartbeat_interval_s=args.heartbeat_interval,
+        state_file=str(STATE_FILE),
     )
 
     # ── Step 3: Render benchmark summary ──────────────────────────────

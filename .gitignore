@@ -34,3 +34,7 @@ artifacts/benchmarks/_archive/
 # Local workspace archive — used for ad-hoc scratch / stashed runs.
 # Not part of the shipped library.
 _archive/
+
+# Benchmark progress snapshot written by the child during long runs.
+# Meant for the parent's heartbeat to read, not to be committed.
+artifacts/benchmarks/.progress.json

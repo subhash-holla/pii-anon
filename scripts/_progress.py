@@ -53,6 +53,7 @@ class ProgressTracker:
         stream: Any = None,
         initial_completed: int = 0,
         heartbeat: bool = False,
+        state_file: str | None = None,
     ) -> None:
         self._total = max(0, int(total_work))
         self._completed = float(initial_completed)
@@ -73,6 +74,19 @@ class ProgressTracker:
         self._started = False
         self._finished = False
         self.phase_log: list[str] = []
+        # Path to a JSON file the tracker atomically writes after every
+        # render.  Parent processes (e.g. ``run_full_benchmark.py``)
+        # read this to print meaningful progress updates — real
+        # completed-of-total counts and rate — without capturing the
+        # child's ``\r``-overwritten TTY stream.  When ``None``, the
+        # file write is skipped entirely (zero overhead).  When set,
+        # the path is usually picked up from the ``PII_ANON_PROGRESS_FILE``
+        # environment variable by callers so the parent can choose the
+        # path and the child just writes to it.
+        import os as _os
+        self._state_file: str | None = state_file or _os.environ.get(
+            "PII_ANON_PROGRESS_FILE"
+        )
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -238,6 +252,77 @@ class ProgressTracker:
                 pct, self._phase, _format_elapsed(elapsed),
                 _format_elapsed(eta_s), self._rate_ema,
             )
+
+        # Atomic JSON snapshot for cross-process progress reading.
+        # Parent processes that launched this tracker as a subprocess
+        # can read the file and print their own meaningful progress
+        # updates without having to parse the in-place TTY output.
+        # Write is best-effort: a disk error here must not break the
+        # actual progress rendering.
+        if self._state_file is not None:
+            self._write_state_file(
+                pct=pct, completed=self._completed, total=self._total,
+                rate=self._rate_ema, eta_s=eta_s, elapsed_s=elapsed,
+                phase=self._phase,
+            )
+
+    def _write_state_file(
+        self,
+        *,
+        pct: float,
+        completed: float,
+        total: int,
+        rate: float,
+        eta_s: float,
+        elapsed_s: float,
+        phase: str,
+    ) -> None:
+        """Write a JSON progress snapshot atomically (write-then-rename).
+
+        The write-then-rename pattern guarantees readers never see a
+        half-written file: if the writer is killed mid-write, the
+        ``.tmp`` file may be truncated but the published path still
+        holds the previous valid snapshot.
+        """
+        import json as _json
+        import os as _os
+        import tempfile as _tempfile
+        try:
+            target = self._state_file or ""
+            if not target:
+                return
+            target_dir = _os.path.dirname(target) or "."
+            payload = {
+                "pct": round(pct, 4),
+                "completed": int(completed),
+                "total": int(total),
+                "rate_units_per_s": round(rate, 2),
+                "eta_seconds": round(eta_s, 1),
+                "elapsed_seconds": round(elapsed_s, 1),
+                "phase": phase,
+                "updated_at_monotonic": round(time.monotonic(), 3),
+                "updated_at_wall_s": round(time.time(), 3),
+            }
+            # ``delete=False`` because we manually rename the file into
+            # place — ``NamedTemporaryFile``'s auto-delete would kill
+            # the file before we can publish it.
+            with _tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=target_dir,
+                prefix=".progress-",
+                suffix=".tmp",
+                delete=False,
+            ) as fh:
+                _json.dump(payload, fh)
+                fh.flush()
+                tmp_path = fh.name
+            _os.replace(tmp_path, target)
+        except Exception:
+            # State-file writing is advisory.  A disk-full, permissions
+            # error, or a disappeared directory must never crash the
+            # actual work the tracker was instantiated to measure.
+            pass
 
 
 # ── Module-level formatters (exported so callers can reuse) ──────────────
