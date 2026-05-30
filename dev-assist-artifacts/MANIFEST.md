@@ -15,7 +15,7 @@ schema_version: 2
 |-------|--------|---------|-----------|
 | 00-Brownfield Assessment | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 02-Requirements | NOT_STARTED | — | — |
+| 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 03-Design | NOT_STARTED | — | — |
 | 04-Development | NOT_STARTED | — | — |
 | 05-Testing | NOT_STARTED | — | — |
@@ -58,17 +58,17 @@ _To be populated as stage 02 progresses._
 
 | Phase | Status | Artifact | Notes |
 |-------|--------|----------|-------|
-| R0. UC↔P/G/O Bridge | NOT_STARTED | — | — |
-| R1. Low-Fidelity Requirements | NOT_STARTED | — | — |
-| R2. Interview Guide | NOT_STARTED | — | — |
-| R3. Simulated Interviews | NOT_STARTED | — | — |
-| R4. High-Fidelity Requirements | NOT_STARTED | — | — |
-| R5. Prioritization Survey | NOT_STARTED | — | — |
-| R6. Simulated Survey Responses | NOT_STARTED | — | — |
-| R7. Prioritization Analysis | NOT_STARTED | — | — |
-| R8. Final Requirements Artifacts | NOT_STARTED | — | — |
-| R9. Cleanup + Verification-Strengthening | NOT_STARTED | — | — |
-| R10. NFR Threshold Validation | NOT_STARTED | — | — |
+| R0. UC↔P/G/O Bridge | VALIDATED | traceability-matrix.md (PGOs + 0-orphan scan) | ✅ |
+| R1. Low-Fidelity Requirements | FOLDED | (into R4) | representative scale |
+| R2. Interview Guide | FOLDED | (reused Discovery concept-value/Kano) | representative scale |
+| R3. Simulated Interviews | FOLDED | (reused Discovery §5 cohort) | representative scale |
+| R4. High-Fidelity Requirements | VALIDATED | requirements-document.md (39 FR + 26 NFR) | ✅ |
+| R5. Prioritization Survey | FOLDED | (6-respondent MoSCoW survey) | representative scale |
+| R6. Simulated Survey Responses | VALIDATED | (6 simulated-survey-respondent) | ✅ |
+| R7. Prioritization Analysis | VALIDATED | requirements-document.md §R7 (MoSCoW) | ✅ ~56/38/6 MUST/SHOULD/COULD |
+| R8. Final Requirements Artifacts | VALIDATED | requirements-document.md + traceability-matrix.md | ✅ canonical |
+| R9. Cleanup + Verification-Strengthening | VALIDATED | (boolean G/W/T + quantified thresholds) | ✅ |
+| R10. NFR Threshold Validation | VALIDATED | requirements-document.md §R10 | ✅ 0 DIVERGED · 5 PERSONA-CONDITIONAL · 1 REVISE-LOOSER |
 
 ## Design Phase Progress
 
@@ -117,6 +117,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 |---|---|---|---|---|---|
 | SO-01-m1 | 2026-05-30 | milestone-close | M1: brownfield assessment + legacy migration (24 items) + vendored briefs; gates → Discovery | AGENT_SIMULATED | `_signoffs/SO-01-m1.yaml` |
 | SO-02-discovery | 2026-05-30 | stage-transition | Discovery COMPLETE: POV pivot (eval headline), 7 personas, 28 UCs, concept-value; 30 agents; gates → Requirements | AGENT_SIMULATED | `_signoffs/SO-02-discovery.yaml` |
+| SO-03-requirements | 2026-05-30 | stage-transition | Requirements COMPLETE: 39 FR + 26 NFR, R7 MoSCoW, R10 (0 DIVERGED); 22 agents; gates → Design | AGENT_SIMULATED | `_signoffs/SO-03-requirements.yaml` |
 
 ## Methodology Notes
 
@@ -139,6 +140,9 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 ### Discovery complete → Requirements (2026-05-30)
 > Stage 1 COMPLETE (30 AGENT_SIMULATED agents, representative scale). **POV pivot:** measurement-first; Pillar-1 `pii-rate-elo` is the headline; pseudonymization-integrity is the defensible empty quadrant; swarm re-scoped OFF raw-F1 (OpenAI Privacy Filter F1≈0.96 + Presidio contest it) onto reversibility + recall-floor + audit + orchestration. 7 personas (2 eval-dedicated), 28 use cases (15 eval / 12 swarm / 1 both), concept-value (3 high-willingness anchor on eval+pseudonymization-integrity; medium = "prove it"). Signed off `_signoffs/SO-02-discovery.yaml`. **Top Requirements priorities:** (1) eval-integrity foundation [critical path]; (2) pseudonymization-integrity + distinct anon-vs-pseudo families; (3) recall-floor by construction (AX-003); (4) running Tier-3 + agentic + multimodal. Cross-repo: stats/scorers/`assemble_paired_set` in eval-data S5–S7. **Ready for Requirements.** Run: `/dev-assist-requirements`.
+
+### Requirements complete → Design (2026-05-30)
+> Stage 2 COMPLETE (22 AGENT_SIMULATED agents). **39 FRs + 26 NFRs**, evaluation-led (≈20 eval / 17 swarm / 2 both), MoSCoW ≈56/38/6. MUST critical path = eval-integrity foundation (FR-003 Bradley-Terry, FR-004 coherent-significance, FR-008 canonical-run, NFR-001/002/006) + headline novelty (FR-009/010 pseudonymization-integrity + distinct families, FR-011 Tier-3) + recall-floor-by-construction (FR-016/NFR-011, AX-003). R10: 0 DIVERGED (5 PERSONA-CONDITIONAL + 1 REVISE-LOOSER ECE). Cross-repo `external_refs` set (DATA-blocking: `assemble_paired_set`/canary/query-aware/agentic-oracle in eval-data S5–S7). Signed off `_signoffs/SO-03-requirements.yaml`. **Ready for Design.** Run: `/dev-assist-design` (5-Diamond Cascade).
 
 ## Pivots Log
 
@@ -172,11 +176,11 @@ Sibling files:
 |---|---|---|
 | Brownfield (M1 assess) | 7 | 7 |
 | Discovery | 30 | 37 |
-| Requirements | 0 | 37 |
-| Design | 0 | 37 |
-| Development | 0 | 37 |
-| Testing | 0 | 37 |
-| **Total** | **37** | **37** |
+| Requirements | 22 | 59 |
+| Design | 0 | 59 |
+| Development | 0 | 59 |
+| Testing | 0 | 59 |
+| **Total** | **59** | **59** |
 
 ---
 
