@@ -1,0 +1,47 @@
+signoff_id: SO-01-m1
+date: "2026-05-30"
+type: milestone-close            # program milestone M1 (brownfield assessment + legacy migration); gates → Discovery
+stage_transition: "00-Brownfield Assessment → 01-Discovery"
+policy: po-required
+signer: AGENT_SIMULATED          # user pre-authorized via "Migrate + absorb, then Discovery" + the eval-integrity steering decision
+project: pii-anon (pii-anon-code, library pillar)
+program: pii-anon SOTA program (../../PROGRAM-MANIFEST.md)
+
+inputs:
+  - path: dev-assist-artifacts/00-brownfield-assessment/assessment-2026-05-30.md
+    note: per-stage ratings + 31 findings + bring-forward plan (7-agent fan-out)
+  - path: dev-assist-artifacts/00-brownfield-assessment/artifact-inventory.md
+    note: 24 legacy files classified (0 archive, 0 deletions)
+  - path: dev-assist-artifacts/00-brownfield-assessment/migration-log.md
+    note: 24 items → 5 canonical citation artifacts; originals preserved
+  - path: dev-assist-artifacts/01-discovery/_inputs/
+    note: two landscape briefs vendored (ba6a532236e130e5, 5127b908ce242b23)
+  - path: developer-assistant.yaml
+    note: brownfield, full-rigor cohorts, strict TDD, po-required, domain_packs []
+  - path: dev-assist-artifacts/00-axioms/project-axioms.yaml
+    note: 6 project axioms (AX-001..006)
+
+decisions_acknowledged:
+  - "domain_packs: [] — agentic-runtime pack rejected (scoped to agent substrates); 6 project axioms authored instead; AX-003 (ensemble-recall-floor) is the load-bearing Theme-1 invariant."
+  - "Config: po-required sign-offs, full-rigor cohorts (30/60/30/9), strict TDD, product-default vocabulary."
+  - "Topology: PAPER (pii-anon-research-paper) is a subdir of the pii_anonymize_pseudonymize monorepo → no git tag/branch there; file-level dev-assist artifacts + its versions/ loop instead."
+  - "STEERING (user): eval-integrity findings (50-sample smoke-run published numbers; incoherent significance computation; presentation) are folded into the overhaul as a first-class redesign of how Pillar-1 (pii-rate-elo) computes+presents results — NOT a pre-PDLC hotfix. All current README/benchmark numbers are PROVISIONAL until a certified canonical run + corrected significance pipeline land."
+  - "Migration batch-approved; all 24 originals preserved untouched in pdlc-artifacts/ (MERGE preserves-in-place, deviating from the move-to-archive default by user instruction)."
+
+findings_carried_forward:   # NOT waived — these are inputs to Discovery/Requirements/Design
+  major_count: 12
+  highlights:
+    - "Published benchmark = uncertified 50-sample smoke run (canonical_claim_run=False) → Pillar-1 redesign + canonical-run policy."
+    - "Statistical-significance computation incoherent (p≈0.5 + large d + non-bracketing CIs) → fix in the eval overhaul."
+    - "Recall-floor AX-003 not by-construction in the swarm path (two divergent floor mechanisms) → central Theme-1 design mandate."
+    - "Swarm fails its own NFR targets (F1 0.85→0.610) / last by composite → re-baseline to measured targets in Requirements."
+    - "Theme-3 agentic interception (AX-006) has zero design realization → greenfield Design diamond."
+    - "No property/fuzz testing for crypto+checksum invariants → Testing."
+  minor_count: 11
+  observation_count: 8
+
+findings_waived_to_pass2: []   # none waived; real-user Pass-2 items (adoption/concept-value) tracked as bring-forward, not blockers
+
+cross_repo_evidence: []        # M1 is CODE-local; cross-repo edges begin at Requirements
+
+next: "Run /dev-assist-discovery (brownfield mode) — pre-populated from assessment STRONG/PARTIAL signal; gaps (concept-value, agentic/multimodal personas+UCs) surfaced as open items. DATA track (pii-anon-eval-data S5–S7) runs in parallel."

@@ -13,7 +13,7 @@ schema_version: 2
 
 | Stage | Status | Started | Completed |
 |-------|--------|---------|-----------|
-| 00-Brownfield Assessment | NOT_STARTED | — | — |
+| 00-Brownfield Assessment | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 01-Discovery | NOT_STARTED | — | — |
 | 02-Requirements | NOT_STARTED | — | — |
 | 03-Design | NOT_STARTED | — | — |
@@ -115,7 +115,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 | Sign-off ID | Date | Type | Scope | Signer | File |
 |---|---|---|---|---|---|
-| _(empty)_ | | | | | |
+| SO-01-m1 | 2026-05-30 | milestone-close | M1: brownfield assessment + legacy migration (24 items) + vendored briefs; gates → Discovery | AGENT_SIMULATED | `_signoffs/SO-01-m1.yaml` |
 
 ## Methodology Notes
 
@@ -125,10 +125,15 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 - **Active axioms (6)**: see `00-axioms/project-axioms.yaml` — synthetic-only-no-real-pii (AX-001), deterministic-pseudonymization (AX-002), ensemble-recall-floor-guarantee (AX-003, the load-bearing T1 invariant), anonymization-pseudonymization-separation (AX-004), calibrated-abstention (AX-005), least-privilege-agentic-interception (AX-006). To be refined in Stage 3 D0 prep.
 - **Verified code findings driving design** (from the approved plan): F1 the swarm never executes sparsely (`policy/router.py:60` runs all engines serially via `default_compat`); F2 the Glicko RD cannot converge (`elo.py:198` is match-count-only) → replace with Bayesian Bradley-Terry; F3 most Tier-3/stats harness already exists in eval-data (build `assemble_paired_set` first); F4 live bug `swarm.py:745` (`predict_candidate` called without `text=`) → fix in a `FEATURE_VERSION` 3→4 retrain.
 - **Epistemic honesty**: all simulated-cohort outputs are marked AGENT_SIMULATED and are not a substitute for real consumers; Pass-2 real-user research is a documented follow-up.
+- **Steering decision (2026-05-30, user)**: the eval-integrity findings (50-sample smoke-run published numbers; internally-incoherent significance computation; results presentation) are NOT a pre-PDLC hotfix — they are folded into the overhaul as a first-class **redesign of how the evaluation pillar (pii-rate-elo) computes and presents results** (Theme 2 / Pillar 1). Carry them as Discovery→Requirements→Design inputs (NFRs on statistical rigor, a canonical-run/publication policy, and honest reporting). Treat all current README/benchmark numbers as **PROVISIONAL** until a certified canonical run + corrected significance pipeline land.
 
 ## Handoff Signals
 
-_Populated at each stage transition. Next expected: Stage 00 Brownfield Assessment → Discovery._
+### Brownfield Assessment complete (2026-05-30)
+> M1 assessment done via a 7-agent fan-out (5 per-stage + 2 legacy-inventory). Per-stage: **Discovery PARTIAL · Requirements PARTIAL · Design STRONG · Development PARTIAL · Testing PARTIAL**. Findings: 0 SHOWSTOPPER · 0 CATASTROPHIC · 12 MAJOR · 11 MINOR · 8 OBSERVATION. Headline MAJORs: (1) published benchmark numbers are a 50-sample smoke run (`canonical_claim_run=False`); (2) internally-incoherent significance computation; (3) recall-floor AX-003 not guaranteed by-construction in the swarm path; (4) swarm fails its own NFR targets (F1 0.85→0.610) / last by composite. Artifacts: `00-brownfield-assessment/assessment-2026-05-30.md` + `artifact-inventory.md` (24 legacy files; 0 deletions; mostly WRAP→`03-design/_inputs/`). **Next:** `/dev-assist-migrate` (24 items) + `/dev-assist-absorb` (2 landscape briefs) → `/dev-assist-discovery` (brownfield mode). M1 sign-off pending migrate+absorb.
+
+### M1 complete → Discovery (2026-05-30)
+> Migration done: 24 legacy items → 5 canonical citation artifacts (`03-design/_inputs/swarm-moe-prior-art.md`, `ensemble-v2-and-speed-prior-art.md`; `03-design/moe-architecture-and-guarantee.md`; `04-development/_provenance/legacy-pdlc-manifest-moe-guarantee.md`; `05-testing/benchmark-evidence/legacy-benchmark-evidence.md`); originals preserved untouched (`migration-log.md`). Two landscape briefs vendored to `01-discovery/_inputs/`. **M1 signed off** (`_signoffs/SO-01-m1.yaml`). 12 MAJOR findings carried forward as Discovery/Requirements/Design inputs — eval-integrity folded into the Pillar-1 overhaul; recall-floor AX-003 is the Theme-1 design mandate; current benchmark numbers PROVISIONAL. **Ready for Discovery.** Run: `/dev-assist-discovery` (brownfield mode). DATA track (`pii-anon-eval-data` S5–S7) runs in parallel.
 
 ## Pivots Log
 
@@ -160,12 +165,13 @@ Sibling files:
 
 | Stage | Agents deployed | Running total |
 |---|---|---|
-| Discovery | 0 | 0 |
-| Requirements | 0 | 0 |
-| Design | 0 | 0 |
-| Development | 0 | 0 |
-| Testing | 0 | 0 |
-| **Total** | **0** | **0** |
+| Brownfield (M1 assess) | 7 | 7 |
+| Discovery | 0 | 7 |
+| Requirements | 0 | 7 |
+| Design | 0 | 7 |
+| Development | 0 | 7 |
+| Testing | 0 | 7 |
+| **Total** | **7** | **7** |
 
 ---
 
