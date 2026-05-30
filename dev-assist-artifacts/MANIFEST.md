@@ -18,7 +18,7 @@ schema_version: 2
 | 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 03-Design | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 04-Development | IN_PROGRESS | 2026-05-30 | — (S1-01 flagship DONE; S2–S7 TODO) |
-| 05-Testing | NOT_STARTED | — | — |
+| 05-Testing | COMPLETE | 2026-05-30 | 2026-05-30 (verdict: SHIP-WITH-CAVEATS foundation / DEFER full redesign) |
 
 Valid status values: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, `BLOCKED`, `DEFERRED`, `SUPERSEDED`.
 
@@ -103,11 +103,11 @@ _To be populated as stage 05 progresses._
 
 | Section | Status | Artifact | Notes |
 |---------|--------|----------|-------|
-| Test architecture | NOT_STARTED | — | — |
-| NFR verification matrix | NOT_STARTED | — | — |
-| Accessibility test plan | NOT_STARTED | — | n/a — Python API + CLI, no interactive web UI |
-| Benchmark harnesses | NOT_STARTED | — | MoE-floor / agentic / multimodal suites |
-| Examples and tests catalog | NOT_STARTED | — | — |
+| Test architecture | COMPLETE | 05-testing/02-architecture/test-architecture.md | ✅ extends existing suite + property tier |
+| NFR verification matrix | COMPLETE | 05-testing/03-nfr-verification/nfr-verification-matrix.md | ✅ 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + 0 FAIL |
+| Accessibility test plan | N/A | release-readiness-report.md | n/a — Python API + CLI (CLI smoke is the analog) |
+| Benchmark harnesses | PROVISIONAL | (existing `make benchmark`; canonical run pending S7) | 🔶 50-sample smoke; numbers PROVISIONAL |
+| Release readiness | COMPLETE | 05-testing/release-readiness-report.md | ✅ SHIP-WITH-CAVEATS (DC-01) / DEFER (full redesign) |
 
 ## Sign-offs
 
@@ -120,6 +120,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | SO-03-requirements | 2026-05-30 | stage-transition | Requirements COMPLETE: 39 FR + 26 NFR, R7 MoSCoW, R10 (0 DIVERGED); 22 agents; gates → Design | AGENT_SIMULATED | `_signoffs/SO-03-requirements.yaml` |
 | SO-04-design | 2026-05-30 | stage-transition | Design COMPLETE: 15 DCs + 3 Pugh-won decisions (SharedLayerProjector / Bayesian-BT rating / agentic pre-filter); 17 agents; 1 CAT resolved + ~15 MAJOR carried; gates → Development | AGENT_SIMULATED | `_signoffs/SO-04-design.yaml` |
 | SO-05-development | 2026-05-30 | work-stream-close | Development W1–W5 plan + W6 S1-01 flagship DONE (SharedLayerProjector, real TDD, 7/7 green, gate APPROVE); S2–S7 TODO (honest); → Testing for current-state release-readiness | AGENT_SIMULATED | `_signoffs/SO-05-development.yaml` |
+| SO-06-testing | 2026-05-30 | stage-transition | Testing COMPLETE: verdict SHIP-WITH-CAVEATS (DC-01 recall-floor) / DEFER (full redesign); NFR matrix 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + 0 FAIL; → Documentation | AGENT_SIMULATED | `_signoffs/SO-06-testing.yaml` |
 
 ## Methodology Notes
 
@@ -151,6 +152,9 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 ### Development (partial) → Testing (2026-05-30)
 > Stage 4 W1–W5 planning COMPLETE + W6 **S1-01 flagship DONE** (real strict-TDD code: `src/pii_anon/routing/shared_layer.py`, RED `ef85166` → GREEN `548f576`, 7/7 green incl. 2000-case property test, ruff + mypy --strict clean, 78 swarm/fusion/moe tests unaffected, story gate APPROVE). The recall-floor MUST (FR-016/NFR-011/AX-003) is discharged as production code. **S2–S7 (~29 stories) TODO** — scaffolded with critical path + cross-repo S6 blockers + 3 security MUST stories. Development is honestly IN_PROGRESS. Signed off `_signoffs/SO-05-development.yaml`. **Ready for Testing** (current-state release-readiness: expect SHIP-WITH-CAVEATS for the foundation / DEFER for the full redesign). Run: `/dev-assist-testing`.
+
+### Testing complete → Documentation (2026-05-30)
+> Stage 5 COMPLETE. **Verdict: SHIP-WITH-CAVEATS** (DC-01 recall-floor foundation — real, 7/7 green, non-regressing, by-construction) / **DEFER** (full 4-theme redesign, ~29 stories, several S6-blocked). NFR matrix: 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + **0 FAIL**. Caveats: benchmark numbers PROVISIONAL (50-sample smoke); security MUST stories pending. a11y N/A. Signed off `_signoffs/SO-06-testing.yaml`. **→ Documentation** (consolidate journey + update user docs + feed papers).
 
 ## Pivots Log
 
