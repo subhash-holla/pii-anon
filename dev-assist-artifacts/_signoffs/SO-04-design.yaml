@@ -1,0 +1,39 @@
+signoff_id: SO-04-design
+date: "2026-05-30"
+type: stage-transition
+stage_transition: "03-Design → 04-Development"
+policy: po-required
+signer: AGENT_SIMULATED
+project: pii-anon (pii-anon-code, library pillar)
+
+inputs:
+  - dev-assist-artifacts/03-design/06-synthesis/D-implementation-ready-design.md   # 15 DCs + 3 headline decisions + SME must-address
+  - dev-assist-artifacts/03-design/_inputs/                                          # migrated swarm prior-art
+  - dev-assist-artifacts/03-design/moe-architecture-and-guarantee.md
+
+methodology:
+  agents: 17 (workflow wfrj580jp: 9 design-explorer proposals + 3 design-critic Pugh + 5 SME heuristic evaluators)
+  diamonds: "D0 prep + D1 (15 DCs) + D2/D3 preserved+extended + D4/D5 (3 headline decisions via DIVERGE/CONVERGE) + D6 synthesis"
+
+decisions_acknowledged:
+  - "D-SWARM (Pugh A 8.4 > C 7.7 > B 7.4): SharedLayerProjector = ONE post-fusion chokepoint making entities(ensemble) ⊇ entities(shared) BY CONSTRUCTION (the AX-003 fix; closes the swarm.py:654/661 leak; floor decoupled from router). + DistilledTopKGate (oracle=frozen XGBoost meta-learner; advisory; artifact-gated fallback) + rules-first Depth-1 early-exit at the orchestrator hook + aux-loss-free SLA selection-bias. REJECTED: always-on TinyNER, full speculative machine (alternates)."
+  - "D-EVAL (Pugh A 8.6 > B 7.4 > C 7.1): RatingEnginePort + 3-tier ladder glicko-legacy → MLE-BT → bayes-bt (Bayesian Davidson/BT NUTS = claim-grade default). NFR-002 coherence BY CONSTRUCTION from one joint posterior. CRITICAL scope correction: rating imports nothing from swarm/moe/fusion (CI-pinned); the detector superset invariant is owned by D-SWARM, not the rating engine. CanonicalRunGate + RecallFloorVerdictGuard (fail-closed)."
+  - "D-AGENTIC (Pugh A): router pre-filter + query-aware gate + unified floor at the build_fusion seam + 4-channel least-privilege (AX-006) + no-raw-PII-persist."
+  - "CATASTROPHIC (eval-01) RESOLVED: NFR-001 MCMC diagnostics (Rhat<=1.01/ESS>=400/0-div) → bayes-bt is the only claim-grade engine; MLE/glicko are smoke/fallback."
+  - "Seam corrections verified: engine-skip MUST be the orchestrator hook (merge() runs post-engines); register_fusion_strategy signature frozen → new construction seam; widen MoERouter.route(); fix available_fusion_modes()."
+
+findings_carried_forward:   # SME REQUEST_CHANGES (5) → MUST-address in Development
+  security_MAJOR:
+    - "Sign + verify the gate_v1.json artifact (auto-discovered learned gate on control path = privilege-escalation risk)."
+    - "Encrypt the token store at rest (SQLiteTokenStore stores raw plaintext PII — AX-001/key-separation tension)."
+    - "Sandbox the attack harness (ingests adversarial material)."
+  perf_MAJOR: ["Commit numeric p50/p95/p99 ceilings per detector class (R10 mandate)", "Stable expert-id tie-break for top-k determinism (NFR-005)", "Bound floor set-difference cost"]
+  eval_MAJOR: ["Davidson tie term for record-level outcomes", "long-tail power-200 handling", "Tier-3 de-circularization in attacks/ (DC-09)", "per-class ECE reporter (DC-10)"]
+  api_MAJOR: ["new construction seam for feature-conditioned routing", "widen MoERouter.route()", "run_reidentification_tournament consumes paired-comparison input"]
+  docs_MAJOR: ["surface distinct anon-vs-pseudo APIs (FR-010 headline)", "update docs/evaluate-your-pipeline.md", "fix divergent recall-floor docs"]
+
+cross_repo_evidence:
+  - "DATA S6 stats/bradley_terry.py VERIFIED ABSENT → blocking for bayes/MLE rating (switch-point: temp local MM impl behind the port until S6)."
+  - "DATA S6 assemble_paired_set (Tier-3 DC-09); S6 canary splits (MIA DC-09); S5 query-aware scorer (DC-13); S7 agentic oracle (DC-13)."
+
+next: "Run /dev-assist-development. Sprint plan headed by the eval-integrity + recall-floor critical path: DC-01 SharedLayerProjector (the single MUST that discharges FR-016/NFR-011/AX-003), DC-06/07 rating engine + coherent significance, DC-11 canonical-run gate. Then DC-08/09/10 (pseudonymization-integrity + attacks + calibration), DC-02/03 MoE-router, DC-13 agentic, DC-14/15 multimodal/portability. Security MAJORs (gate signature, token encryption, harness sandbox) are MUST stories."

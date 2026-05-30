@@ -16,7 +16,7 @@ schema_version: 2
 | 00-Brownfield Assessment | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 03-Design | NOT_STARTED | — | — |
+| 03-Design | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 04-Development | NOT_STARTED | — | — |
 | 05-Testing | NOT_STARTED | — | — |
 
@@ -76,13 +76,13 @@ _To be populated as stage 03 progresses._
 
 | Diamond | Status | Artifacts | Outcome |
 |---------|--------|-----------|---------|
-| Prep | NOT_STARTED | — | — |
-| D1 Design Cases | NOT_STARTED | — | — |
-| D2 Workflow | NOT_STARTED | — | — |
-| D3 UI | NOT_STARTED | — | — |
-| D4 System | NOT_STARTED | — | — |
-| D5 Architecture | NOT_STARTED | — | — |
-| D6 Synthesis | NOT_STARTED | — | — |
+| Prep | VALIDATED | D-implementation-ready-design.md §D0 | ✅ baseline preserved + 6 axioms |
+| D1 Design Cases | VALIDATED | §D1 (15 DCs) | ✅ DC↔FR/NFR, 0 orphan |
+| D2 Workflow | VALIDATED | §D2 | ✅ sync+async + orchestrator early-exit hook |
+| D3 UI | VALIDATED | §D3 | ✅ API+CLI+Make (a11y n/a) |
+| D4 System | VALIDATED | §D4 (3 headline decisions) | ✅ Modular (preserved) |
+| D5 Architecture | VALIDATED | §D5 | ✅ ports-adapters + RatingEnginePort + routing/ + attacks/ |
+| D6 Synthesis | VALIDATED | 06-synthesis/D-implementation-ready-design.md | ✅ 3 Pugh winners + 5-SME (1 CAT resolved + ~15 MAJOR carried) |
 
 ## Development Phase Progress
 
@@ -118,6 +118,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | SO-01-m1 | 2026-05-30 | milestone-close | M1: brownfield assessment + legacy migration (24 items) + vendored briefs; gates → Discovery | AGENT_SIMULATED | `_signoffs/SO-01-m1.yaml` |
 | SO-02-discovery | 2026-05-30 | stage-transition | Discovery COMPLETE: POV pivot (eval headline), 7 personas, 28 UCs, concept-value; 30 agents; gates → Requirements | AGENT_SIMULATED | `_signoffs/SO-02-discovery.yaml` |
 | SO-03-requirements | 2026-05-30 | stage-transition | Requirements COMPLETE: 39 FR + 26 NFR, R7 MoSCoW, R10 (0 DIVERGED); 22 agents; gates → Design | AGENT_SIMULATED | `_signoffs/SO-03-requirements.yaml` |
+| SO-04-design | 2026-05-30 | stage-transition | Design COMPLETE: 15 DCs + 3 Pugh-won decisions (SharedLayerProjector / Bayesian-BT rating / agentic pre-filter); 17 agents; 1 CAT resolved + ~15 MAJOR carried; gates → Development | AGENT_SIMULATED | `_signoffs/SO-04-design.yaml` |
 
 ## Methodology Notes
 
@@ -143,6 +144,9 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 ### Requirements complete → Design (2026-05-30)
 > Stage 2 COMPLETE (22 AGENT_SIMULATED agents). **39 FRs + 26 NFRs**, evaluation-led (≈20 eval / 17 swarm / 2 both), MoSCoW ≈56/38/6. MUST critical path = eval-integrity foundation (FR-003 Bradley-Terry, FR-004 coherent-significance, FR-008 canonical-run, NFR-001/002/006) + headline novelty (FR-009/010 pseudonymization-integrity + distinct families, FR-011 Tier-3) + recall-floor-by-construction (FR-016/NFR-011, AX-003). R10: 0 DIVERGED (5 PERSONA-CONDITIONAL + 1 REVISE-LOOSER ECE). Cross-repo `external_refs` set (DATA-blocking: `assemble_paired_set`/canary/query-aware/agentic-oracle in eval-data S5–S7). Signed off `_signoffs/SO-03-requirements.yaml`. **Ready for Design.** Run: `/dev-assist-design` (5-Diamond Cascade).
+
+### Design complete → Development (2026-05-30)
+> Stage 3 COMPLETE (17 AGENT_SIMULATED agents). **15 Design Cases** + 3 headline Pugh-won architecture decisions: **D-SWARM** `SharedLayerProjector` (recall-floor BY CONSTRUCTION — the AX-003 fix) + distilled top-k gate + rules-first early-exit; **D-EVAL** `RatingEnginePort` 3-tier ladder (Bayesian-BT NUTS = claim-grade; coherent significance by construction; rating import-isolated from detection); **D-AGENTIC** router pre-filter + unified floor at the build_fusion seam. 5-SME panel: 1 CATASTROPHIC (NFR-001 MCMC) RESOLVED + ~15 MAJOR carried as MUST stories (sign gate artifact; encrypt token store; sandbox harness; commit latency ceilings; Davidson ties; docs discoverability). Signed off `_signoffs/SO-04-design.yaml`. **Critical path:** DC-01 SharedLayerProjector → DC-06/07 rating engine → DC-11 canonical-run gate. Cross-repo: bayes/MLE rating blocks on eval-data S6 `stats/bradley_terry.py` (absent today). **Ready for Development.** Run: `/dev-assist-development`.
 
 ## Pivots Log
 
@@ -177,10 +181,10 @@ Sibling files:
 | Brownfield (M1 assess) | 7 | 7 |
 | Discovery | 30 | 37 |
 | Requirements | 22 | 59 |
-| Design | 0 | 59 |
-| Development | 0 | 59 |
-| Testing | 0 | 59 |
-| **Total** | **59** | **59** |
+| Design | 17 | 76 |
+| Development | 0 | 76 |
+| Testing | 0 | 76 |
+| **Total** | **76** | **76** |
 
 ---
 
