@@ -14,7 +14,7 @@ schema_version: 2
 | Stage | Status | Started | Completed |
 |-------|--------|---------|-----------|
 | 00-Brownfield Assessment | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 01-Discovery | NOT_STARTED | — | — |
+| 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 02-Requirements | NOT_STARTED | — | — |
 | 03-Design | NOT_STARTED | — | — |
 | 04-Development | NOT_STARTED | — | — |
@@ -44,13 +44,13 @@ _To be populated as stage 01 progresses._
 
 | Section | Status | Artifact | User Approved? |
 |---------|--------|----------|----------------|
-| 0. POV Stress Test | NOT_STARTED | — | — |
-| 1. Motivation & Background | NOT_STARTED | — | — |
-| 2. Personas & Workflows | NOT_STARTED | — | — |
-| 3. Market Research (Pugh + JTBD + Kano) | NOT_STARTED | — | — |
-| 4. Use Cases | NOT_STARTED | — | — |
-| 5. Concept Value Study | NOT_STARTED | — | — |
-| 6. Final Discovery Report | NOT_STARTED | — | — |
+| 0. POV Stress Test | VALIDATED | 00-pov-stress-test.md | ✅ AGENT_SIMULATED (POV pivot: measurement-first; eval headline) |
+| 1. Motivation & Background | VALIDATED | 01-motivation-background.md | ✅ |
+| 2. Personas & Workflows | VALIDATED | personas.md | ✅ 7 personas (2 eval-dedicated) |
+| 3. Market Research (Pugh + JTBD + Kano) | VALIDATED | 03-market-research.md | ✅ detectors + eval-benchmarks, live-verified 2026 |
+| 4. Use Cases | VALIDATED | 04-use-cases.md | ✅ 28 UCs (15 eval / 12 swarm / 1 both) + 3-SME panel |
+| 5. Concept Value Study | VALIDATED | 06-concept-value-study.md | ✅ 8-archetype cohort + SME findings |
+| 6. Final Discovery Report | VALIDATED | discovery-report.md | ✅ canonical |
 
 ## Requirements Phase Progress
 
@@ -116,6 +116,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | Sign-off ID | Date | Type | Scope | Signer | File |
 |---|---|---|---|---|---|
 | SO-01-m1 | 2026-05-30 | milestone-close | M1: brownfield assessment + legacy migration (24 items) + vendored briefs; gates → Discovery | AGENT_SIMULATED | `_signoffs/SO-01-m1.yaml` |
+| SO-02-discovery | 2026-05-30 | stage-transition | Discovery COMPLETE: POV pivot (eval headline), 7 personas, 28 UCs, concept-value; 30 agents; gates → Requirements | AGENT_SIMULATED | `_signoffs/SO-02-discovery.yaml` |
 
 ## Methodology Notes
 
@@ -135,6 +136,9 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 ### M1 complete → Discovery (2026-05-30)
 > Migration done: 24 legacy items → 5 canonical citation artifacts (`03-design/_inputs/swarm-moe-prior-art.md`, `ensemble-v2-and-speed-prior-art.md`; `03-design/moe-architecture-and-guarantee.md`; `04-development/_provenance/legacy-pdlc-manifest-moe-guarantee.md`; `05-testing/benchmark-evidence/legacy-benchmark-evidence.md`); originals preserved untouched (`migration-log.md`). Two landscape briefs vendored to `01-discovery/_inputs/`. **M1 signed off** (`_signoffs/SO-01-m1.yaml`). 12 MAJOR findings carried forward as Discovery/Requirements/Design inputs — eval-integrity folded into the Pillar-1 overhaul; recall-floor AX-003 is the Theme-1 design mandate; current benchmark numbers PROVISIONAL. **Ready for Discovery.** Run: `/dev-assist-discovery` (brownfield mode). DATA track (`pii-anon-eval-data` S5–S7) runs in parallel.
+
+### Discovery complete → Requirements (2026-05-30)
+> Stage 1 COMPLETE (30 AGENT_SIMULATED agents, representative scale). **POV pivot:** measurement-first; Pillar-1 `pii-rate-elo` is the headline; pseudonymization-integrity is the defensible empty quadrant; swarm re-scoped OFF raw-F1 (OpenAI Privacy Filter F1≈0.96 + Presidio contest it) onto reversibility + recall-floor + audit + orchestration. 7 personas (2 eval-dedicated), 28 use cases (15 eval / 12 swarm / 1 both), concept-value (3 high-willingness anchor on eval+pseudonymization-integrity; medium = "prove it"). Signed off `_signoffs/SO-02-discovery.yaml`. **Top Requirements priorities:** (1) eval-integrity foundation [critical path]; (2) pseudonymization-integrity + distinct anon-vs-pseudo families; (3) recall-floor by construction (AX-003); (4) running Tier-3 + agentic + multimodal. Cross-repo: stats/scorers/`assemble_paired_set` in eval-data S5–S7. **Ready for Requirements.** Run: `/dev-assist-requirements`.
 
 ## Pivots Log
 
@@ -167,12 +171,12 @@ Sibling files:
 | Stage | Agents deployed | Running total |
 |---|---|---|
 | Brownfield (M1 assess) | 7 | 7 |
-| Discovery | 0 | 7 |
-| Requirements | 0 | 7 |
-| Design | 0 | 7 |
-| Development | 0 | 7 |
-| Testing | 0 | 7 |
-| **Total** | **7** | **7** |
+| Discovery | 30 | 37 |
+| Requirements | 0 | 37 |
+| Design | 0 | 37 |
+| Development | 0 | 37 |
+| Testing | 0 | 37 |
+| **Total** | **37** | **37** |
 
 ---
 
