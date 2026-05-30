@@ -1,0 +1,206 @@
+# developer-assistant per-project configuration — pii-anon (pii-anon-code library)
+# Read by skills + hooks. Sibling of dev-assist-artifacts/MANIFEST.md.
+# Full schema in ${CLAUDE_PLUGIN_ROOT}/references/config-spec.md.
+#
+# This project is a REAL software library (dual-pillar: the pii-rate-elo
+# evaluation framework + the swarm detection/anonymization/pseudonymization
+# engine), with real external + academic consumers. Unlike the sibling
+# pii-anon-eval-data project, the PDLC vocabulary is NOT remapped — canonical
+# product-centric IDs (UC/PGO/FR/NFR/DC/Story) are used as-is.
+#
+# Part of a coordinated 3-repo program (see ../PROGRAM-MANIFEST.md):
+#   - pii-anon-code        (this repo)       — the library
+#   - pii-anon-eval-data   (active dev-assist project, mid-Development S5)
+#   - pii-anon-research-paper (thin; lives inside the pii_anonymize_pseudonymize monorepo)
+
+schema_version: 1
+
+# --- Project profile ---------------------------------------------------------
+
+project_name: "pii-anon"
+created: "2026-05-30"
+plugin_version: "0.1.0"
+language_profile: "python"
+
+# --- Spec versioning (4D) ----------------------------------------------------
+
+spec_version: "1.0.0"
+template_compatibility: ">=0.1.0 <1.0.0"
+
+# --- Inheritance + extension (4D) --------------------------------------------
+
+extends:
+  profile: null
+  domain_packs: []                          # see domain_packs note below
+
+scope:
+  type: brownfield                          # mature v1.4.0 library; see 00-brownfield-assessment/
+
+# --- Vocabulary (product-default; deliberately NOT remapped) -----------------
+
+vocabulary:
+  UC: "Use Case"
+  PGO: "PGO triple"
+  FR: "Functional Requirement"
+  NFR: "Non-Functional Requirement"
+  DC: "Design Case"
+  Story: "Story"
+
+# --- Domain packs ------------------------------------------------------------
+# None selected. The `agentic-runtime` pack applies_to_domains
+# [agentic-runtime, multi-agent-substrate, ...] and would impose its axioms
+# project-wide; pii-anon is a PII library that is *usable in* agentic contexts
+# (Theme 3), not an agent substrate. Following the eval-data precedent, the
+# project's genuine cross-cutting invariants — no-real-PII, deterministic
+# pseudonymization, the swarm recall-floor guarantee, anon≠pseudo separation,
+# calibrated abstention, least-privilege interception — are encoded as
+# project-authored axioms in dev-assist-artifacts/00-axioms/project-axioms.yaml
+# instead (borrowing replay-determinism / reasoning-visibility / capability-
+# boundary concepts only where Theme 3 applies).
+
+domain_packs: []
+
+# --- Test mode (K) -----------------------------------------------------------
+
+test_mode: tests-as-stage                   # Stage 5 is the formal verification stage
+                                            # (Stage 4 still runs strict TDD per story)
+
+# --- Sign-off policy (L) -----------------------------------------------------
+# po-required: this is a rigorous, multi-session, cross-repo program where the
+# user validates at each checkpoint (M0–M7) and paper claims are SHA-pinned to
+# code/data evidence via cross_repo_evidence in signoffs.
+
+signoff:
+  required_at_stage_transitions: true
+  policy: po-required
+
+# --- Hook toggles ------------------------------------------------------------
+
+hooks:
+  advisory_or_blocking: advisory
+  enabled:
+    validate_story_on_write: true
+    refresh_manifest: true
+    enforce_plan_naming: true
+    aggregate_review_gate: true
+    notify_gate_completion: true
+    load_manifest_on_session: true
+    journal_story_lifecycle: true
+    journal_git_event: true
+    auto_scaffold_on_stage_complete: true
+    dispatch_reviewers_on_review: true
+    flag_consistency_drift: false
+    sensitive_data_scan: true               # PII library: guard test fixtures/examples
+    regen_html_on_write: true
+    learnings_trigger_synthesis: false
+
+# --- Lifecycle journal (A) ---------------------------------------------------
+
+lifecycle_journal:
+  mode: aggregate
+  per_story_threshold: 50
+
+# --- Worktree isolation (E) --------------------------------------------------
+
+worktree:
+  mode: auto                                # allocate when parallel dispatch >= 2 (Stage 4 stories)
+  base_dir: worktrees
+  auto_merge_back_on_done: false            # merge explicitly via /dev-assist-worktree-merge
+
+# --- Reviewer dispatch (C) ---------------------------------------------------
+
+reviewer_dispatch:
+  auto_on_review: true
+  parallelism: 8
+  security_paths: [src, scripts, tests]
+  default_model: opus
+
+# --- Manifest reconcile ------------------------------------------------------
+
+manifest:
+  auto_refresh: false
+
+# --- Cross-artifact consistency (F) ------------------------------------------
+
+consistency:
+  hook_enabled: false
+  on_demand_command: true
+  blocking_at_stage_transition: true
+
+# --- Security (G) ------------------------------------------------------------
+
+security:
+  sensitive_data_scan:
+    enforcement: advisory                   # advisory at setup; tighten to blocking_pre_push
+                                            # once the real-PII pattern set is authored
+    exceptions_file: dev-assist-artifacts/00-security/exceptions.yaml
+
+# --- Project axioms (J) ------------------------------------------------------
+
+axioms:
+  registry_path: dev-assist-artifacts/00-axioms/project-axioms.yaml
+  enforce_at_gates: true
+
+# --- HTML renderer -----------------------------------------------------------
+
+html:
+  theme: default
+  auto_regenerate: true
+  engineering_tree_depth: 2
+  custom_logo_path: null
+
+# --- Cohort defaults (4B) — FULL RIGOR ---------------------------------------
+# User chose "everything end-to-end / full rigor": methodology-strict values.
+
+cohorts:
+  simulated_interviews: 30
+  simulated_surveys: 60
+  concept_value_study: 15
+  diverge_orchestrators: 3
+  user_research_participants: 30
+  sme_reviewers: 9
+  cvs_questions: 30
+
+# --- Persona model (4B) ------------------------------------------------------
+# Consumers: enterprise privacy engineer, ML/platform engineer, compliance/legal
+# reviewer, academic de-id/privacy researcher, agentic-platform/security
+# developer, OSS maintainer/privacy-tool vendor.
+
+personas:
+  classification: priority
+  max_personas: 10
+  target_count: 7
+
+# --- Reviewer matrix (4B) ----------------------------------------------------
+# accessibility kept OUT of gate_overrides: the consumer surface is a Python
+# API + CLI + docs/exports (no interactive web UI). performance-benchmark is
+# in the gate set because latency/throughput NFRs are central to Theme 1.
+
+reviewers:
+  default_set: [code-quality, security-sast, requirements-coverage, traceability]
+  optional_set: [accessibility, performance-benchmark, axiom-compliance, contributor-experience]
+  gate_overrides:
+    story:                  { add: [axiom-compliance] }
+    epic:                   { add: [performance-benchmark, axiom-compliance] }
+    sprint:                 { add: [performance-benchmark, axiom-compliance] }
+    release:                { add: [performance-benchmark, axiom-compliance] }
+    contributor_readiness:  { add: [contributor-experience] }
+
+# --- TDD discipline (4B) — STRICT --------------------------------------------
+# Mature library with strong existing TDD culture (2,437 tests); the redesign
+# touches load-bearing detection code → strict RED → GREEN → REFACTOR.
+
+tdd:
+  discipline: strict
+  require_red_commit: true
+  require_refactor_commit: false
+
+# --- Testing (4B) ------------------------------------------------------------
+# pass2_required stays false: agent-simulated cohorts are NOT a substitute for
+# real consumers. Real Pass-2 user research is a genuine follow-up; the release
+# verdict downgrades SHIP -> SHIP-WITH-CAVEATS for DIVERGED items lacking
+# real-user evidence.
+
+testing:
+  pass2_required: false
+  pass2_default_protocol: agent-simulated
