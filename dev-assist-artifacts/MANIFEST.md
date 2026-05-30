@@ -17,7 +17,7 @@ schema_version: 2
 | 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 03-Design | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 04-Development | NOT_STARTED | — | — |
+| 04-Development | IN_PROGRESS | 2026-05-30 | — (S1-01 flagship DONE; S2–S7 TODO) |
 | 05-Testing | NOT_STARTED | — | — |
 
 Valid status values: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, `BLOCKED`, `DEFERRED`, `SUPERSEDED`.
@@ -90,12 +90,12 @@ _To be populated as stage 04 progresses._
 
 | Wave | Status | Artifacts | Notes |
 |------|--------|-----------|-------|
-| W1. Preflight | NOT_STARTED | — | — |
-| W2. Planning | NOT_STARTED | — | — |
-| W3. Quality | NOT_STARTED | — | — |
-| W4. Testing setup | NOT_STARTED | — | — |
-| W5. Stories | NOT_STARTED | — | — |
-| W6. Execution | NOT_STARTED | — | — |
+| W1. Preflight | COMPLETE | development-log.md §W1 | ✅ tech-stack + legacy inventory + 0 DIVERGED |
+| W2. Planning | COMPLETE | development-log.md §W2 (7-sprint plan, 15 DCs → ~30 stories) | ✅ critical path + S6 blockers |
+| W3. Quality | COMPLETE | development-log.md §W3 | ✅ 5-gate cascade + strict TDD + security MUSTs |
+| W4. Testing setup | COMPLETE | development-log.md §W4 | ✅ extend existing suite + property/ε-gate scaffolded |
+| W5. Stories | COMPLETE | 02-stories/sprint-1/ + plan table | ✅ epics + sprint story set |
+| W6. Execution | IN_PROGRESS | S1-01 DONE (`routing/shared_layer.py`, RED ef85166→GREEN 548f576, 7/7 green, gate APPROVE) | 🔶 S2–S7 TODO |
 
 ## Testing Phase Progress
 
@@ -119,6 +119,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | SO-02-discovery | 2026-05-30 | stage-transition | Discovery COMPLETE: POV pivot (eval headline), 7 personas, 28 UCs, concept-value; 30 agents; gates → Requirements | AGENT_SIMULATED | `_signoffs/SO-02-discovery.yaml` |
 | SO-03-requirements | 2026-05-30 | stage-transition | Requirements COMPLETE: 39 FR + 26 NFR, R7 MoSCoW, R10 (0 DIVERGED); 22 agents; gates → Design | AGENT_SIMULATED | `_signoffs/SO-03-requirements.yaml` |
 | SO-04-design | 2026-05-30 | stage-transition | Design COMPLETE: 15 DCs + 3 Pugh-won decisions (SharedLayerProjector / Bayesian-BT rating / agentic pre-filter); 17 agents; 1 CAT resolved + ~15 MAJOR carried; gates → Development | AGENT_SIMULATED | `_signoffs/SO-04-design.yaml` |
+| SO-05-development | 2026-05-30 | work-stream-close | Development W1–W5 plan + W6 S1-01 flagship DONE (SharedLayerProjector, real TDD, 7/7 green, gate APPROVE); S2–S7 TODO (honest); → Testing for current-state release-readiness | AGENT_SIMULATED | `_signoffs/SO-05-development.yaml` |
 
 ## Methodology Notes
 
@@ -147,6 +148,9 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 
 ### Design complete → Development (2026-05-30)
 > Stage 3 COMPLETE (17 AGENT_SIMULATED agents). **15 Design Cases** + 3 headline Pugh-won architecture decisions: **D-SWARM** `SharedLayerProjector` (recall-floor BY CONSTRUCTION — the AX-003 fix) + distilled top-k gate + rules-first early-exit; **D-EVAL** `RatingEnginePort` 3-tier ladder (Bayesian-BT NUTS = claim-grade; coherent significance by construction; rating import-isolated from detection); **D-AGENTIC** router pre-filter + unified floor at the build_fusion seam. 5-SME panel: 1 CATASTROPHIC (NFR-001 MCMC) RESOLVED + ~15 MAJOR carried as MUST stories (sign gate artifact; encrypt token store; sandbox harness; commit latency ceilings; Davidson ties; docs discoverability). Signed off `_signoffs/SO-04-design.yaml`. **Critical path:** DC-01 SharedLayerProjector → DC-06/07 rating engine → DC-11 canonical-run gate. Cross-repo: bayes/MLE rating blocks on eval-data S6 `stats/bradley_terry.py` (absent today). **Ready for Development.** Run: `/dev-assist-development`.
+
+### Development (partial) → Testing (2026-05-30)
+> Stage 4 W1–W5 planning COMPLETE + W6 **S1-01 flagship DONE** (real strict-TDD code: `src/pii_anon/routing/shared_layer.py`, RED `ef85166` → GREEN `548f576`, 7/7 green incl. 2000-case property test, ruff + mypy --strict clean, 78 swarm/fusion/moe tests unaffected, story gate APPROVE). The recall-floor MUST (FR-016/NFR-011/AX-003) is discharged as production code. **S2–S7 (~29 stories) TODO** — scaffolded with critical path + cross-repo S6 blockers + 3 security MUST stories. Development is honestly IN_PROGRESS. Signed off `_signoffs/SO-05-development.yaml`. **Ready for Testing** (current-state release-readiness: expect SHIP-WITH-CAVEATS for the foundation / DEFER for the full redesign). Run: `/dev-assist-testing`.
 
 ## Pivots Log
 

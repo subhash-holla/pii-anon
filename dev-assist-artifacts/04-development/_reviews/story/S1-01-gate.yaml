@@ -1,0 +1,23 @@
+gate: story
+story: S1-01-shared-layer-projector
+date: "2026-05-30"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE   # zero SHOWSTOPPER/CATASTROPHIC/MAJOR/REQUEST_CHANGES
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED (ef85166) precedes GREEN (548f576) on the branch; ruff clean; mypy --strict clean (2 files); module is minimal/pure with full docstrings; no dead code; idiomatic dataclasses(slots)."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: "AX-003 (recall-floor) satisfied BY CONSTRUCTION — project() returns a superset of the shared key-set; property test asserts ZERO violations over 2000 seeded cases. AX-002 determinism: stable ordering test passes. AX-001 n/a (no fixtures with PII; synthetic-shaped only)."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "Test names pin FR-016/NFR-011/AX-003 (test_fr_016_*, test_nfr_011_*, test_ax_003_*). Story → DC-01 → UC-13 → PGO-4 chain intact. Successor S1-02 (production wiring) registered in DoD."
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: "CONDITIONAL (touches src/): no secrets, no network egress, no unsafe; pure in-memory span re-injection. No new attack surface. (Gate-artifact signing + token encryption belong to S2-05/S6-03.)"
+conditional_reviewers_skipped: [performance-benchmark, accessibility, requirements-coverage, contributor-experience]
+findings: []
+followups:
+  - "S1-02: wire SharedLayerProjector into MoEFusionStrategy + SwarmFusionStrategy post-merge() (makes the floor live in production)."
+  - "S1-04: migrate the seeded-random property test to hypothesis @given."
