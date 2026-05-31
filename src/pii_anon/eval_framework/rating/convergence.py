@@ -150,7 +150,7 @@ def split_rhat(samples: NDArray[np.floating]) -> NDArray[np.float64]:
     grand_mean = chain_means.mean(axis=0)  # (n_params,)
 
     between = n / (m - 1) * np.sum((chain_means - grand_mean) ** 2, axis=0)
-    within = chain_means.shape[0] and chain_vars.mean(axis=0)  # (n_params,)
+    within = chain_vars.mean(axis=0)  # (n_params,) — mean within-half-chain variance
 
     var_plus = (n - 1) / n * within + between / n
     # Guard a degenerate within-chain variance of exactly 0 (constant chains):
