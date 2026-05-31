@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01) |
-| State | **IN_PROGRESS** (owner: dev-assist-development-executor; claimed_at 2026-05-30; started_at 2026-05-30) |
+| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-30; started_at 2026-05-30; review_ready_at 2026-05-30) |
 | Implements | FR-016, NFR-011, AX-003 (now **LIVE** on the fusion path); touches NFR-005 (determinism), FR-008 (audit) |
 | Traces | UC-13 → PGO-4; Design D-SWARM DECISION 1 + D-AGENTIC DECISION 3 (floor wrapped at the `build_fusion` seam) |
 | Test-type tags | `[UNIT-TEST]` `[INTEGRATION-TEST]` |
@@ -44,9 +44,18 @@ Make the recall-floor **LIVE on the production fusion path**: both `MoEFusionStr
 - **GREEN**: add `floor_fusion.py`; wrap swarm+moe in build_fusion (lazy import); re-export from `routing/__init__.py`.
 - **REFACTOR**: extract the `regex-oss` shared-extraction helper; mypy/ruff clean.
 
+### Evidence (commit hashes — branch `pdlc/sota-program`)
+- **RED** `4760657` — `test: S1-02 RED — pin FR-016/NFR-011/AX-003/NFR-005 floor LIVE at build_fusion seam` (2 files: story + `tests/test_floor_fusion_wiring.py`). 18 tests collected, 8 failed (FR-016/AX-003 superset + `_inner` absent) / 10 passed → RED gate satisfied (the load-bearing floor invariants fail because `FloorProjectingFusion` is absent and `build_fusion` returns bare strategies).
+- **GREEN** `a14888e` — `feat: S1-02 GREEN — FloorProjectingFusion wraps swarm+moe at build_fusion seam` (4 files: `routing/floor_fusion.py` (new), `fusion.py`, `routing/__init__.py`, test). All wiring tests pass; 104 targeted tests green; ruff + mypy --strict clean.
+- **REFACTOR** `fa36891` — `refactor: S1-02 — cover FloorProjectingFusion.__getattr__ guard branch (100%)` (1 file, test-only). `_shared_subset` helper already factored out in GREEN; added 2 tests exercising the `__getattr__` underscore-guard + missing-public-attr forward paths → `floor_fusion.py` at 100% line+branch coverage. 108 targeted tests green.
+- **Full suite** (`pytest -m "not performance"`, enforces `--cov-fail-under=84`): exit 0, total coverage **86.12%** (≥84 gate), `floor_fusion.py` 100%, `shared_layer.py` 100%. No new failures vs. the ~2671-test baseline.
+- **At-risk tests verified GREEN**: `test_swarm.py::test_build_fusion_factory` (`strategy_id == "swarm"`), `test_fusion.py` weighted_consensus isinstance, `test_moe.py::test_moe_strategy_id`.
+- **Implementation notes**: shared set derived from the `regex-oss` subset of the SAME `findings` (regex never re-run → deterministic, NFR-005). `routing/__init__.py` re-exports `FloorProjectingFusion` via PEP-562 module `__getattr__` (lazy) to keep the fusion↔routing cycle broken. Swarm inner provably DROPS the gated span (verified `SwarmFusionStrategy().merge([gated]) == []`); MoE keeps it natively → floor no-ops for MoE on that input but the superset guarantee still holds for both modes.
+- §4 risks (regex-oss-disabled profile no-op; single-engine fast-path bypass; explicit `floor_violation_blocked` audit note) DOCUMENTED as follow-ons, NOT changed in S1-02 per story scope.
+
 ## 12. Definition of Done
-- [ ] RED commit precedes GREEN (git-evidenced); failing build_fusion-level tests for both modes
-- [ ] `FloorProjectingFusion` implemented; build_fusion wraps swarm+moe; lazy import (no cycle)
-- [ ] `strategy_id` passthrough; both modes floor-enforced; empty-shared no-op; deterministic
-- [ ] ruff + mypy --strict clean; no public-API change; full suite green (esp. the 78)
-- [ ] Story-gate review APPROVE (`_reviews/story/S1-02-gate.yaml`)
+- [x] RED commit precedes GREEN (git-evidenced `4760657` → `a14888e`); failing build_fusion-level tests for both modes
+- [x] `FloorProjectingFusion` implemented; build_fusion wraps swarm+moe; lazy import (no cycle — verified `import pii_anon.fusion; import pii_anon.routing` succeeds)
+- [x] `strategy_id` passthrough; both modes floor-enforced; empty-shared no-op; deterministic
+- [x] ruff + mypy --strict clean; no public-API change; full suite green (esp. the 78 swarm/fusion/moe; targeted run 108 green, full suite exit 0 @ 86.12% cov)
+- [ ] Story-gate review APPROVE (`_reviews/story/S1-02-gate.yaml`) — awaiting orchestrator reviewer dispatch
