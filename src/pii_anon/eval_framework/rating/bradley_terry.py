@@ -232,13 +232,8 @@ class BradleyTerryMLEEngine:
             for name in names:
                 updated[name] /= geo_mean
 
-            delta = (
-                max(
-                    abs(math.log(updated[name]) - math.log(pi[name]))
-                    for name in names
-                )
-                if names
-                else 0.0
+            delta = max(
+                abs(math.log(updated[name]) - math.log(pi[name])) for name in names
             )
             pi = updated
             self._last_fit_iterations = iteration + 1
@@ -247,11 +242,24 @@ class BradleyTerryMLEEngine:
                 self._last_fit_converged = True
                 break
         else:
-            # Loop exhausted without an early ``break``: the fit did not reach
-            # ``tol``. An empty design (no sweeps) is vacuously converged.
-            self._last_fit_converged = not names
+            # Loop exhausted without an early ``break``: the fit ran every one of
+            # ``max_iter`` sweeps and never crossed ``tol`` — flag non-converged.
+            # (All public callers guard against empty ``names``, so the loop body
+            # always runs at least once with a real design.)
+            self._last_fit_converged = False
 
         return {name: math.log(value) for name, value in pi.items()}
+
+    def _reset_fit_diagnostics(self) -> None:
+        """Clear the convergence diagnostics at the start of every public fit.
+
+        A degenerate (empty) design performs no MM sweeps and is vacuously
+        converged in 0 iterations; a non-empty design overwrites these in
+        :meth:`_fit_mm`.
+        """
+        self._last_fit_converged = True
+        self._last_fit_iterations = 0
+        self._last_fit_delta = 0.0
 
     def _warn_if_not_converged(self, n_systems: int) -> None:
         """Emit a :class:`BradleyTerryConvergenceWarning` iff the last fit failed.
@@ -334,12 +342,8 @@ class BradleyTerryMLEEngine:
                 num_matches[name_i] += 1
                 num_matches[name_j] += 1
 
-        if systems:
-            theta = self._fit_mm(systems, wins, games)
-        else:
-            theta = {}
-            self._last_fit_converged = True
-            self._last_fit_iterations = 0
+        self._reset_fit_diagnostics()
+        theta = self._fit_mm(systems, wins, games) if systems else {}
         self._warn_if_not_converged(len(systems))
         self._store_ratings(theta, num_matches)
 
@@ -406,12 +410,8 @@ class BradleyTerryMLEEngine:
             games[(sys_j, sys_i)] = games.get((sys_j, sys_i), 0.0) + float(n)
 
         names.sort()  # deterministic iteration order
-        if names:
-            theta = self._fit_mm(names, wins, games)
-        else:
-            theta = {}
-            self._last_fit_converged = True
-            self._last_fit_iterations = 0
+        self._reset_fit_diagnostics()
+        theta = self._fit_mm(names, wins, games) if names else {}
         self._warn_if_not_converged(len(names))
 
         num_matches: dict[str, int] = {name: 0 for name in names}
