@@ -10,7 +10,8 @@ dependency; migrating these to @given is tracked as story S6-PROP).
 """
 from __future__ import annotations
 
-import random
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from pii_anon.types import EngineFinding, EnsembleFinding
 from pii_anon.routing.shared_layer import (
@@ -88,27 +89,53 @@ def test_type_carrying_relabel_does_not_cover_shared() -> None:
     assert result.violations_blocked == 1
 
 
-def test_nfr_011_property_superset_invariant_seeded() -> None:
-    """ZERO subset violations over many seeded-random (output, shared) pairs."""
-    rng = random.Random(42)
-    types = ["EMAIL_ADDRESS", "CREDIT_CARD", "PERSON_NAME", "PHONE_NUMBER", "US_SSN", "IBAN"]
-    fields = ["text", "notes", None]
-    langs = ["en", "es", "zh"]
-    projector = SharedLayerProjector()
-    for _ in range(2000):
-        n_shared = rng.randint(0, 6)
-        n_out = rng.randint(0, 6)
-        shared = [_ef(rng.choice(types), s := rng.randint(0, 40), s + rng.randint(1, 12),
-                      field_path=rng.choice(fields), language=rng.choice(langs)) for _ in range(n_shared)]
-        output = [_enf(rng.choice(types), s := rng.randint(0, 40), s + rng.randint(1, 12),
-                       field_path=rng.choice(fields), language=rng.choice(langs)) for _ in range(n_out)]
-        result = projector.project(output, shared)
-        out_keys = {span_key_ensemble(f) for f in result.findings}
-        shared_keys = {span_key_engine(s) for s in shared}
-        assert shared_keys <= out_keys, "recall-floor violated: a shared span was not in the output"
-        # re-injected spans must not duplicate keys already present
-        reinjected_keys = [span_key_ensemble(f) for f in result.findings if is_shared_floor(f)]
-        assert len(reinjected_keys) == len(set(reinjected_keys))
+# --- hypothesis strategy for property-based superset-invariant coverage (S1-04) ---
+_PROP_TYPES = ["EMAIL_ADDRESS", "CREDIT_CARD", "PERSON_NAME", "PHONE_NUMBER", "US_SSN", "IBAN"]
+_PROP_FIELDS: list[str | None] = ["text", "notes", None]
+_PROP_LANGS = ["en", "es", "zh"]
+
+
+@st.composite
+def _span_specs(draw: st.DrawFn) -> tuple[str, str | None, str, int, int]:
+    """One generated span: (entity_type, field_path, language, start, end).
+
+    Mirrors the offset domain of the retired seeded generator: start in [0, 40],
+    length in [1, 12] (so span_end = start + length is always > span_start).
+    """
+    entity_type = draw(st.sampled_from(_PROP_TYPES))
+    field_path = draw(st.sampled_from(_PROP_FIELDS))
+    language = draw(st.sampled_from(_PROP_LANGS))
+    start = draw(st.integers(min_value=0, max_value=40))
+    length = draw(st.integers(min_value=1, max_value=12))
+    return (entity_type, field_path, language, start, start + length)
+
+
+@settings(max_examples=400, derandomize=True)
+@given(
+    shared_specs=st.lists(_span_specs(), max_size=6),
+    output_specs=st.lists(_span_specs(), max_size=6),
+)
+def test_nfr_011_property_superset_invariant(
+    shared_specs: list[tuple[str, str | None, str, int, int]],
+    output_specs: list[tuple[str, str | None, str, int, int]],
+) -> None:
+    """NFR-011: ZERO subset violations over hypothesis-generated (output, shared) pairs.
+
+    Property: for every generated pair, shared_keys ⊆ out_keys (the recall floor
+    holds by construction) AND the re-injected shared-floor spans never duplicate
+    a key already present in the projected output.
+    """
+    shared = [_ef(t, start, end, field_path=fp, language=lang)
+              for (t, fp, lang, start, end) in shared_specs]
+    output = [_enf(t, start, end, field_path=fp, language=lang)
+              for (t, fp, lang, start, end) in output_specs]
+    result = SharedLayerProjector().project(output, shared)
+    out_keys = {span_key_ensemble(f) for f in result.findings}
+    shared_keys = {span_key_engine(s) for s in shared}
+    assert shared_keys <= out_keys, "recall-floor violated: a shared span was not in the output"
+    # re-injected spans must not duplicate keys already present
+    reinjected_keys = [span_key_ensemble(f) for f in result.findings if is_shared_floor(f)]
+    assert len(reinjected_keys) == len(set(reinjected_keys))
 
 
 def test_determinism_repeatable() -> None:
