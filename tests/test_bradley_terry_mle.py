@@ -206,11 +206,19 @@ def test_nfr_026_run_round_robin_ratings_lie_on_the_elo_scale() -> None:
 def test_fr_003_degenerate_total_order_does_not_diverge() -> None:
     """Negative case: point composites are a PERFECT total order ⇒ a raw BT
     MLE would send strengths to ±∞. The soft-outcome mapping (sigmoid of
-    composite gaps) + smoothing must keep every rating finite and converge."""
+    composite gaps) + smoothing must keep every rating finite and ordered.
+
+    This widely-separated 6-system design is *near-separable*: the MM fit
+    exhausts max_iter (honestly flagged via BradleyTerryConvergenceWarning —
+    asserted by ``test_code_quality_*``), but the result stays finite + strictly
+    monotone, which is the contract this test pins. The convergence warning is
+    suppressed here so this assertion set is unaffected by the diagnostics."""
     engine = BradleyTerryMLEEngine()
     # A widely separated, strictly monotone total order.
     composites = {f"s{idx}": float(idx) for idx in range(6)}
-    updates = engine.run_round_robin(composites)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", BradleyTerryConvergenceWarning)
+        updates = engine.run_round_robin(composites)
     assert updates
     for name in composites:
         rating = engine.get_rating(name)
@@ -480,11 +488,18 @@ def test_nfr_026_additive_export_from_rating_package() -> None:
 )
 def test_ax_002_run_round_robin_is_deterministic(composites: dict[str, float]) -> None:
     """Property: two independent engines fed identical composites produce
-    byte-identical ratings — no seed/order nondeterminism in the port path."""
+    byte-identical ratings — no seed/order nondeterminism in the port path.
+
+    Some Hypothesis-drawn composite maps are near-separable and legitimately
+    exhaust max_iter (flagged via BradleyTerryConvergenceWarning); that warning
+    is orthogonal to the determinism contract under test and is suppressed here.
+    The convergence DIAGNOSTICS are themselves asserted deterministic."""
     e1 = BradleyTerryMLEEngine()
     e2 = BradleyTerryMLEEngine()
-    e1.run_round_robin(composites)
-    e2.run_round_robin(composites)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", BradleyTerryConvergenceWarning)
+        e1.run_round_robin(composites)
+        e2.run_round_robin(composites)
     for name in composites:
         r1 = e1.get_rating(name)
         r2 = e2.get_rating(name)
@@ -492,6 +507,9 @@ def test_ax_002_run_round_robin_is_deterministic(composites: dict[str, float]) -
         assert r1.rating == r2.rating
         assert r1.rd == r2.rd
         assert math.isfinite(r1.rating)
+    # Diagnostics are a pure function of the input too.
+    assert e1.last_fit_converged == e2.last_fit_converged
+    assert e1.last_fit_iterations == e2.last_fit_iterations
 
 
 @settings(max_examples=30, deadline=None, suppress_health_check=[HealthCheck.too_slow])

@@ -61,10 +61,11 @@ from __future__ import annotations
 
 import math
 import random
+import warnings
 
 from .elo import EloRating, RatingUpdate
 
-__all__ = ["BradleyTerryMLEEngine"]
+__all__ = ["BradleyTerryConvergenceWarning", "BradleyTerryMLEEngine"]
 
 # Elo-scale reporting constants — kept in lock-step with ``elo.py``.
 _ELO_ANCHOR = 1500.0
@@ -74,6 +75,20 @@ _LN10 = math.log(10.0)
 # Comparison-shape aliases.
 PairedCounts = dict[tuple[str, str], tuple[float, float, int]]
 Record = tuple[str, str]
+
+
+class BradleyTerryConvergenceWarning(UserWarning):
+    """Emitted when the MM fit exhausts ``max_iter`` without reaching ``tol``.
+
+    The fit is NOT discarded — strengths remain finite and monotone in the
+    composite order, so the result is still serviceable. The warning makes the
+    non-convergence **observable** rather than silent: a caller (notably the SDO
+    competitive-supremacy J-meter, which consumes this BT-MLE engine) can detect
+    a non-converged fit via this warning or the :attr:`BradleyTerryMLEEngine.
+    last_fit_converged` diagnostic and decide whether to escalate (e.g. fall
+    back to the claim-grade ``bayes-bt`` tier) instead of trusting a fit that
+    stopped at ``delta ≫ tol`` on a near-separable soft design.
+    """
 
 
 class BradleyTerryMLEEngine:
@@ -123,6 +138,39 @@ class BradleyTerryMLEEngine:
         self._ratings: dict[str, EloRating] = {}
         self._history: list[RatingUpdate] = []
 
+        # Convergence diagnostics of the MOST RECENT fit (code-quality-story-01).
+        # ``_last_fit_iterations == 0`` means "no fit has run yet"; a finished
+        # fit records whether it reached ``tol`` and the sweeps it took.
+        self._last_fit_converged: bool = True
+        self._last_fit_iterations: int = 0
+        self._last_fit_delta: float = 0.0
+
+    # -- Read-only convergence diagnostics ----------------------------------
+
+    @property
+    def max_iter(self) -> int:
+        """Maximum MM sweeps this engine will run before declaring non-convergence."""
+        return self._max_iter
+
+    @property
+    def last_fit_converged(self) -> bool:
+        """Whether the most recent fit reached ``tol`` within ``max_iter``.
+
+        ``False`` flags a fit that exhausted ``max_iter`` (e.g. a near-separable
+        soft design). The strengths are still finite and monotone, but the fit
+        stopped at ``delta ≥ tol`` — inspect this before trusting a tight margin.
+        Defaults to ``True`` before any fit has run.
+        """
+        return self._last_fit_converged
+
+    @property
+    def last_fit_iterations(self) -> int:
+        """MM sweeps performed by the most recent fit (``0`` if none has run).
+
+        Equals :attr:`max_iter` exactly when the fit did not converge.
+        """
+        return self._last_fit_iterations
+
     # -- Internals ----------------------------------------------------------
 
     def _sigmoid(self, x: float) -> float:
@@ -151,9 +199,17 @@ class BradleyTerryMLEEngine:
         ``n_ij``. Strengths are renormalized to geometric-mean 1 after every
         sweep (sum-to-zero in θ). Systems that played no comparison stay at the
         anchor (θ = 0).
+
+        Records the convergence outcome on ``self`` (``_last_fit_converged`` /
+        ``_last_fit_iterations``) so a non-converged fit is observable rather
+        than silent — see :class:`BradleyTerryConvergenceWarning`. Uses the
+        ``for/else`` idiom: a ``break`` marks convergence; the ``else`` branch
+        runs only when the loop is exhausted, marking non-convergence and
+        recording the final ``delta`` (returned to callers via ``_last_fit_*``).
         """
         pi = {name: 1.0 for name in names}
-        for _ in range(self._max_iter):
+        self._last_fit_iterations = 0
+        for iteration in range(self._max_iter):
             updated: dict[str, float] = {}
             for name in names:
                 denom = 0.0
@@ -176,14 +232,46 @@ class BradleyTerryMLEEngine:
             for name in names:
                 updated[name] /= geo_mean
 
-            delta = max(
-                abs(math.log(updated[name]) - math.log(pi[name])) for name in names
+            delta = (
+                max(
+                    abs(math.log(updated[name]) - math.log(pi[name]))
+                    for name in names
+                )
+                if names
+                else 0.0
             )
             pi = updated
+            self._last_fit_iterations = iteration + 1
+            self._last_fit_delta = delta
             if delta < self._tol:
+                self._last_fit_converged = True
                 break
+        else:
+            # Loop exhausted without an early ``break``: the fit did not reach
+            # ``tol``. An empty design (no sweeps) is vacuously converged.
+            self._last_fit_converged = not names
 
         return {name: math.log(value) for name, value in pi.items()}
+
+    def _warn_if_not_converged(self, n_systems: int) -> None:
+        """Emit a :class:`BradleyTerryConvergenceWarning` iff the last fit failed.
+
+        Called once per PUBLIC fit so a non-converged fit surfaces exactly one
+        warning (not one per internal ``_fit_mm`` sweep). ``stacklevel=3`` points
+        the warning at the external caller (caller → public fit → here).
+        """
+        if not self._last_fit_converged:
+            warnings.warn(
+                BradleyTerryConvergenceWarning(
+                    f"Bradley-Terry MM fit did not converge: "
+                    f"n_systems={n_systems}, "
+                    f"final_delta={self._last_fit_delta:.3e} >= tol={self._tol:.1e} "
+                    f"after max_iter={self._max_iter} sweeps. Ratings are finite "
+                    f"and monotone (serviceable), but the design is near-separable; "
+                    f"inspect `last_fit_converged` before trusting a tight margin."
+                ),
+                stacklevel=3,
+            )
 
     def _store_ratings(
         self, theta: dict[str, float], num_matches: dict[str, int]
@@ -246,7 +334,13 @@ class BradleyTerryMLEEngine:
                 num_matches[name_i] += 1
                 num_matches[name_j] += 1
 
-        theta = self._fit_mm(systems, wins, games) if systems else {}
+        if systems:
+            theta = self._fit_mm(systems, wins, games)
+        else:
+            theta = {}
+            self._last_fit_converged = True
+            self._last_fit_iterations = 0
+        self._warn_if_not_converged(len(systems))
         self._store_ratings(theta, num_matches)
 
         updates: list[RatingUpdate] = []
@@ -312,7 +406,13 @@ class BradleyTerryMLEEngine:
             games[(sys_j, sys_i)] = games.get((sys_j, sys_i), 0.0) + float(n)
 
         names.sort()  # deterministic iteration order
-        theta = self._fit_mm(names, wins, games) if names else {}
+        if names:
+            theta = self._fit_mm(names, wins, games)
+        else:
+            theta = {}
+            self._last_fit_converged = True
+            self._last_fit_iterations = 0
+        self._warn_if_not_converged(len(names))
 
         num_matches: dict[str, int] = {name: 0 for name in names}
         for (sys_i, sys_j), (_wi, _wj, n) in comparisons.items():
@@ -326,6 +426,13 @@ class BradleyTerryMLEEngine:
 
         Each record is one paired comparison the winner won. Returns sum-to-zero
         log-strengths θ. This is the unit :meth:`paired_bootstrap` resamples.
+
+        The underlying ``_fit_mm`` updates the convergence diagnostics, but this
+        method does NOT emit a :class:`BradleyTerryConvergenceWarning`: it is the
+        per-resample bootstrap primitive, so warning here would be one-per-draw
+        noise. :meth:`paired_bootstrap` snapshots and restores the engine's
+        diagnostics around its loop so a resample never clobbers the diagnostics
+        of the caller's actual point fit.
         """
         names: list[str] = []
         seen: set[str] = set()
@@ -364,12 +471,24 @@ class BradleyTerryMLEEngine:
         samples: dict[str, list[float]] = {name: [] for name in names}
         n_rec = len(records)
 
+        # Snapshot the caller's point-fit diagnostics; the resampling loop refits
+        # many times via ``fit_records`` and would otherwise leave the engine
+        # reporting some arbitrary resample's convergence state.
+        saved_converged = self._last_fit_converged
+        saved_iterations = self._last_fit_iterations
+        saved_delta = self._last_fit_delta
+
         for _ in range(b):
             resampled = [records[rng.randrange(n_rec)] for _ in range(n_rec)]
             theta = self.fit_records(resampled)
             for name in names:
                 # A system absent from a resample anchors at θ = 0.
                 samples[name].append(theta.get(name, 0.0))
+
+        # Restore: the bootstrap is a CI procedure, not a point fit.
+        self._last_fit_converged = saved_converged
+        self._last_fit_iterations = saved_iterations
+        self._last_fit_delta = saved_delta
 
         cis: dict[str, tuple[float, float]] = {}
         for name in names:
