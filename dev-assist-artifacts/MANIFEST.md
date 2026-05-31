@@ -95,7 +95,7 @@ _To be populated as stage 04 progresses._
 | W3. Quality | COMPLETE | development-log.md §W3 | ✅ 5-gate cascade + strict TDD + security MUSTs |
 | W4. Testing setup | COMPLETE | development-log.md §W4 | ✅ extend existing suite + property/ε-gate scaffolded |
 | W5. Stories | COMPLETE | 02-stories/sprint-1/ + plan table | ✅ epics + sprint story set |
-| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail. **S3-01 DONE** (rating port + registry + import-boundary). **S3-02 DONE** (`bradley-terry-mle` 2nd ladder tier — pure-stdlib MM + paired bootstrap + observable convergence; 5-reviewer gate APPROVE; 2727 pass/0 fail) | 🔶 S2 / S3-03..S7 TODO + SDO gate |
+| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE; sprint gate APPROVE. **Eval-integrity ladder COMPLETE in code**: **S3-01 DONE** (rating port + registry + import-boundary) · **S3-02 DONE** (`bradley-terry-mle` MM + paired bootstrap) · **S3-03 DONE** (`bayes-bt` NUTS claim-grade + pure-numpy NFR-001 gate — **resolves CATASTROPHIC eval-01**; fail-loud, import-safe; 5-reviewer gate APPROVE). Full suite exit 0 (2780 collected, ~2757 pass/0 fail), 86.03% cov | 🔶 S3-04 (coherent-sig + J) authored → S4-CS-01 SDO gate authored → S2/S4/S5/S6/S7 + security MUSTs |
 
 ## Testing Phase Progress
 
@@ -122,6 +122,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | SO-05-development | 2026-05-30 | work-stream-close | Development W1–W5 plan + W6 S1-01 flagship DONE (SharedLayerProjector, real TDD, 7/7 green, gate APPROVE); S2–S7 TODO (honest); → Testing for current-state release-readiness | AGENT_SIMULATED | `_signoffs/SO-05-development.yaml` |
 | SO-06-testing | 2026-05-30 | stage-transition | Testing COMPLETE: verdict SHIP-WITH-CAVEATS (DC-01 recall-floor) / DEFER (full redesign); NFR matrix 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + 0 FAIL; → Documentation | AGENT_SIMULATED | `_signoffs/SO-06-testing.yaml` |
 | SO-07-sprint1 | 2026-05-31 | sprint-close | Dev **Sprint-1 COMPLETE** (S1-01..05): recall-floor LIVE by construction (both modes, multilingual, deterministic) + per-lang ε-gate (teeth) + hypothesis + swarm-language fix; sprint gate REQUEST_CHANGES→APPROVE (1 MAJOR remediated by S1-05; 0/5 refutations upheld); 2690 pass/0 fail | AGENT_SIMULATED | `_signoffs/SO-07-sprint1.yaml` |
+| SO-08-s3-eval-integrity | 2026-05-31 | work-stream-close | **Eval-integrity rating ladder COMPLETE in code** (S3-02 `bradley-terry-mle` + S3-03 `bayes-bt` NUTS claim-grade + pure-numpy NFR-001 convergence gate — **resolves SME CATASTROPHIC eval-01**). Both 5-reviewer gates APPROVE (each 1 substantive MINOR remediated in-loop). Full suite exit 0 (2780 collected, ~2757 pass/0 fail), 86.03% cov, ruff + mypy --strict clean. S3-04 (coherent-sig + J) + S4-CS-01 (SDO gate) authored. **SDO verdict: NOT_YET** (binding: no canonical claim run + gate unbuilt). | AGENT_SIMULATED | `_signoffs/SO-08-s3-eval-integrity.yaml` |
 
 ## Methodology Notes
 
@@ -164,6 +165,21 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 >
 > **S3-01 DONE (eval-integrity FOUNDATION) — 2026-05-31.** `RatingEnginePort` (`@runtime_checkable typing.Protocol`: `run_round_robin` + `get_rating`; structural → zero call-site changes), `RatingEngineRegistry` (entry-point group `pii_anon.rating_engines`, mirrors `engines/registry.py`), `PIIRateEloEngine` registered as `glicko-legacy` (discovery live-verified → `['glicko-legacy']`), AST import-boundary CI test (rating imports NOTHING from swarm/moe/fusion/policy — GREEN). `elo.py` + all 7 callers UNTOUCHED; RED `e5a554e` → GREEN `d5cf633`; full suite **2699 pass / 0 fail**; ruff + mypy --strict clean (115 files). Gate `_reviews/story/S3-01-gate.yaml` APPROVE. **Next: S3-02** (`bradley-terry-mle` — ship a temp-local minorization-maximization impl behind the port; ⛓ blocks on DATA S6 `stats/bradley_terry.py`, verified absent) → **S3-03** (`bayes-bt` NumPyro NUTS = claim-grade; NFR-001 convergence gate R̂≤1.01 ∧ ESS≥400 ∧ 0-div) → **S3-04** (coherent significance by construction + record-level paired outcomes + Davidson ties). Then the security MUSTs (S2-05 gate-sign / S5-04 harness-sandbox / S6-03 token-encryption) + S2/S4/S5/S6/S7. Claim via `/dev-assist-story-claim S3-02`.
 
+### S3 eval-integrity rating ladder COMPLETE → S3-04 coherent-significance + SDO gate (2026-05-31)
+> **The 3-tier rating ladder + the NFR-001 convergence gate are now LIVE in code** — the eval-integrity FOUNDATION the whole Pillar-1 overhaul rests on. **S3-02 `bradley-terry-mle`** (pure-stdlib MM/Hunter-2004 + paired-bootstrap CIs + observable convergence) and **S3-03 `bayes-bt`** (NumPyro NUTS = claim-grade default) both sit behind the S3-01 `RatingEnginePort` (structural, zero call-site changes; discovery → `['bayes-bt','bradley-terry-mle','glicko-legacy']`). **S3-03 RESOLVES the SME CATASTROPHIC eval-01**: `convergence.py` is the pure-numpy NFR-001 gate (split-R̂ ≤ 1.01 ∧ bulk-ESS ≥ 400/param ∧ 0 divergences) that **fails loud** and names the binding constraint; only `bayes-bt` is claim-grade. **Env-honest**: numpyro/jax are NOT installed in the `.venv` (heavy wheels; real-dep run is Pass-2) → the module is import-safe (lazy NUTS import), the engine stays discoverable, calling it without `bayes-eval` raises a loud `MissingOptionalDependencyError` (never a silent fallback), and the gate has real in-tree TEETH (pure-numpy) while the real NUTS run is `importorskip`/Pass-2. Both stories passed the canonical **5-reviewer** story gate APPROVE (`_reviews/story/S3-0{2,3}-gate.yaml`), each with one substantive MINOR remediated in-loop (S3-02: observable non-convergence; S3-03: fail-loud divergence counting). Full suite **exit 0** (2780 collected, ~2757 pass / 0 fail), coverage 86.03%, ruff + mypy --strict (118 files) clean; `elo.py` + all 7 callers byte-identical throughout; `bayes-eval` optional extra added (numpyro/jax/arviz). Signed off `_signoffs/SO-08-s3-eval-integrity.yaml`.
+>
+> **⚠️ User WIP preserved** (md5 byte-identical to session start, never staged): `src/pii_anon/orchestrator.py`, `tests/test_moe_enhancements.py`, `artifacts/benchmarks/*`, `benchmark-diagnostics.json`, `README.md`, `docs/*`. Only narrow explicit `git add` of owned files used throughout.
+>
+> **NEXT (critical path):** **S3-04** (`coherent significance BY CONSTRUCTION` — one joint posterior → point∈CI ∧ sign↔verdict ∧ significant-iff-CI-excludes-0 cannot disagree; record-level paired outcomes from `per_record_f1`; Davidson tie term at the wired `# DAVIDSON(S3-04)` seam; the `rank_one_probability` J primitive) → **S4-CS-01 `CompetitiveSupremacyGate`** (the SDO objective). **Both stories authored + cold-pickup-ready** (`sprint-3/S3-04-coherent-significance.md`, `sprint-4/S4-CS-01-competitive-supremacy-gate.md`). Claim via `/dev-assist-story-claim S3-04`.
+>
+> **★ SOTA-DOMINANCE OBJECTIVE (SDO) — current verdict: `NOT_YET`.** The `CompetitiveSupremacyGate` (S4-CS-01) is scaffolded but not yet implemented, so J and the G1–G7 checks aren't yet code-computable. Manual assessment of the binding constraints, in priority order:
+> 1. **G7 `canonical_claim_run == False`** — ALL current README/benchmark numbers are a 50-sample smoke run; CLAIM_GRADE is structurally blocked until a regenerated certified canonical run (S7) lands. **(the #1 binding constraint)**
+> 2. **The SDO gate itself is unbuilt** — S4-CS-01 must ship the skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7 (computable now from the benchmark JSON + glicko/MLE) + the verdict state machine, wired into CI as a NON-BLOCKING report.
+> 3. **J not yet computed** — needs S3-04's `rank_one_probability` (+ either a `bayes-eval` real-NUTS run for the claim-grade J, or the in-tree MLE-bootstrap J-fallback). The S3 ladder + S1 floor are the foundation J is computed on (all DONE).
+> 4. **G2/G4 pending** — distinct anon-vs-pseudo scorers (S4-01) + calibration/selective-risk reporter (S4-03).
+> 5. **Tier-C unrun** — OpenAI Privacy Filter / Azure AI Language / AWS Comprehend (real-API Pass-2) — CLAIM_GRADE blocked until run-or-waived-with-reason (the visible honesty boundary).
+> **Immediate next action toward the objective:** ship S3-04 (unblocks J), then S4-CS-01 (makes the verdict code-computable + wired into CI). The eval-integrity ladder (S1 floor + S3 ratings + NFR-001 gate) that the SDO rests on is now complete.
+
 ## Pivots Log
 
 | Date | Stage(s) affected | Source finding | Plan file |
@@ -198,9 +214,9 @@ Sibling files:
 | Discovery | 30 | 37 |
 | Requirements | 22 | 59 |
 | Design | 17 | 76 |
-| Development | 28 (3 explore + 1 plan + 6 story executors + 11 sprint-gate workflow + S3-02: 2 executors + 5 story-gate reviewers) | 104 |
-| Testing | 0 | 104 |
-| **Total** | **104** | **104** |
+| Development | 40 (3 explore + 1 plan + 6 story executors + 11 sprint-gate workflow + S3-02: 2 executors + 5 reviewers + S3-03: 1 executor + 5 reviewers) | 116 |
+| Testing | 0 | 116 |
+| **Total** | **116** | **116** |
 
 ---
 

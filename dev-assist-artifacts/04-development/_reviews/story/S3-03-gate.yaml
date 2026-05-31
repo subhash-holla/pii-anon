@@ -1,0 +1,123 @@
+gate: story
+story: S3-03-bayes-bt
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: >
+  Canonical 5-reviewer story gate (code-quality + axiom-compliance + traceability +
+  security-sast + requirements-coverage, per select-reviewer-set.sh) over the S3-03 diff
+  (RED 33f389f -> GREEN 2b2110b -> REFACTOR 69cd45c), PLUS orchestrator independent
+  verification (read both new modules; ran ruff/mypy/full-suite/discovery/teeth/isolation;
+  numpyro/jax NOT installed = env protected). Initial aggregate APPROVE with 4 MINORs (none
+  blocking); the one substantive on-mission MINOR (AXIOM-S303-OBS-1, divergence-arm fail-loud)
+  + the trivial code-quality-story-02 (bool/int branch order) were remediated in-loop
+  (RED 5fb8fbb -> GREEN 97976a3) and re-verified. code-quality-story-01 (test-name FR/NFR ID
+  embedding) accepted as cosmetic. Resolves SME CATASTROPHIC eval-01 (only bayes-bt is
+  claim-grade; the hard NFR-001 gate fails loud).
+tdd_evidence:
+  red: 33f389f
+  green: 2b2110b
+  refactor: 69cd45c
+  minor_remediation: { red: 5fb8fbb, green: 97976a3 }
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED 33f389f precedes GREEN 2b2110b. ruff All-checks-passed; mypy src/pii_anon (strict)
+      Success 118 files; targeted 27 passed / 2 skipped (the 2 importorskip NUTS tests).
+      Diagnostic math independently re-derived: split_rhat exact match vs manual split-Gelman-Rubin
+      (rel err <1e-10); bulk_ess AR(1) phi=0.5 ratio 0.335 vs theoretical 0.333, phi=0.99 collapses;
+      Geyer pairing + biased-1/n FFT autocov correct; degenerate-variance guards correct. NumPyro
+      model correct by inspection (HalfNormal sigma, sum-to-zero theta, BinomialLogits; extra_fields
+      ('diverging',) present; sequential chains; DAVIDSON(S3-04) seam). Lazy-import discipline: zero
+      top-level numpyro/jax. Scope: 8 owned files; elo.py + bradley_terry.py + 7 callers empty diff.
+    findings:
+      - id: code-quality-story-01
+        severity: MINOR
+        status: ACCEPTED_COSMETIC
+        location: "tests/test_convergence_gate.py"
+        detail: "14/15 convergence-gate test fn names don't embed nfr_001/fr_003 (IDs are in the module docstring + the threshold-literal test + teeth-test prose). Rename-only; traceability-tooling nicety. Accepted as cosmetic — the trace is unambiguous from docstrings + the requirements matrix."
+      - id: code-quality-story-02
+        severity: MINOR
+        status: REMEDIATED
+        location: "src/pii_anon/eval_framework/rating/convergence.py (count_divergences)"
+        detail: "isinstance(int,np.integer) preceded isinstance(bool,np.bool_); since bool subclasses int the bool branch was dead. Behaviour correct but misleading."
+        remediation: "GREEN 97976a3 reorders bool-before-int (behaviour-preserving). 67 rating tests green."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      Import-isolation GREEN over both new files (AST: convergence.py top-level = numpy only;
+      bayes_bt.py top-level = stdlib + .convergence/.elo; numpyro/jax lazy inside _run_nuts/_bt_model).
+      Fail-loud NFR-001 BOTH arms verified live: numpyro-absent -> MissingOptionalDependencyError (loud,
+      from exc, names bayes-eval); non-converged -> assert_claim_grade RAISES (teeth tests pass);
+      claim-grade asserted AFTER storing the report (inspectable on failure). AX-002: ConvergenceReport
+      pure function (two-call byte-identical); NUTS seeded PRNGKey. AX-001: no real-PII fixtures.
+    findings:
+      - id: AXIOM-S303-OBS-1
+        severity: MINOR
+        status: REMEDIATED
+        location: "src/pii_anon/eval_framework/rating/bayes_bt.py (_count_divergences)"
+        detail: "Defensive broad-except returning 0 could silently blind the NFR-001 0-divergence arm if numpyro's get_extra_fields API drifted or the 'diverging' field were absent — a fabricated 0 could pass a non-claim-grade fit. R-hat + ESS arms are full-teeth pure-numpy; this is the one arm depending on a third-party return value (real-NUTS / Pass-2 path)."
+        remediation: "RED 5fb8fbb -> GREEN 97976a3: _count_divergences now RAISES when 'diverging' is absent or extra is non-dict (and lets a genuine get_extra_fields exception propagate) instead of returning 0 — fail-loud, eval-01 contract. Pinned in-tree by 3 stub-mcmc tests (no numpyro needed): happy-path counts flags; missing-field raises; non-dict raises."
+      - id: AXIOM-S303-OBS-2
+        severity: OBSERVATION
+        detail: "Positive note: rd = 400*sd(theta)/ln10 is a genuine posterior SD (replaces legacy match-count-only RD); ConvergenceReport.binding_constraint always names the single next-fix — exemplary calibrated-uncertainty/reasoning-visibility alignment."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-003/NFR-001/NFR-026 -> Story -> Test -> Design chain intact. NFR-001 LITERAL MATCH:
+      requirements-document.md:60 (split-Rhat<=1.01 ∧ bulk-ESS>=400/param ∧ 0 divergences) <->
+      convergence.py:67-69 (RHAT_MAX=1.01, ESS_MIN_PER_PARAM=400, MAX_DIVERGENCES=0); pinned by
+      test_nfr_001_threshold_literals_are_the_contract + 3 teeth raisers. Design trace verbatim:
+      D-implementation-ready-design.md:42. HONEST scope: Davidson/coherence deferred to S3-04 (seam
+      present; S3-04 story exists, depends on S3-03 DONE, consumes the Posterior). Deps S3-01+S3-02 DONE.
+    findings:
+      - severity: OBSERVATION
+        detail: "Implements lists NFR-026 (SHOULD) alongside FR-003/NFR-001 (MUSTs); correctly scoped — S3-03 is the sole owner of the NFR-001 gate; S3-04 owns the distinct DC-07/FR-004/NFR-002 coherence claim. No MUST overclaim/collision."
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: >
+      Entry-point bayes-bt loads via the SAME generic RatingEngineRegistry path as S3-01/02
+      (select(group) -> ep.load() -> isinstance(RatingEnginePort) gate -> swallow) — no new trust
+      surface; no per-engine special-casing. Lazy-import: only stdlib + intra-package at module top;
+      numpyro/jax inside methods, ImportError -> loud MissingOptionalDependencyError. Dangerous-pattern
+      grep (eval/exec/subprocess/network-egress/unsafe-deserialization/file-write/secrets) over both new
+      files = ZERO. New ML deps (numpyro/jax/arviz) are in the OPTIONAL bayes-eval extra only; base
+      [project].dependencies stays pydantic-only -> default-install attack surface unchanged.
+      jax.random.PRNGKey is statistical sampling, not crypto. No PII handling.
+    findings: []
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      Every §3 acceptance bullet -> a passing in-tree test (27 passed / 2 skipped). The ONLY
+      unverified-in-tree item is the real NUTS RUN (the 2 genuine pytest.importorskip('numpyro') skips
+      — grep confirms ZERO xfail hiding a failure; the negative-path skipif markers RUN here). The
+      NFR-001 GATE (split-Rhat/ESS/divergence -> binding_constraint -> claim_grade -> raise) is FULLY
+      exercised pure-numpy (PASS-path + 3 TEETH raisers + multi-fail priority); only the SAMPLER feeding
+      it is Pass-2, and that split is wired loud (assert_claim_grade is the last line of
+      fit_paired_posterior; divergences via the required extra_fields). Honesty boundary stated in §2,
+      provisional_status, Evidence footer, and nfr-verification-matrix (which names S3-03 as the successor).
+    findings:
+      - severity: OBSERVATION
+        detail: "nfr-verification-matrix.md:11 still reads NFR-001 = DEFERRED -> 'S3-03 (bayes-bt); eval-data S6'. Once S3-03 closes, flip NFR-001 to in-tree-VERIFIED (gate half), retaining the eval-data S6 chain for the real-data convergence run. Epic/sprint-gate housekeeping."
+      - severity: OBSERVATION
+        detail: "When the bayes-eval CI lane / eval-data S6 runs real NUTS, record the real Rhat/ESS/divergence numbers into the traceability matrix Status Change Log so the AGENT_SIMULATED -> confirmed transition for this resolved-CATASTROPHIC MUST is auditable."
+conditional_reviewers_note: "security-sast + requirements-coverage fired per select-reviewer-set.sh (entry-point/optional-dep surface + NFR-001 MUST)."
+cross_reviewer_patterns:
+  - "Three reviewers (axiom-compliance, traceability, requirements-coverage) independently affirm the SAME honesty split: the pure-numpy NFR-001 GATE is fully verified in-tree (teeth); only the real-NUTS SAMPLER is Pass-2 — and it is wired loud. No reviewer found a fabricated claim-grade path."
+  - "Two reviewers (code-quality, axiom-compliance) independently flagged divergence-counting robustness (dead bool branch / silent-0 blind spot) -> both remediated in one RED->GREEN."
+outcome:
+  tests: "full suite exit 0 (~2754 passed / ~14 skipped, 2777 collected; rating suites 67 passed/2 skipped post-remediation); coverage 86.03%; ruff + mypy --strict (118 files) clean."
+  invariant: >
+    Claim-grade 3rd ladder tier (bayes-bt, NumPyro NUTS) LIVE behind the RatingEnginePort:
+    import-safe without jax (engine discoverable, 3 tiers), fail-loud on missing extra
+    (MissingOptionalDependencyError) AND on non-convergence (ConvergenceError) AND now on a
+    missing 'diverging' field. The pure-numpy NFR-001 gate (split-Rhat<=1.01 ∧ bulk-ESS>=400 ∧
+    0-divergences) has real in-tree teeth + names the binding constraint. Resolves CATASTROPHIC
+    eval-01. elo.py + bradley_terry.py + 7 callers byte-identical.
+  safety: "numpyro/jax NOT installed (env protected); user WIP (orchestrator.py + test_moe_enhancements.py + benchmarks/* + README + docs) md5-identical to session baseline; only narrow owned-file git add."
+followups:
+  - "S3-04 coherent significance BY CONSTRUCTION (one joint posterior; record-level paired outcomes from per_record_f1; Davidson tie term at the wired seam) — consumes this Posterior; story authored, ready to claim."
+  - "S4-CS-01 CompetitiveSupremacyGate (SDO) — J = rank_one_probability(this posterior); story authored."
+  - "Epic/sprint gate housekeeping: flip nfr-verification-matrix NFR-001 to in-tree-VERIFIED (gate half), keep eval-data S6 chain for the real-data run; record real Rhat/ESS/divergence at Pass-2."
+  - "Pass-2 / bayes-eval CI lane: run real NUTS (importorskip tests execute), verify convergence on real eval data, narrow the (already fail-loud) divergence path to the specific numpyro exception type."

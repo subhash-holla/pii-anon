@@ -1,0 +1,51 @@
+signoff_id: SO-08-s3-eval-integrity
+date: "2026-05-31"
+type: work-stream-close          # Eval-integrity rating ladder + NFR-001 gate COMPLETE in code
+work_stream: "04-Development / Sprint-3 (Epic E3, DC-06/DC-07 eval rating engine)"
+policy: po-required
+signer: AGENT_SIMULATED
+project: pii-anon (pii-anon-code, library pillar)
+
+stories_completed: [S3-02, S3-03]   # S3-01 already DONE (SO-prior); S3-04 authored, not yet executed
+inputs:
+  - dev-assist-artifacts/04-development/02-stories/sprint-3/S3-02-bradley-terry-mle.md   (DONE)
+  - dev-assist-artifacts/04-development/02-stories/sprint-3/S3-03-bayes-bt.md             (DONE)
+  - dev-assist-artifacts/04-development/02-stories/sprint-3/S3-04-coherent-significance.md (authored, TODO)
+  - dev-assist-artifacts/04-development/02-stories/sprint-4/S4-CS-01-competitive-supremacy-gate.md (authored, TODO)
+  - dev-assist-artifacts/04-development/_reviews/story/S3-02-gate.yaml   (5-reviewer APPROVE)
+  - dev-assist-artifacts/04-development/_reviews/story/S3-03-gate.yaml   (5-reviewer APPROVE)
+
+decisions_acknowledged:
+  - "The 3-tier rating ladder is LIVE behind the S3-01 RatingEnginePort: glicko-legacy (S3-01) -> bradley-terry-mle (S3-02, pure-stdlib MM/Hunter-2004 + paired bootstrap) -> bayes-bt (S3-03, NumPyro NUTS = claim-grade default). Structural Protocol -> zero call-site changes; elo.py + 7 callers byte-identical throughout."
+  - "S3-03 RESOLVES SME CATASTROPHIC eval-01: convergence.py is the pure-numpy NFR-001 gate (split-Rhat<=1.01 ∧ bulk-ESS>=400/param ∧ 0 divergences) that fails loud + names the binding constraint; only bayes-bt is claim-grade (frequentist tiers satisfy NFR-001 only by-substitution -> smoke/fallback only)."
+  - "Env-honest architecture: numpyro/jax/arviz are NOT installed in the .venv (heavy platform wheels; protecting the user's shared env; real-dep run is Pass-2). Module is import-safe (lazy NUTS import) -> engine discoverable; calling without bayes-eval raises a loud MissingOptionalDependencyError (never a silent non-Bayesian fallback); the pure-numpy gate has real in-tree TEETH; the real NUTS run is importorskip/Pass-2. bayes-eval optional extra added (base [project].dependencies stays pydantic-only)."
+  - "Both stories carried one substantive MINOR remediated in-loop (S3-02: silent non-convergence -> observable via last_fit_converged + BradleyTerryConvergenceWarning; S3-03: divergence-arm could silently report 0 -> now fails loud) — both matter because these engines feed the SDO J-meter / claim-grade gate."
+
+gate:
+  s3_02_gate: "5-reviewer (code-quality + axiom-compliance + traceability + security-sast + requirements-coverage) APPROVE; 1 MINOR remediated; RED d959032 / GREEN d965930 / REFACTOR 725f9e7 / MINOR 623fe3f->5286273->b0d9e8d."
+  s3_03_gate: "5-reviewer APPROVE (security-sast 0 findings; split-Gelman-Rubin + Geyer-ESS math independently re-derived); 1 substantive MINOR remediated; RED 33f389f / GREEN 2b2110b / REFACTOR 69cd45c / MINOR 5fb8fbb->97976a3."
+  tests: "full suite exit 0 (2780 collected, ~2757 passed / ~14 skipped / 0 failed); coverage 86.03% (>=84 gate); ruff + mypy --strict (118 files) clean."
+
+findings_waived: []   # all gate MINORs either remediated or accepted-cosmetic (test-name IDs); OBSERVATIONs logged in the gate yamls
+
+invariants_preserved:
+  - "Rating import-isolation (D-EVAL DECISION 2 / S3-05): eval_framework.rating imports NOTHING from swarm/moe/fusion/policy — AST boundary test GREEN over both new modules."
+  - "AX-002 determinism: pure-numpy gate + paired bootstrap byte-identical per seed; NUTS seeded PRNGKey."
+  - "AX-004 anon != pseudo: untouched (rating tier is detection-agnostic)."
+  - "No public-API regression; elo.py + leaderboard.py + scorecard.py + 7 callers byte-identical; ~2,548 baseline tests + new all green."
+  - "User WIP (orchestrator.py + test_moe_enhancements.py + artifacts/benchmarks/* + benchmark-diagnostics.json + README.md + docs/*) md5-identical to session baseline throughout — never staged (narrow git add only)."
+
+sota_dominance_objective:
+  verdict: NOT_YET
+  binding_constraints_in_priority_order:
+    - "G7 canonical_claim_run == False (all benchmark numbers are a 50-sample smoke run) -> CLAIM_GRADE structurally blocked until a regenerated certified canonical run (S7). [#1]"
+    - "The CompetitiveSupremacyGate (S4-CS-01) is scaffolded but unbuilt -> J and G1-G7 not yet code-computable."
+    - "J needs S3-04's rank_one_probability (+ a bayes-eval run or the in-tree MLE-bootstrap J-fallback)."
+    - "G2/G4 pending (distinct anon/pseudo scorers S4-01; calibration/selective-risk reporter S4-03)."
+    - "Tier-C (OpenAI/Azure/AWS) unrun (real-API Pass-2) -> CLAIM_GRADE blocked until run-or-waived-with-reason (visible honesty boundary)."
+  foundation_status: "Eval-integrity ladder the SDO rests on is COMPLETE in code: S1 recall-floor (G1) LIVE + S3 rating ladder (glicko/MLE/bayes) + NFR-001 convergence gate (G7 coherent-significance half). J is computed off this foundation."
+  immediate_next_action: "Ship S3-04 (unblocks J via rank_one_probability + coherent significance by construction), then S4-CS-01 (gate skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7, wired into CI as a NON-BLOCKING report)."
+
+epistemic_honesty: "AGENT_SIMULATED execution against a real local venv (real pytest/ruff/mypy, py3.12). The claim-grade NUTS SAMPLER's real run + R-hat/ESS/divergence on real data = tracked Pass-2 / bayes-eval-CI (the 2 importorskip tests SKIP honestly in-tree). Benchmark numbers remain PROVISIONAL (canonical_claim_run=False). The SDO CLAIM_GRADE verdict is itself gated on a regenerated canonical run."
+
+next: "S3-04 coherent-significance (one joint posterior + record-level paired outcomes + Davidson ties + rank_one_probability J primitive) -> S4-CS-01 CompetitiveSupremacyGate (SDO skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7 + verdict machine + CI non-blocking report). Then security MUSTs (S2-05/S5-04/S6-03) + S2/S4/S5/S6/S7. DATA track (eval-data S5->S6->S7) unblocks the real BT primitive + Tier-3 + canary in parallel."
