@@ -283,10 +283,12 @@ def count_divergences(
     """
     if divergences is None:
         return 0
-    if isinstance(divergences, (int, np.integer)):
-        return int(divergences)
+    # bool BEFORE int: Python's bool is a subclass of int, so the int branch
+    # would otherwise catch bool first (making a separate bool branch dead).
     if isinstance(divergences, (bool, np.bool_)):
         return int(bool(divergences))
+    if isinstance(divergences, (int, np.integer)):
+        return int(divergences)
     return int(np.sum(np.asarray(divergences) != 0))
 
 

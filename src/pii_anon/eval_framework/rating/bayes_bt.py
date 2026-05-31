@@ -416,13 +416,25 @@ class BayesBTEngine:
         :func:`~pii_anon.eval_framework.rating.convergence.count_divergences`
         (single source of truth), so the ``diverging`` flags are summed exactly
         the way the NFR-001 gate expects.
+
+        **Fails loud** (does NOT swallow to 0): ``_run_nuts`` always requests
+        ``extra_fields=("diverging",)``, so the field must be present. If it is
+        absent (numpyro API drift, or a run that forgot the request) the
+        0-divergence arm of the NFR-001 gate would be silently blinded — a
+        fabricated "no divergences" could pass a non-claim-grade fit. We raise
+        instead, so a real failure of the divergence arm is visible (the
+        fail-loud contract that resolves eval-01). A genuine exception from
+        ``get_extra_fields()`` is allowed to propagate for the same reason.
         """
-        try:
-            extra = mcmc.get_extra_fields()
-        except Exception:
-            return 0
-        diverging = extra.get("diverging") if isinstance(extra, dict) else None
-        return count_divergences(diverging)
+        extra = mcmc.get_extra_fields()
+        if not isinstance(extra, dict) or "diverging" not in extra:
+            raise RuntimeError(
+                "NUTS extra fields missing 'diverging'; cannot verify the "
+                "NFR-001 0-divergence gate. Ensure the sampler runs with "
+                "extra_fields=('diverging',). Refusing to report a fabricated "
+                "0-divergence count (fail-loud, eval-01 contract)."
+            )
+        return count_divergences(extra["diverging"])
 
     # -- Public API: structural port (FR-003) -------------------------------
 
