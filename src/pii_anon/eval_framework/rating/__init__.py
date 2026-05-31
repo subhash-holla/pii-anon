@@ -22,6 +22,8 @@ from .elo import (
     RatingUpdate,
 )
 from .leaderboard import Leaderboard, LeaderboardExporter
+from .port import RatingEnginePort
+from .registry import RatingEngineRegistry
 from .scorecard import BenchmarkScorecard, SystemScorecard
 
 __all__ = [
@@ -30,6 +32,8 @@ __all__ = [
     "GovernanceResult",
     "GovernanceThresholds",
     "RatingUpdate",
+    "RatingEnginePort",
+    "RatingEngineRegistry",
     "SystemScorecard",
     "BenchmarkScorecard",
     "Leaderboard",

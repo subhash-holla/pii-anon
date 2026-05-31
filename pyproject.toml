@@ -67,6 +67,9 @@ spacy_ner = "pii_anon.engines.spacy_adapter:SpacyNERAdapter"
 stanza_ner = "pii_anon.engines.stanza_adapter:StanzaNERAdapter"
 gliner = "pii_anon.engines.gliner_adapter:GLiNERAdapter"
 
+[project.entry-points."pii_anon.rating_engines"]
+glicko-legacy = "pii_anon.eval_framework.rating.elo:PIIRateEloEngine"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
