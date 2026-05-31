@@ -318,3 +318,46 @@ def test_integration_run_round_robin_real_nuts_returns_updates() -> None:
     assert all(isinstance(u, RatingUpdate) for u in updates)
     rating = engine.get_rating("sys_a")
     assert isinstance(rating, EloRating)
+
+
+# --------------------------------------------------------------------------
+# NFR-001 0-divergence arm — fail loud, never silently report 0 (gate MINOR
+# AXIOM-S303-OBS-1). Exercised with a stub mcmc so it runs WITHOUT numpyro.
+# --------------------------------------------------------------------------
+
+
+class _StubMCMC:
+    """Minimal stand-in for a numpyro MCMC exposing ``get_extra_fields``."""
+
+    def __init__(self, extra: object) -> None:
+        self._extra = extra
+
+    def get_extra_fields(self) -> object:
+        return self._extra
+
+
+def test_nfr_001_count_divergences_happy_path_counts_diverging_flags() -> None:
+    """When the requested ``diverging`` field is present, count the truthy flags."""
+    mcmc = _StubMCMC({"diverging": [0, 1, 0, 1, 1]})
+    assert BayesBTEngine._count_divergences(mcmc) == 3
+
+
+def test_nfr_001_count_divergences_fails_loud_when_diverging_field_absent() -> None:
+    """A missing ``diverging`` field MUST fail loud, not silently report 0.
+
+    ``_run_nuts`` always requests ``extra_fields=("diverging",)``; if the field
+    is nonetheless absent (numpyro API drift, or a run that forgot the request)
+    the 0-divergence arm of the NFR-001 gate would be blinded. The claim-grade
+    gate must never see a fabricated 0 — it raises instead.
+    """
+    mcmc = _StubMCMC({})  # extra fields present but 'diverging' missing
+    with pytest.raises(Exception) as exc:
+        BayesBTEngine._count_divergences(mcmc)
+    assert "diverging" in str(exc.value)
+
+
+def test_nfr_001_count_divergences_fails_loud_on_non_dict_extra() -> None:
+    """A non-dict extra-fields payload also fails loud (cannot verify 0-div)."""
+    mcmc = _StubMCMC(None)
+    with pytest.raises(Exception):
+        BayesBTEngine._count_divergences(mcmc)
