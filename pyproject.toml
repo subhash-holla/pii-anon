@@ -70,6 +70,7 @@ gliner = "pii_anon.engines.gliner_adapter:GLiNERAdapter"
 [project.entry-points."pii_anon.rating_engines"]
 glicko-legacy = "pii_anon.eval_framework.rating.elo:PIIRateEloEngine"
 bradley-terry-mle = "pii_anon.eval_framework.rating.bradley_terry:BradleyTerryMLEEngine"
+bayes-bt = "pii_anon.eval_framework.rating.bayes_bt:BayesBTEngine"
 
 [project.optional-dependencies]
 dev = [
@@ -116,6 +117,15 @@ swarm-train = [
   "numpy>=1.24",
   "datasets>=2.14",
   "tqdm>=4.66",
+]
+# Claim-grade Bayesian Bradley-Terry rating tier (bayes-bt, S3-03). NUTS sampler
+# stack — heavy, platform-specific wheels; the engine is import-safe without them
+# (lazy import) and only *sampling* requires this extra.
+bayes-eval = [
+  "numpyro>=0.13",
+  "jax>=0.4",
+  "arviz>=0.17",
+  "numpy>=1.24",
 ]
 
 [tool.setuptools]
@@ -185,6 +195,14 @@ module = [
   "datasets",
   "datasets.*",
   "pii_anon_datasets",
+  "numpyro",
+  "numpyro.*",
+  "jax",
+  "jax.*",
+  "jaxlib",
+  "jaxlib.*",
+  "arviz",
+  "arviz.*",
 ]
 ignore_missing_imports = true
 

@@ -433,10 +433,12 @@ def test_nfr_003_paired_bootstrap_separates_clearly_distinct_systems() -> None:
 # nfr_026: registry discovery lists BOTH tiers + resolves to the port
 # ---------------------------------------------------------------------------
 
-def test_nfr_026_discovery_lists_both_ladder_tiers_sorted() -> None:
+def test_nfr_026_discovery_lists_all_ladder_tiers_sorted() -> None:
     """Given the bradley-terry-mle entry point, when discovery runs after the
-    editable install, then the registry lists exactly the two installed tiers
-    sorted: ['bradley-terry-mle', 'glicko-legacy']."""
+    editable install, then the registry lists all three installed ladder tiers
+    sorted: ['bayes-bt', 'bradley-terry-mle', 'glicko-legacy']. (Updated in S3-03:
+    the claim-grade ``bayes-bt`` tier is import-safe so it is discovered even
+    without the ``bayes-eval`` extra installed.)"""
     registry = RatingEngineRegistry()
     discovered = registry.discover_entrypoint_engines(RATING_GROUP)
     assert "bradley-terry-mle" in discovered, (
@@ -444,7 +446,11 @@ def test_nfr_026_discovery_lists_both_ladder_tiers_sorted() -> None:
         "editing pyproject so entry_points metadata regenerates"
     )
     assert "glicko-legacy" in discovered
-    assert sorted(discovered) == ["bradley-terry-mle", "glicko-legacy"]
+    assert sorted(discovered) == [
+        "bayes-bt",
+        "bradley-terry-mle",
+        "glicko-legacy",
+    ]
 
 
 def test_nfr_026_discovered_bt_engine_resolves_to_the_port() -> None:

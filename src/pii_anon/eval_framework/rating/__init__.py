@@ -14,7 +14,9 @@ See ``docs/composite-metric-evidence.md`` for full research backing.
 
 from __future__ import annotations
 
+from .bayes_bt import BayesBTEngine, MissingOptionalDependencyError, Posterior
 from .bradley_terry import BradleyTerryConvergenceWarning, BradleyTerryMLEEngine
+from .convergence import ConvergenceError, ConvergenceReport
 from .elo import (
     PIIRateEloEngine,
     EloRating,
@@ -31,6 +33,11 @@ __all__ = [
     "PIIRateEloEngine",
     "BradleyTerryMLEEngine",
     "BradleyTerryConvergenceWarning",
+    "BayesBTEngine",
+    "Posterior",
+    "MissingOptionalDependencyError",
+    "ConvergenceReport",
+    "ConvergenceError",
     "EloRating",
     "GovernanceResult",
     "GovernanceThresholds",

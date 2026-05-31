@@ -23,7 +23,7 @@ The dev ``.venv`` has numpy but NOT numpyro/jax/arviz, so:
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
 
 import pytest
 
@@ -61,14 +61,34 @@ def test_fr_003_bayes_bt_engine_is_a_rating_engine_port() -> None:
 def test_fr_003_module_is_import_safe_without_numpyro() -> None:
     """The module must import and the engine must construct even with numpyro
     absent (lazy import inside the sampling method). Discovery depends on this:
-    the registry lists bayes-bt without the heavy extra installed."""
-    module = importlib.import_module(
-        "pii_anon.eval_framework.rating.bayes_bt"
+    the registry lists bayes-bt without the heavy extra installed.
+
+    Imported in a FRESH SUBPROCESS so the check is hermetic — it neither depends
+    on this process's already-imported state nor pollutes its module identity
+    (an in-process ``importlib.reload`` would rebind the module globally and
+    break other tests' isinstance/raises identity)."""
+    import subprocess
+    import sys
+
+    code = (
+        "import importlib.util as u;"
+        "assert u.find_spec('numpyro') is None, 'precondition: numpyro absent';"
+        "from pii_anon.eval_framework.rating.bayes_bt import BayesBTEngine;"
+        "from pii_anon.eval_framework.rating.port import RatingEnginePort;"
+        "e = BayesBTEngine();"
+        "assert isinstance(e, RatingEnginePort);"
+        "print('IMPORT_SAFE_OK')"
     )
-    # Re-import is a no-op but proves no top-level numpyro/jax import exists.
-    importlib.reload(module)
-    engine = module.BayesBTEngine()
-    assert isinstance(engine, RatingEnginePort)
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"module not import-safe without numpyro:\nSTDOUT={result.stdout}\n"
+        f"STDERR={result.stderr}"
+    )
+    assert "IMPORT_SAFE_OK" in result.stdout
 
 
 def test_fr_003_no_top_level_numpyro_or_jax_import_in_source() -> None:

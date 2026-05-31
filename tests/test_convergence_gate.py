@@ -263,20 +263,21 @@ def test_teeth_divergence_failure_raises_and_names_constraint() -> None:
 
 
 def test_teeth_ess_failure_raises_and_names_constraint() -> None:
-    """TEETH: well-separated-mean R̂ may be fine but ESS < 400/param (short,
-    autocorrelated run) → NOT claim-grade; assert_claim_grade RAISES naming
-    ESS."""
+    """TEETH: chains that MIX (R̂ ≤ 1.01) but were simply NOT SAMPLED ENOUGH so
+    bulk-ESS < 400/param → NOT claim-grade; assert_claim_grade RAISES naming ESS
+    as the binding constraint (R̂ is fine, the gap is too-few effective draws).
+
+    The honest 'undersampled' construction is a SMALL IID posterior: iid draws
+    have R̂≈1.0 (well mixed) and ESS≈n_chains·n_draws (each draw ~one effective
+    sample), so a total just under 400 puts ESS below the bar while R̂ passes."""
     rng = _rng(22)
-    phi = 0.98
-    n_chains, n_draws = 2, 250
-    samples = np.empty((n_chains, n_draws, 1))
-    for c in range(n_chains):
-        x = 0.0
-        for t in range(n_draws):
-            x = phi * x + rng.standard_normal()
-            samples[c, t, 0] = x
+    # 4 chains × 80 iid draws = 320 total ⇒ R̂≈1.0, ESS≈320 < 400.
+    samples = rng.standard_normal((4, 80, 1))
     report = ConvergenceReport.from_samples(samples, n_divergences=0)
 
+    assert report.max_rhat <= RHAT_MAX, (
+        f"R̂ must be fine so ESS is the binding constraint, got {report.max_rhat}"
+    )
     assert report.min_bulk_ess < ESS_MIN_PER_PARAM
     assert report.claim_grade is False
     assert "ess" in report.binding_constraint.lower()

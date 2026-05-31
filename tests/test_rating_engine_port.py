@@ -81,11 +81,20 @@ def test_fr_003_port_methods_are_behaviourally_usable_via_elo() -> None:
 
 def test_nfr_026_discover_entrypoint_engines_finds_glicko_legacy() -> None:
     """Given the entry-point group, when discover_entrypoint_engines runs,
-    then 'glicko-legacy' is discovered and resolves to a PIIRateEloEngine."""
+    then 'glicko-legacy' is discovered and resolves to a PIIRateEloEngine.
+
+    Updated in S3-03: the full 3-tier ladder is now installed, so discovery
+    returns exactly ['bayes-bt', 'bradley-terry-mle', 'glicko-legacy'] sorted
+    (``bayes-bt`` is import-safe → discoverable without the ``bayes-eval`` extra)."""
     registry = RatingEngineRegistry()
     discovered = registry.discover_entrypoint_engines(RATING_GROUP)
     assert isinstance(discovered, list)
     assert "glicko-legacy" in discovered
+    assert sorted(discovered) == [
+        "bayes-bt",
+        "bradley-terry-mle",
+        "glicko-legacy",
+    ]
 
     engine = registry.get("glicko-legacy")
     assert isinstance(engine, PIIRateEloEngine)
