@@ -32,11 +32,14 @@ Mathematical contracts encoded here
 from __future__ import annotations
 
 import math
+import warnings
 
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from pii_anon.eval_framework.rating import (
+    BradleyTerryConvergenceWarning,
     RatingEnginePort,
     RatingEngineRegistry,
 )
@@ -230,6 +233,112 @@ def test_fr_003_two_system_degenerate_design_is_finite() -> None:
     assert rw is not None and rl is not None
     assert math.isfinite(rw.rating) and math.isfinite(rl.rating)
     assert rw.rating > rl.rating
+
+
+# ---------------------------------------------------------------------------
+# code-quality-story-01: MM convergence MUST be observable, never silent
+#
+# The MM fit can exhaust max_iter WITHOUT reaching tol on near-separable soft
+# designs (≥6 systems, large composite gaps). Ratings stay finite + monotone
+# (so the result is serviceable), but a non-converged fit must be inspectable
+# and honestly flagged — this engine feeds the SDO competitive-supremacy
+# J-meter, where a silently non-converged fit would be undetectable.
+# ---------------------------------------------------------------------------
+
+# An easy, moderate-gap 3-system design (verified to converge well inside
+# max_iter) and a near-separable ≥6-system design (verified to exhaust it).
+_EASY_CONVERGENT_DESIGN = {"a": 0.6, "b": 0.5, "c": 0.4}
+_NEAR_SEPARABLE_DESIGN = {f"s{idx}": float(idx) for idx in range(6)}
+
+
+def test_code_quality_fit_exposes_convergence_diagnostics() -> None:
+    """An easy moderate 3-system round-robin converges; the engine must expose
+    that fact through INSPECTABLE read-only diagnostics — `last_fit_converged`
+    True and `last_fit_iterations` strictly below max_iter."""
+    engine = BradleyTerryMLEEngine()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # an easy design must NOT warn
+        engine.run_round_robin(_EASY_CONVERGENT_DESIGN)
+    assert engine.last_fit_converged is True
+    assert isinstance(engine.last_fit_iterations, int)
+    assert 0 < engine.last_fit_iterations < engine.max_iter
+
+
+def test_code_quality_fit_paired_also_exposes_convergence_diagnostics() -> None:
+    """The diagnostics are populated on the claim-grade `fit_paired` path too
+    (not only the port path) — a real paired design converges and is flagged
+    converged with iterations < max_iter."""
+    engine = BradleyTerryMLEEngine()
+    engine.fit_paired(
+        {
+            ("A", "B"): (8.0, 2.0, 10),
+            ("B", "C"): (7.0, 3.0, 10),
+            ("A", "C"): (9.0, 1.0, 10),
+        }
+    )
+    assert engine.last_fit_converged is True
+    assert 0 < engine.last_fit_iterations < engine.max_iter
+
+
+def test_code_quality_near_separable_soft_design_is_flagged_not_silent() -> None:
+    """A ≥6-system round-robin with large composite gaps exhausts max_iter; the
+    fit must be HONESTLY flagged `last_fit_converged is False` (iterations hit
+    max_iter) — yet the ratings remain finite + strictly monotone in composite
+    order, so the result is still serviceable (not discarded, just flagged)."""
+    engine = BradleyTerryMLEEngine()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", BradleyTerryConvergenceWarning)
+        engine.run_round_robin(_NEAR_SEPARABLE_DESIGN)
+    assert engine.last_fit_converged is False
+    assert engine.last_fit_iterations == engine.max_iter
+    # The flagged result is still usable: finite + strictly monotone.
+    ratings = [
+        engine.get_rating(name) for name in sorted(_NEAR_SEPARABLE_DESIGN)
+    ]
+    values = [r.rating for r in ratings if r is not None]
+    assert len(values) == len(_NEAR_SEPARABLE_DESIGN)
+    assert all(math.isfinite(v) for v in values)
+    assert values == sorted(values)
+    assert all(values[i] < values[i + 1] for i in range(len(values) - 1))
+
+
+def test_code_quality_nonconvergence_emits_warning() -> None:
+    """Non-convergence must SURFACE: a BradleyTerryConvergenceWarning fires on
+    the near-separable design, and the message carries the diagnostic context
+    (n_systems, final delta, max_iter)."""
+    engine = BradleyTerryMLEEngine()
+    with pytest.warns(BradleyTerryConvergenceWarning) as record:
+        engine.run_round_robin(_NEAR_SEPARABLE_DESIGN)
+    assert len(record) >= 1
+    message = str(record[0].message)
+    assert str(len(_NEAR_SEPARABLE_DESIGN)) in message  # n_systems
+    assert str(engine.max_iter) in message  # max_iter
+
+
+def test_code_quality_convergent_design_emits_no_warning() -> None:
+    """The converse: an easy convergent design must NOT emit the convergence
+    warning at all (recorded-warning list is empty of our warning type)."""
+    engine = BradleyTerryMLEEngine()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        engine.run_round_robin(_EASY_CONVERGENT_DESIGN)
+    convergence_warnings = [
+        w for w in caught
+        if issubclass(w.category, BradleyTerryConvergenceWarning)
+    ]
+    assert convergence_warnings == [], (
+        "a convergent design must not emit a convergence warning"
+    )
+
+
+def test_code_quality_convergence_warning_is_a_user_warning() -> None:
+    """The warning is a UserWarning subclass exported from the rating package
+    (so callers can filter it precisely without importing the engine module)."""
+    assert issubclass(BradleyTerryConvergenceWarning, UserWarning)
+    import pii_anon.eval_framework.rating as rating_pkg
+
+    assert "BradleyTerryConvergenceWarning" in rating_pkg.__all__
+    assert rating_pkg.BradleyTerryConvergenceWarning is BradleyTerryConvergenceWarning
 
 
 # ---------------------------------------------------------------------------
