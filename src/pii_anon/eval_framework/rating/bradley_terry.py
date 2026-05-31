@@ -213,24 +213,34 @@ class BradleyTerryMLEEngine:
         :meth:`elo.PIIRateEloEngine.run_round_robin`).
         """
         systems = sorted(composites.keys())
-        wins: dict[str, float] = {name: 0.0 for name in systems}
-        games: dict[tuple[str, str], float] = {}
         # Record the prior (pre-fit) ratings for the audit history.
         old_ratings = {
-            name: (self._ratings[name].rating if name in self._ratings else self._initial_rating)
+            name: (
+                self._ratings[name].rating
+                if name in self._ratings
+                else self._initial_rating
+            )
             for name in systems
         }
+
+        # Single pass over the complete design: compute each soft outcome
+        # exactly once (deterministic, sorted), accumulating the MM inputs and
+        # the per-match outcomes used for the audit history.
+        wins: dict[str, float] = {name: 0.0 for name in systems}
+        games: dict[tuple[str, str], float] = {}
         num_matches: dict[str, int] = {name: 0 for name in systems}
+        soft_outcomes: list[tuple[str, str, float]] = []
+        n_ij = 1.0 + 2.0 * self._smoothing  # one comparison + symmetric prior
 
         for idx_i in range(len(systems)):
             for idx_j in range(idx_i + 1, len(systems)):
                 name_i = systems[idx_i]
                 name_j = systems[idx_j]
                 s_ij = self._sigmoid(composites[name_i] - composites[name_j])
+                soft_outcomes.append((name_i, name_j, s_ij))
                 # Symmetric smoothing → finite MLE even for a separable order.
                 wins[name_i] += s_ij + self._smoothing
                 wins[name_j] += (1.0 - s_ij) + self._smoothing
-                n_ij = 1.0 + 2.0 * self._smoothing
                 games[(name_i, name_j)] = n_ij
                 games[(name_j, name_i)] = n_ij
                 num_matches[name_i] += 1
@@ -240,17 +250,11 @@ class BradleyTerryMLEEngine:
         self._store_ratings(theta, num_matches)
 
         updates: list[RatingUpdate] = []
-        for idx_i in range(len(systems)):
-            for idx_j in range(idx_i + 1, len(systems)):
-                name_i = systems[idx_i]
-                name_j = systems[idx_j]
-                s_ij = self._sigmoid(composites[name_i] - composites[name_j])
-                updates.append(
-                    self._make_update(name_i, old_ratings[name_i], s_ij)
-                )
-                updates.append(
-                    self._make_update(name_j, old_ratings[name_j], 1.0 - s_ij)
-                )
+        for name_i, name_j, s_ij in soft_outcomes:
+            updates.append(self._make_update(name_i, old_ratings[name_i], s_ij))
+            updates.append(
+                self._make_update(name_j, old_ratings[name_j], 1.0 - s_ij)
+            )
 
         self._history.extend(updates)
         return updates
