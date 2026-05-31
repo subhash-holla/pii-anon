@@ -18,14 +18,16 @@ with confidence in ``[0.50, 0.90)`` is below the Layer-1 fast-pass threshold
 ``meta_score < corroboration_override_threshold``) drops it. The floor must
 re-inject it.
 
-Property coverage uses a seeded-random generator (hypothesis is not yet a
-dependency; migrating these to @given is tracked as story S1-04 / S6-PROP).
+Property coverage uses a hypothesis ``@given`` strategy (migrated from the
+original ``random.Random(1602)`` seeded generator in S1-05; hypothesis has been
+a dependency since S1-04). ``@settings(derandomize=True)`` keeps it
+deterministic, matching the pattern in ``test_shared_layer_projector.py``.
 """
 from __future__ import annotations
 
-import random
-
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from pii_anon.fusion import build_fusion
 from pii_anon.routing.shared_layer import (
@@ -251,30 +253,55 @@ def test_nfr_005_reinjection_order_is_input_order(mode: str, expected_id: str) -
     )
 
 
-# ── seeded property: superset invariant over many build_fusion(...) merges ───
+# ── hypothesis property: superset invariant over many build_fusion(...) merges ─
+#: Domain mirrors the retired seeded generator (random.Random(1602)).
+_PROP_TYPES = ["EMAIL_ADDRESS", "CREDIT_CARD", "PHONE_NUMBER", "PERSON_NAME"]
+_PROP_FIELDS = ["text", "notes"]
+_PROP_LANGS = ["en", "es"]
+
+
+@st.composite
+def _shared_span_specs(draw: st.DrawFn) -> tuple[str, str, str, int, int, float]:
+    """One generated shared (regex-oss) span spec.
+
+    ``(entity_type, field_path, language, start, end, confidence)``. Offsets
+    match the retired generator (start in [0, 40], length in [1, 12]); the
+    confidence stays below the swarm fast-pass threshold so the inner emission
+    gate is exercised (the floor must re-inject what the gate drops).
+    """
+    entity_type = draw(st.sampled_from(_PROP_TYPES))
+    field_path = draw(st.sampled_from(_PROP_FIELDS))
+    language = draw(st.sampled_from(_PROP_LANGS))
+    start = draw(st.integers(min_value=0, max_value=40))
+    length = draw(st.integers(min_value=1, max_value=12))
+    confidence = draw(st.floats(min_value=0.50, max_value=0.89))
+    return (entity_type, field_path, language, start, start + length, confidence)
+
 
 @pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)
-def test_nfr_011_property_superset_invariant_seeded(mode: str, expected_id: str) -> None:
-    """ZERO subset violations over many seeded-random finding sets through the
-    LIVE build_fusion seam (recall-floor by construction, end-to-end)."""
-    rng = random.Random(1602)
-    semantic = ["EMAIL_ADDRESS", "CREDIT_CARD", "PHONE_NUMBER", "PERSON_NAME"]
-    fields = ["text", "notes"]
-    langs = ["en", "es"]
+@settings(max_examples=400, derandomize=True)
+@given(shared_specs=st.lists(_shared_span_specs(), max_size=4))
+def test_nfr_011_property_superset_invariant(
+    mode: str,
+    expected_id: str,
+    shared_specs: list[tuple[str, str, str, int, int, float]],
+) -> None:
+    """NFR-011: ZERO subset violations over hypothesis-generated finding sets
+    through the LIVE build_fusion seam (recall-floor by construction, end-to-end).
+
+    Migrated from the seeded ``random.Random(1602)`` generator (S1-05); kept
+    deterministic via ``derandomize=True``, mirroring the property pattern in
+    ``test_shared_layer_projector.py``.
+    """
+    shared = [
+        _ef(t, start, end, field_path=fp, language=lang, confidence=round(conf, 2))
+        for (t, fp, lang, start, end, conf) in shared_specs
+    ]
     strategy = _build(mode)
-    for _ in range(150):
-        n_shared = rng.randint(0, 4)
-        shared = [
-            _ef(rng.choice(semantic), s := rng.randint(0, 40), s + rng.randint(1, 12),
-                field_path=rng.choice(fields), language=rng.choice(langs),
-                # below fast-pass so the inner gate is exercised
-                confidence=round(rng.uniform(0.50, 0.89), 2))
-            for _ in range(n_shared)
-        ]
-        out = strategy.merge(list(shared))  # type: ignore[attr-defined]
-        out_keys = {span_key_ensemble(f) for f in out}
-        shared_keys = {span_key_engine(s) for s in shared}
-        assert shared_keys <= out_keys, (
-            f"[{mode}] recall-floor violated through the live seam: a regex-oss "
-            "shared span is missing from the fused output"
-        )
+    out = strategy.merge(list(shared))  # type: ignore[attr-defined]
+    out_keys = {span_key_ensemble(f) for f in out}
+    shared_keys = {span_key_engine(s) for s in shared}
+    assert shared_keys <= out_keys, (
+        f"[{mode}] recall-floor violated through the live seam: a regex-oss "
+        "shared span is missing from the fused output"
+    )
