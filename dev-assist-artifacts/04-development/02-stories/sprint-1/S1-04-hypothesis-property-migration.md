@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01) |
-| State | **IN_PROGRESS** (claimer: dev-assist-development-executor; claimed_at 2026-05-30; started 2026-05-30) |
+| State | **REVIEW** (claimer: dev-assist-development-executor; claimed_at 2026-05-30; started 2026-05-30; review_ready 2026-05-30) |
 | Implements | NFR-011 (property infra), test-quality |
 | Traces | Design D-SWARM verification (property test ZERO violations); W4 testing-setup (add hypothesis to dev extra) |
 | Test-type tags | `[PROPERTY-TEST]` |
@@ -38,7 +38,7 @@ Replace the seeded-random superset-invariant test (`tests/test_shared_layer_proj
 - **RED** `3949d237f41a13e00c742e337d1b50737ce9003a` — `test: S1-04 RED` — rewrote
   `test_nfr_011_property_superset_invariant` as `@given`; collection failed with
   `ModuleNotFoundError: No module named 'hypothesis'` (dep absent), confirming RED.
-- **GREEN** `<filled-after-commit>` — `feat: S1-04 GREEN` — added `"hypothesis>=6.0"`
+- **GREEN** `28a0e04f1424d612f297e86b6bfcec577664a3aa` — `feat: S1-04 GREEN` — added `"hypothesis>=6.0"`
   to `pyproject.toml` `dev` extra; installed (`hypothesis-6.155.1`); fixed line-9
   docstring (S6-PROP → S1-04). Target file: **7 passed** (5 example unit tests +
   migrated property + determinism). Property test: **400 passing examples, 0 failing**
@@ -48,7 +48,11 @@ Replace the seeded-random superset-invariant test (`tests/test_shared_layer_proj
   `end = start + length`; two `st.lists(..., max_size=6)` for shared & output).
 - **Lint/Types**: `ruff check src tests` → All checks passed; `mypy src/pii_anon`
   (strict) → Success, no issues in 113 source files.
-- **Full suite** (`pytest -m "not performance"`): `<filled-after-run>`.
+- **Full suite** (`pytest -m "not performance"`): **2683 passed, 11 skipped, 0 failed**
+  (exit 0); coverage 86.15% (>= 84% floor); `routing/shared_layer.py` at 100%.
+  Net test count vs the project's recorded 2679 baseline differs by +4 due to
+  pre-existing branch commits (S1-02 `test_floor_fusion_wiring.py`), NOT S1-04:
+  the projector file held 7 tests before and after (strict 1:1 migration).
 - **Scope**: only `tests/test_shared_layer_projector.py`, `pyproject.toml` (single
   dev-dep line), and this story `.md` were modified. WIP files
   `src/pii_anon/orchestrator.py` and `tests/test_moe_enhancements.py` were not touched.
