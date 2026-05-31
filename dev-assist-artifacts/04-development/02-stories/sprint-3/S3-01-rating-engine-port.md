@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-06) |
-| State | **TODO** |
+| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-31; started_at 2026-05-31; review_at 2026-05-31) |
 | Implements | FR-003 (rating-engine abstraction), NFR-026 (graceful degradation / registry); foundation for NFR-001 ladder; S3-05 import-boundary guard |
 | Traces | Design D-EVAL DECISION 2 (RatingEnginePort 3-tier ladder; rating import-isolated from detection) |
 | Test-type tags | `[UNIT-TEST]` `[CONTRACT-TEST]` `[CI-GATE]` |
@@ -33,7 +33,17 @@ Introduce a `RatingEnginePort` (structural `typing.Protocol`) + a `RatingEngineR
 - `EloRating` / `RatingUpdate` types are imported from `eval_framework.rating.elo` for the Protocol signatures.
 
 ## 12. Definition of Done
-- [ ] RED: contract test (`PIIRateEloEngine` is-a `RatingEnginePort`) + registry discovery test + import-boundary test — failing (port/registry absent)
-- [ ] Protocol + registry + entry point added; `PIIRateEloEngine` unchanged & still satisfies the port
-- [ ] All ~7 callers untouched & green; ruff + mypy --strict clean; full suite green
+- [x] RED: contract test (`PIIRateEloEngine` is-a `RatingEnginePort`) + registry discovery test + import-boundary test — failing (port/registry absent)
+- [x] Protocol + registry + entry point added; `PIIRateEloEngine` unchanged & still satisfies the port
+- [x] All ~7 callers untouched & green; ruff + mypy --strict clean; full suite green
 - [ ] Story-gate review APPROVE (`_reviews/story/S3-01-gate.yaml`)
+
+## Evidence (agent-simulated execution)
+- **RED** commit `e5a554e` — `tests/test_rating_engine_port.py` (7 tests) + `tests/test_rating_import_boundary.py` (2 tests). Contract test failed on import (`RatingEnginePort` absent); import-boundary test GREEN on introduction (AST walk, zero violations).
+- **GREEN** commit `d5cf633` — `port.py` (`@runtime_checkable RatingEnginePort` Protocol), `registry.py` (`RatingEngineRegistry`, group `pii_anon.rating_engines`), additive `__init__.py` export, `pyproject.toml` entry-point table. `elo.py` UNCHANGED.
+- **REFACTOR**: none required (ruff + mypy --strict clean at GREEN; minimal mirror of `engines/registry.py`).
+- **Port surface** (minimal): `run_round_robin(self, composites: dict[str, float]) -> list[RatingUpdate]`, `get_rating(self, name: str) -> EloRating | None`.
+- **Entry-point discovery** (after `pip install -e . --no-deps`): `discover_entrypoint_engines("pii_anon.rating_engines")` → `['glicko-legacy']`; resolves to `PIIRateEloEngine`.
+- **Quality gates**: ruff `All checks passed`; mypy `--strict` `Success: no issues found in 115 source files`; coverage 86.19% (≥84%). Targeted 9/9 green; rating-consumer suite (rating/elo/leaderboard/competitor/scorecard) 318 green.
+- **Untouched & green**: `elo.py` + all 4 production callers (`leaderboard.py:133`, `competitor_composite.py:91/124`, `competitor_compare.py`) + re-exports.
+- *Note: executed under agent-simulated CI (local `.venv`); Pass-2 real-CI confirmation to be scheduled by orchestrator.*
