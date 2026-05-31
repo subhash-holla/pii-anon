@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01) — gate remediation |
-| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-31; started_at 2026-05-31; review_ready_at 2026-05-31) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S1-05-gate.yaml`) |
 | Implements | FR-016/NFR-011 (correctness of the LIVE floor), NFR-024/025 (per-language fairness correctness), AX-002 |
 | Traces | Sprint-1-close gate `wftzms2fs` MAJOR (axiom-compliance) + MINOR (traceability); Design D-SWARM DECISION 1 |
 | Test-type tags | `[UNIT-TEST]` `[INTEGRATION-TEST]` `[PROPERTY-TEST]` |

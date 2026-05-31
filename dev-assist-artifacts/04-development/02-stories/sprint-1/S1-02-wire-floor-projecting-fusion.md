@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01) |
-| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-30; started_at 2026-05-30; review_ready_at 2026-05-30) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S1-02-gate.yaml`; swarm-language MAJOR remediated by S1-05) |
 | Implements | FR-016, NFR-011, AX-003 (now **LIVE** on the fusion path); touches NFR-005 (determinism), FR-008 (audit) |
 | Traces | UC-13 → PGO-4; Design D-SWARM DECISION 1 + D-AGENTIC DECISION 3 (floor wrapped at the `build_fusion` seam) |
 | Test-type tags | `[UNIT-TEST]` `[INTEGRATION-TEST]` |

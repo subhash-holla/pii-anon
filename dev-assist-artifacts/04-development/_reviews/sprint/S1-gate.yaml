@@ -1,0 +1,46 @@
+gate: sprint
+sprint: S1
+title: "Recall-floor foundation (DC-01) — make the floor LIVE, correct, multilingual, CI-guarded"
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+stories: [S1-01, S1-02, S1-03, S1-04, S1-05]
+
+method: >
+  Sprint-1-close verification run as a between-sprints Workflow (wftzms2fs, 11 agents):
+  6 reviewer-dimension agents over the full Sprint-1 diff (88649eb..HEAD) + 5 adversaries
+  each attempting to REFUTE a load-bearing claim by running code. More thorough than the
+  standard reviewer-set gate; recorded here as the sprint gate.
+
+initial_verdict: REQUEST_CHANGES
+final_verdict: APPROVE   # after S1-05 remediation + independent re-verification
+
+workflow_result:
+  counts: { blockers: 0, major: 1, minor: 2, observation: 26 }
+  dimension_verdicts:
+    code-quality: APPROVE
+    axiom-compliance: REQUEST_CHANGES   # the 1 MAJOR
+    traceability: APPROVE               # 1 MINOR (stale docstring + un-migrated seam property test)
+    security-sast: APPROVE
+    performance: APPROVE
+    requirements-coverage: APPROVE       # 1 MINOR (missing story-gate yamls)
+  adversarial:
+    refuted: 0
+    total: 5
+    claims_held: ["floor-live (9 omission probes)", "determinism (4 attacks)", "zero-regression (full suite 2685 passed)", "S1-03 ε-gate has teeth (monkeypatch-verified)", "import hygiene (all orderings, no cycle)"]
+
+major_finding:
+  id: "wftzms2fs-axiom-01"
+  title: "Swarm emitted non-English findings mislabeled language='en' -> language-keyed floor re-injected a duplicate for every non-en regex-oss span the swarm kept."
+  status: REMEDIATED
+  remediation: "S1-05 (GREEN 6dbb37b) — swarm propagates language at both emission sites (mirrors moe.py:431). Re-verified: es/zh/en multilingual input -> dups=0 on both swarm + mixture_of_experts modes."
+
+minor_findings:
+  - "Stale docstring + un-migrated seam-level seeded property test in test_floor_fusion_wiring.py -> CLOSED by S1-05 CLEANUP f940df2 (migrated to @given + docstring fixed)."
+  - "Missing story-gate yamls for S1-02..S1-05 -> CLOSED (written 2026-05-31 under _reviews/story/)."
+
+outcome:
+  tests: "full suite 2690 passed / 12 skipped / 0 failed; coverage 86.22% (>=84 gate); ruff + mypy --strict clean."
+  invariant: "AX-003 recall-floor LIVE BY CONSTRUCTION on the production fusion path (both modes), deterministic, multilingual-correct, per-language ε<=0.005 CI guard with teeth, hypothesis property coverage."
+  safety: "User uncommitted WIP (orchestrator.py + test_moe_enhancements.py) byte-identical (md5-verified) throughout; never staged."
+
+next: "S3 eval-integrity critical path — S3-01 RatingEnginePort + RatingEngineRegistry + glicko-legacy facade + import-boundary CI test."

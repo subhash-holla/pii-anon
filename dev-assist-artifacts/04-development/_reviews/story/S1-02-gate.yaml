@@ -1,0 +1,30 @@
+gate: story
+story: S1-02-wire-floor-projecting-fusion
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE   # post-S1-05 remediation of the swarm-language MAJOR this story exposed
+basis: "Sprint-1-close verification workflow wftzms2fs (6 reviewer dimensions + 5 adversaries over the diff) + independent re-verification."
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED 4760657 precedes GREEN a14888e (git-evidenced); ruff clean; mypy --strict clean (113 files). FloorProjectingFusion idiomatic; lazy import in build_fusion + PEP-562 module __getattr__ re-export break the fusion<->routing cycle (verified by fresh import); strategy_id + __getattr__ passthrough preserve every production consumer (orchestrator _get_or_build_fusion, build_fusion_audit — no isinstance checks exist that the wrapper could break). Scope discipline perfect: 4 owned files. 23 new tests."
+  - reviewer: axiom-compliance
+    verdict: APPROVE   # was REQUEST_CHANGES at the sprint gate; remediated by S1-05
+    notes: "AX-003 recall-floor BY CONSTRUCTION verified LIVE on the build_fusion seam (project() only appends, never removes; shared captured BEFORE inner.merge). AX-002 determinism + AX-001 (synthetic-only fixtures) hold. The sprint-gate MAJOR (swarm emitted non-en findings mislabeled 'en' -> language-keyed projector re-injected a duplicate) was a pre-existing swarm bug this story EXPOSED, not introduced by the wrapper; remediated by S1-05 (GREEN 6dbb37b). Re-verified post-fix: es-input -> 1 span, 0 dups, both swarm + moe modes."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "FR-016 / NFR-011 / NFR-005 pinned by named tests (test_fr_016_*, test_nfr_011_*, test_nfr_005_*). Story -> DC-01 -> UC-13 -> PGO-4 chain intact."
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: "FloorProjectingFusion.__getattr__ passthrough is recursion-safe (underscore guard, verified against pre-init instances); no secrets / network / unsafe / eval; pure in-memory span re-injection."
+  - reviewer: performance
+    verdict: APPROVE
+    notes: "Floor set-difference = O(n) span-key set ops; shared derived from the regex-oss subset of existing findings (regex NOT re-run); determinism adds no latency hotspot."
+conditional_reviewers_skipped: [accessibility, requirements-coverage, contributor-experience]
+adversarial:
+  refuted: 0
+  total: 5
+  notes: "Floor-live (9 omission probes), determinism (4 attacks), zero-regression (full suite 2685 passed), and import-hygiene adversaries all FAILED to refute (high confidence)."
+findings: []
+followups:
+  - "Documented non-gaps (NOT bugs): regex-oss-disabled profile -> floor no-op; single-engine fast-path bypasses fusion (does no gating so cannot violate the floor); explicit floor_violation_blocked audit note = clean follow-on (data already present via is_shared_floor + source_count=0)."

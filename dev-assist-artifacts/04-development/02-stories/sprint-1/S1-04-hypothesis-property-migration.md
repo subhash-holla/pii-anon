@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01) |
-| State | **REVIEW** (claimer: dev-assist-development-executor; claimed_at 2026-05-30; started 2026-05-30; review_ready 2026-05-30) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S1-04-gate.yaml`) |
 | Implements | NFR-011 (property infra), test-quality |
 | Traces | Design D-SWARM verification (property test ZERO violations); W4 testing-setup (add hypothesis to dev extra) |
 | Test-type tags | `[PROPERTY-TEST]` |

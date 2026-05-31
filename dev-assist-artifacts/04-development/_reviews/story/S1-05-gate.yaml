@@ -1,0 +1,23 @@
+gate: story
+story: S1-05-swarm-language-propagation
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: "Remediation of the Sprint-1-close MAJOR (wftzms2fs) + independent re-verification (both modes, multilingual)."
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED 6fe5660 precedes GREEN 6dbb37b; CLEANUP f940df2; ruff + mypy --strict clean (113 files). Emission-only surgery in swarm.py (2 sites) + a deterministic _representative_language helper mirroring moe.py:431. No clustering/Dawid-Skene/meta-learner change. NO existing test asserted the buggy 'en' -> no other test file edited."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: "Closes the MAJOR: build_fusion('swarm').merge([es regex span]) -> 1 span lang='es' (was 2: en native + es floor-dup). Both modes verified dups=0 on en/es/zh. AX-003 superset still holds (projector unchanged); AX-002 determinism (helper prefers regex-oss else first-in-order). NFR-024/025 per-language fairness correctness restored."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "Pinned by test_swarm_language_propagation.py (test_fr_016_*, test_nfr_024_*, test_ax_002_*). MINOR closed: seam property test migrated to @given + stale docstring fixed in test_floor_fusion_wiring.py."
+  - reviewer: performance
+    verdict: APPROVE
+    notes: "Adds one O(k) representative-language lookup per emitted cluster; negligible."
+conditional_reviewers_skipped: [security-sast, requirements-coverage, accessibility, contributor-experience]
+findings: []
+followups:
+  - "S1-03's field_path language-keying workaround is now redundant (swarm labels correctly) but harmless; can simplify in a future cleanup."

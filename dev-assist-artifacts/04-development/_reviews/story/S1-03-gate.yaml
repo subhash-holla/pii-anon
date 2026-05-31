@@ -1,0 +1,24 @@
+gate: story
+story: S1-03-per-language-recall-floor-gate
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: "Sprint-1-close verification workflow wftzms2fs + independent re-verification."
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED 7d637fd precedes GREEN f1638a5; ruff + mypy --strict clean. composite.py NOT touched (RECALL_FLOOR_EPSILON kept module-local per story preference — zero risk to global FloorGateConfig). Reuses the eval-framework _aligned_prf (STRICT) primitive."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "FR-007 / NFR-011 pinned. The per-language ε-gate (ε=0.005) has TEETH — adversary monkeypatch-verified that against the bare SwarmFusionStrategy recall['es']=0.0 < floor, so the gate fails if S1-02 is reverted. The field_path language-keying workaround it used is now redundant after S1-05 (swarm propagates language) but remains harmless/robust."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: "AX-001 synthetic-only fixtures (no real PII; only offsets/types feed metrics). Per-language floor is a CONSEQUENCE of AX-003 (spans(ensemble) superset spans(shared))."
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: "Self-contained test ALWAYS runs (no external dataset); @requires_dataset integration scale-up skips gracefully when pii-anon-datasets absent."
+conditional_reviewers_skipped: [security-sast, performance, accessibility, contributor-experience]
+findings: []
+followups:
+  - "Optional: wire the per-language ε-gate into the benchmark runner (run_competitor_benchmark.py) + FloorGateConfig as an additive field (DC-11 CanonicalRunGate scope, S4)."
+  - "Real-multilingual-dataset integration assertion is a placeholder pending the dataset runner (Pass-2)."

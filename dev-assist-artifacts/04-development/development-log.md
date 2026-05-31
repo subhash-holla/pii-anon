@@ -37,8 +37,16 @@ Extend the existing pytest suite (don't rebuild). Add `hypothesis` to the dev ex
 - **Verification:** 7/7 new tests green (incl. seeded-random superset-invariant property test, 2,000 cases, ZERO violations; the AX-003 leak-closure test; determinism test). ruff clean; **mypy --strict** clean. swarm/fusion/moe suites (78 tests) unaffected. No public-API change.
 - **Story-gate review:** `_reviews/story/S1-01-gate.yaml` → **APPROVE**.
 
-### ⏭ Remaining (S1-02 … S7): TODO — scaffolded above, ready for `/dev-assist-story-claim`.
-The flagship discharges the single load-bearing MUST (FR-016/NFR-011/AX-003) this redesign is gated on. The next-highest-leverage stories are S1-02 (wire the projector into both fusion strategies — makes the floor live in production) and S3-01/03 (the rating-engine port + Bayesian claim-grade engine — the eval-integrity foundation).
+### ✅ Sprint-1 COMPLETE (S1-02..05) — recall-floor LIVE (2026-05-31)
+- **S1-02** wire `FloorProjectingFusion` at the `build_fusion` seam (RED `4760657` → GREEN `a14888e` → REFACTOR `fa36891`): both `swarm` + `mixture_of_experts` delegate to `SharedLayerProjector.project()` post-merge; floor now LIVE on the production path. 23 tests. `src/pii_anon/routing/floor_fusion.py` (new) + `fusion.py` + `routing/__init__.py`.
+- **S1-03** per-language recall-floor ε-gate ε≤0.005 (RED `7d637fd` → GREEN `f1638a5`): self-contained multilingual test with a teeth-verified regression guard (fails if S1-02 reverted). `tests/test_recall_floor_per_language_gate.py`.
+- **S1-04** hypothesis `@given` property migration (RED `3949d23` → GREEN `28a0e04`): `hypothesis>=6.0` dev dep; 400 examples, 0 falsifying, `derandomize=True`.
+- **S1-05** swarm language propagation (RED `6fe5660` → GREEN `6dbb37b` → CLEANUP `f940df2`): remediates the sprint-gate MAJOR (swarm mislabeled non-en findings `'en'` → floor over-injected duplicates). Mirrors `moe.py:431`. Re-verified dups=0 on en/es/zh, both modes.
+- **Sprint-1-close gate** (between-sprints Workflow `wftzms2fs`, 11 agents): REQUEST_CHANGES (1 MAJOR) → remediated → **APPROVE**; **0/5 adversarial refutations upheld**. Full suite **2690 passed / 12 skipped / 0 failed**; coverage 86.22%; ruff + mypy --strict clean. Gates: `_reviews/story/S1-0{2,3,4,5}-gate.yaml` + `_reviews/sprint/S1-gate.yaml`. Signed off `_signoffs/SO-07-sprint1.yaml`.
+- **Safety**: user WIP (`orchestrator.py` + `test_moe_enhancements.py`) byte-identical (md5-verified) throughout; never staged.
+
+### ⏭ Remaining (S2 … S7): TODO — scaffolded above, ready for `/dev-assist-story-claim`.
+The next-highest-leverage stream is the **eval-integrity critical path (S3)**: S3-01 (`RatingEnginePort` + `RatingEngineRegistry` + `glicko-legacy` facade + import-boundary CI test — story scaffolded at `02-stories/sprint-3/`) → S3-02 (MLE-BT temp-local MM, ⛓ DATA S6) → S3-03 (bayes-bt NUTS) → S3-04 (coherent significance). Then the security MUSTs (S2-05 / S5-04 / S6-03) and S2/S4/S5/S6/S7.
 
 ## Epistemic honesty
 This pass delivered the recall-floor foundation as **real, tested, type-checked production code** and a complete sprint plan. It did NOT implement the full 4-theme redesign (MoE-router ML, Bayesian MCMC engine, attacks/, agentic, multimodal) — that is genuinely multi-sprint and partly blocked on eval-data S6. Status is reported honestly per-story; nothing is marked DONE that isn't green in-tree.

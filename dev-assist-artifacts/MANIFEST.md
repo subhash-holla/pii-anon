@@ -17,7 +17,7 @@ schema_version: 2
 | 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 03-Design | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 04-Development | IN_PROGRESS | 2026-05-30 | — (S1-01 flagship DONE; S2–S7 TODO) |
+| 04-Development | IN_PROGRESS | 2026-05-30 | — (Sprint-1 COMPLETE: S1-01..05 DONE, recall-floor LIVE; S2–S7 TODO) |
 | 05-Testing | COMPLETE | 2026-05-30 | 2026-05-30 (verdict: SHIP-WITH-CAVEATS foundation / DEFER full redesign) |
 
 Valid status values: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, `BLOCKED`, `DEFERRED`, `SUPERSEDED`.
@@ -95,7 +95,7 @@ _To be populated as stage 04 progresses._
 | W3. Quality | COMPLETE | development-log.md §W3 | ✅ 5-gate cascade + strict TDD + security MUSTs |
 | W4. Testing setup | COMPLETE | development-log.md §W4 | ✅ extend existing suite + property/ε-gate scaffolded |
 | W5. Stories | COMPLETE | 02-stories/sprint-1/ + plan table | ✅ epics + sprint story set |
-| W6. Execution | IN_PROGRESS | S1-01 DONE (`routing/shared_layer.py`, RED ef85166→GREEN 548f576, 7/7 green, gate APPROVE) | 🔶 S2–S7 TODO |
+| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail | 🔶 S2–S7 TODO |
 
 ## Testing Phase Progress
 
@@ -121,6 +121,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 | SO-04-design | 2026-05-30 | stage-transition | Design COMPLETE: 15 DCs + 3 Pugh-won decisions (SharedLayerProjector / Bayesian-BT rating / agentic pre-filter); 17 agents; 1 CAT resolved + ~15 MAJOR carried; gates → Development | AGENT_SIMULATED | `_signoffs/SO-04-design.yaml` |
 | SO-05-development | 2026-05-30 | work-stream-close | Development W1–W5 plan + W6 S1-01 flagship DONE (SharedLayerProjector, real TDD, 7/7 green, gate APPROVE); S2–S7 TODO (honest); → Testing for current-state release-readiness | AGENT_SIMULATED | `_signoffs/SO-05-development.yaml` |
 | SO-06-testing | 2026-05-30 | stage-transition | Testing COMPLETE: verdict SHIP-WITH-CAVEATS (DC-01 recall-floor) / DEFER (full redesign); NFR matrix 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + 0 FAIL; → Documentation | AGENT_SIMULATED | `_signoffs/SO-06-testing.yaml` |
+| SO-07-sprint1 | 2026-05-31 | sprint-close | Dev **Sprint-1 COMPLETE** (S1-01..05): recall-floor LIVE by construction (both modes, multilingual, deterministic) + per-lang ε-gate (teeth) + hypothesis + swarm-language fix; sprint gate REQUEST_CHANGES→APPROVE (1 MAJOR remediated by S1-05; 0/5 refutations upheld); 2690 pass/0 fail | AGENT_SIMULATED | `_signoffs/SO-07-sprint1.yaml` |
 
 ## Methodology Notes
 
@@ -156,6 +157,13 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 ### Testing complete → Documentation (2026-05-30)
 > Stage 5 COMPLETE. **Verdict: SHIP-WITH-CAVEATS** (DC-01 recall-floor foundation — real, 7/7 green, non-regressing, by-construction) / **DEFER** (full 4-theme redesign, ~29 stories, several S6-blocked). NFR matrix: 2 VERIFIED + 2 PARTIAL + 22 DEFERRED + **0 FAIL**. Caveats: benchmark numbers PROVISIONAL (50-sample smoke); security MUST stories pending. a11y N/A. Signed off `_signoffs/SO-06-testing.yaml`. **→ Documentation** (consolidate journey + update user docs + feed papers).
 
+### Development Sprint-1 COMPLETE → S3 eval-integrity (2026-05-31)
+> **Sprint-1 (recall-floor foundation, Epic E1/DC-01) is DONE — S1-01..S1-05, all green in-tree.** The recall-floor is now **LIVE BY CONSTRUCTION on the production fusion path**: `FloorProjectingFusion` (`src/pii_anon/routing/floor_fusion.py`) wraps both `swarm` + `mixture_of_experts` at the `build_fusion` seam and delegates to `SharedLayerProjector.project()` post-merge (S1-02). Added: per-language recall-floor ε-gate ε≤0.005 with a teeth-verified regression guard (S1-03, `tests/test_recall_floor_per_language_gate.py`); hypothesis `@given` property migration + `hypothesis>=6.0` dev dep (S1-04); **swarm now propagates `language` on emission** (S1-05, fixes a pre-existing multilingual mislabel the floor exposed → was producing duplicate spans for non-en docs). Sprint-1-close verification ran as a between-sprints **Workflow** (`wftzms2fs`, 11 agents): verdict **REQUEST_CHANGES (1 MAJOR) → remediated by S1-05 → APPROVE**; **0/5 adversarial refutations upheld** (floor-live, determinism, zero-regression, ε-gate-teeth, import-hygiene all held). Full suite **2690 passed / 12 skipped / 0 failed**, coverage 86.22%, ruff + mypy --strict clean. Gate evidence: `_reviews/story/S1-0{2,3,4,5}-gate.yaml` + `_reviews/sprint/S1-gate.yaml`. Signed off `_signoffs/SO-07-sprint1.yaml`. **M4 progresses: recall-floor foundation is now shipped AND live (not just standalone).**
+>
+> **⚠️ User WIP preserved:** the user has unrelated uncommitted changes in `src/pii_anon/orchestrator.py` (calibration-load cleanup) + `tests/test_moe_enhancements.py` (md5 byte-identical throughout this session, never staged). Do NOT stage these or the `artifacts/benchmarks/*` / `benchmark-diagnostics.json` / `README.md` / `docs/` changes when committing — use narrow explicit `git add`.
+>
+> **Ready for S3 (eval-integrity critical path).** Next: **S3-01** (story file scaffolded at `02-stories/sprint-3/S3-01-rating-engine-port.md`) — `RatingEnginePort` (`typing.Protocol`, structural → zero call-site changes) + `RatingEngineRegistry` (entry-point group `pii_anon.rating_engines`, mirror `engines/registry.py`) + register `PIIRateEloEngine` as `glicko-legacy` facade + AST import-boundary CI test (rating imports nothing from swarm/moe/fusion/policy — clean today). Then S3-02 (MLE-BT temp-local MM, ⛓ DATA-S6 `bradley_terry.py`) / S3-03 (bayes-bt NUTS, NFR-001 convergence gate) / S3-04 (coherent significance). Claim via `/dev-assist-story-claim S3-01`.
+
 ## Pivots Log
 
 | Date | Stage(s) affected | Source finding | Plan file |
@@ -190,9 +198,9 @@ Sibling files:
 | Discovery | 30 | 37 |
 | Requirements | 22 | 59 |
 | Design | 17 | 76 |
-| Development | 0 | 76 |
-| Testing | 0 | 76 |
-| **Total** | **76** | **76** |
+| Development | 20 (3 explore + 1 plan + 5 story executors + 11 sprint-gate workflow) | 96 |
+| Testing | 0 | 96 |
+| **Total** | **96** | **96** |
 
 ---
 

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E1 Recall-floor foundation (DC-01 / DC-11) |
-| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-30; started_at 2026-05-30; review_ready_at 2026-05-30) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S1-03-gate.yaml`) |
 | Implements | FR-007 (canonical-run floor gate), NFR-011 (per-language ε ≤ 0.005) |
 | Traces | Design DC-11 (RecallFloorVerdictGuard / per-language ε-gate) |
 | Test-type tags | `[CI-GATE]` `[INTEGRATION-TEST]` |
