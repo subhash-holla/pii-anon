@@ -5,8 +5,8 @@ violations. Also pins the swarm.py:654/658-660 leak fix (a sub-fast-pass
 shared-layer regex span that the Layer-4 emission/corroboration gate would drop
 is re-injected by the projector).
 
-Property coverage uses a seeded-random generator (hypothesis is not yet a
-dependency; migrating these to @given is tracked as story S6-PROP).
+Property coverage uses a hypothesis @given strategy (migrated from a
+seeded-random generator under story S1-04).
 """
 from __future__ import annotations
 
