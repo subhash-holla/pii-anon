@@ -61,10 +61,11 @@ def _build(mode: str) -> object:
 # ── FR-016: shared-layer span the inner gate drops is re-injected ────────────
 
 @pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)
-def test_fr_016_reinjects_swarm_gated_shared_span(mode: str, expected_id: str) -> None:
+def test_fr_016_gated_shared_span_present_in_output(mode: str, expected_id: str) -> None:
     """A ``regex-oss`` SEMANTIC span (conf in [0.50,0.90)) that the swarm Layer-4
     emission/corroboration gate would drop is present in build_fusion(...).merge
-    output and satisfies ``is_shared_floor`` (provenance=shared_floor)."""
+    output for BOTH modes (re-injected by the floor if the inner gate dropped
+    it). FR-016: the shared span must survive the live seam."""
     # conf 0.55: below fast-pass (0.90) so it reaches Layer 4; single regex-oss
     # engine -> corroboration_count==1 < corroboration_min(2) AND meta < 0.85
     # -> the swarm gate drops it. CREDIT_CARD is a SEMANTIC_TYPE.
@@ -74,13 +75,38 @@ def test_fr_016_reinjects_swarm_gated_shared_span(mode: str, expected_id: str) -
 
     out_keys = {span_key_ensemble(f) for f in out}
     assert span_key_engine(gated) in out_keys, (
-        f"[{mode}] shared-layer span dropped by the inner gate was not "
-        "re-injected by the floor (FR-016 violated)"
+        f"[{mode}] shared-layer span dropped by the inner gate was not present "
+        "on the live seam (FR-016 violated)"
     )
+    cc = [f for f in out if f.entity_type == "CREDIT_CARD"]
+    assert cc and "regex-oss" in cc[0].engines
+
+
+def test_fr_016_swarm_gate_leak_is_reinjected_by_floor() -> None:
+    """The documented swarm leak (§6 / AX-003): the swarm inner strategy DROPS a
+    low-confidence single-engine ``regex-oss`` SEMANTIC span at Layer 4, so the
+    floor MUST re-inject it tagged ``provenance=shared_floor``.
+
+    Asserted swarm-specifically because the drop is guaranteed only for the
+    swarm emission/corroboration gate; the MoE expert-weight floor keeps this
+    span natively (see ``test_fr_016_gated_shared_span_present_in_output`` for
+    the cross-mode presence guarantee)."""
+    gated = _ef("CREDIT_CARD", 40, 56, confidence=0.55)
+
+    # Precondition: the bare swarm strategy genuinely drops this span, so any
+    # presence in the wrapped output is the floor's doing, not a coincidence.
+    from pii_anon.swarm import SwarmFusionStrategy
+    assert SwarmFusionStrategy().merge([gated]) == [], (
+        "precondition: swarm Layer-4 gate must drop the gated span"
+    )
+
+    strategy = build_fusion("swarm", weights={}, min_consensus=1)
+    out = strategy.merge([gated])
     reinjected = [f for f in out if is_shared_floor(f)]
-    assert len(reinjected) == 1, f"[{mode}] expected exactly one floor-restored finding"
+    assert len(reinjected) == 1, "floor must re-inject the swarm-gated shared span"
     assert reinjected[0].entity_type == "CREDIT_CARD"
     assert "regex-oss" in reinjected[0].engines
+    assert span_key_engine(gated) == span_key_ensemble(reinjected[0])
 
 
 @pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)

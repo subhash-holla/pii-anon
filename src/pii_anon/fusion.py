@@ -499,16 +499,25 @@ def build_fusion(
         )
     if mode == "mixture_of_experts":
         from pii_anon.moe import MoEFusionStrategy, get_default_registry
-        return MoEFusionStrategy(
+
+        # Lazy import (mirrors the moe import above) to avoid the fusion<->routing
+        # import cycle. Wrap with the recall-floor so a shared-layer (regex-oss)
+        # span the MoE expert-weight floor drops is re-injected (FR-016/AX-003).
+        from pii_anon.routing.floor_fusion import FloorProjectingFusion
+        return FloorProjectingFusion(MoEFusionStrategy(
             registry=get_default_registry(),
             top_k=3,
             iou_threshold=iou_threshold,
             performance_floor=True,
             min_expert_weight=0.15,
-        )
+        ))
     if mode == "swarm":
         from pii_anon.swarm import SwarmFusionStrategy
-        return SwarmFusionStrategy()
+
+        # Wrap with the recall-floor so a shared-layer (regex-oss) span the swarm
+        # Layer-4 emission/corroboration gate drops is re-injected (FR-016/AX-003).
+        from pii_anon.routing.floor_fusion import FloorProjectingFusion
+        return FloorProjectingFusion(SwarmFusionStrategy())
     if mode in _CUSTOM_FACTORIES:
         return _CUSTOM_FACTORIES[mode](weights, min_consensus)
     raise FusionError(f"Unknown fusion mode `{mode}`")
