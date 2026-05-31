@@ -156,6 +156,33 @@ class SpanCandidate:
     corroboration_count: int = 0
 
 
+def _representative_language(candidate: SpanCandidate) -> str:
+    """Language to stamp on a Layer-4 emitted finding.
+
+    ``SpanCandidate`` carries no language of its own, so the Layer-4 emission
+    site (``swarm.py`` Layer 4) derives the representative source language from
+    the cluster's source ``EngineFinding`` objects — the swarm analogue of MoE's
+    ``representative.language`` (``moe.py:431``). Without this the emitted
+    finding falls back to the ``"en"`` default (``types.py:162``), mislabelling
+    non-English spans and forcing the language-keyed ``SharedLayerProjector`` to
+    re-inject a duplicate (S1-05 / Sprint-1-close gate ``wftzms2fs``).
+
+    Selection is deterministic (NFR-005): the shared-layer ``regex-oss`` finding
+    wins when present (it is the floor's shared engine and the source of the
+    language-key mismatch this fix closes); otherwise the first source finding
+    in insertion order is used. Source findings for one clustered span share a
+    language in practice, so this only disambiguates the degenerate mixed-
+    language overlap case stably.
+    """
+    findings = candidate.engine_findings
+    shared = findings.get("regex-oss")
+    if shared is not None:
+        return shared.language
+    for finding in findings.values():
+        return finding.language
+    return "en"
+
+
 # ---------------------------------------------------------------------------
 # Temperature Scaler
 # ---------------------------------------------------------------------------
@@ -617,6 +644,11 @@ class SwarmFusionStrategy(FusionStrategy):
                     field_path=f.field_path,
                     span_start=f.span_start,
                     span_end=f.span_end,
+                    # Propagate the source finding's language (mirror
+                    # moe.py:431); the default 'en' would mislabel non-English
+                    # spans and force the language-keyed SharedLayerProjector to
+                    # re-inject a duplicate (S1-05 / gate wftzms2fs).
+                    language=f.language,
                     explanation=f"swarm:fast_pass (conf={f.confidence:.2f})",
                 ))
             else:
@@ -667,6 +699,13 @@ class SwarmFusionStrategy(FusionStrategy):
                 field_path=candidate.field_path,
                 span_start=candidate.span_start,
                 span_end=candidate.span_end,
+                # Propagate the representative source finding's language (mirror
+                # moe.py:431). SpanCandidate carries no language of its own, so
+                # derive it from the cluster's source engine findings; without
+                # this the 'en' default mislabels non-English spans and the
+                # language-keyed SharedLayerProjector re-injects a duplicate
+                # (S1-05 / gate wftzms2fs).
+                language=_representative_language(candidate),
                 explanation=(
                     f"swarm:ds={candidate.ds_confidence:.2f}"
                     f" meta={candidate.meta_score:.2f}"
