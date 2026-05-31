@@ -95,7 +95,7 @@ _To be populated as stage 04 progresses._
 | W3. Quality | COMPLETE | development-log.md §W3 | ✅ 5-gate cascade + strict TDD + security MUSTs |
 | W4. Testing setup | COMPLETE | development-log.md §W4 | ✅ extend existing suite + property/ε-gate scaffolded |
 | W5. Stories | COMPLETE | 02-stories/sprint-1/ + plan table | ✅ epics + sprint story set |
-| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail | 🔶 S2–S7 TODO |
+| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail. **S3-01 DONE** (eval rating-engine port + registry + import-boundary; 2699 pass/0 fail) | 🔶 S2 / S3-02..S7 TODO |
 
 ## Testing Phase Progress
 
@@ -162,7 +162,7 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 >
 > **⚠️ User WIP preserved:** the user has unrelated uncommitted changes in `src/pii_anon/orchestrator.py` (calibration-load cleanup) + `tests/test_moe_enhancements.py` (md5 byte-identical throughout this session, never staged). Do NOT stage these or the `artifacts/benchmarks/*` / `benchmark-diagnostics.json` / `README.md` / `docs/` changes when committing — use narrow explicit `git add`.
 >
-> **Ready for S3 (eval-integrity critical path).** Next: **S3-01** (story file scaffolded at `02-stories/sprint-3/S3-01-rating-engine-port.md`) — `RatingEnginePort` (`typing.Protocol`, structural → zero call-site changes) + `RatingEngineRegistry` (entry-point group `pii_anon.rating_engines`, mirror `engines/registry.py`) + register `PIIRateEloEngine` as `glicko-legacy` facade + AST import-boundary CI test (rating imports nothing from swarm/moe/fusion/policy — clean today). Then S3-02 (MLE-BT temp-local MM, ⛓ DATA-S6 `bradley_terry.py`) / S3-03 (bayes-bt NUTS, NFR-001 convergence gate) / S3-04 (coherent significance). Claim via `/dev-assist-story-claim S3-01`.
+> **S3-01 DONE (eval-integrity FOUNDATION) — 2026-05-31.** `RatingEnginePort` (`@runtime_checkable typing.Protocol`: `run_round_robin` + `get_rating`; structural → zero call-site changes), `RatingEngineRegistry` (entry-point group `pii_anon.rating_engines`, mirrors `engines/registry.py`), `PIIRateEloEngine` registered as `glicko-legacy` (discovery live-verified → `['glicko-legacy']`), AST import-boundary CI test (rating imports NOTHING from swarm/moe/fusion/policy — GREEN). `elo.py` + all 7 callers UNTOUCHED; RED `e5a554e` → GREEN `d5cf633`; full suite **2699 pass / 0 fail**; ruff + mypy --strict clean (115 files). Gate `_reviews/story/S3-01-gate.yaml` APPROVE. **Next: S3-02** (`bradley-terry-mle` — ship a temp-local minorization-maximization impl behind the port; ⛓ blocks on DATA S6 `stats/bradley_terry.py`, verified absent) → **S3-03** (`bayes-bt` NumPyro NUTS = claim-grade; NFR-001 convergence gate R̂≤1.01 ∧ ESS≥400 ∧ 0-div) → **S3-04** (coherent significance by construction + record-level paired outcomes + Davidson ties). Then the security MUSTs (S2-05 gate-sign / S5-04 harness-sandbox / S6-03 token-encryption) + S2/S4/S5/S6/S7. Claim via `/dev-assist-story-claim S3-02`.
 
 ## Pivots Log
 
@@ -198,9 +198,9 @@ Sibling files:
 | Discovery | 30 | 37 |
 | Requirements | 22 | 59 |
 | Design | 17 | 76 |
-| Development | 20 (3 explore + 1 plan + 5 story executors + 11 sprint-gate workflow) | 96 |
-| Testing | 0 | 96 |
-| **Total** | **96** | **96** |
+| Development | 21 (3 explore + 1 plan + 6 story executors + 11 sprint-gate workflow) | 97 |
+| Testing | 0 | 97 |
+| **Total** | **97** | **97** |
 
 ---
 

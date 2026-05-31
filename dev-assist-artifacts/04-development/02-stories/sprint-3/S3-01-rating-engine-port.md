@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-06) |
-| State | **REVIEW** (owner: dev-assist-development-executor; claimed_at 2026-05-31; started_at 2026-05-31; review_at 2026-05-31) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S3-01-gate.yaml`) |
 | Implements | FR-003 (rating-engine abstraction), NFR-026 (graceful degradation / registry); foundation for NFR-001 ladder; S3-05 import-boundary guard |
 | Traces | Design D-EVAL DECISION 2 (RatingEnginePort 3-tier ladder; rating import-isolated from detection) |
 | Test-type tags | `[UNIT-TEST]` `[CONTRACT-TEST]` `[CI-GATE]` |

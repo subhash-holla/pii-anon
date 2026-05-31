@@ -46,7 +46,7 @@ Extend the existing pytest suite (don't rebuild). Add `hypothesis` to the dev ex
 - **Safety**: user WIP (`orchestrator.py` + `test_moe_enhancements.py`) byte-identical (md5-verified) throughout; never staged.
 
 ### ⏭ Remaining (S2 … S7): TODO — scaffolded above, ready for `/dev-assist-story-claim`.
-The next-highest-leverage stream is the **eval-integrity critical path (S3)**: S3-01 (`RatingEnginePort` + `RatingEngineRegistry` + `glicko-legacy` facade + import-boundary CI test — story scaffolded at `02-stories/sprint-3/`) → S3-02 (MLE-BT temp-local MM, ⛓ DATA S6) → S3-03 (bayes-bt NUTS) → S3-04 (coherent significance). Then the security MUSTs (S2-05 / S5-04 / S6-03) and S2/S4/S5/S6/S7.
+The **eval-integrity critical path (S3)** is underway: **S3-01 ✅ DONE** (`RatingEnginePort` `@runtime_checkable` Protocol + `RatingEngineRegistry` entry-point group `pii_anon.rating_engines` + `glicko-legacy` facade + AST import-boundary CI test; RED `e5a554e` → GREEN `d5cf633`; elo.py + 7 callers untouched; gate APPROVE `_reviews/story/S3-01-gate.yaml`). **Next: S3-02** (bradley-terry-mle — temp-local MM behind the port; ⛓ DATA S6 `stats/bradley_terry.py` absent) → S3-03 (bayes-bt NumPyro NUTS, NFR-001 convergence gate) → S3-04 (coherent significance + Davidson ties). Then the security MUSTs (S2-05 / S5-04 / S6-03) and S2/S4/S5/S6/S7.
 
 ## Epistemic honesty
 This pass delivered the recall-floor foundation as **real, tested, type-checked production code** and a complete sprint plan. It did NOT implement the full 4-theme redesign (MoE-router ML, Bayesian MCMC engine, attacks/, agentic, multimodal) — that is genuinely multi-sprint and partly blocked on eval-data S6. Status is reported honestly per-story; nothing is marked DONE that isn't green in-tree.
