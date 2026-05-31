@@ -162,15 +162,19 @@ def test_nfr_011_per_language_recall_floor_holds_on_floored_fusion() -> None:
     """For EVERY language L: ``recall_ensemble[L] >= recall_shared[L] - ε`` when
     the ensemble is the LIVE floored ``build_fusion("swarm")`` path (S1-02).
 
-    REGRESSION-GUARD STATE (RED): the ensemble is temporarily computed from the
-    BARE inner ``SwarmFusionStrategy`` (the pre-S1-02 state) — the ``es`` span is
-    dropped, so ``recall_ensemble[es] = 0 < recall_shared[es] - ε`` and this
-    assertion FAILS. GREEN flips ``_ensemble_merge`` to the floored seam.
+    The floored seam re-injects the swarm-gated ``es`` span, so the per-language
+    floor holds for all of ``en`` / ``es`` / ``zh``. The companion teeth test
+    (:func:`test_nfr_011_floor_has_teeth_bare_swarm_drops_non_english_below_floor`)
+    proves this assertion would FAIL against the bare inner strategy — i.e. the
+    gate is a genuine regression guard on S1-02, not a tautology.
     """
     shared, gold = _synthetic_multilingual_case()
 
-    # NOTE (RED): bare inner strategy — no floor. Flipped to build_fusion in GREEN.
-    ensemble_out = SwarmFusionStrategy().merge(list(shared))
+    # LIVE floored production seam (S1-02): build_fusion wraps the swarm strategy
+    # in FloorProjectingFusion, which re-injects any regex-oss span the inner
+    # Layer-4 gate dropped — restoring recall(ensemble) >= recall(shared).
+    ensemble = build_fusion("swarm", weights={}, min_consensus=1)
+    ensemble_out = ensemble.merge(list(shared))
 
     recall_shared = _recall_per_language(_to_labeled(shared), gold)
     recall_ensemble = _recall_per_language(_to_labeled(ensemble_out), gold)
