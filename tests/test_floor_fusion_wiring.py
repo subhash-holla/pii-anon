@@ -169,6 +169,24 @@ def test_fr_016_attribute_passthrough_to_inner(mode: str, expected_id: str) -> N
     assert callable(strategy.merge)  # type: ignore[attr-defined]
 
 
+@pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)
+def test_fr_016_getattr_guard_blocks_private_recursion(mode: str, expected_id: str) -> None:
+    """A missing private/dunder attribute raises AttributeError via the
+    __getattr__ underscore guard (no inner forwarding, no infinite recursion)."""
+    strategy = _build(mode)
+    with pytest.raises(AttributeError):
+        _ = strategy._this_private_attr_does_not_exist  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)
+def test_fr_016_missing_public_attr_forwards_then_raises(mode: str, expected_id: str) -> None:
+    """A missing PUBLIC attribute is forwarded to the inner strategy, which also
+    lacks it, so AttributeError surfaces — confirming the passthrough path."""
+    strategy = _build(mode)
+    with pytest.raises(AttributeError):
+        _ = strategy.totally_missing_public_attribute  # type: ignore[attr-defined]
+
+
 # ── NFR-011: no regex-oss spans -> byte-identical to the inner strategy ──────
 
 @pytest.mark.parametrize("mode,expected_id", WRAPPED_MODES)
