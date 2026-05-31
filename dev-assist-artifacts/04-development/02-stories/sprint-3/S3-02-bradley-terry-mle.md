@@ -5,7 +5,8 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-06 ladder / DC-07 significance foundation) |
-| State | **REVIEW** (2026-05-31; claimer=dev-assist-development-executor; awaiting story-gate cascade) |
+| State | **DONE** (gate APPROVE 2026-05-31; `_reviews/story/S3-02-gate.yaml`; 1 MINOR remediated in-loop) |
+| provisional_status | AGENT_SIMULATED (local `.venv`; Pass-2 real-CI scheduled by orchestrator) |
 | Implements | FR-003 (rating-engine abstraction — **second** ladder tier), NFR-002/NFR-003 (significance-coherence foundation via paired bootstrap), NFR-026 (graceful degradation) |
 | Traces | Design D-EVAL DECISION 2 — `RatingEnginePort` 3-tier ladder: `glicko-legacy` → **`bradley-terry-mle`** → `bayes-bt`. "pure-stdlib MM + paired bootstrap; fast PR-CI/smoke tier." |
 | Test-type tags | `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` |

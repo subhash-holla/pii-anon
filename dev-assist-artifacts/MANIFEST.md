@@ -95,7 +95,7 @@ _To be populated as stage 04 progresses._
 | W3. Quality | COMPLETE | development-log.md §W3 | ✅ 5-gate cascade + strict TDD + security MUSTs |
 | W4. Testing setup | COMPLETE | development-log.md §W4 | ✅ extend existing suite + property/ε-gate scaffolded |
 | W5. Stories | COMPLETE | 02-stories/sprint-1/ + plan table | ✅ epics + sprint story set |
-| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail. **S3-01 DONE** (eval rating-engine port + registry + import-boundary; 2699 pass/0 fail) | 🔶 S2 / S3-02..S7 TODO |
+| W6. Execution | IN_PROGRESS | **Sprint-1 COMPLETE** (S1-01..05 DONE): recall-floor LIVE on the fusion path (S1-02) + per-lang ε-gate (S1-03) + hypothesis property (S1-04) + swarm-language fix (S1-05); sprint gate REQUEST_CHANGES→APPROVE; 2690 pass/0 fail. **S3-01 DONE** (rating port + registry + import-boundary). **S3-02 DONE** (`bradley-terry-mle` 2nd ladder tier — pure-stdlib MM + paired bootstrap + observable convergence; 5-reviewer gate APPROVE; 2727 pass/0 fail) | 🔶 S2 / S3-03..S7 TODO + SDO gate |
 
 ## Testing Phase Progress
 
@@ -198,9 +198,9 @@ Sibling files:
 | Discovery | 30 | 37 |
 | Requirements | 22 | 59 |
 | Design | 17 | 76 |
-| Development | 21 (3 explore + 1 plan + 6 story executors + 11 sprint-gate workflow) | 97 |
-| Testing | 0 | 97 |
-| **Total** | **97** | **97** |
+| Development | 28 (3 explore + 1 plan + 6 story executors + 11 sprint-gate workflow + S3-02: 2 executors + 5 story-gate reviewers) | 104 |
+| Testing | 0 | 104 |
+| **Total** | **104** | **104** |
 
 ---
 
