@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-06 ladder / DC-07 significance foundation) |
-| State | **IN_PROGRESS** (2026-05-31; claimer=dev-assist-development-executor) |
+| State | **REVIEW** (2026-05-31; claimer=dev-assist-development-executor; awaiting story-gate cascade) |
 | Implements | FR-003 (rating-engine abstraction — **second** ladder tier), NFR-002/NFR-003 (significance-coherence foundation via paired bootstrap), NFR-026 (graceful degradation) |
 | Traces | Design D-EVAL DECISION 2 — `RatingEnginePort` 3-tier ladder: `glicko-legacy` → **`bradley-terry-mle`** → `bayes-bt`. "pure-stdlib MM + paired bootstrap; fast PR-CI/smoke tier." |
 | Test-type tags | `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` |
@@ -45,17 +45,21 @@ The design's canonical source for the BT primitive is `pii-anon-eval-data` `stat
 `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` — implies reviewer set: code-quality + axiom-compliance + traceability (always); security-sast (conditional — entry-point load path, same trust surface as S3-01, expect APPROVE).
 
 ## 12. Definition of Done
-- [ ] **RED**: `tests/test_bradley_terry_mle.py` written first & failing — contract (`isinstance … RatingEnginePort`), MM-recovers-known-ordering, stationarity-condition, degenerate-no-divergence, paired-bootstrap determinism+coherence, registry-discovery-lists-both, determinism property (`@given` seeded). RED commit precedes GREEN (git-evidenced).
-- [ ] **GREEN**: `bradley_terry.py` + additive `__init__.py` export + `pyproject.toml` entry-point row (`bradley-terry-mle = "...bradley_terry:BradleyTerryMLEEngine"`). `pip install -e .` then discovery lists both tiers.
-- [ ] **Quality**: ruff clean; **mypy --strict** clean; full suite green (≥ 2699 prior, no regressions); coverage ≥ 84%.
-- [ ] **Isolation**: `test_rating_import_boundary.py` stays GREEN (rating ⊄ detection).
-- [ ] **Untouched**: `elo.py` + 7 callers byte-identical (git-verified); user WIP md5 unchanged.
-- [ ] **Story-gate review APPROVE** (`_reviews/story/S3-02-gate.yaml`).
+- [x] **RED**: `tests/test_bradley_terry_mle.py` written first & failing — contract (`isinstance … RatingEnginePort`), MM-recovers-known-ordering, stationarity-condition, degenerate-no-divergence, paired-bootstrap determinism+coherence, registry-discovery-lists-both, determinism property (`@given` seeded). RED commit precedes GREEN (git-evidenced: `d959032` before `d965930`). RED failed at collection with `ModuleNotFoundError: pii_anon.eval_framework.rating.bradley_terry`.
+- [x] **GREEN**: `bradley_terry.py` + additive `__init__.py` export + `pyproject.toml` entry-point row (`bradley-terry-mle = "...bradley_terry:BradleyTerryMLEEngine"`). `pip install -e . --no-deps` regenerated entry_points metadata; discovery lists both tiers.
+- [x] **Quality**: ruff clean (`src/pii_anon/eval_framework/rating/` + test); **mypy --strict** clean via the canonical CI command `mypy src/pii_anon` → *Success: no issues found in 116 source files* (`strict = true` is set in `[tool.mypy]`). Full suite green: **2721 passed, 12 skipped, 9 deselected, 0 failed/0 errors** (≥ 2699 floor; baseline 2711 → 2733 collected = +22 new, no regressions). Coverage **86.31%** (≥ 84%).
+  - *Note: the project's canonical type-check is `mypy src/pii_anon` (used by `.github/workflows/ci.yml`). Bare `mypy` (relying on `packages=["pii_anon"]`) reports a pre-existing "missing py.typed marker" enumeration error that is independent of this story's code and predates it; the path-form `mypy src/pii_anon` is authoritative and strict-clean.*
+- [x] **Isolation**: `test_rating_import_boundary.py` stays GREEN over the new file (`bradley_terry.py` imports only `math`, `random`, and `.elo`; no swarm/moe/fusion/policy).
+- [x] **Untouched**: `elo.py` + `leaderboard.py`/`scorecard.py`/`port.py`/`registry.py` + all callers (`competitor_composite.py`, `competitor_compare.py`, `external_evaluator.py`, package `__init__`s) byte-identical vs pre-story `42a16cf` (empty `git diff`). User WIP md5 unchanged (orchestrator.py / test_moe_enhancements.py / artifacts/benchmarks/* / benchmark-diagnostics.json / README.md / docs/* all identical to start-of-task baseline).
+- [ ] **Story-gate review APPROVE** (`_reviews/story/S3-02-gate.yaml`) — pending orchestrator cascade.
 
 ## Evidence (filled on completion)
-- RED commit · GREEN commit · REFACTOR commit (if any)
-- `isinstance(BradleyTerryMLEEngine(), RatingEnginePort)` → True; `discover_entrypoint_engines("pii_anon.rating_engines")` → `['bradley-terry-mle', 'glicko-legacy']`
-- MM recovers planted ordering; stationarity residual < tol; degenerate composites converge (no overflow)
-- Paired-bootstrap CIs deterministic for fixed seed; point ∈ CI; rank↔CI coherence holds
-- ruff / mypy --strict / full-suite / coverage results
-- *Agent-simulated CI (local `.venv`); Pass-2 real-CI confirmation scheduled by orchestrator.*
+- **Commits** (RED → GREEN → REFACTOR, git-ordered): RED `d959032ee41da3dbad9880f997d8df7d3201ab86` · GREEN `d965930b9ce1acb7e598b38393fd6328aace5474` · REFACTOR `725f9e770dbaa8eb67cf8a7d4cbfac10cbd47c3a` (single-pass soft-outcome computation; behaviour-preserving).
+- **Structural port**: `isinstance(BradleyTerryMLEEngine(), RatingEnginePort)` → **True** (runtime_checkable Protocol; `RatingEnginePort` NOT in the engine MRO → structural, not nominal). `discover_entrypoint_engines("pii_anon.rating_engines")` → **`['bradley-terry-mle', 'glicko-legacy']`** (sorted). Both resolve to a `RatingEnginePort`.
+- **MM correctness**: planted asymmetric design (A 8-2 B, B 7-3 C, A 9-1 C) → recovered ordering A > B > C; BT stationarity residual `max_i |W_i − Σ_j n_ij·π_i/(π_i+π_j)|` < 1e-6 (assert tol); Σθ_i ≈ 0 (sum-to-zero anchored). Elo-scale mapping `1500 + 400·θ/ln10` inverts to Σθ ≈ 0.
+- **Degeneracy fix**: perfect total order (`{s0..s5} = 0..5`) converges with all-finite ratings, strict monotonicity preserved (no ±∞); soft outcomes `sigmoid(γ·(C_i−C_j))`, γ=10, + symmetric smoothing ε=1e-3.
+- **Paired bootstrap (NFR-002/003)**: CIs byte-identical for fixed seed (`paired_bootstrap(records, b, seed)` pure over `random.Random(seed)`); differ across seeds; point estimate ∈ CI for every system; rank↔CI coherence holds (lo_X > hi_Y ⇒ point[X] > point[Y]); strongly-ordered design yields strict A-vs-C separation.
+- **Determinism (AX-002)**: two `@given`-seeded properties (round-robin ratings + bootstrap CIs) — byte-identical across independent engines / repeated seeds.
+- **Quality results**: ruff = *All checks passed!*; `mypy src/pii_anon` = *Success: no issues found in 116 source files* (strict); full suite **2721 passed / 12 skipped / 9 deselected / 0 failed**; coverage **86.31%**. BT test file alone: **22 passed**.
+- **Pure-stdlib constraint**: `bradley_terry.py` imports only `math`, `random`, `.elo` — no numpy/scipy/jax/numpyro/torch/pandas. Seam markers present: `# SWITCH-POINT(S6)` (eval-data primitive swap) and `# DAVIDSON(S3-04)` (tie term).
+- *Agent-simulated CI (local `.venv`, Python 3.12.12, hypothesis 6.155.1); Pass-2 real-CI confirmation scheduled by orchestrator.*
