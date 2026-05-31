@@ -69,6 +69,7 @@ gliner = "pii_anon.engines.gliner_adapter:GLiNERAdapter"
 
 [project.entry-points."pii_anon.rating_engines"]
 glicko-legacy = "pii_anon.eval_framework.rating.elo:PIIRateEloEngine"
+bradley-terry-mle = "pii_anon.eval_framework.rating.bradley_terry:BradleyTerryMLEEngine"
 
 [project.optional-dependencies]
 dev = [

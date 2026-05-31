@@ -14,6 +14,7 @@ See ``docs/composite-metric-evidence.md`` for full research backing.
 
 from __future__ import annotations
 
+from .bradley_terry import BradleyTerryMLEEngine
 from .elo import (
     PIIRateEloEngine,
     EloRating,
@@ -28,6 +29,7 @@ from .scorecard import BenchmarkScorecard, SystemScorecard
 
 __all__ = [
     "PIIRateEloEngine",
+    "BradleyTerryMLEEngine",
     "EloRating",
     "GovernanceResult",
     "GovernanceThresholds",
