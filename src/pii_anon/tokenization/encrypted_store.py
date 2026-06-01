@@ -444,33 +444,44 @@ class EncryptedSQLiteTokenStore(TokenStore):
             expires_at=expires_at,
         )
 
+    # -- row encode / write (shared by put + rewrap_all) -------------------
+    def _encrypt_row(
+        self, dek: bytes, mapping: TokenMapping, key_id: str
+    ) -> tuple[bytes, bytes, str, int, bytes, float, float | None]:
+        """Build the full encrypted row tuple for ``mapping`` under ``key_id``.
+
+        Single source of truth for the (blind_index, scope_index, key_id,
+        version, payload, created_at, expires_at) column ordering shared by
+        :meth:`put` and :meth:`rewrap_all`.
+        """
+        index_key = self._index_key_for(dek)
+        bi = self._blind_index(index_key, mapping.scope, mapping.token)
+        si = self._scope_index(index_key, mapping.scope)
+        payload = self._encrypt_payload(dek, mapping, key_id, bi)
+        return (bi, si, key_id, mapping.version, payload, mapping.created_at, mapping.expires_at)
+
+    def _write_row(
+        self, row: tuple[bytes, bytes, str, int, bytes, float, float | None]
+    ) -> None:
+        """Persist one prebuilt encrypted row (``INSERT OR REPLACE``)."""
+        self._conn.execute(
+            f"""
+            INSERT OR REPLACE INTO {self._TABLE}
+            (blind_index, scope_index, key_id, version, payload,
+             created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            row,
+        )
+
     # -- TokenStore surface ------------------------------------------------
     def put(self, mapping: TokenMapping) -> None:
         key_id = self._provider.current_key_id()
         with self._lock:
             dek = self._dek_for(key_id)
-            index_key = self._index_key_for(dek)
-            bi = self._blind_index(index_key, mapping.scope, mapping.token)
-            si = self._scope_index(index_key, mapping.scope)
-            payload = self._encrypt_payload(dek, mapping, key_id, bi)
+            row = self._encrypt_row(dek, mapping, key_id)
             with self._conn:
-                self._conn.execute(
-                    f"""
-                    INSERT OR REPLACE INTO {self._TABLE}
-                    (blind_index, scope_index, key_id, version, payload,
-                     created_at, expires_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        bi,
-                        si,
-                        key_id,
-                        mapping.version,
-                        payload,
-                        mapping.created_at,
-                        mapping.expires_at,
-                    ),
-                )
+                self._write_row(row)
 
     def get(self, token: str, *, scope: str | None = None) -> TokenMapping | None:
         now = time.time()
@@ -663,33 +674,14 @@ class EncryptedSQLiteTokenStore(TokenStore):
         self._ensure_current_envelope()
         new_key_id = new_provider.current_key_id()
 
-        # 3. Atomically clear + re-encrypt every mapping under the new DEK.
+        # 3. Atomically clear + re-encrypt every mapping under the new DEK,
+        #    reusing the same row-encode / row-write helpers as put().
         with self._lock:
             new_dek = self._dek_for(new_key_id)
-            index_key = self._index_key_for(new_dek)
             with self._conn:
                 self._conn.execute(f"DELETE FROM {self._TABLE}")
                 for mapping in snapshot:
-                    bi = self._blind_index(index_key, mapping.scope, mapping.token)
-                    si = self._scope_index(index_key, mapping.scope)
-                    payload = self._encrypt_payload(new_dek, mapping, new_key_id, bi)
-                    self._conn.execute(
-                        f"""
-                        INSERT OR REPLACE INTO {self._TABLE}
-                        (blind_index, scope_index, key_id, version, payload,
-                         created_at, expires_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            bi,
-                            si,
-                            new_key_id,
-                            mapping.version,
-                            payload,
-                            mapping.created_at,
-                            mapping.expires_at,
-                        ),
-                    )
+                    self._write_row(self._encrypt_row(new_dek, mapping, new_key_id))
         return len(snapshot)
 
     def list_key_ids(self) -> list[str]:
