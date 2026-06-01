@@ -258,3 +258,118 @@ def test_budget_must_be_positive_bounded() -> None:
     bad["budget"] = {"cpu_seconds": -1.0, "address_space_bytes": 1, "wall_seconds": 1.0}
     with pytest.raises(SandboxViolation):
         load_attack_spec(bad)
+
+
+# --------------------------------------------------------------------------- #
+# Defensive-branch coverage: the fail-loud refusals must each be pinned.       #
+# --------------------------------------------------------------------------- #
+def test_source_of_wrong_type_is_refused() -> None:
+    """A source that is neither a JSON document string nor a mapping (e.g. an
+    int) is refused loudly."""
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(123)  # type: ignore[arg-type]
+    assert "json document or a mapping" in str(exc.value).lower()
+
+
+def test_missing_params_and_allowed_paths_default_to_empty() -> None:
+    """A spec omitting params + allowed_paths yields empty defaults (the
+    None-handling branches in the validators)."""
+    ok = _well_formed_mapping()
+    del ok["params"]
+    del ok["allowed_paths"]
+    spec = load_attack_spec(ok)
+    assert dict(spec.params) == {}
+    assert spec.allowed_paths == frozenset()
+
+
+def test_params_not_a_mapping_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["params"] = "not-a-mapping"
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "mapping" in str(exc.value).lower()
+
+
+def test_params_with_non_string_key_is_refused() -> None:
+    """A non-string params key (reachable only via a pre-parsed mapping, not
+    JSON) is refused."""
+    bad = _well_formed_mapping()
+    bad["params"] = {123: "x"}
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "key" in str(exc.value).lower()
+
+
+def test_allowed_paths_as_bare_string_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["allowed_paths"] = "/tmp/single"
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "list/sequence" in str(exc.value).lower() or "sequence" in str(exc.value).lower()
+
+
+def test_allowed_paths_not_a_sequence_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["allowed_paths"] = 42
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "sequence" in str(exc.value).lower()
+
+
+def test_allowed_paths_entry_not_a_string_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["allowed_paths"] = ["/tmp/ok", 99]
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "string" in str(exc.value).lower()
+
+
+def test_empty_attack_id_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["attack_id"] = ""
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "attack_id" in str(exc.value)
+
+
+def test_runner_not_a_string_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["runner"] = 123
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "runner" in str(exc.value).lower()
+
+
+def test_budget_not_a_mapping_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["budget"] = "generous"
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "budget" in str(exc.value).lower()
+
+
+def test_budget_with_non_numeric_value_is_refused() -> None:
+    bad = _well_formed_mapping()
+    bad["budget"] = {"cpu_seconds": "lots", "address_space_bytes": 1, "wall_seconds": 1.0}
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "budget" in str(exc.value).lower() or "numeric" in str(exc.value).lower()
+
+
+def test_budget_passed_as_resource_budget_instance_is_accepted() -> None:
+    """A pre-parsed mapping may carry an already-built ResourceBudget; the
+    coercer accepts it as-is (the isinstance fast-path)."""
+    ok = _well_formed_mapping()
+    ok["budget"] = ResourceBudget(cpu_seconds=2.0, address_space_bytes=1024, wall_seconds=2.0)
+    spec = load_attack_spec(ok)
+    assert spec.budget.cpu_seconds == 2.0
+
+
+def test_path_equal_to_allowed_directory_is_accepted_at_load() -> None:
+    """A declared path exactly equal to an allowed directory (not strictly
+    under it) is accepted — the equality branch of the containment check."""
+    ok = _well_formed_mapping()
+    ok["allowed_paths"] = ["/tmp/sandbox-synthetic"]
+    ok["params"] = {"corpus_path": "/tmp/sandbox-synthetic"}
+    spec = load_attack_spec(ok)
+    assert "/tmp/sandbox-synthetic" in spec.allowed_paths

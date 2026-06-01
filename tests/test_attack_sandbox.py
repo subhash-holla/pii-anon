@@ -515,3 +515,138 @@ def test_a8_attack_result_equality_excludes_timing() -> None:
     time.sleep(0.01)
     r2 = run_attack_under_sandbox(spec_source, inputs=inputs)
     assert r1 == r2
+
+
+# --------------------------------------------------------------------------- #
+# Defensive-branch coverage: shims, rlimit-degrade paths, outcome guard.       #
+# --------------------------------------------------------------------------- #
+def test_assert_no_network_noarg_form_uses_policy_posture() -> None:
+    """The no-arg assert_no_network() reads the policy's own network posture."""
+    ok = SandboxPolicy(network="deny")
+    ok.assert_no_network()  # does not raise
+    tampered = SandboxPolicy(network="deny")
+    object.__setattr__(tampered, "network", "allow")
+    with pytest.raises(SandboxViolation):
+        tampered.assert_no_network()
+
+
+def test_capability_precheck_rejects_path_param_outside_allow_list() -> None:
+    """assert_no_unsafe_capability enforces *_path params against allowed_paths
+    at run time (the path-param branch), independent of the load-time check."""
+    spec = load_attack_spec(
+        _well_formed_mapping(allowed_paths=["/tmp/ok"], params={"corpus_path": "/tmp/ok/x"})
+    )
+    # tamper the params to point outside the allow-list, bypassing the loader.
+    object.__setattr__(spec, "params", {"corpus_path": "/etc/elsewhere"})
+    policy = SandboxPolicy.from_spec(spec)
+    with pytest.raises(SandboxViolation) as exc:
+        policy.assert_no_unsafe_capability(spec, DEFAULT_ATTACK_REGISTRY)
+    assert "path" in str(exc.value).lower()
+
+
+def test_capability_precheck_rejects_non_scalar_param() -> None:
+    """assert_no_unsafe_capability re-checks scalar-only defensively (a tampered
+    non-scalar param is refused even if it bypassed the loader)."""
+    spec = load_attack_spec(_well_formed_mapping())
+    object.__setattr__(spec, "params", {"smuggled": [1, 2, 3]})
+    policy = SandboxPolicy.from_spec(spec)
+    with pytest.raises(SandboxViolation) as exc:
+        policy.assert_no_unsafe_capability(spec, DEFAULT_ATTACK_REGISTRY)
+    assert "scalar" in str(exc.value).lower()
+
+
+def test_runner_returning_non_mapping_is_refused() -> None:
+    """The execution chokepoint requires a mapping outcome; a runner returning
+    a non-mapping is refused with SandboxViolation."""
+    spec = load_attack_spec(_well_formed_mapping())
+    sandbox = AttackSandbox(SandboxPolicy.from_spec(spec))
+
+    def _bad_outcome(**_: Any) -> Any:
+        return ["not", "a", "mapping"]
+
+    with pytest.raises(SandboxViolation) as exc:
+        sandbox.run(spec, _bad_outcome, inputs={})
+    assert "mapping" in str(exc.value).lower()
+
+
+def test_rlimit_degrades_to_watchdog_when_resource_module_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the stdlib resource module is unavailable, the guard degrades to the
+    wall-clock watchdog and records a platform_limit_unavailable audit note
+    (never a silent no-op). Simulated by monkeypatching the module-level handle."""
+    import pii_anon.eval_framework.attacks.sandbox as sb
+
+    monkeypatch.setattr(sb, "_resource", None)
+    result = run_attack_under_sandbox(
+        _well_formed_mapping(params={}),
+        inputs={"masked_texts": ["x"], "known_tokens": ["y"]},
+    )
+    audit_text = " | ".join(result.audit).lower()
+    assert "platform_limit_unavailable" in audit_text
+    assert "resource module not importable" in audit_text
+    # the run still completes (watchdog is the primary terminator).
+    assert result.terminated_for_budget is False
+
+
+class _FakeResource:
+    """Minimal stand-in for the stdlib resource module to exercise the
+    rlimit-applied + rlimit-absent + restore branches deterministically,
+    without touching the real process limits."""
+
+    RLIM_INFINITY = -1
+
+    def __init__(self, *, have_as: bool, have_cpu: bool) -> None:
+        self.RUSAGE_SELF = 0
+        self.RLIMIT_AS = 5 if have_as else None
+        self.RLIMIT_CPU = 0 if have_cpu else None
+        self._limits: dict[int, tuple[int, int]] = {5: (100, 1000), 0: (100, 1000)}
+        self.set_calls: list[tuple[int, tuple[int, int]]] = []
+
+    class _Usage:
+        ru_utime = 0.1
+        ru_stime = 0.1
+
+    def getrusage(self, _who: int) -> _Usage:
+        return self._Usage()
+
+    def getrlimit(self, which: int) -> tuple[int, int]:
+        return self._limits[which]
+
+    def setrlimit(self, which: int, limits: tuple[int, int]) -> None:
+        self.set_calls.append((which, limits))
+        self._limits[which] = limits
+
+
+def test_rlimit_applied_branch_records_applied_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With a fake resource module that accepts setrlimit, both AS + CPU rlimits
+    are 'applied' (audit lines) and restored afterwards (the apply + clamp +
+    restore branches), with no real process-limit side effect."""
+    import pii_anon.eval_framework.attacks.sandbox as sb
+
+    fake = _FakeResource(have_as=True, have_cpu=True)
+    monkeypatch.setattr(sb, "_resource", fake)
+    result = run_attack_under_sandbox(
+        _well_formed_mapping(params={}),
+        inputs={"masked_texts": ["x"], "known_tokens": ["y"]},
+    )
+    audit_text = " | ".join(result.audit).lower()
+    assert "rlimit rlimit_as applied" in audit_text
+    assert "rlimit rlimit_cpu applied" in audit_text
+    # restored: the last setrlimit for each which returns to the saved (100,1000).
+    assert fake._limits[fake.RLIMIT_AS] == (100, 1000)
+    assert fake._limits[fake.RLIMIT_CPU] == (100, 1000)
+
+
+def test_rlimit_absent_branch_records_unavailable_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When a specific rlimit constant is absent, that limit records a
+    platform_limit_unavailable note (not present), never a silent no-op."""
+    import pii_anon.eval_framework.attacks.sandbox as sb
+
+    fake = _FakeResource(have_as=False, have_cpu=False)
+    monkeypatch.setattr(sb, "_resource", fake)
+    result = run_attack_under_sandbox(
+        _well_formed_mapping(params={}),
+        inputs={"masked_texts": ["x"], "known_tokens": ["y"]},
+    )
+    audit_text = " | ".join(result.audit).lower()
+    assert "rlimit_as not present" in audit_text
+    assert "rlimit_cpu not present" in audit_text
