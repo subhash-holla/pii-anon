@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -121,7 +122,7 @@ class PairwiseVerdict:
 
 
 def _validate_samples(
-    theta_samples: NDArray[np.floating], names: list[str]
+    theta_samples: NDArray[np.floating[Any]], names: list[str]
 ) -> NDArray[np.float64]:
     """Coerce ``theta_samples`` to ``(n_draws, n_systems)`` float64 and check shape.
 
@@ -149,7 +150,7 @@ def _validate_samples(
 
 
 def pairwise_significance(
-    theta_samples: NDArray[np.floating], names: list[str]
+    theta_samples: NDArray[np.floating[Any]], names: list[str]
 ) -> list[PairwiseVerdict]:
     """Coherent pairwise significance for every pair, off ONE joint posterior.
 
@@ -193,7 +194,7 @@ def pairwise_significance(
 
 
 def rank_one_distribution(
-    theta_samples: NDArray[np.floating], names: list[str]
+    theta_samples: NDArray[np.floating[Any]], names: list[str]
 ) -> dict[str, float]:
     """Distribution over "who is #1": ``P(rank(name) = 1 | joint posterior)``.
 
@@ -210,7 +211,7 @@ def rank_one_distribution(
 
 
 def rank_one_probability(
-    theta_samples: NDArray[np.floating], names: list[str], name: str
+    theta_samples: NDArray[np.floating[Any]], names: list[str], name: str
 ) -> float:
     """``P(rank(name) = 1 | joint posterior)`` — the SDO J for one system.
 

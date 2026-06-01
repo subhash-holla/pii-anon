@@ -196,7 +196,9 @@ def test_nfr_002_significance_is_single_source_three_quantities_from_one_vector(
         axis=1,
     )
     names = ["a", "b", "c"]
-    verdicts = {(v.i, v.j): v for v in pairwise_significance(samples, names)}
+    all_verdicts = pairwise_significance(samples, names)
+    assert all(isinstance(v, PairwiseVerdict) for v in all_verdicts)
+    verdicts = {(v.i, v.j): v for v in all_verdicts}
     v = verdicts[("a", "b")]
     d = samples[:, 0] - samples[:, 1]  # the SAME vector the impl must use
     assert v.point == pytest.approx(float(np.mean(d)))
@@ -239,6 +241,22 @@ def test_orientation_verdict_i_j_are_the_named_systems_in_order() -> None:
     assert (v.i, v.j) == ("alpha", "beta")
     # alpha (col0, offset +2) clearly beats beta (col1, offset −2).
     assert v.point > 0 and v.significant and v.p_i_beats_j > 0.9
+
+
+def test_orientation_non_2d_samples_rejected() -> None:
+    """[CONTRACT-TEST] A non-2-D samples array (e.g. 1-D or 3-D) is rejected — the
+    orientation contract is strictly (n_draws, n_systems)."""
+    with pytest.raises(ValueError):
+        pairwise_significance(np.zeros((10,)), ["a"])  # 1-D
+    with pytest.raises(ValueError):
+        pairwise_significance(np.zeros((4, 5, 2)), ["a", "b"])  # 3-D
+
+
+def test_orientation_zero_draws_rejected() -> None:
+    """[CONTRACT-TEST] Zero draws (an empty posterior) is rejected — you cannot
+    derive a verdict from no samples."""
+    with pytest.raises(ValueError):
+        pairwise_significance(np.zeros((0, 2)), ["a", "b"])
 
 
 # ---------------------------------------------------------------------------
@@ -367,13 +385,18 @@ def test_davidson_softmax_equivalence_bridges_pure_numpy_to_numpyro_logits() -> 
     math."""
     for delta in (-2.0, -0.3, 0.0, 1.1, 2.4):
         for nu in (0.25, 1.0, 3.0):
-            logits = np.array([delta / 2.0, math.log(nu), -delta / 2.0])
-            m = logits.max()
-            soft = np.exp(logits - m)
-            soft /= soft.sum()
-            assert davidson_p_i_beats_j(delta, nu) == pytest.approx(float(soft[0]))
-            assert davidson_p_tie(delta, nu) == pytest.approx(float(soft[1]))
-            assert davidson_p_j_beats_i(delta, nu) == pytest.approx(float(soft[2]))
+            # Reference softmax via plain stdlib math (no numpy reduction): keeps
+            # this identity check independent of the numpy-reload sentinel issue
+            # other modules can trigger under coverage instrumentation, and is the
+            # exact softmax([δ/2, ln ν, −δ/2]) the NumPyro Multinomial uses.
+            logits = [delta / 2.0, math.log(nu), -delta / 2.0]
+            m = max(logits)
+            exps = [math.exp(x - m) for x in logits]
+            denom = sum(exps)
+            soft = [e / denom for e in exps]
+            assert davidson_p_i_beats_j(delta, nu) == pytest.approx(soft[0])
+            assert davidson_p_tie(delta, nu) == pytest.approx(soft[1])
+            assert davidson_p_j_beats_i(delta, nu) == pytest.approx(soft[2])
 
 
 def test_davidson_higher_strength_gets_more_win_mass() -> None:
