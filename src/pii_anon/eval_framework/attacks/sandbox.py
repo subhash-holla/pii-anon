@@ -34,13 +34,13 @@ import threading
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
 from typing import Any, Callable, Final
 
 from pii_anon.eval_framework.attacks.spec import (
     AttackSpec,
     ResourceBudget,
     SandboxViolation,
+    _is_within_allowed,
     load_attack_spec,
 )
 from pii_anon.harness.attack import reconstruction_attack_score
@@ -107,19 +107,13 @@ class SandboxPolicy:
         """Return ``path`` iff it is one of, or strictly under, an allowed
         directory; otherwise raise ``SandboxViolation`` (path-not-allow-listed).
 
-        Uses path-component containment (not a naive ``startswith``) so a
-        sibling that merely shares a string prefix is NOT allowed.
+        Delegates to the canonical ``spec._is_within_allowed`` (path-component
+        containment, not a naive ``startswith``) so a sibling that merely shares
+        a string prefix is NOT allowed, and the load-time + run-time path checks
+        cannot drift.
         """
-        target = PurePosixPath(path)
-        for allowed in self.allowed_paths:
-            base = PurePosixPath(allowed)
-            if target == base:
-                return path
-            try:
-                target.relative_to(base)
-                return path
-            except ValueError:
-                continue
+        if _is_within_allowed(path, self.allowed_paths):
+            return path
         raise SandboxViolation(f"path {path!r} is not in the allow-list {sorted(self.allowed_paths)!r}")
 
     def assert_no_network_value(self, value: str) -> None:

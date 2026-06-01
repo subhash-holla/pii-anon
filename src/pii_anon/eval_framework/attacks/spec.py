@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Any, Final, Literal, get_args
 
 # Re-exported from sandbox to avoid a circular import at module-load time;
@@ -182,10 +183,10 @@ def _is_within_allowed(path: str, allowed_paths: frozenset[str]) -> bool:
 
     Uses path-component containment (not a naive ``startswith``) so a sibling
     that merely shares a string prefix (``/a/b-evil`` vs allowed ``/a/b``) is
-    NOT treated as allowed.
+    NOT treated as allowed. This is the single source of truth for the
+    path-allow-list semantics; ``sandbox.SandboxPolicy.assert_path_allowed``
+    delegates to it so the two cannot drift.
     """
-    from pathlib import PurePosixPath
-
     target = PurePosixPath(path)
     for allowed in allowed_paths:
         base = PurePosixPath(allowed)
