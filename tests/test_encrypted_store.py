@@ -24,6 +24,7 @@ from __future__ import annotations
 import importlib
 import sqlite3
 import tempfile
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -241,7 +242,9 @@ class TestContractSharedBehaviour:
     def test_ttl_get_returns_none_for_expired(self, builder, tmp_path: Path) -> None:
         store, closers = builder(tmp_path)
         try:
-            now = 1_000_000.0
+            # expires_at is compared against the wall clock by every store, so
+            # anchor on time.time(): "expired" = far past, "valid" = far future.
+            now = time.time()
             store.put(
                 _mapping(scope="s1", token="t1", plaintext="v", created_at=now - 100, expires_at=now - 1)
             )
@@ -253,9 +256,9 @@ class TestContractSharedBehaviour:
     def test_ttl_count_and_list_exclude_expired(self, builder, tmp_path: Path) -> None:
         store, closers = builder(tmp_path)
         try:
-            now = 1_000_000_000.0
+            now = time.time()
             store.put(_mapping(scope="s1", token="exp", plaintext="v1", created_at=now - 100, expires_at=now - 1))
-            store.put(_mapping(scope="s1", token="ok", plaintext="v2", created_at=now, expires_at=now + 1_000_000))
+            store.put(_mapping(scope="s1", token="ok", plaintext="v2", created_at=now, expires_at=now + 86_400))
             assert store.count() == 1
             assert store.count(scope="s1") == 1
             listed = store.list_by_scope("s1")
@@ -268,9 +271,9 @@ class TestContractSharedBehaviour:
     def test_delete_expired_removes_only_expired(self, builder, tmp_path: Path) -> None:
         store, closers = builder(tmp_path)
         try:
-            now = 1_000_000_000.0
+            now = time.time()
             store.put(_mapping(scope="s1", token="exp", plaintext="v1", created_at=now - 100, expires_at=now - 1))
-            store.put(_mapping(scope="s1", token="ok", plaintext="v2", created_at=now, expires_at=now + 1_000_000))
+            store.put(_mapping(scope="s1", token="ok", plaintext="v2", created_at=now, expires_at=now + 86_400))
             removed = store.delete_expired()
             assert removed == 1
             assert store.count() == 1
@@ -351,33 +354,24 @@ class TestA2NotPlaintextOnDisk:
 # A3 — tamper a ciphertext byte => decrypt RAISES (NFR-014, integrity)
 # ===========================================================================
 class TestA3TamperRaises:
-    def _corrupt_first_blob_byte(self, db_path: Path) -> None:
-        """Flip one byte of the first ciphertext BLOB cell in the DB."""
+    def _corrupt_first_payload_byte(self, db_path: Path) -> None:
+        """Flip one byte inside the first row's ciphertext payload blob."""
         conn = sqlite3.connect(str(db_path))
         try:
-            tables = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            ]
-            for table in tables:
-                info = conn.execute(f"PRAGMA table_info('{table}')").fetchall()
-                colnames = [c[1] for c in info]
-                rows = conn.execute(f"SELECT rowid, * FROM '{table}'").fetchall()  # noqa: S608
-                for row in rows:
-                    rowid = row[0]
-                    for col_idx, cell in enumerate(row[1:]):
-                        if isinstance(cell, (bytes, bytearray)) and len(cell) > 0:
-                            mutated = bytearray(cell)
-                            mutated[0] ^= 0x01
-                            conn.execute(
-                                f"UPDATE '{table}' SET {colnames[col_idx]} = ? WHERE rowid = ?",  # noqa: S608
-                                (bytes(mutated), rowid),
-                            )
-                            conn.commit()
-                            return
-            raise AssertionError("no BLOB cell found to corrupt")
+            table = "encrypted_token_mappings"
+            row = conn.execute(
+                f"SELECT rowid, payload FROM '{table}'"  # noqa: S608
+            ).fetchone()
+            assert row is not None, "no row to corrupt"
+            rowid, payload = row[0], bytes(row[1])
+            assert len(payload) > 0
+            mutated = bytearray(payload)
+            mutated[0] ^= 0x01
+            conn.execute(
+                f"UPDATE '{table}' SET payload = ? WHERE rowid = ?",  # noqa: S608
+                (bytes(mutated), rowid),
+            )
+            conn.commit()
         finally:
             conn.close()
 
@@ -386,7 +380,7 @@ class TestA3TamperRaises:
         store.put(_mapping())
         store.close()
 
-        self._corrupt_first_blob_byte(temp_db_path)
+        self._corrupt_first_payload_byte(temp_db_path)
 
         store2 = _make_store(temp_db_path)
         with pytest.raises(TokenStoreIntegrityError):
@@ -401,7 +395,7 @@ class TestA3TamperRaises:
         store = _make_store(temp_db_path)
         store.put(_mapping())
         store.close()
-        self._corrupt_first_blob_byte(temp_db_path)
+        self._corrupt_first_payload_byte(temp_db_path)
         store2 = _make_store(temp_db_path)
         raised = False
         try:
@@ -418,8 +412,10 @@ class TestA3TamperRaises:
         store.put(_mapping(scope="s", token="<EMAIL_ADDRESS:v1:tok_b>", plaintext="b@example.test"))
         store.close()
 
-        # Swap the encrypted payload of row B into row A's slot, keeping A's
-        # blind-index / AAD-binding columns. Decryption under A's AAD must fail.
+        # Swap the two rows' encrypted payloads while keeping each row's
+        # blind-index column (its AAD binding) in place. Whichever token we
+        # then read decrypts the *other* row's payload under *its own* AAD ->
+        # the tag fails (cut-and-paste / row-relocation tampering).
         conn = sqlite3.connect(str(temp_db_path))
         try:
             table = "encrypted_token_mappings"
@@ -427,11 +423,14 @@ class TestA3TamperRaises:
                 f"SELECT blind_index, payload FROM '{table}'"  # noqa: S608
             ).fetchall()
             assert len(rows) == 2
-            (bi_a, payload_a), (bi_b, payload_b) = rows[0], rows[1]
-            # Put B's payload under A's blind index (relocation / cut-and-paste).
+            (bi_first, payload_first), (bi_second, payload_second) = rows[0], rows[1]
             conn.execute(
                 f"UPDATE '{table}' SET payload = ? WHERE blind_index = ?",  # noqa: S608
-                (payload_b, bi_a),
+                (payload_second, bi_first),
+            )
+            conn.execute(
+                f"UPDATE '{table}' SET payload = ? WHERE blind_index = ?",  # noqa: S608
+                (payload_first, bi_second),
             )
             conn.commit()
         finally:
@@ -439,7 +438,7 @@ class TestA3TamperRaises:
 
         store2 = _make_store(temp_db_path)
         with pytest.raises(TokenStoreIntegrityError):
-            # Reading row A now decrypts B's payload under A's AAD -> tag fail.
+            # Reading row A now decrypts B's relocated payload under A's AAD.
             store2.get("<EMAIL_ADDRESS:v1:tok_a>", scope="s")
         store2.close()
 
@@ -643,7 +642,7 @@ class TestA7AnonPseudoWall:
 # A8 — fail-loud on missing crypto dep (NFR-026 pattern)
 # ===========================================================================
 class TestA8MissingCryptoDep:
-    def test_nfr_026_missing_aead_raises_loud_with_install_hint(
+    def test_nfr_026_missing_aead_provider_guard_raises_with_install_hint(
         self, temp_db_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # Module import must already have succeeded (discovery unaffected) ...
@@ -653,6 +652,23 @@ class TestA8MissingCryptoDep:
         monkeypatch.setattr(mod, "ChaCha20Poly1305", None, raising=False)
         with pytest.raises(TokenizationError) as ei:
             EncryptedSQLiteTokenStore(temp_db_path, key_provider=StaticTestKeyProvider(KEK_A))
+        assert "pii-anon[crypto]" in str(ei.value)
+
+    def test_nfr_026_missing_aead_store_ctor_guard_raises(
+        self, temp_db_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Hit the store constructor's own crypto guard directly.
+
+        Build a real provider FIRST (so it is not the thing that raises), then
+        null the AEAD symbols and construct the store — exercising the store's
+        independent ``if AESGCM is None or ChaCha20Poly1305 is None`` guard.
+        """
+        mod = importlib.import_module("pii_anon.tokenization.encrypted_store")
+        provider = StaticTestKeyProvider(KEK_A)  # built while crypto present
+        monkeypatch.setattr(mod, "AESGCM", None)
+        monkeypatch.setattr(mod, "ChaCha20Poly1305", None, raising=False)
+        with pytest.raises(TokenizationError) as ei:
+            EncryptedSQLiteTokenStore(temp_db_path, key_provider=provider)
         assert "pii-anon[crypto]" in str(ei.value)
 
 
@@ -691,3 +707,76 @@ class TestEnvelopeKeyProviderProtocol:
         assert key_id == "k1"
         unwrapped = provider.unwrap(key_id, wrapped)
         assert unwrapped == b"D" * 32
+
+
+# ===========================================================================
+# Input-validation + robustness guards (defensive error paths)
+# ===========================================================================
+class TestGuardsAndRobustness:
+    def test_provider_rejects_bad_kek_length(self) -> None:
+        with pytest.raises(TokenizationError):
+            StaticTestKeyProvider(b"short", key_id="k1")  # not 16/24/32 bytes
+
+    def test_store_rejects_unsupported_algorithm_on_put(self, temp_db_path: Path) -> None:
+        store = EncryptedSQLiteTokenStore(
+            temp_db_path,
+            key_provider=StaticTestKeyProvider(KEK_A),
+            algorithm="rot13",  # unsupported
+        )
+        with pytest.raises(TokenizationError):
+            store.put(_mapping())
+        store.close()
+
+    def test_scopeless_get_skips_expired_then_finds_valid(self, temp_db_path: Path) -> None:
+        """Scope-less scan must skip an expired row and still find a live one."""
+        now = time.time()
+        store = _make_store(temp_db_path)
+        store.put(
+            _mapping(scope="s1", token="exp", plaintext="v1", created_at=now - 100, expires_at=now - 1)
+        )
+        store.put(_mapping(scope="s2", token="live", plaintext="v2"))
+        # No-scope lookup of the expired token -> None (skipped, then unmatched).
+        assert store.get("exp") is None
+        # No-scope lookup of the live token -> found.
+        got = store.get("live")
+        assert got is not None and got.plaintext == "v2"
+        store.close()
+
+    def test_scopeless_get_skips_unreversible_row_then_fails_loud(self, temp_db_path: Path) -> None:
+        """A row owned by an unwrap-failing key is skipped in the scan loop,
+        and because that key owns rows the lookup then FAILS LOUD (NFR-015).
+
+        Exercises both the in-scan skip branch (the row cannot be decrypted) and
+        the wrong-key fail-loud guard — a scope-less get under the wrong KEK
+        must never silently report a token as absent when an unreadable row set
+        is present.
+        """
+        store = EncryptedSQLiteTokenStore(
+            temp_db_path, key_provider=StaticTestKeyProvider(KEK_A, key_id="k1")
+        )
+        store.put(_mapping(scope="s", token="<EMAIL_ADDRESS:v1:tok_x>", plaintext=SYNTH_PLAINTEXT))
+        store.rewrap_all(StaticTestKeyProvider(KEK_B, key_id="k2"))
+        store.close()
+
+        # Reopen under k1/KEK_A. The only row is owned by k2 (unreversible here):
+        # the scan skips the undecryptable row, then the wrong-key guard raises.
+        stale = EncryptedSQLiteTokenStore(
+            temp_db_path, key_provider=StaticTestKeyProvider(KEK_A, key_id="k1")
+        )
+        with pytest.raises((TokenStoreIntegrityError, TokenizationError)):
+            stale.get("<EMAIL_ADDRESS:v1:tok_unrelated>")
+        stale.close()
+
+    def test_row_key_id_returns_none_for_absent(self, temp_db_path: Path) -> None:
+        store = _make_store(temp_db_path)
+        store.put(_mapping())
+        assert store.row_key_id("<EMAIL_ADDRESS:v1:tok_absent>", scope="s") is None
+        assert store.row_key_id(SYNTH_TOKEN, scope="s") is not None
+        store.close()
+
+    def test_dek_for_missing_envelope_raises(self, temp_db_path: Path) -> None:
+        """Requesting a DEK for a key id with no persisted envelope raises."""
+        store = _make_store(temp_db_path)
+        with pytest.raises(TokenStoreIntegrityError):
+            store._dek_for("never-minted-key-id")
+        store.close()

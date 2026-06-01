@@ -21,6 +21,25 @@ class TokenizationError(PiiAnonError):
     """Raised when tokenization or detokenization fails."""
 
 
+class TokenStoreIntegrityError(TokenizationError):
+    """Raised when an at-rest token-store row fails authenticated decryption.
+
+    The fail-loud signal for the encrypted reversible-pseudonymization vault
+    (``EncryptedSQLiteTokenStore``, S6-03). The underlying AEAD primitive
+    raises ``InvalidTag`` when a stored ciphertext, nonce, auth tag, or the
+    bound associated data (key id / scope / token / version) has been tampered
+    with — including a row's ciphertext being relocated to a different
+    ``(scope, token)`` slot. This is re-raised as ``TokenStoreIntegrityError``
+    rather than ever returning ``None``, the original plaintext, or undecrypted
+    bytes: a tampered vault must never silently yield a successful-but-wrong
+    reversal (NFR-014 unauthorized-reversal = 0).
+
+    Messages name only the offending ``key_id`` / blind-index prefix and a
+    generic reason; they never include key bytes or any plaintext (a failure
+    must not become a decryption oracle).
+    """
+
+
 class CalibrationError(PiiAnonError):
     """Raised when calibration data is missing or invalid."""
 
