@@ -14,9 +14,24 @@ See ``docs/composite-metric-evidence.md`` for full research backing.
 
 from __future__ import annotations
 
-from .bayes_bt import BayesBTEngine, MissingOptionalDependencyError, Posterior
+from .bayes_bt import (
+    BayesBTEngine,
+    MissingOptionalDependencyError,
+    PairedCountsWithTies,
+    Posterior,
+)
 from .bradley_terry import BradleyTerryConvergenceWarning, BradleyTerryMLEEngine
 from .convergence import ConvergenceError, ConvergenceReport
+from .paired_set import PairedComparisonSet, assemble_paired_set
+from .significance import (
+    PairwiseVerdict,
+    davidson_p_i_beats_j,
+    davidson_p_j_beats_i,
+    davidson_p_tie,
+    pairwise_significance,
+    rank_one_distribution,
+    rank_one_probability,
+)
 from .elo import (
     PIIRateEloEngine,
     EloRating,
@@ -35,9 +50,19 @@ __all__ = [
     "BradleyTerryConvergenceWarning",
     "BayesBTEngine",
     "Posterior",
+    "PairedCountsWithTies",
     "MissingOptionalDependencyError",
     "ConvergenceReport",
     "ConvergenceError",
+    "PairwiseVerdict",
+    "pairwise_significance",
+    "rank_one_probability",
+    "rank_one_distribution",
+    "davidson_p_i_beats_j",
+    "davidson_p_tie",
+    "davidson_p_j_beats_i",
+    "PairedComparisonSet",
+    "assemble_paired_set",
     "EloRating",
     "GovernanceResult",
     "GovernanceThresholds",

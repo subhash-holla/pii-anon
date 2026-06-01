@@ -70,6 +70,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only, never imported at runtime
 __all__ = [
     "BayesBTEngine",
     "MissingOptionalDependencyError",
+    "PairedCountsWithTies",
     "Posterior",
 ]
 
@@ -85,6 +86,13 @@ _BAYES_EVAL_EXTRA = "bayes-eval"
 # Comparison-shape alias, identical to S3-02's ``fit_paired`` shape:
 # ``{(sys_i, sys_j): (wins_i, wins_j, n)}``.
 PairedCounts = dict[tuple[str, str], tuple[float, float, int]]
+
+# DAVIDSON(S3-04): the PARALLEL 4-tuple shape carrying tie counts:
+# ``{(sys_i, sys_j): (wins_i, wins_j, ties, n)}`` with ``wins_i+wins_j+ties=n``.
+# Kept separate from ``PairedCounts`` (which ``fit_paired_posterior`` consumes
+# with integer ``int(round(...))`` totals) so the tie path never perturbs the
+# plain-BT counts. Produced by ``rating.paired_set.assemble_paired_set``.
+PairedCountsWithTies = dict[tuple[str, str], tuple[float, float, float, int]]
 
 
 class MissingOptionalDependencyError(ImportError):
@@ -134,12 +142,19 @@ class Posterior:
     ratings:
         Posterior-summary :class:`EloRating` per system (mean θ → Elo rating,
         sd θ → Elo-scale rd).
+    nu_samples:
+        DAVIDSON(S3-04): the joint draws of the Davidson tie parameter ``ν``,
+        or ``None`` for a plain Bradley-Terry (no-ties) fit. When present the fit
+        modeled ties; ``ν > 0`` is the identifiable tie propensity. Carried on the
+        SAME posterior as ``theta_samples`` so significance and tie inference are
+        read off ONE joint sample.
     """
 
     systems: list[str]
     theta_samples: "NDArray[np.float64]"
     convergence: ConvergenceReport
     ratings: dict[str, EloRating]
+    nu_samples: "NDArray[np.float64] | None" = None
 
 
 class BayesBTEngine:
@@ -285,6 +300,50 @@ class BayesBTEngine:
             np.asarray(totals, dtype=np.int_),
         )
 
+    @staticmethod
+    def _normalize_comparisons_with_ties(
+        comparisons: "PairedCountsWithTies",
+    ) -> tuple[
+        list[str],
+        "NDArray[np.int_]",
+        "NDArray[np.int_]",
+        "NDArray[np.int_]",
+    ]:
+        """Flatten 4-tuple tie counts into sorted-name index + outcome arrays.
+
+        DAVIDSON(S3-04). Returns ``(names, idx_i, idx_j, outcomes)`` where
+        ``outcomes`` is an ``(n_records_total, 3)`` integer array of
+        ``(wins_i, ties, wins_j)`` per comparison record (the Davidson Multinomial
+        category order is i-wins / tie / j-wins, matching logits
+        ``[δ/2, ln ν, −δ/2]``). Each ``(wins_i, wins_j, ties, n)`` entry becomes
+        ONE Multinomial record over ``n`` trials. numpy-only; integer counts (no
+        half-splitting). Raises if a tally is inconsistent
+        (``wins_i + wins_j + ties != n``).
+        """
+        import numpy as np
+
+        names: list[str] = sorted({name for pair in comparisons for name in pair})
+        index = {name: k for k, name in enumerate(names)}
+        idx_i: list[int] = []
+        idx_j: list[int] = []
+        outcomes: list[tuple[int, int, int]] = []
+        for (sys_i, sys_j), (wins_i, wins_j, ties, n) in comparisons.items():
+            wi, wj, t = int(round(wins_i)), int(round(wins_j)), int(round(ties))
+            if wi + wj + t != int(n):
+                raise ValueError(
+                    f"inconsistent tie tally for ({sys_i}, {sys_j}): "
+                    f"wins_i={wi} + wins_j={wj} + ties={t} != n={int(n)}"
+                )
+            idx_i.append(index[sys_i])
+            idx_j.append(index[sys_j])
+            outcomes.append((wi, t, wj))  # category order: i-wins, tie, j-wins
+        return (
+            names,
+            np.asarray(idx_i, dtype=np.int_),
+            np.asarray(idx_j, dtype=np.int_),
+            np.asarray(outcomes, dtype=np.int_),
+        )
+
     def _posterior_to_ratings(
         self, names: list[str], theta_samples: "NDArray[np.float64]"
     ) -> dict[str, EloRating]:
@@ -318,36 +377,64 @@ class BayesBTEngine:
         self,
         idx_i: "NDArray[np.int_]",
         idx_j: "NDArray[np.int_]",
-        wins_i: "NDArray[np.int_]",
-        totals: "NDArray[np.int_]",
         n_systems: int,
+        wins_i: "NDArray[np.int_] | None" = None,
+        totals: "NDArray[np.int_] | None" = None,
+        outcomes: "NDArray[np.int_] | None" = None,
     ) -> None:
-        """NumPyro Bayesian Bradley-Terry model (called only under :meth:`_run_nuts`).
+        """NumPyro Bayesian Bradley-Terry model (called only under the NUTS runs).
 
         ``σ ~ HalfNormal(1)``; ``θ_raw ~ Normal(0, σ)``; ``θ = θ_raw − mean`` for
-        sum-to-zero identifiability; per record ``wins_i ~ Binomial(n_ij,
-        logits = θ_i − θ_j)``.
+        sum-to-zero identifiability. The likelihood branch depends on the data:
+
+        * **Plain BT (default):** ``wins_i``/``totals`` given →
+          ``wins_i ~ Binomial(n_ij, logits = θ_i − θ_j)`` per record.
+        * **DAVIDSON(S3-04) tie branch:** ``outcomes`` (an ``(R, 3)`` array of
+          ``(wins_i, ties, wins_j)`` per record) given → a tie parameter
+          ``ν ~ HalfNormal(1)`` and a three-way Multinomial with logits
+          ``[δ/2, ln ν, −δ/2]`` (δ = θ_i − θ_j), i.e. Davidson (1970):
+          ``P(i>j) ∝ exp(θ_i)``, ``P(tie) ∝ ν·exp((θ_i+θ_j)/2)``,
+          ``P(j>i) ∝ exp(θ_j)``. The tie term shares the SAME ``θ`` as the win
+          term, so significance stays coherent off ONE joint posterior. ``ν = 0``
+          would nest plain BT (the closed form in ``significance.py`` proves this
+          equivalence; the in-tree unit tests pin the math without jax).
         """
         import jax.numpy as jnp
         import numpyro
         import numpyro.distributions as dist
 
-        sigma = numpyro.sample("sigma", dist.HalfNormal(1.0))
-        with numpyro.plate("systems", n_systems):
+        sigma = numpyro.sample("sigma", dist.HalfNormal(1.0))  # pragma: no cover
+        with numpyro.plate("systems", n_systems):  # pragma: no cover
             theta_raw = numpyro.sample("theta_raw", dist.Normal(0.0, sigma))
         # Sum-to-zero anchor → identifiable strengths on the Elo scale.
-        theta = numpyro.deterministic("theta", theta_raw - jnp.mean(theta_raw))
-
-        logits = theta[idx_i] - theta[idx_j]
-        # DAVIDSON(S3-04): the tie likelihood factor wires in HERE — a Davidson
-        # model adds a ``ties_ij ~ ...`` term with a ``nu`` tie parameter
-        # alongside this Binomial, sharing the SAME ``theta`` so significance
-        # stays coherent off one joint posterior. Plain BT (no ties) for now.
-        numpyro.sample(
-            "wins",
-            dist.BinomialLogits(logits=logits, total_count=totals),
-            obs=wins_i,
+        theta = numpyro.deterministic(  # pragma: no cover
+            "theta", theta_raw - jnp.mean(theta_raw)
         )
+
+        delta = theta[idx_i] - theta[idx_j]  # pragma: no cover
+
+        if outcomes is not None:  # pragma: no cover
+            # DAVIDSON(S3-04) tie branch. Multinomial logits [δ/2, ln ν, −δ/2]
+            # over (i-wins, tie, j-wins). The common exp((θ_i+θ_j)/2) factor
+            # cancels in the softmax, so these logits reproduce the Davidson
+            # closed form exactly (see significance.davidson_*).
+            nu = numpyro.sample("nu", dist.HalfNormal(1.0))
+            log_nu = jnp.log(nu)
+            tie_logits = jnp.broadcast_to(log_nu, delta.shape)
+            logits3 = jnp.stack([delta / 2.0, tie_logits, -delta / 2.0], axis=-1)
+            total_per_record = outcomes.sum(axis=-1)
+            numpyro.sample(
+                "outcomes",
+                dist.Multinomial(total_count=total_per_record, logits=logits3),
+                obs=outcomes,
+            )
+        else:
+            # Plain Bradley-Terry (no ties): the legacy default path.
+            numpyro.sample(  # pragma: no cover
+                "wins",
+                dist.BinomialLogits(logits=delta, total_count=totals),
+                obs=wins_i,
+            )
 
     def _run_nuts(
         self, comparisons: PairedCounts
@@ -395,9 +482,9 @@ class BayesBTEngine:
             rng_key,
             idx_i=idx_i,
             idx_j=idx_j,
+            n_systems=n_systems,
             wins_i=wins_i,
             totals=totals,
-            n_systems=n_systems,
             extra_fields=("diverging",),
         )
 
@@ -407,6 +494,63 @@ class BayesBTEngine:
         theta_by_chain = np.asarray(samples["theta"], dtype=np.float64)
         n_div = self._count_divergences(mcmc)
         return names, theta_by_chain, n_div
+
+    def _run_nuts_with_ties(
+        self, comparisons: "PairedCountsWithTies"
+    ) -> tuple[list[str], "NDArray[np.float64]", "NDArray[np.float64]", int]:
+        """Run the DAVIDSON(S3-04) tie-aware NUTS; return
+        ``(names, theta_by_chain, nu_by_chain, n_div)``.
+
+        Mirrors :meth:`_run_nuts` exactly (lazy numpyro import HERE; loud
+        :class:`MissingOptionalDependencyError` when the ``bayes-eval`` extra is
+        absent; sequential chains; explicit ``extra_fields=("diverging",)`` so the
+        NFR-001 0-divergence arm keeps its teeth) but threads the
+        ``(R, 3)`` Davidson outcome array and additionally retains the ``ν`` draws.
+        ``theta_by_chain`` is ``(num_chains, num_samples, n_systems)``;
+        ``nu_by_chain`` is ``(num_chains, num_samples)``.
+        """
+        try:
+            import jax
+            import numpy as np
+            import numpyro
+            from numpyro.infer import MCMC, NUTS
+        except ImportError as exc:  # bayes-eval extra absent → fail LOUD.
+            package = getattr(exc, "name", None) or "numpyro"
+            raise MissingOptionalDependencyError.for_package(package) from exc
+
+        if not comparisons:
+            raise ValueError("comparisons must be non-empty to fit a posterior")
+
+        names, idx_i, idx_j, outcomes = self._normalize_comparisons_with_ties(
+            comparisons
+        )
+        n_systems = len(names)
+
+        numpyro.set_host_device_count(self._num_chains)
+        kernel = NUTS(self._bt_model, target_accept_prob=self._target_accept_prob)
+        mcmc = MCMC(
+            kernel,
+            num_warmup=self._num_warmup,
+            num_samples=self._num_samples,
+            num_chains=self._num_chains,
+            chain_method="sequential",
+            progress_bar=False,
+        )
+        rng_key = jax.random.PRNGKey(self._seed)
+        mcmc.run(
+            rng_key,
+            idx_i=idx_i,
+            idx_j=idx_j,
+            n_systems=n_systems,
+            outcomes=outcomes,
+            extra_fields=("diverging",),
+        )
+
+        samples = mcmc.get_samples(group_by_chain=True)
+        theta_by_chain = np.asarray(samples["theta"], dtype=np.float64)
+        nu_by_chain = np.asarray(samples["nu"], dtype=np.float64)
+        n_div = self._count_divergences(mcmc)
+        return names, theta_by_chain, nu_by_chain, n_div
 
     @staticmethod
     def _count_divergences(mcmc: Any) -> int:
@@ -542,3 +686,90 @@ class BayesBTEngine:
         # Fail loud on a non-claim-grade fit (the NFR-001 teeth).
         assert_claim_grade(report)
         return posterior
+
+    def fit_paired_posterior_with_ties(
+        self, comparisons: "PairedCountsWithTies", *, _store_state: bool = True
+    ) -> Posterior:
+        """DAVIDSON(S3-04): fit the claim-grade joint posterior WITH ties.
+
+        Sibling of :meth:`fit_paired_posterior` for the tie-aware path.
+        ``comparisons`` maps ``(sys_i, sys_j)`` → ``(wins_i, wins_j, ties, n)``
+        (the 4-tuple ``rating.paired_set.assemble_paired_set`` produces). Runs the
+        Davidson NUTS model (a ``ν ~ HalfNormal`` tie parameter + a three-way
+        Multinomial sharing the SAME ``θ``), ENFORCES the NFR-001 convergence gate
+        over the θ draws, and returns a :class:`Posterior` whose ``nu_samples``
+        carries the joint ``ν`` draws — so by-construction significance and the
+        tie inference are read off ONE joint posterior.
+
+        ``_store_state`` (internal) controls whether this fit mutates the engine's
+        stored ratings / ``last_posterior``. The Tier-3 RRS path
+        (:meth:`fit_rrs_posterior`) passes ``False`` so its DISTINCT posterior
+        never bleeds into the de-id engine state (FR-010/AX-004).
+
+        **Requires the ``bayes-eval`` extra** → loud
+        :class:`MissingOptionalDependencyError` when absent.
+        """
+        names, theta_by_chain, nu_by_chain, n_div = self._run_nuts_with_ties(
+            comparisons
+        )
+
+        # NFR-001 gate over the θ chains (the ν draws are an auxiliary parameter;
+        # the claim-grade ordering/significance live in θ). Report first so a
+        # failed gate still leaves an inspectable report on the exception.
+        report = ConvergenceReport.from_samples(theta_by_chain, n_divergences=n_div)
+
+        n_chains, n_draws, n_systems = theta_by_chain.shape
+        theta_flat = theta_by_chain.reshape(n_chains * n_draws, n_systems)
+        nu_flat = nu_by_chain.reshape(n_chains * n_draws)
+
+        ratings = self._posterior_to_ratings(names, theta_flat)
+
+        if _store_state:
+            # Track per-system match counts for audit parity (full n incl. ties),
+            # then summarize — mirrors the plain-BT path.
+            for (sys_i, sys_j), (_wi, _wj, _t, n) in comparisons.items():
+                for name in (sys_i, sys_j):
+                    prior = self._ratings.get(name, EloRating(name))
+                    self._ratings[name] = EloRating(
+                        system_name=name,
+                        rating=prior.rating,
+                        rd=prior.rd,
+                        num_matches=prior.num_matches + n,
+                    )
+            self._ratings.update(ratings)
+
+        posterior = Posterior(
+            systems=names,
+            theta_samples=theta_flat,
+            convergence=report,
+            ratings=ratings,
+            nu_samples=nu_flat,
+        )
+        if _store_state:
+            self._last_posterior = posterior
+
+        # Fail loud on a non-claim-grade fit (the NFR-001 teeth).
+        assert_claim_grade(report)
+        return posterior
+
+    def fit_rrs_posterior(self, comparisons: "PairedCountsWithTies") -> Posterior:
+        """FR-010/AX-004: fit the Tier-3 re-identification-resistance (RRS) posterior.
+
+        A SEPARATE Davidson sub-model for the Tier-3 RRS metric, kept STRICTLY
+        DISTINCT from the detection / de-identification significance: it is its
+        own method, returns its OWN :class:`Posterior` object, and — critically —
+        passes ``_store_state=False`` so it shares NO mutable state with the de-id
+        engine (it never touches ``self._ratings`` or ``self._last_posterior``).
+        The anon≠pseudo / RRS-never-merged-into-de-id axiom (AX-004) is therefore
+        enforced structurally: there is no code path that folds an RRS fit into a
+        de-id rating.
+
+        ``comparisons`` is the same 4-tuple tie shape (RRS paired outcomes derive
+        from re-identification attempts, not detection F1). Returns the RRS joint
+        :class:`Posterior` (with ``nu_samples``) for the caller to consume in
+        isolation.
+
+        **Requires the ``bayes-eval`` extra** → loud
+        :class:`MissingOptionalDependencyError` when absent.
+        """
+        return self.fit_paired_posterior_with_ties(comparisons, _store_state=False)

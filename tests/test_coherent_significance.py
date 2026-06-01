@@ -161,19 +161,27 @@ def test_nfr_002_never_significant_when_ci_spans_zero(
 
 @settings(deadline=None, max_examples=60, suppress_health_check=[HealthCheck.too_slow])
 @given(_posteriors())
-def test_nfr_002_p_i_beats_j_sign_matches_verdict_sign(
+def test_nfr_002_p_i_beats_j_sign_matches_significant_verdict(
     posterior: tuple[np.ndarray, list[str]],
 ) -> None:
-    """[PROPERTY-TEST] p_i_beats_j = mean(θ_i > θ_j) is read off the same draws:
-    point > 0 ⇒ p_i_beats_j > 0.5; point < 0 ⇒ < 0.5 (ties at exactly 0.5 are
-    allowed only when point is ~0). The win-probability cannot contradict the
-    point/CI."""
+    """[PROPERTY-TEST] p_i_beats_j = mean(θ_i > θ_j) is read off the SAME draws and
+    cannot contradict the SIGNIFICANT verdict: when the CI strictly excludes 0,
+    the win-probability is decisively on that side (> 0.5 if ci_lo > 0; < 0.5 if
+    ci_hi < 0).
+
+    NB: we deliberately tie this to the *significant* verdict, not to the raw
+    sign of ``point``. ``point`` is the posterior MEAN of d while ``p_i_beats_j``
+    is the fraction of POSITIVE draws (a median-like sign mass); under a skewed d
+    a tiny-positive mean can legitimately coexist with exactly 50% positive
+    draws. The coherence claim is that the SIGNIFICANT verdict and the
+    win-probability agree — which they must, since a CI strictly above 0 means
+    essentially all draws are positive."""
     samples, names = posterior
     for v in pairwise_significance(samples, names):
-        if v.point > 1e-9:
-            assert v.p_i_beats_j > 0.5
-        elif v.point < -1e-9:
-            assert v.p_i_beats_j < 0.5
+        if v.significant and v.ci_lo > 0.0:
+            assert v.p_i_beats_j > 0.5, "CI strictly positive but p_i_beats_j ≤ 0.5"
+        elif v.significant and v.ci_hi < 0.0:
+            assert v.p_i_beats_j < 0.5, "CI strictly negative but p_i_beats_j ≥ 0.5"
 
 
 def test_nfr_002_significance_is_single_source_three_quantities_from_one_vector() -> None:
@@ -258,7 +266,7 @@ def test_fr_004_rank_one_probability_dominant_system_near_one() -> None:
         offsets=[5.0, 0.0, -1.0], n_draws=2000, scale=0.3, seed=4
     )
     names = ["winner", "mid", "low"]
-    assert rank_one_probability(samples, "winner") == pytest.approx(1.0, abs=1e-6)
+    assert rank_one_probability(samples, names, "winner") == pytest.approx(1.0, abs=1e-6)
 
 
 def test_fr_004_rank_one_probability_symmetric_tie_is_half() -> None:
@@ -269,8 +277,8 @@ def test_fr_004_rank_one_probability_symmetric_tie_is_half() -> None:
     b = rng.standard_normal(20000)  # iid, exchangeable with a
     samples = np.stack([a, b], axis=1)
     names = ["a", "b"]
-    pa = rank_one_probability(samples, "a")
-    pb = rank_one_probability(samples, "b")
+    pa = rank_one_probability(samples, names, "a")
+    pb = rank_one_probability(samples, names, "b")
     assert pa == pytest.approx(0.5, abs=0.02)
     assert pb == pytest.approx(0.5, abs=0.02)
     assert pa + pb == pytest.approx(1.0)
@@ -282,8 +290,9 @@ def test_fr_004_rank_one_probability_unknown_name_raises() -> None:
     samples = _location_family_posterior(
         offsets=[1.0, -1.0], n_draws=100, scale=0.1, seed=6
     )
+    names = ["a", "b"]
     with pytest.raises((KeyError, ValueError)):
-        rank_one_probability(samples, "pii-anon")  # not in names
+        rank_one_probability(samples, names, "pii-anon")  # not in names
 
 
 def test_fr_004_rank_one_probability_is_deterministic() -> None:

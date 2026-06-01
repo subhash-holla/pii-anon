@@ -95,11 +95,15 @@ def test_fr_004_n_equals_record_count_for_every_pair() -> None:
 
 
 def test_fr_004_tie_band_boundary_equal_to_eps_is_a_tie() -> None:
-    """[UNIT-TEST] A gap EXACTLY equal to ε classifies as a tie (|Δ| ≤ ε)."""
+    """[UNIT-TEST] A gap EXACTLY equal to ε classifies as a tie (|Δ| ≤ ε).
+
+    Uses an exactly-representable gap (``0.0`` vs ``eps``) so the boundary test
+    is not at the mercy of binary float rounding (``0.55 − 0.50`` is NOT exactly
+    ``0.05``)."""
     eps = 0.05
     per_record = {
-        "a": [0.50],
-        "b": [0.55],  # gap == eps exactly
+        "a": [0.0],
+        "b": [eps],  # gap == eps exactly (0.0 + eps − 0.0 == eps)
     }
     counts = assemble_paired_set(per_record, tie_eps=eps).to_paired_counts_with_ties()
     wi, wj, ties, n = counts[("a", "b")]
@@ -111,8 +115,8 @@ def test_fr_004_tie_band_boundary_just_over_eps_is_a_win() -> None:
     tie — the boundary is inclusive on ties only."""
     eps = 0.05
     per_record = {
-        "a": [0.50],
-        "b": [0.55 + 1e-6],  # gap just over eps
+        "a": [0.0],
+        "b": [eps * 2.0],  # gap = 0.10 > eps, exactly representable enough
     }
     counts = assemble_paired_set(per_record, tie_eps=eps).to_paired_counts_with_ties()
     wi, wj, ties, n = counts[("a", "b")]
