@@ -60,7 +60,6 @@ from pii_anon.eval_framework.rating.significance import rank_one_probability
 
 from .competitor_tiers import (
     TIER_R_NAMES,
-    RunStatus,
     TierEntry,
     apply_run_status,
     default_registry,
@@ -646,13 +645,3 @@ def _decide(
     else:
         binding = "unrun Tier-C (CLAIM_GRADE blocked): " + ", ".join(sorted(blocking_tier_c))
     return Verdict.PROVISIONAL_SOTA, binding
-
-
-def _binding_constraint(verdict: SupremacyVerdict) -> str:
-    """Public re-entry for the binding constraint of an existing verdict.
-
-    The verdict already carries its binding constraint (computed by
-    :func:`_decide`); this thin accessor mirrors :mod:`convergence`'s
-    free-function shape for callers that hold only the dataclass.
-    """
-    return verdict.binding_constraint
