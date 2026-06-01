@@ -108,6 +108,11 @@ benchmark = [
   "numpy>=1.24",
 ]
 crypto = ["cryptography>=41.0"]
+# OPTIONAL asymmetric (Ed25519) signing for the gate_v1.json control-path
+# artifact (S2-05). The DEFAULT signer/verifier is pure-stdlib HMAC-SHA256 with
+# ZERO new dependencies; this extra is needed ONLY for the optional Ed25519
+# envelope variant (lazy-imported, never a hard import on the default path).
+gate-signing = ["cryptography>=41.0"]
 cli = ["typer>=0.12", "rich>=13.0", "pyyaml>=6.0"]
 datasets = ["pii-anon-datasets>=1.0.0"]
 swarm-ml = ["xgboost>=2.0", "scikit-learn>=1.4", "numpy>=1.24"]

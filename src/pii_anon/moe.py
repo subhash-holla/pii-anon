@@ -12,12 +12,90 @@ Architecture (inspired by Mixtral 8x7B):
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pii_anon.fusion import FusionStrategy, _cluster_overlapping_spans
+from pii_anon.moe_gate_signing import KeyRing, verify
 from pii_anon.types import EngineFinding, EnsembleFinding
+
+
+def load_verified_gate(
+    path: str | Path,
+    *,
+    key_ring: KeyRing,
+    verify_on_load: bool = True,
+) -> dict[str, Any] | None:
+    """Load a ``gate_v1.json`` artifact through the verify-on-load seam (S2-05).
+
+    This is the ONLY sanctioned way a learned gate enters the control path. It
+    is fail-closed by default:
+
+    * **Absence is graceful** — if ``path`` does not exist, returns ``None`` so the
+      caller keeps the static ``entity_strengths`` softmax (NFR-026). Absence of
+      the artifact is fine.
+    * **Present-but-unverifiable is a hard error** — a present file that fails
+      signature verification (a tampered byte, a missing/empty/malformed
+      signature, an unknown/retired key id, or malformed JSON) raises
+      :class:`~pii_anon.errors.GateSignatureError`. It does NOT degrade to the
+      static fallback (present-and-broken != absent) and NEVER returns the
+      unsigned content.
+
+    The gate file is parsed as JSON only — it is never routed through any unsafe
+    object-deserialization path.
+
+    Parameters
+    ----------
+    path : str | Path
+        Filesystem path to the ``gate_v1.json`` envelope.
+    key_ring : KeyRing
+        The trust root (current + grace-window previous keys). The signature's
+        ``key_id`` must resolve here or verification fails loud.
+    verify_on_load : bool
+        Defaults to ``True`` (fail-closed). The ``False`` escape hatch returns the
+        raw payload WITHOUT verification and exists ONLY for explicit offline
+        tooling; it is never the default and never reachable from the production
+        ``MoERouter`` construction seam (which passes ``verify_on_load=True``).
+
+    Returns
+    -------
+    dict | None
+        The verified gate payload, or ``None`` if the artifact is absent.
+
+    Raises
+    ------
+    GateSignatureError
+        If a present artifact fails verification (when ``verify_on_load`` is True).
+    """
+    gate_path = Path(path)
+    if not gate_path.exists():
+        return None
+
+    # JSON only — the gate file is never deserialized through any unsafe path.
+    from pii_anon.errors import GateSignatureError
+
+    try:
+        envelope = json.loads(gate_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, ValueError) as exc:
+        if verify_on_load:
+            raise GateSignatureError("malformed gate envelope: file is not valid JSON") from exc
+        return None
+
+    if not verify_on_load:
+        # Explicit offline-tooling escape hatch ONLY: return the raw payload
+        # without verification. Never the default; never the production path.
+        if not isinstance(envelope, dict):
+            return None
+        inner = envelope.get("payload")
+        if isinstance(inner, dict):
+            return dict(inner)
+        return dict(envelope)
+
+    verified: dict[str, Any] = verify(envelope, key_set=key_ring)
+    return verified
 
 
 @dataclass
@@ -179,6 +257,17 @@ class MoERouter:
         If True, always include the expert with the highest strength
         score for each entity type, ensuring ensemble >= best individual
         expert (default True).
+    gate_path : str | Path | None
+        Optional path to a learned-gate artifact (``gate_v1.json``). When given
+        together with ``key_ring``, the gate is loaded through the fail-closed
+        verify-on-load seam (S2-05): the signature is verified before the payload
+        is accepted. Absence of the file is graceful (``None`` -> static softmax,
+        NFR-026); a present-but-unverifiable file raises ``GateSignatureError``.
+        ``None`` (the default) keeps the no-gate static-softmax behaviour
+        unchanged — this parameter is strictly additive.
+    key_ring : KeyRing | None
+        Trust root for verifying ``gate_path``. Required when ``gate_path`` is
+        provided. ``None`` (the default) preserves the no-gate path.
     """
 
     def __init__(
@@ -187,11 +276,24 @@ class MoERouter:
         top_k: int = 3,
         *,
         performance_floor: bool = True,
+        gate_path: str | Path | None = None,
+        key_ring: KeyRing | None = None,
     ) -> None:
         self.registry = registry
         self.top_k = max(1, top_k)
         self.performance_floor = performance_floor
         self._route_cache: dict[str, list[tuple[str, float]]] = {}
+        # Verified learned-gate payload (None on the no-gate static-softmax path,
+        # NFR-026). Loaded ONLY through the fail-closed verify-on-load seam — the
+        # production construction path always passes verify_on_load=True so a
+        # tampered/unsigned gate can never reach route().
+        self.gate_payload: dict[str, Any] | None = None
+        if gate_path is not None:
+            if key_ring is None:
+                raise ValueError("gate_path requires a key_ring for verify-on-load")
+            self.gate_payload = load_verified_gate(
+                gate_path, key_ring=key_ring, verify_on_load=True
+            )
 
     def route(self, entity_type: str) -> list[tuple[str, float]]:
         """Compute routing for a single entity type.

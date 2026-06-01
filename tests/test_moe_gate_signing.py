@@ -38,7 +38,6 @@ import base64
 import copy
 import hmac
 import inspect
-import json
 from pathlib import Path
 from typing import Any
 
@@ -542,3 +541,90 @@ def test_ed25519_tamper_raises_optional() -> None:
     envelope["payload"]["oracle_hash"] = "ffffffffffffffffffffffffffffffff"
     with pytest.raises(GateSignatureError):
         gate_signing.verify_ed25519(envelope, key_id="ed-1", public_key=priv.public_key())
+
+
+def test_ed25519_sign_rejects_non_ed25519_key_optional() -> None:
+    """Optional: sign_ed25519 with a non-Ed25519 private key -> raise."""
+    pytest.importorskip("cryptography")
+    with pytest.raises(GateSignatureError, match="Ed25519PrivateKey"):
+        gate_signing.sign_ed25519(_payload(), key_id="ed-1", private_key="not-a-key")
+
+
+def test_ed25519_verify_rejects_wrong_scheme_optional() -> None:
+    """Optional: verify_ed25519 on an HMAC-scheme envelope -> raise (no cross-scheme
+    silent accept)."""
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    hmac_env = sign(_payload(), key_id="ed-1", key=TEST_KEY)  # scheme == hmac-sha256
+    pub = Ed25519PrivateKey.generate().public_key()
+    with pytest.raises(GateSignatureError, match="unsupported signature scheme"):
+        gate_signing.verify_ed25519(hmac_env, key_id="ed-1", public_key=pub)
+
+
+def test_ed25519_verify_rejects_unexpected_key_id_optional() -> None:
+    """Optional: verify_ed25519 when the envelope key_id != the expected id -> raise."""
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    envelope = gate_signing.sign_ed25519(_payload(), key_id="ed-OTHER", private_key=priv)
+    with pytest.raises(GateSignatureError, match="unknown key id"):
+        gate_signing.verify_ed25519(envelope, key_id="ed-1", public_key=priv.public_key())
+
+
+def test_ed25519_verify_rejects_non_ed25519_public_key_optional() -> None:
+    """Optional: verify_ed25519 with a non-Ed25519 public key -> raise."""
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    envelope = gate_signing.sign_ed25519(_payload(), key_id="ed-1", private_key=priv)
+    with pytest.raises(GateSignatureError, match="Ed25519PublicKey"):
+        gate_signing.verify_ed25519(envelope, key_id="ed-1", public_key="not-a-public-key")
+
+
+def test_ed25519_verify_rejects_non_base64_value_optional() -> None:
+    """Optional: verify_ed25519 with a non-base64 signature value -> raise (decode
+    failure is fail-closed)."""
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    envelope = gate_signing.sign_ed25519(_payload(), key_id="ed-1", private_key=priv)
+    envelope["signature"]["value"] = "!!!not-base64!!!"
+    with pytest.raises(GateSignatureError):
+        gate_signing.verify_ed25519(envelope, key_id="ed-1", public_key=priv.public_key())
+
+
+# ── HMAC verify: unsupported scheme on the default path ──────────────────────
+def test_verify_rejects_unsupported_scheme() -> None:
+    """The default HMAC verify() rejects an unexpected scheme rather than silently
+    trusting it (e.g. an ed25519-scheme envelope sent to the HMAC verifier)."""
+    envelope = sign(_payload(), key_id="k1", key=TEST_KEY)
+    envelope["signature"]["scheme"] = "ed25519"
+    with pytest.raises(GateSignatureError, match="unsupported signature scheme"):
+        verify(envelope, key_set=_ring())
+
+
+# ── Env-overridable key-provider seam (Pass-2 custody drop-in) ───────────────
+def test_key_provider_defaults_to_non_production_test_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """gate_signing_key_provider returns the NON-PRODUCTION test key when the
+    override env var is unset."""
+    monkeypatch.delenv("PII_ANON_GATE_SIGNING_KEY", raising=False)
+    assert gate_signing.gate_signing_key_provider() == gate_signing._TEST_HMAC_KEY
+
+
+def test_key_provider_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """gate_signing_key_provider honours the env override (the custody seam) so
+    real key material drops in without a code change."""
+    monkeypatch.setenv("PII_ANON_GATE_SIGNING_KEY", "operator-supplied-key")
+    assert gate_signing.gate_signing_key_provider() == b"operator-supplied-key"
+
+
+def test_key_provider_is_a_non_production_dummy() -> None:
+    """Audit: the in-tree default key is an obvious NON-PRODUCTION dummy (the
+    story forbids committing real secret material)."""
+    assert b"NON-PRODUCTION" in gate_signing._TEST_HMAC_KEY

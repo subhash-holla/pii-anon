@@ -27,3 +27,17 @@ class CalibrationError(PiiAnonError):
 
 class ExpertManifestError(PiiAnonError):
     """Raised when an expert manifest is malformed or fails validation."""
+
+
+class GateSignatureError(PiiAnonError):
+    """Raised when a control-path gate artifact (``gate_v1.json``) fails
+    signature verification: a tampered byte, a missing/empty/malformed
+    signature, an unknown or retired key id, or a malformed envelope.
+
+    This is the fail-loud signal for the MoE-router learned-gate load path
+    (S2-05). Verification never silently accepts an unverifiable gate and never
+    silently falls back to its unsigned content — it raises this instead.
+    Messages name only the offending ``key_id``/``scheme`` and a generic reason;
+    they never include key bytes or any correct-HMAC material (a failure must
+    not be a forgery oracle).
+    """
