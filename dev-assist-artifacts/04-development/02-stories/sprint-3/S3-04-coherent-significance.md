@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-07 coherent significance) |
-| State | **TODO** |
+| State | **IN_PROGRESS** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; red_at=2026-06-01) |
 | provisional_status | AGENT_SIMULATED (real-NUTS Davidson run is a `bayes-eval`-CI / Pass-2 step) |
 | Implements | FR-004 (coherent significance), NFR-002 (significance coherence — now **BY CONSTRUCTION**), NFR-003; FR-010/AX-004 (anon≠pseudo never merged — the Tier-3 RRS Davidson sub-model stays separate) |
 | Traces | Design D-EVAL DECISION 2 / DC-07: "one joint posterior (point∈CI, sign↔verdict, significant-iff-CI-excludes-0 cannot disagree) — eliminates elo.py:243/542/561 fabricated-outcome/fake-CI/decoupled-significance defects. Record-level paired outcomes (N·C(K,2) from per_record_f1) + Davidson tie term. Separate Davidson sub-model for Tier-3 RRS (never merged — FR-010)." |
