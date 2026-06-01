@@ -194,6 +194,18 @@ def _require_envelope(envelope: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     return envelope["payload"], signature
 
 
+def _decode_signature_value(value: str) -> bytes:
+    """Base64-decode a ``signature.value`` (fail-closed).
+
+    A non-base64 / truncated value raises :class:`GateSignatureError` — a decode
+    failure is never a silent accept. The error text carries no secret material.
+    """
+    try:
+        return base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise GateSignatureError("signature mismatch: signature value is not valid base64") from exc
+
+
 def verify(envelope: Any, *, key_set: KeyRing) -> dict[str, Any]:
     """Verify a detached HMAC-SHA256 envelope and return the verified payload.
 
@@ -221,12 +233,7 @@ def verify(envelope: Any, *, key_set: KeyRing) -> dict[str, Any]:
         # even if the file carries a self-consistent HMAC under an attacker key.
         raise GateSignatureError(f"unknown key id: {key_id!r} (not in the key ring)")
 
-    try:
-        provided = base64.b64decode(signature["value"], validate=True)
-    except (binascii.Error, ValueError) as exc:
-        # A non-base64 / truncated signature value is fail-closed, not a silent
-        # accept. The exception text carries no secret material.
-        raise GateSignatureError("signature mismatch: signature value is not valid base64") from exc
+    provided = _decode_signature_value(signature["value"])
 
     expected = hmac.new(key, canonical_gate_bytes(payload), hashlib.sha256).digest()
     if not hmac.compare_digest(expected, provided):
@@ -297,10 +304,7 @@ def verify_ed25519(
     if not isinstance(public_key, Ed25519PublicKey):
         raise GateSignatureError("ed25519 verification requires an Ed25519PublicKey")
 
-    try:
-        provided = base64.b64decode(signature["value"], validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise GateSignatureError("signature mismatch: signature value is not valid base64") from exc
+    provided = _decode_signature_value(signature["value"])
 
     try:
         public_key.verify(provided, canonical_gate_bytes(payload))
