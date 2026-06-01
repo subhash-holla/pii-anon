@@ -720,7 +720,9 @@ def _guarded_rank1(
     cols = [names.index(n) for n in compliant]
     sub = theta_samples[:, cols]
     dist = rank_one_distribution(sub, compliant)
-    crowned = max(dist, key=lambda n: (dist[n], n))
+    # Crown the highest rank-1 mass; tie-break by LOWEST name for determinism,
+    # consistent with _top_composite_system (negate the prob so min picks the max).
+    crowned = min(compliant, key=lambda n: (-dist[n], n))
     j_core = dist.get(_CORE_SYSTEM, 0.0)
     return float(j_core), crowned
 
