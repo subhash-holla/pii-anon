@@ -81,3 +81,52 @@ def test_s3_05_at_least_one_rating_module_scanned() -> None:
     paths = _rating_module_paths()
     assert paths, "expected at least one *.py under eval_framework/rating/"
     assert any(p.name == "__init__.py" for p in paths)
+
+
+# ---------------------------------------------------------------------------
+# S4-CS-01: the SDO gate boundary — SCOPED to the two new gate modules only.
+#
+# The CompetitiveSupremacyGate lives in eval_framework/evaluation/ and may import
+# pii_anon.eval_framework.rating + read JSON, but must NOT reach into the
+# detection / orchestration layers (swarm / moe / fusion / policy). We scope this
+# scan to the TWO new gate modules deliberately: the wider evaluation/ package
+# legitimately imports moe (competitor_compare.py:909), so broadening the scan
+# would false-fail (story §2a / §7 boundary invariant).
+# ---------------------------------------------------------------------------
+
+_GATE_MODULE_FILES: frozenset[str] = frozenset(
+    {"competitive_supremacy.py", "competitor_tiers.py"}
+)
+
+
+def _gate_module_paths() -> list[Path]:
+    import pii_anon.eval_framework.evaluation as evaluation_pkg
+
+    pkg_dir = Path(evaluation_pkg.__file__).parent
+    return sorted(
+        p for p in pkg_dir.glob("*.py") if p.name in _GATE_MODULE_FILES
+    )
+
+
+def test_s4_cs_01_gate_modules_have_no_detection_layer_imports() -> None:
+    """[CONTRACT-TEST] The SDO gate modules (competitive_supremacy.py,
+    competitor_tiers.py) must not import swarm/moe/fusion/policy. AST-based, so
+    a docstring mentioning "moe" cannot false-positive."""
+    violations: list[str] = []
+    for path in _gate_module_paths():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for module in _collect_imported_modules(tree):
+            if _module_head_is_forbidden(module):
+                violations.append(f"{path.name}: imports {module}")
+
+    assert not violations, (
+        "SDO gate modules must not import detection/orchestration packages: "
+        + "; ".join(violations)
+    )
+
+
+def test_s4_cs_01_both_gate_modules_are_scanned() -> None:
+    """Guard: the scoped glob actually matches BOTH new gate modules (so the
+    boundary test can never silently pass on a rename)."""
+    names = {p.name for p in _gate_module_paths()}
+    assert names == _GATE_MODULE_FILES
