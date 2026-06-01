@@ -214,7 +214,7 @@ def test_nfr_002_significance_is_single_source_three_quantities_from_one_vector(
 # ---------------------------------------------------------------------------
 
 
-def test_orientation_columns_map_to_systems_transpose_breaks_loudly() -> None:
+def test_fr_004_orientation_columns_map_to_systems_transpose_breaks_loudly() -> None:
     """[CONTRACT-TEST] theta_samples is (n_draws, n_systems): differencing columns
     [:, col_i] − [:, col_j]. A 4-system posterior fed TRANSPOSED (n_systems rows)
     must NOT silently produce a 4-pair verdict list — feed mismatched names so it
@@ -230,7 +230,7 @@ def test_orientation_columns_map_to_systems_transpose_breaks_loudly() -> None:
         pairwise_significance(samples.T, names)
 
 
-def test_orientation_verdict_i_j_are_the_named_systems_in_order() -> None:
+def test_fr_004_orientation_verdict_i_j_are_the_named_systems_in_order() -> None:
     """[CONTRACT-TEST] Verdict (i, j) carries the actual system NAMES (sorted
     pairings), and column 0 corresponds to names[0]."""
     samples = _location_family_posterior(
@@ -243,7 +243,7 @@ def test_orientation_verdict_i_j_are_the_named_systems_in_order() -> None:
     assert v.point > 0 and v.significant and v.p_i_beats_j > 0.9
 
 
-def test_orientation_non_2d_samples_rejected() -> None:
+def test_fr_004_orientation_non_2d_samples_rejected() -> None:
     """[CONTRACT-TEST] A non-2-D samples array (e.g. 1-D or 3-D) is rejected — the
     orientation contract is strictly (n_draws, n_systems)."""
     with pytest.raises(ValueError):
@@ -252,7 +252,7 @@ def test_orientation_non_2d_samples_rejected() -> None:
         pairwise_significance(np.zeros((4, 5, 2)), ["a", "b"])  # 3-D
 
 
-def test_orientation_zero_draws_rejected() -> None:
+def test_fr_004_orientation_zero_draws_rejected() -> None:
     """[CONTRACT-TEST] Zero draws (an empty posterior) is rejected — you cannot
     derive a verdict from no samples."""
     with pytest.raises(ValueError):
@@ -340,7 +340,7 @@ def test_fr_004_rank_one_distribution_mismatched_names_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_davidson_three_probabilities_sum_to_one() -> None:
+def test_fr_004_davidson_three_probabilities_sum_to_one() -> None:
     """[UNIT-TEST] P(i>j) + P(tie) + P(j>i) = 1 for arbitrary δ and ν > 0."""
     for delta in (-2.0, -0.5, 0.0, 0.7, 3.0):
         for nu in (0.1, 1.0, 2.5):
@@ -351,7 +351,7 @@ def test_davidson_three_probabilities_sum_to_one() -> None:
             assert all(0.0 <= p <= 1.0 for p in (p_i, p_t, p_j))
 
 
-def test_davidson_nu_zero_nests_plain_bradley_terry() -> None:
+def test_fr_004_davidson_nu_zero_nests_plain_bradley_terry() -> None:
     """[UNIT-TEST] ν=0 ⇒ no tie mass; the win probability collapses to the plain
     Bradley-Terry logistic σ(δ): P(i>j) = 1/(1+e^−δ), P(tie) = 0."""
     for delta in (-1.5, 0.0, 0.8, 2.0):
@@ -361,7 +361,7 @@ def test_davidson_nu_zero_nests_plain_bradley_terry() -> None:
         assert davidson_p_j_beats_i(delta, 0.0) == pytest.approx(1.0 - expected)
 
 
-def test_davidson_symmetric_third_at_nu_one() -> None:
+def test_fr_004_davidson_symmetric_third_at_nu_one() -> None:
     """[UNIT-TEST] δ=0, ν=1 ⇒ the three outcomes are equiprobable (1/3 each):
     unnormalized terms [e^0, ν, e^0] = [1, 1, 1]."""
     assert davidson_p_i_beats_j(0.0, 1.0) == pytest.approx(1.0 / 3.0)
@@ -369,7 +369,7 @@ def test_davidson_symmetric_third_at_nu_one() -> None:
     assert davidson_p_j_beats_i(0.0, 1.0) == pytest.approx(1.0 / 3.0)
 
 
-def test_davidson_quarter_half_quarter_at_nu_two() -> None:
+def test_fr_004_davidson_quarter_half_quarter_at_nu_two() -> None:
     """[UNIT-TEST] δ=0, ν=2 ⇒ terms [1, 2, 1] → (0.25, 0.5, 0.25): the tie carries
     half the mass, wins split the rest symmetrically."""
     assert davidson_p_i_beats_j(0.0, 2.0) == pytest.approx(0.25)
@@ -377,7 +377,7 @@ def test_davidson_quarter_half_quarter_at_nu_two() -> None:
     assert davidson_p_j_beats_i(0.0, 2.0) == pytest.approx(0.25)
 
 
-def test_davidson_softmax_equivalence_bridges_pure_numpy_to_numpyro_logits() -> None:
+def test_fr_004_davidson_softmax_equivalence_bridges_pure_numpy_to_numpyro_logits() -> None:
     """[CONTRACT-TEST] The Davidson↔NumPyro bridge identity: the closed-form
     triple equals softmax([δ/2, ln ν, −δ/2]). This pins the pure-numpy formulas
     to the ``Multinomial(logits=[δ/2, ln ν, −δ/2])`` model the Davidson branch
@@ -399,7 +399,7 @@ def test_davidson_softmax_equivalence_bridges_pure_numpy_to_numpyro_logits() -> 
             assert davidson_p_j_beats_i(delta, nu) == pytest.approx(soft[2])
 
 
-def test_davidson_higher_strength_gets_more_win_mass() -> None:
+def test_fr_004_davidson_higher_strength_gets_more_win_mass() -> None:
     """[UNIT-TEST] For fixed ν, increasing δ shifts mass from j-wins toward
     i-wins monotonically (sanity on the directionality)."""
     nu = 1.0
@@ -410,7 +410,7 @@ def test_davidson_higher_strength_gets_more_win_mass() -> None:
         prev = p_i
 
 
-def test_davidson_negative_nu_rejected() -> None:
+def test_fr_004_davidson_negative_nu_rejected() -> None:
     """[CONTRACT-TEST] A negative tie parameter is meaningless → raise."""
     with pytest.raises(ValueError):
         davidson_p_tie(0.0, -1.0)
@@ -557,7 +557,7 @@ def test_fr_010_rrs_posterior_is_a_distinct_object_never_merged() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_integration_real_nuts_with_ties_converges_and_identifies_nu() -> None:
+def test_nfr_001_integration_real_nuts_with_ties_converges_and_identifies_nu() -> None:
     """[INTEGRATION-TEST] Given a synthetic ≥4-system design WITH ties, when the
     Davidson NUTS path runs, then the ConvergenceReport is claim_grade (NFR-001),
     the posterior-mean ordering recovers the planted ordering, and the tie
