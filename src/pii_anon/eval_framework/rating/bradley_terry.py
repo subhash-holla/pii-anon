@@ -63,6 +63,9 @@ import math
 import random
 import warnings
 
+import numpy as np
+from numpy.typing import NDArray
+
 from .elo import EloRating, RatingUpdate
 
 __all__ = ["BradleyTerryConvergenceWarning", "BradleyTerryMLEEngine"]
@@ -498,6 +501,52 @@ class BradleyTerryMLEEngine:
                 _percentile(ordered, 0.975),
             )
         return cis
+
+    def paired_bootstrap_draws(
+        self, records: list[Record], b: int, *, seed: int
+    ) -> tuple[NDArray[np.float64], list[str]]:
+        """Raw per-resample θ rows ``(b, n_systems)`` + the column name order.
+
+        The companion to :meth:`paired_bootstrap`: that method collapses each
+        system's resampled θ to a percentile CI, but the SDO J-meter (rank-1
+        probability) needs the *joint* per-resample strength vectors so it can
+        ask "in what fraction of resamples is system X the argmax". This method
+        stacks the very same per-resample :meth:`fit_records` θ the CI loop
+        already computes into a ``(b, n_systems)`` float64 array whose columns
+        are ``names`` (the sorted system list) — the orientation
+        :func:`significance.rank_one_probability` consumes directly.
+
+        **Deterministic** for a fixed ``seed`` (pure ``random.Random`` draws;
+        sorted system iteration), and additive: it does not change
+        :meth:`paired_bootstrap` or any other existing method. A system absent
+        from a given resample anchors at θ = 0 for that row (matching the CI
+        path). The engine's point-fit convergence diagnostics are snapshotted and
+        restored around the loop so a resample never clobbers them.
+        """
+        rng = random.Random(seed)
+        names = sorted({name for record in records for name in record})
+        n_rec = len(records)
+
+        saved_converged = self._last_fit_converged
+        saved_iterations = self._last_fit_iterations
+        saved_delta = self._last_fit_delta
+
+        rows: list[list[float]] = []
+        for _ in range(b):
+            resampled = [records[rng.randrange(n_rec)] for _ in range(n_rec)]
+            theta = self.fit_records(resampled)
+            rows.append([theta.get(name, 0.0) for name in names])
+
+        self._last_fit_converged = saved_converged
+        self._last_fit_iterations = saved_iterations
+        self._last_fit_delta = saved_delta
+
+        draws: NDArray[np.float64] = np.asarray(rows, dtype=np.float64)
+        if draws.ndim == 1:
+            # b == 0 → an empty (0,) array; reshape to (0, n_systems) so the
+            # column contract holds regardless of the resample count.
+            draws = draws.reshape(b, len(names))
+        return draws, names
 
 
 def _percentile(ordered: list[float], q: float) -> float:

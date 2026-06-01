@@ -618,3 +618,67 @@ def test_real_artifact_verdict_is_not_yet_binding_canonical_run() -> None:
     assert "canonical_claim_run" in verdict.binding_constraint
     assert "False" in verdict.binding_constraint
     assert verdict.canonical_claim_run is False
+
+
+# ---------------------------------------------------------------------------
+# CLI surface — the `supremacy` command (thin; gate logic stays in the gate).
+# ---------------------------------------------------------------------------
+
+
+def _write_bench(tmp_path: Path, bench: dict[str, object]) -> Path:
+    target = tmp_path / "benchmark-results.json"
+    target.write_text(json.dumps(bench), encoding="utf-8")
+    return target
+
+
+def test_cli_supremacy_is_non_blocking_exit_zero(tmp_path: Path) -> None:
+    """[INTEGRATION-TEST] `supremacy` (default) prints the verdict + binding
+    constraint and exits 0 even when the verdict is NOT_YET (non-blocking)."""
+    from typer.testing import CliRunner
+
+    from pii_anon.cli import create_app
+
+    bench = _canonical_benchmark()
+    bench["run_metadata"]["canonical_claim_run"] = False  # type: ignore[index]
+    artifact = _write_bench(tmp_path, bench)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        create_app(), ["supremacy", "--artifact", str(artifact), "--output", "json"]
+    )
+    assert result.exit_code == 0
+    assert "NOT_YET" in result.stdout
+    assert "canonical_claim_run" in result.stdout
+
+
+def test_cli_supremacy_canonical_claim_exits_one_unless_claim_grade(
+    tmp_path: Path,
+) -> None:
+    """[INTEGRATION-TEST] With --canonical-claim a non-CLAIM_GRADE verdict exits
+    1 (the only hard-failure mode)."""
+    from typer.testing import CliRunner
+
+    from pii_anon.cli import create_app
+
+    artifact = _write_bench(tmp_path, _canonical_benchmark())  # PROVISIONAL at best
+    runner = CliRunner()
+    result = runner.invoke(
+        create_app(),
+        ["supremacy", "--artifact", str(artifact), "--canonical-claim"],
+    )
+    assert result.exit_code == 1
+
+
+def test_cli_supremacy_missing_artifact_is_bad_parameter(tmp_path: Path) -> None:
+    """[INTEGRATION-TEST] A missing artifact path is a typer BadParameter (exit
+    non-zero), never a silent empty verdict."""
+    from typer.testing import CliRunner
+
+    from pii_anon.cli import create_app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        create_app(),
+        ["supremacy", "--artifact", str(tmp_path / "nope.json")],
+    )
+    assert result.exit_code != 0

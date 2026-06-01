@@ -766,6 +766,63 @@ def create_app() -> Any:
         if not report.passed:
             raise typer.Exit(1)
 
+    @app.command("supremacy")
+    def supremacy(
+        artifact: str = typer.Option(
+            "artifacts/benchmarks/benchmark-results.json",
+            help="Path to the benchmark-results.json to evaluate (read-only)",
+        ),
+        canonical_claim: bool = typer.Option(
+            False,
+            "--canonical-claim",
+            help="Treat as a claim-grade emission: exit 1 unless CLAIM_GRADE_SOTA",
+        ),
+        output: str = typer.Option("json", help="Output format: json|text"),
+    ) -> None:
+        """Report the SDO CompetitiveSupremacyGate verdict + the binding constraint.
+
+        Non-blocking by default (always exit 0). With ``--canonical-claim`` the
+        command exits 1 unless the verdict is CLAIM_GRADE_SOTA — the only mode in
+        which a non-supreme result is a hard failure. The gate LOGIC lives in
+        ``SupremacyVerdict.from_artifacts``; this command stays thin.
+        """
+        from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+            SupremacyVerdict,
+            Verdict,
+        )
+
+        path = Path(artifact)
+        if not path.exists():
+            raise typer.BadParameter(f"benchmark artifact not found: {artifact}")
+        benchmark = json.loads(path.read_text(encoding="utf-8"))
+        verdict = SupremacyVerdict.from_artifacts(benchmark)
+
+        _dump_output(
+            {
+                "verdict": verdict.verdict.value,
+                "binding_constraint": verdict.binding_constraint,
+                "j_value": (
+                    round(verdict.j_value, 4) if verdict.j_value is not None else None
+                ),
+                "j_source": verdict.j_source,
+                "canonical_claim_run": verdict.canonical_claim_run,
+                "guarantees": {
+                    g.axis: {
+                        True: "PASS",
+                        False: "FAIL",
+                        None: "PENDING",
+                    }[g.passed]
+                    for g in verdict.guarantees
+                },
+                "axes_pending": list(verdict.axes_pending),
+                "unrun_tier_c": sorted(verdict.unrun_tier_c),
+                "carve_out_note": verdict.carve_out_note,
+            },
+            output,
+        )
+        if canonical_claim and verdict.verdict is not Verdict.CLAIM_GRADE_SOTA:
+            raise typer.Exit(1)
+
     @app.command("version")
     def version() -> None:
         print(__version__)

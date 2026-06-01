@@ -528,3 +528,54 @@ def test_ax_002_paired_bootstrap_is_deterministic_per_seed(seed: int) -> None:
     first = engine.paired_bootstrap(records, b=60, seed=seed)
     second = engine.paired_bootstrap(records, b=60, seed=seed)
     assert first == second
+
+
+# ---------------------------------------------------------------------------
+# S4-CS-01: paired_bootstrap_draws — raw (b, n_systems) θ rows for the SDO J.
+# ---------------------------------------------------------------------------
+
+
+def test_s4_paired_bootstrap_draws_shape_and_column_order() -> None:
+    """[CONTRACT-TEST] paired_bootstrap_draws returns a (b, n_systems) float64
+    array whose columns are the SORTED system names — the orientation
+    rank_one_probability consumes directly."""
+    import numpy as np
+
+    engine = BradleyTerryMLEEngine()
+    draws, names = engine.paired_bootstrap_draws(_planted_records(), 50, seed=3)
+    assert names == ["A", "B", "C"]  # sorted
+    assert draws.shape == (50, 3)
+    assert draws.dtype == np.float64
+
+
+def test_s4_paired_bootstrap_draws_is_deterministic_for_fixed_seed() -> None:
+    """[PROPERTY-TEST] Same records + seed ⇒ byte-identical θ rows (AX-002)."""
+    import numpy as np
+
+    engine = BradleyTerryMLEEngine()
+    d1, n1 = engine.paired_bootstrap_draws(_planted_records(), 40, seed=9)
+    d2, n2 = engine.paired_bootstrap_draws(_planted_records(), 40, seed=9)
+    assert n1 == n2
+    assert np.array_equal(d1, d2)
+
+
+def test_s4_paired_bootstrap_draws_feed_rank_one_probability() -> None:
+    """[INTEGRATION-TEST] The draws feed rank_one_probability: the planted
+    strongest system (A) wins rank-1 in (almost) every resample → J(A) high."""
+    from pii_anon.eval_framework.rating.significance import rank_one_probability
+
+    engine = BradleyTerryMLEEngine()
+    draws, names = engine.paired_bootstrap_draws(_planted_records(), 200, seed=11)
+    j_a = rank_one_probability(draws, names, "A")
+    assert j_a > 0.9  # A is the planted winner
+
+
+def test_s4_paired_bootstrap_draws_does_not_clobber_point_fit_diagnostics() -> None:
+    """[PROPERTY-TEST] Like paired_bootstrap, the draws variant snapshots and
+    restores the engine's point-fit convergence diagnostics."""
+    engine = BradleyTerryMLEEngine()
+    point = engine.fit_records(_planted_records())  # establishes diagnostics
+    assert point  # non-empty
+    saved = (engine.last_fit_converged, engine.last_fit_iterations)
+    engine.paired_bootstrap_draws(_planted_records(), 30, seed=5)
+    assert (engine.last_fit_converged, engine.last_fit_iterations) == saved
