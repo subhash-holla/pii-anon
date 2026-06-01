@@ -32,6 +32,7 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     SupremacyVerdict,
     Verdict,
     f_beta,
+    recall_floor_breachers,
 )
 
 # ---------------------------------------------------------------------------
@@ -519,7 +520,12 @@ def test_j_unavailable_cannot_be_claim_grade() -> None:
                         ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
     )
     assert verdict.j_source == "unavailable"
-    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+    # §5: J ≥ 0.95 is required for BOTH CLAIM_GRADE and PROVISIONAL, so a J that
+    # cannot even be computed is a hard NOT_YET — not merely "not CLAIM_GRADE".
+    # The verdict machine reports the J-gap as the binding constraint (ahead of
+    # the unrun-Tier-C blocker), so NOT_YET is the only correct verdict here.
+    assert verdict.verdict is Verdict.NOT_YET
+    assert "J" in verdict.binding_constraint
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +598,233 @@ def test_verdict_is_deterministic_for_fixed_inputs() -> None:
 
 
 # ---------------------------------------------------------------------------
+# G7 RecallFloorVerdictGuard (story §3 G7): "a floor-breaching system can never
+# top-rank." The guard couples the recall-floor signals to BOTH the J/ranking
+# (a breacher can never be J-argmax) AND G7 (the top claimant must not breach).
+# Recall-floor breach is keyed on RECALL-SPECIFIC signals only — a non-qualifying
+# qualification_status, a failing recall/f1 profile floor-check, or (when the
+# per-language ε artifact is present) ε > EPS_RECALL_PER_LANG. Latency/throughput
+# floor failures are NOT recall breaches (the speed-floor is a different axis).
+# ---------------------------------------------------------------------------
+
+
+def _breaching_system(
+    name: str,
+    *,
+    composite: float,
+    recall: float = 0.99,
+    precision: float = 0.99,
+) -> dict[str, object]:
+    """A system that BREACHES the recall floor via a non-qualifying
+    qualification_status, while otherwise looking strong (high composite)."""
+    return _system(
+        name,
+        recall=recall,
+        precision=precision,
+        composite=composite,
+        per_entity_recall=_ENSEMBLE_ENTITIES,
+        qualification="disqualified",  # non-qualifying ⇒ recall-floor breach
+    )
+
+
+def test_recall_floor_breachers_flags_nonqualifying_status() -> None:
+    """[UNIT-TEST] recall_floor_breachers() flags a system whose
+    qualification_status is non-qualifying (disqualified/floor_breach/…), and
+    does NOT flag a 'core'/'qualified' system."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _systems_by_name,
+    )
+
+    bench = _canonical_benchmark()
+    bench["systems"].append(_breaching_system("rogue", composite=0.99))  # type: ignore[attr-defined]
+    systems = _systems_by_name(bench)
+    breachers = recall_floor_breachers(bench, systems)
+    assert "rogue" in breachers
+    assert "pii-anon" not in breachers  # core qualifies
+    assert "gliner" not in breachers  # qualified qualifies
+
+
+def test_recall_floor_breachers_flags_failing_recall_profile_check() -> None:
+    """[UNIT-TEST] A per-profile recall (or f1) floor-check that FAILS marks the
+    run recall-floor-breaching — but a failing LATENCY/throughput check does
+    NOT (the RecallFloorVerdictGuard is recall-specific, not the conflated
+    floor_pass)."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _systems_by_name,
+    )
+
+    # A latency-only floor failure must NOT make anyone a recall breacher.
+    latency_bench = _canonical_benchmark()
+    latency_bench["floor_pass"] = False  # ensemble floor fails on speed
+    latency_bench["profile_results"] = [
+        {
+            "profile": "short_chat",
+            "floor_pass": False,
+            "floor_checks": [
+                {"metric": "latency_p50_ms", "passed": False, "actual": 9.9,
+                 "target": 1.0, "comparator": "scrubadub"},
+                {"metric": "recall", "passed": True, "actual": 0.8,
+                 "target": 0.6, "comparator": "gliner"},
+            ],
+        }
+    ]
+    systems = _systems_by_name(latency_bench)
+    assert recall_floor_breachers(latency_bench, systems) == frozenset()
+
+    # A RECALL floor-check failure, by contrast, IS a recall-floor breach.
+    recall_bench = _canonical_benchmark()
+    recall_bench["floor_pass"] = False
+    recall_bench["profile_results"] = [
+        {
+            "profile": "long_document",
+            "floor_pass": False,
+            "floor_checks": [
+                {"metric": "recall", "passed": False, "actual": 0.10,
+                 "target": 0.66, "comparator": "gliner"},
+            ],
+        }
+    ]
+    systems = _systems_by_name(recall_bench)
+    assert recall_floor_breachers(recall_bench, systems)  # non-empty
+
+
+def test_recall_floor_breachers_per_language_eps_when_artifact_present() -> None:
+    """[UNIT-TEST] When the per-language ε artifact IS present and a language's ε
+    exceeds EPS_RECALL_PER_LANG, the run is recall-floor-breaching; an absent
+    artifact is PENDING-not-fabricated (no breach manufactured from nothing)."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _systems_by_name,
+    )
+
+    bench = _canonical_benchmark()
+    bench["per_language_recall_delta"] = {"en": 0.001, "de": 0.02}  # 0.02 > 0.005
+    systems = _systems_by_name(bench)
+    assert recall_floor_breachers(bench, systems)  # ε breach
+
+    # Absent artifact + qualifying statuses + passing profiles ⇒ no fabricated breach.
+    clean = _canonical_benchmark()
+    del clean["per_language_recall_delta"]
+    systems_clean = _systems_by_name(clean)
+    assert recall_floor_breachers(clean, systems_clean) == frozenset()
+
+
+def test_floor_breacher_with_highest_composite_never_top_ranks() -> None:
+    """[PROPERTY-TEST] THE TEETH of the RecallFloorVerdictGuard (story §3 G7).
+
+    Construct a benchmark where a FLOOR-BREACHING system holds the STRICTLY
+    HIGHEST composite_score. The guard must ensure:
+      1. it is NEVER J-argmax — the crowned (rank-1) system is a floor-COMPLIANT
+         one (pii-anon), i.e. J(breacher) does not crown it; AND
+      2. the verdict can NEVER be CLAIM_GRADE on account of the guard (a
+         floor-breaching top-composite system cannot yield a claim-grade SDO).
+    """
+    bench = _canonical_benchmark()
+    # The breacher out-composites everyone (0.99 > pii-anon 0.80) yet breaches
+    # the recall floor (non-qualifying status) → it must never be crowned.
+    bench["systems"].append(_breaching_system("rogue-sota", composite=0.99))  # type: ignore[attr-defined]
+
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        pending_overrides=_ALL_PENDING_PASS,
+        tier_c_waivers={n: "w" for n in
+                        ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+    )
+    # The breacher is identified.
+    assert "rogue-sota" in verdict.recall_floor_breachers
+    # 1. The MLE-bootstrap J must NOT crown the breacher: pii-anon's rank-1
+    #    probability stays the SDO objective, and the breacher cannot be the
+    #    argmax (its rank-1 mass is forced to 0 / it is excluded).
+    j_top = verdict.j_rank1_system
+    assert j_top is not None
+    assert j_top != "rogue-sota"
+    # 2. The verdict cannot be CLAIM_GRADE while a floor-breaching system holds
+    #    the top composite (the guard sub-condition of G7 fails).
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+    g7 = verdict.guarantee("G7")
+    assert g7.passed is False
+    assert "floor" in g7.binding_detail.lower()
+
+
+def test_floor_compliant_top_system_passes_the_recall_floor_guard() -> None:
+    """[UNIT-TEST] The companion to the teeth: a floor-COMPLIANT top system
+    (pii-anon, qualifying status, passing recall floor-checks) passes the
+    RecallFloorVerdictGuard — G7's guard sub-condition does not fire, and with a
+    canonical run + provenance G7 PASSES."""
+    bench = _canonical_benchmark()  # pii-anon top composite, 'core', floor clean
+    verdict = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    assert verdict.recall_floor_breachers == frozenset()
+    assert verdict.guarantee("G7").passed is True  # guard does not demote a clean top
+    # The crowned system is the floor-compliant claimant.
+    assert verdict.j_rank1_system == "pii-anon"
+
+
+def test_g7_guard_fails_when_top_claimant_pii_anon_is_floor_breaching() -> None:
+    """[CONTRACT-TEST] If pii-anon ITSELF is the top-composite claimant but
+    breaches the recall floor (e.g. a per-language ε regression), the
+    RecallFloorVerdictGuard sub-condition of G7 fails with a clear binding_detail
+    — even though canonical_claim_run is True and provenance is complete."""
+    bench = _canonical_benchmark()
+    # pii-anon stays top composite, but a per-language ε regression breaches the
+    # recall floor for the run.
+    bench["per_language_recall_delta"] = {"en": 0.05}  # 0.05 ≫ 0.005
+    verdict = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    g7 = verdict.guarantee("G7")
+    assert g7.passed is False
+    assert "floor" in g7.binding_detail.lower()
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# ---------------------------------------------------------------------------
+# §5 completion predicate: CLAIM_GRADE ⟺ … ∧ (Tier-R ∪ Tier-C all RUN-or-WAIVED).
+# An UNRUN Tier-R member (gliner2) — not just unrun Tier-C — blocks CLAIM_GRADE.
+# ---------------------------------------------------------------------------
+
+
+def test_unrun_tier_r_gliner2_blocks_claim_grade() -> None:
+    """[CONTRACT-TEST] §5: gliner2 is a Tier-R member that is UNRUN in today's
+    benchmark. With everything else satisfied (canonical, all-G pass, J≥0.95, all
+    Tier-C waived), an UNRUN-unwaived Tier-R member STILL blocks CLAIM_GRADE → at
+    most PROVISIONAL. (Regression guard: _decide must gate on Tier-R ∪ Tier-C, not
+    Tier-C alone.)"""
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        _canonical_benchmark(),  # available_competitors omits gliner2 ⇒ UNRUN
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides=_ALL_PENDING_PASS,
+        tier_c_waivers={n: "w" for n in
+                        ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+    )
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+    assert verdict.verdict is Verdict.PROVISIONAL_SOTA
+    assert "gliner2" in verdict.binding_constraint
+
+
+def test_waived_tier_r_gliner2_unblocks_claim_grade() -> None:
+    """[CONTRACT-TEST] §5: gliner2 WAIVED-with-reason satisfies the Tier-R∪Tier-C
+    predicate, so (with all else satisfied) the verdict reaches CLAIM_GRADE."""
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        _canonical_benchmark(),
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides=_ALL_PENDING_PASS,
+        tier_c_waivers={n: "w" for n in
+                        ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
+    assert verdict.binding_constraint == ""
+
+
+def test_unrun_tier_r_surfaces_in_honesty_boundary() -> None:
+    """[AUDIT] The gate exposes the unrun Tier-R set (gliner2) as a visible
+    honesty-boundary field, distinct from unrun Tier-C."""
+    verdict = SupremacyVerdict.from_artifacts(_canonical_benchmark())
+    assert "gliner2" in verdict.unrun_tier_r
+
+
+# ---------------------------------------------------------------------------
 # THE ONE real-artifact test — READ-ONLY, value-independent.
 # ---------------------------------------------------------------------------
 
@@ -618,6 +851,36 @@ def test_real_artifact_verdict_is_not_yet_binding_canonical_run() -> None:
     assert "canonical_claim_run" in verdict.binding_constraint
     assert "False" in verdict.binding_constraint
     assert verdict.canonical_claim_run is False
+
+
+@pytest.mark.skipif(
+    not _REAL_ARTIFACT.exists(), reason="benchmark-results.json artifact absent"
+)
+def test_real_artifact_recall_floor_guard_does_not_perturb_headline() -> None:
+    """[INTEGRATION-TEST] CRITICAL invariant: the RecallFloorVerdictGuard must NOT
+    change today's headline verdict/binding. The real artifact's top-level
+    ``floor_pass`` is False, but that is driven by LATENCY/throughput floor-checks
+    (short_chat / structured_form_latency / log_lines), NOT recall — every recall
+    and f1 profile floor-check PASSES. So:
+      * pii-anon (the top-composite claimant, qualification 'core', recall
+        floor-checks passing) is NOT a recall-floor breacher — the guard must not
+        conflate the latency-driven floor_pass=False with a recall breach; AND
+      * the headline stays NOT_YET / canonical_claim_run=False (canonical is the
+        #1 binding constraint, ahead of the guard sub-condition)."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _systems_by_name,
+    )
+
+    bench = json.loads(_REAL_ARTIFACT.read_text(encoding="utf-8"))
+    systems = _systems_by_name(bench)
+    breachers = recall_floor_breachers(bench, systems)
+    # Latency-driven floor_pass=False must NOT manufacture a recall breach for
+    # the qualifying claimant.
+    assert "pii-anon" not in breachers
+    # Headline unchanged: canonical remains the #1 binding constraint.
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.verdict is Verdict.NOT_YET
+    assert verdict.binding_constraint.startswith("canonical_claim_run=False")
 
 
 # ---------------------------------------------------------------------------

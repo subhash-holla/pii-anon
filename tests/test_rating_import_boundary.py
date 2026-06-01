@@ -86,12 +86,22 @@ def test_s3_05_at_least_one_rating_module_scanned() -> None:
 # ---------------------------------------------------------------------------
 # S4-CS-01: the SDO gate boundary — SCOPED to the two new gate modules only.
 #
-# The CompetitiveSupremacyGate lives in eval_framework/evaluation/ and may import
-# pii_anon.eval_framework.rating + read JSON, but must NOT reach into the
-# detection / orchestration layers (swarm / moe / fusion / policy). We scope this
-# scan to the TWO new gate modules deliberately: the wider evaluation/ package
-# legitimately imports moe (competitor_compare.py:909), so broadening the scan
-# would false-fail (story §2a / §7 boundary invariant).
+# The CompetitiveSupremacyGate lives in pii_anon/eval_framework/evaluation/ and
+# may import pii_anon.eval_framework.rating + read JSON, but must NOT reach into
+# the detection / orchestration layers (swarm / moe / fusion / policy).
+#
+# We scope this scan to the TWO new gate modules (competitive_supremacy.py,
+# competitor_tiers.py) DELIBERATELY — to forward-proof exactly those two files as
+# the gate grows, without coupling the boundary gate to unrelated neighbours in
+# the same directory. NOTE the precise package geometry: the legacy
+# competitor_compare.py whose `from pii_anon.moe import ...` lives at line 909 is
+# NOT in this package — it sits in the SIBLING `pii_anon/evaluation/` package
+# (src/pii_anon/evaluation/competitor_compare.py), which this glob over
+# `pii_anon/eval_framework/evaluation/*.py` never reaches. So the per-module
+# scope is not a workaround for an in-package moe import (there is none here): it
+# is a deliberate, named contract over the two gate modules (story §2a / §7
+# boundary invariant). competitor_compare.py stays byte-identical (RISK-6) and is
+# untouched by this gate either way.
 # ---------------------------------------------------------------------------
 
 _GATE_MODULE_FILES: frozenset[str] = frozenset(
@@ -111,7 +121,14 @@ def _gate_module_paths() -> list[Path]:
 def test_s4_cs_01_gate_modules_have_no_detection_layer_imports() -> None:
     """[CONTRACT-TEST] The SDO gate modules (competitive_supremacy.py,
     competitor_tiers.py) must not import swarm/moe/fusion/policy. AST-based, so
-    a docstring mentioning "moe" cannot false-positive."""
+    a docstring mentioning "moe" cannot false-positive.
+
+    Per-module scope rationale (corrected): the only moe import in the competitor
+    family is competitor_compare.py:909, which lives in the SIBLING package
+    pii_anon/evaluation/ — NOT under the pii_anon/eval_framework/evaluation/ this
+    glob scans. The scope is therefore a deliberate forward-proofing contract on
+    the two NEW gate modules, not a dodge around an unreachable in-package import.
+    """
     violations: list[str] = []
     for path in _gate_module_paths():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
