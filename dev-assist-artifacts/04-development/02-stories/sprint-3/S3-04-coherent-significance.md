@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | E3 Eval rating engine (DC-07 coherent significance) |
-| State | **IN_PROGRESS** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; red_at=2026-06-01) |
+| State | **REVIEW** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; red_at=2026-06-01; review_at=2026-06-01) |
 | provisional_status | AGENT_SIMULATED (real-NUTS Davidson run is a `bayes-eval`-CI / Pass-2 step) |
 | Implements | FR-004 (coherent significance), NFR-002 (significance coherence — now **BY CONSTRUCTION**), NFR-003; FR-010/AX-004 (anon≠pseudo never merged — the Tier-3 RRS Davidson sub-model stays separate) |
 | Traces | Design D-EVAL DECISION 2 / DC-07: "one joint posterior (point∈CI, sign↔verdict, significant-iff-CI-excludes-0 cannot disagree) — eliminates elo.py:243/542/561 fabricated-outcome/fake-CI/decoupled-significance defects. Record-level paired outcomes (N·C(K,2) from per_record_f1) + Davidson tie term. Separate Davidson sub-model for Tier-3 RRS (never merged — FR-010)." |
@@ -45,13 +45,34 @@ The design's canonical `assemble_paired_set` lives in `pii-anon-eval-data` (S6 �
 `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` `[INTEGRATION-TEST]` — reviewers: code-quality + axiom-compliance + traceability (always); requirements-coverage (FR-004/NFR-002 MUST); security-sast (if entry-point/load path touched — likely not).
 
 ## 12. Definition of Done
-- [ ] **RED**: `tests/test_coherent_significance.py` (coherence-by-construction property tests: point∈CI, sign↔verdict, never-contradict; rank_one_probability sums to 1 + dominant≈1 + tie≈0.5; Davidson tie-formula pure-numpy teeth) + `tests/test_paired_set.py` (assemble from per_record_f1, ties, ragged-reject) — written first & failing.
-- [ ] **GREEN**: `significance.py` + `paired_set.py` + Davidson extension to `_bt_model` (+ importorskip real-NUTS-with-ties integration test) + additive `__init__.py` exports.
-- [ ] **Coherence proven**: property tests show the three significance statements cannot disagree (the NFR-002 by-construction claim has teeth). The three elo defects are documented as NOT reproducible in the claim-grade path.
-- [ ] **Quality**: full suite green (numpyro integration tests SKIP); ruff + mypy --strict clean; import-boundary GREEN; coverage ≥ 84%.
-- [ ] **Tier-3 separation**: CI guard asserts RRS posterior never merged into de-id significance (FR-010/AX-004).
-- [ ] **Untouched**: elo.py + 7 callers byte-identical; numpyro/jax NOT installed; user WIP md5 unchanged.
-- [ ] **Story-gate APPROVE** (`_reviews/story/S3-04-gate.yaml`).
+- [x] **RED**: `tests/test_coherent_significance.py` (coherence-by-construction property tests: point∈CI, sign↔verdict, never-contradict; rank_one_probability sums to 1 + dominant≈1 + tie≈0.5; Davidson tie-formula pure-numpy teeth) + `tests/test_paired_set.py` (assemble from per_record_f1, ties, ragged-reject) — written first & failing. RED `9238350` (both modules `ModuleNotFoundError`).
+- [x] **GREEN**: `significance.py` + `paired_set.py` + Davidson extension to `_bt_model` (+ importorskip real-NUTS-with-ties integration test) + additive `__init__.py` exports. GREEN `57dbb4f`.
+- [x] **Coherence proven**: property tests show the three significance statements cannot disagree (the NFR-002 by-construction claim has teeth — single-source `d = θ_samples[:,i]−θ_samples[:,j]`). The three elo defects (no `1.96` normal-CI, no `_sigmoid` fabricated outcome, no `2·√(rd²+rd²)` decoupled threshold) are documented as NOT reproducible in the claim-grade path (AST/source guard `test_fr_004_significance_module_has_no_elo_defect_signatures`).
+- [x] **Quality**: full suite green (2802 passed, 15 skipped numpyro-importorskip, 0 failed; exit 0); ruff clean; mypy clean for the 3 owned src files (`mypy src/pii_anon`); import-boundary GREEN (auto-scans the 2 new files); coverage 85.93% ≥ 84% (significance.py + paired_set.py 100%).
+- [x] **Tier-3 separation**: CI guard `test_fr_010_rrs_posterior_is_a_distinct_object_never_merged` asserts the RRS Davidson path is a distinct method (`fit_rrs_posterior`, `_store_state=False`) never merged into de-id significance (FR-010/AX-004).
+- [x] **Untouched**: elo.py + 5 non-owned src callers byte-identical (`git diff --quiet` empty); numpyro/jax/arviz NOT installed (`find_spec` → None); user-WIP md5 unchanged (orchestrator.py `0afc6dee…`, test_moe_enhancements.py `910e9cd6…`, README.md `8a0f1000…`, benchmark-diagnostics.json `47f9b116…`).
+- [ ] **Story-gate APPROVE** (`_reviews/story/S3-04-gate.yaml`) — pending orchestrator-dispatched reviewers.
 
 ## Evidence (filled on completion)
-- RED/GREEN/REFACTOR SHAs · coherence property results · rank_one_probability (J) behavior · Davidson teeth · Tier-3 separation guard · importorskip integration status · ruff/mypy/suite/coverage · *AGENT_SIMULATED; real-NUTS Davidson run = Pass-2.*
+*Provisional status: AGENT_SIMULATED. The pure-numpy significance / rank-prob / paired-set / Davidson-closed-form paths run for real in-tree (numpy 2.0.2, no numpyro). The real-NUTS Davidson tie run (`test_integration_real_nuts_with_ties_converges_and_identifies_nu`) is `pytest.importorskip("numpyro")`-gated and SKIPs locally → it is the `bayes-eval`-CI / Pass-2 verification.*
+
+**Commit SHAs (RED precedes GREEN precedes REFACTOR):**
+- RED `9238350ddff7f967b8d4173aeb8ccc40928be5c5` — `test: S3-04 RED` (State → IN_PROGRESS; both new modules `ModuleNotFoundError`).
+- GREEN `57dbb4ffc0f3cf05f36186ae3eaa421ed368ceb4` — `feat: S3-04 GREEN`.
+- REFACTOR `52e8b466b56e0fb11a5fde1902f1b92d736c2324` — `refactor: S3-04` (mypy-strict `np.floating[Any]`, 100%-cov guard tests, coverage-safe Davidson identity).
+
+**RED count:** 46 new test functions (`test_paired_set.py` 19 + `test_coherent_significance.py` 27); 45 run green locally + 1 importorskip integration SKIP.
+
+**Coherence (NFR-002) property results:** `point ∈ CI` always; `significant ⇒ point ≠ 0` with matching CI side; never significant-when-CI-spans-0; `p_i_beats_j` agrees with the significant verdict (CI strictly > 0 ⇒ p > 0.5, since ≤ 2.5% of draws are non-positive). Single-source derivation pinned on a fixed posterior (point/CI/significant/p recomputed by hand from the SAME `d`). Hypothesis location-family generators, `@settings(deadline=None, suppress_health_check=[too_slow])`.
+
+**rank_one_probability (the SDO J):** distribution sums to 1.0; dominant synthetic system → ≈ 1.0; exchangeable pair → ≈ 0.5 each; unknown name raises `KeyError` (no silent 0.0); deterministic; pure-numpy `argmax` over the system axis. theta-orientation `(n_draws, n_systems)` pinned — transposed array raises (`test_orientation_columns_map_to_systems_transpose_breaks_loudly`).
+
+**Davidson teeth (pure-numpy):** P(i>j)+P(tie)+P(j>i)=1; ν=0 nests plain BT (`P(i>j)=σ(δ)`, `P(tie)=0`); (1/3,1/3,1/3) at δ=0,ν=1; (0.25,0.5,0.25) at δ=0,ν=2; bridge identity `softmax([δ/2, ln ν, −δ/2]) == (p_i, p_tie, p_j)` pins the closed form to the NumPyro `Multinomial(logits=…)` model. The `# DAVIDSON(S3-04)` seam in `_bt_model` adds `ν ~ HalfNormal(1)` + the 3-way Multinomial sharing the SAME θ; `fit_paired_posterior_with_ties` + `_run_nuts_with_ties` (numpyro lazy, mirrors `_run_nuts`, retains ν draws on `Posterior.nu_samples`).
+
+**paired_set:** `assemble_paired_set({sys:[f1…]})` → `(wins_i, wins_j, ties, n)`; tie-band ε boundary exact; ragged inputs raise LOUD naming systems+lengths (DELIBERATE divergence from `competitor_compare.py:2871` `min_len` truncation — a test asserts it does NOT truncate); <2 systems / 0 records / NaN / negative-ε rejected; deterministic. Two adapter views: `to_paired_counts()` (S3-02 integer 3-tuple, ties EXCLUDED `n'=wins_i+wins_j`, no half-split) + `to_paired_counts_with_ties()` (4-tuple). `# SWITCH-POINT(S6)` marker + docstring for the eval-data swap.
+
+**Tier-3 separation (FR-010/AX-004):** `fit_rrs_posterior` is a DISTINCT method (`__func__ is not fit_paired_posterior.__func__`), `_store_state=False` → never touches `self._ratings`/`self._last_posterior`; with numpyro absent both paths fail loud independently and no de-id posterior is produced as an RRS side effect.
+
+**importorskip integration:** `test_integration_real_nuts_with_ties_converges_and_identifies_nu` SKIPs locally (`could not import 'numpyro'`); asserts (Pass-2) claim_grade convergence, planted-ordering recovery, and identifiable ν.
+
+**Quality gates:** full suite **2802 passed, 15 skipped, 0 failed** (exit 0); **ruff** all checks passed (6 owned files); **mypy** clean for `significance.py`/`paired_set.py`/`bayes_bt.py` under `mypy src/pii_anon` (the 4 residual `convergence.py` `np.floating` type-arg errors are PRE-EXISTING at parent `c12328b` under numpy-2.0.2 stubs — out-of-scope, convergence.py left byte-identical); **coverage 85.93% ≥ 84%** (`significance.py`/`paired_set.py` at 100%; jax-only Davidson `numpyro.sample` lines `# pragma: no cover`). **import-boundary** GREEN (AST-scans the 2 new files; a tighter assertion forbids `evaluation`/`external_evaluator` imports too). **Untouched:** elo.py + 5 non-owned src callers byte-identical; numpyro/jax/arviz absent; user-WIP md5 unchanged.
