@@ -194,9 +194,25 @@ def _apply_soft_rlimits(budget: ResourceBudget, audit: list[str]) -> list[tuple[
         audit.append("platform_limit_unavailable: resource module not importable; relying on wall-clock watchdog")
         return saved
 
+    # RLIMIT_CPU is measured against CUMULATIVE process CPU since start, not per
+    # call. Setting the bare budget as the soft limit in-process would send
+    # SIGXCPU as soon as the host process (e.g. the test runner) had already
+    # consumed more than ``cpu_seconds`` — destabilizing it. We therefore set
+    # the CPU soft limit RELATIVE to CPU already consumed (consumed + budget),
+    # so it caps THIS attack's additional CPU without killing the host process.
+    # The wall-clock watchdog remains the reliable primary terminator.
+    consumed_cpu_seconds = 0.0
+    try:
+        usage = _resource.getrusage(_resource.RUSAGE_SELF)
+        consumed_cpu_seconds = float(usage.ru_utime + usage.ru_stime)
+    except (ValueError, OSError):  # pragma: no cover - getrusage failure is rare
+        consumed_cpu_seconds = 0.0
+
+    cpu_soft = int(consumed_cpu_seconds + budget.cpu_seconds) + 1  # +1s headroom, ceil
+
     for name, which, soft_value in (
         ("RLIMIT_AS", getattr(_resource, "RLIMIT_AS", None), budget.address_space_bytes),
-        ("RLIMIT_CPU", getattr(_resource, "RLIMIT_CPU", None), int(budget.cpu_seconds) or 1),
+        ("RLIMIT_CPU", getattr(_resource, "RLIMIT_CPU", None), cpu_soft),
     ):
         if which is None:
             audit.append(f"platform_limit_unavailable: {name} not present; relying on wall-clock watchdog")
@@ -209,7 +225,18 @@ def _apply_soft_rlimits(budget: ResourceBudget, audit: list[str]) -> list[tuple[
             if cur_hard != _resource.RLIM_INFINITY:
                 new_soft = min(soft_value, cur_hard)
             _resource.setrlimit(which, (new_soft, cur_hard))
-            audit.append(f"rlimit {name} applied: soft={new_soft}")
+            # Determinism (AX-002 / A8): the audit line is part of AttackResult
+            # equality, so it must NOT embed the run-varying consumed-CPU value
+            # or the consumed-relative soft number. For RLIMIT_CPU we record the
+            # stable BUDGET, noting the relative-to-consumed application; for
+            # RLIMIT_AS the soft value is the budget (already deterministic).
+            if name == "RLIMIT_CPU":
+                audit.append(
+                    f"rlimit {name} applied: budget={budget.cpu_seconds}s "
+                    f"(soft set relative to CPU already consumed)"
+                )
+            else:
+                audit.append(f"rlimit {name} applied: soft={new_soft}")
         except (ValueError, OSError) as exc:
             audit.append(f"platform_limit_unavailable: {name} setrlimit refused ({exc}); relying on wall-clock watchdog")
     return saved
