@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E5 Attacks / privacy-adversary** (DC-09 `attacks/` package — real Tier-3 LLM-adversary + LiRA@128 MIA family) |
-| State | **TODO** |
+| State | **IN_PROGRESS** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; in_progress_at=2026-06-01 RED) |
 | provisional_status | AGENT_SIMULATED (in-process guards run for real in-tree; real seccomp/namespace/wall-clock-kill OS isolation + any real-key/real-adversary execution are a Pass-2 confirmation — marked honestly, never simulated as real) |
 | Implements | **FR-011** (real Tier-3 LLM-adversary re-id — its runner must execute sandboxed), **FR-013** (full-power MIA: LiRA@128 + Secret-Sharer — its runner must execute sandboxed); hardens the execution substrate for **NFR-012** (Tier-3 RRS power) + **NFR-013** (MIA power); upholds **NFR-024 / AX-001** (no real PII in repo/fixtures/logs) + **FR-026 / AX-006** (least-privilege, no raw PII persisted to any channel) |
 | Traces | Design **DC-09** (`attacks/` package: real Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA); **D6 SME MUST-address list, Security MAJOR (3): "sandbox the attack harness (ingests adversarial material)"** (`D-implementation-ready-design.md:56`). Axioms **AX-001** (synthetic-only) + **AX-006** (least-privilege). POV: an attack runner that ingests adversarial material must never become an execution-escalation surface. |
