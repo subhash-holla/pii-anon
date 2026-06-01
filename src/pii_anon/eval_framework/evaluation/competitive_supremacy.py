@@ -41,9 +41,11 @@ Completion predicate (story §5)
 -------------------------------
 * ``CLAIM_GRADE_SOTA`` ⟺ canonical ∧ (every in-scope Gk ``True``) ∧ J ≥ 0.95 ∧
   (Tier-R ∪ Tier-C all RUN-or-WAIVED).
-* ``PROVISIONAL_SOTA`` ⟺ same but blocked ONLY by unrun Tier-C.
+* ``PROVISIONAL_SOTA`` ⟺ same but blocked only by unrun tiers (unrun Tier-C
+  and/or unrun Tier-R — the full Tier-R ∪ Tier-C set must be RUN-or-WAIVED to
+  reach CLAIM_GRADE).
 * ``NOT_YET`` ⟺ otherwise — report the binding constraint (priority:
-  canonical-run → failed G (lowest k) → J gap → unrun Tier-C).
+  canonical-run → failed G (lowest k) → J gap → unrun Tier-C → unrun Tier-R).
 """
 
 from __future__ import annotations
@@ -199,7 +201,8 @@ class SupremacyVerdict:
         The single :class:`Verdict`.
     binding_constraint:
         The single most important failing item (priority: canonical-run → failed
-        G (lowest k) → J gap → unrun Tier-C). ``""`` IFF ``CLAIM_GRADE_SOTA``.
+        G (lowest k) → J gap → unrun Tier-C → unrun Tier-R). ``""`` IFF
+        ``CLAIM_GRADE_SOTA``.
     j_value:
         The SDO objective ``P(rank(pii-anon)=1)`` (``None`` when unavailable).
     j_source:
