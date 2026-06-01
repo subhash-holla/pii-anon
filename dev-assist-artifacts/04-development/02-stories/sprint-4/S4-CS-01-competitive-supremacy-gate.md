@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E-CS Competitive-Supremacy** (new; DC-11 CanonicalRunGate / RecallFloorVerdictGuard family) |
-| State | **REVIEW** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; in_progress_at=2026-06-01; review_at=2026-06-01; scaffold — phased; this story = skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7 + verdict machine + binding-constraint reporter + CI non-blocking wire) |
+| State | **DONE** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; review_at=2026-06-01; gate=APPROVE 6/6 @ iter-2 [1 MAJOR remediated]; done_at=2026-06-01; scaffold — phased; G1/G3/G6/G7 + verdict machine + binding reporter + RecallFloorVerdictGuard LIVE; G2←S4-01/G4←S4-03/G5←S5-S6 tracked successors) |
 | provisional_status | AGENT_SIMULATED (CLAIM_GRADE verdict is itself gated on a regenerated canonical run — see G7) |
 | Implements | FR-007/FR-008 (canonical-run gate + provenance), NFR-006 (canonical run), the SDO objective J; consumes FR-016/NFR-011 (G1 floor), FR-009/010 (G2), FR-005/NFR-017 (G4), latency NFRs (G5), FR-003/004/NFR-001/002 (G7) |
 | Traces | Program AMENDMENT — "SOTA-Dominance Objective (SDO)"; Design DC-11. POV: dominate-where-claimed (moat axes) + non-inferior on raw F1. |
