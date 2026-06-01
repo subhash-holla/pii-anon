@@ -28,6 +28,7 @@ access — no dynamic-eval, no subprocess/shell-out, no unsafe-deserialization.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -178,25 +179,46 @@ def _normalise_allowed_paths(raw: Any) -> frozenset[str]:
     return frozenset(paths)
 
 
-def _is_within_allowed(path: str, allowed_paths: frozenset[str]) -> bool:
-    """True iff ``path`` is one of, or strictly under, an allowed directory.
+def _components_contained(target: PurePosixPath, base: PurePosixPath) -> bool:
+    """True iff ``target`` is ``base`` or strictly under it, by path COMPONENT.
 
-    Uses path-component containment (not a naive ``startswith``) so a sibling
-    that merely shares a string prefix (``/a/b-evil`` vs allowed ``/a/b``) is
-    NOT treated as allowed. This is the single source of truth for the
-    path-allow-list semantics; ``sandbox.SandboxPolicy.assert_path_allowed``
-    delegates to it so the two cannot drift.
+    Compares resolved path components (NOT a raw ``startswith``) so a sibling
+    that merely shares a string prefix (``/a/b-evil`` vs ``/a/b``) is NOT
+    contained. Both inputs are assumed already collapsed (no ``..`` segment) by
+    the caller; this is purely the sibling-prefix-safe boundary check shared by
+    the load-time (``normpath``) and run-time (``realpath``) containment paths.
     """
-    target = PurePosixPath(path)
+    if target == base:
+        return True
+    try:
+        target.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_within_allowed(path: str, allowed_paths: frozenset[str]) -> bool:
+    """True iff ``path`` RESOLVES to one of, or strictly under, an allowed dir.
+
+    Both ``path`` and each allowed root are first normalised with
+    ``os.path.normpath`` so a ``..`` traversal is COLLAPSED before the
+    containment check (closing the lexical-``relative_to`` bypass:
+    ``/grant/../../../etc/passwd`` normalises to ``/etc/passwd`` and is no
+    longer under ``/grant``). Normalisation is purely lexical (no filesystem
+    dependence — deterministic, AX-002), so this stays usable at LOAD time.
+    Containment is by path component (no naive ``startswith``), so a
+    sibling-prefix is still rejected. This is the single source of truth for the
+    load-time path-allow-list semantics; the run-time
+    ``sandbox.SandboxPolicy.assert_path_allowed`` additionally applies
+    ``os.path.realpath`` (to also resolve symlinks) and then reuses the same
+    component-containment boundary, so the two cannot drift on the boundary
+    logic.
+    """
+    target = PurePosixPath(os.path.normpath(path))
     for allowed in allowed_paths:
-        base = PurePosixPath(allowed)
-        if target == base:
+        base = PurePosixPath(os.path.normpath(allowed))
+        if _components_contained(target, base):
             return True
-        try:
-            target.relative_to(base)
-            return True
-        except ValueError:
-            continue
     return False
 
 

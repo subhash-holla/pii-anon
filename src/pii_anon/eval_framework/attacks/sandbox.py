@@ -29,18 +29,20 @@ patterns are referenced in prose via the reworded forms only).
 
 from __future__ import annotations
 
+import os
 import socket
 import threading
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Any, Callable, Final
 
 from pii_anon.eval_framework.attacks.spec import (
     AttackSpec,
     ResourceBudget,
     SandboxViolation,
-    _is_within_allowed,
+    _components_contained,
     load_attack_spec,
 )
 from pii_anon.harness.attack import reconstruction_attack_score
@@ -104,16 +106,31 @@ class SandboxPolicy:
 
     # -- sanctioned access shims ------------------------------------------- #
     def assert_path_allowed(self, path: str) -> str:
-        """Return ``path`` iff it is one of, or strictly under, an allowed
-        directory; otherwise raise ``SandboxViolation`` (path-not-allow-listed).
+        """Return ``path`` iff it RESOLVES to one of, or strictly under, an
+        allowed directory; otherwise raise ``SandboxViolation``.
 
-        Delegates to the canonical ``spec._is_within_allowed`` (path-component
-        containment, not a naive ``startswith``) so a sibling that merely shares
-        a string prefix is NOT allowed, and the load-time + run-time path checks
-        cannot drift.
+        Run-time canonicalisation closes BOTH allow-list escapes the iter-1
+        lexical containment missed:
+
+        - ``os.path.realpath`` collapses ``..`` (so
+          ``/grant/../../../etc/passwd`` resolves OUT of ``/grant`` and is
+          rejected) AND resolves symlinks (so a symlink inside the grant that
+          points OUTSIDE the grant is rejected by its real target).
+
+        After realpath of BOTH the candidate and each allowed root, containment
+        is checked by path component via the shared ``_components_contained``
+        boundary (no naive ``startswith``), so a sibling-prefix
+        (``/a/b-evil`` vs ``/a/b``) is still NOT allowed. The boundary logic is
+        the same primitive the load-time ``_is_within_allowed`` uses, so the two
+        cannot drift; only the canonicalisation differs (run-time additionally
+        resolves symlinks via the filesystem — documented FS dependence here,
+        whereas load-time stays purely lexical/deterministic).
         """
-        if _is_within_allowed(path, self.allowed_paths):
-            return path
+        real_target = PurePosixPath(os.path.realpath(path))
+        for allowed in self.allowed_paths:
+            real_base = PurePosixPath(os.path.realpath(allowed))
+            if _components_contained(real_target, real_base):
+                return path
         raise SandboxViolation(f"path {path!r} is not in the allow-list {sorted(self.allowed_paths)!r}")
 
     def assert_no_network_value(self, value: str) -> None:
