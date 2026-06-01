@@ -1,0 +1,180 @@
+# S3-04 — coherent significance BY CONSTRUCTION + record-level paired outcomes + Davidson ties
+# Canonical story gate (5 reviewers, parallel, independent, read-only).
+gate: story
+scope_id: S3-04
+iteration: 1
+date: 2026-06-01
+aggregate_verdict: APPROVE   # 0 SHOWSTOPPER / 0 CATASTROPHIC / 0 MAJOR / 0 REQUEST_CHANGES
+
+reviewer_set:   # computed by select-reviewer-set.sh (config default_set + story override)
+  - code-quality
+  - security-sast
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:        "9238350  # both new modules ModuleNotFoundError; State -> IN_PROGRESS"
+  green:      "57dbb4f"
+  refactor:   "52e8b46"
+  review:     "7a95477  # State -> REVIEW; evidence filled"
+  minor_remediation: "d4330b3  # 12 test renames embed FR-004/NFR-001 IDs + NFR-003 trace clarified"
+  red_before_green_confirmed: true   # code-quality: git ls-tree 9238350 shows significance.py + paired_set.py ABSENT
+  out_of_scope_sibling_commit: "edc7ecc  # convergence.py np.floating[Any] — S3-03 mypy-stub-drift follow-up, NOT part of S3-04 owned diff"
+
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED 9238350 precedes GREEN 57dbb4f (significance.py + paired_set.py absent at RED, tests
+      would ModuleNotFoundError). ruff All-checks-passed (6 owned files); mypy --strict 0 errors on
+      the 3 owned src files (and package-wide 0 after edc7ecc). Davidson closed-form independently
+      re-derived: sum-to-1; nu=0 nests plain BT; (1/3,1/3,1/3)@nu=1; (0.25,0.5,0.25)@nu=2;
+      softmax([delta/2, ln nu, -delta/2]) bridge holds. numpyro lazy (only inside _bt_model /
+      _run_nuts / _run_nuts_with_ties); module import-safe; pragma:no-cover only on jax-only lines.
+      Scope: diff touches exactly the 6 owned files + the story md; elo.py + callers byte-identical.
+      Coverage 85.93% (significance.py + paired_set.py 100%).
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: >
+      Owned diff is pure-numpy statistics + a lazy-numpyro Davidson model. Zero dynamic-execution
+      sinks, zero subprocess spawning, zero unsafe-deserialization, zero network egress, zero
+      filesystem writes, zero hard-coded secrets. pyproject rating-engine entry-point surface
+      byte-identical across the range (no new trust surface — S3-04 adds library functions, not
+      engines). numpyro/jax imported only inside _run_nuts_with_ties; absent path raises a loud
+      MissingOptionalDependencyError (verified empirically with numpyro absent) — never a silent
+      fallback. No real-PII-shaped fixtures (AX-001). jax PRNGKey / numpy RNG are statistical +
+      seeded, not cryptographic.
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      Every section-3 Given/When/Then bullet and every actionable section-12 DoD box maps to a NAMED
+      passing in-tree test (ran the two owned files: 45 passed / 1 skipped pre-rename). The single
+      skip is exactly the honestly-carried real-NUTS-with-ties Davidson RUN (importorskip numpyro) —
+      the ONLY unverified-in-tree item, matching the story claim. No over-claim that the sampler ran
+      (provisional_status AGENT_SIMULATED; Evidence names it the bayes-eval-CI / Pass-2 verification).
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-004 / NFR-002 / FR-010 exist in requirements-document.md; AX-004 in design D0; DC-07 in
+      design D1 + DECISION 2 with text matching the story Traces claim near-verbatim. Requirement IDs
+      embedded in test names. NFR-002 "by construction" has real property-test teeth (the forbidden
+      elo.py:561 disagreement state asserted unreachable). Cross-reviewer joint signal SATISFIED:
+      S3-02 to_paired_counts integer-3-tuple shape pinned (test_fr_004_to_paired_counts_*) and S3-03
+      (n_draws, n_systems) theta orientation pinned in-tree (test_bayes_bt.py:220 + the orientation
+      tests). elo.py byte-identical.
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      AX-002 determinism re-run byte-identical (pairwise_significance / rank_one / Davidson). AX-004
+      anon-vs-pseudo separation enforced STRUCTURALLY: fit_rrs_posterior delegates with
+      _store_state=False; every self._ratings / self._last_posterior write sits inside an
+      `if _store_state:` guard, so the RRS posterior provably cannot bleed into de-id engine state
+      (the headline FR-010 axiom, with teeth). AX-001 synthetic-only fixtures. S3-05 import boundary
+      holds (AST-confirmed: significance.py numpy+stdlib, paired_set.py stdlib only, neither imports
+      evaluation/). NFR-002 coherence is a genuine single-source invariant — 0 violations across a
+      500-posterior adversarial probe.
+
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    status: REMEDIATED
+    location: tests/test_coherent_significance.py (12 functions)
+    description: >
+      12 test functions used topic-scoped prefixes (orientation_*, davidson_*, integration_*) without
+      embedding an FR/NFR/AX ID, inconsistent with the convention used throughout test_paired_set.py
+      and the wider suite. (Same class as the S3-03 cosmetic naming finding.)
+    remediation: >
+      Renamed in d4330b3: orientation_* + davidson_* -> test_fr_004_* (coherent significance /
+      record-level paired outcomes / Davidson teeth); the real-NUTS integration test ->
+      test_nfr_001_integration_* (convergence gate). Pure renames, no behaviour change; ruff clean
+      (line-length 120); test_coherent_significance.py 26 passed / 1 skipped. The S3-05 import-boundary
+      test_s3_05_* name retained (valid DC-ID embed).
+  - id: TRACE-S304-MINOR-1
+    severity: MINOR
+    status: REMEDIATED
+    location: dev-assist-artifacts/.../sprint-3/S3-04-coherent-significance.md (Implements line)
+    description: >
+      Story Implements line declared NFR-003 (bootstrap-CI empirical coverage, a SHOULD) but no
+      nfr_003-named test lives in S3-04's diff; NFR-003 is verified in-tree by S3-02's test_nfr_003_*.
+      The FR/NFR->Test link broke for NFR-003 *within this story's diff* (declared-but-not-tested-here).
+    remediation: >
+      Implements line clarified in d4330b3: S3-04 *feeds* NFR-003's coverage sim (it assembles the
+      per-record paired set the sim consumes) but NFR-003 itself is verified by S3-02 test_nfr_003_*
+      + the eval-data S5 coverage study, not re-tested here. Declared-vs-tested set now reconciles.
+  - id: SAST-S304-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    location: src/pii_anon/eval_framework/rating/bayes_bt.py:217
+    description: >
+      getattr(exc, "name", None) reads the standard ImportError.name attribute to label the missing
+      package — benign introspection of a fixed attribute on a caught exception, not external-input
+      dynamic dispatch. No breach.
+  - id: SAST-S304-OBS-3
+    severity: OBSERVATION
+    status: ACCEPTED
+    location: tests/test_coherent_significance.py (elo-defect source guard)
+    description: >
+      The elo-defect guard reads the module's own source via Path(__file__).read_text + ast.parse
+      (read-only introspection, no untrusted path, no unsafe-deserialization). Appropriate.
+  - id: REQCOV-S304-OBS-1
+    severity: OBSERVATION
+    status: TRACK-SUCCESSOR
+    location: requirements-document.md NFR-003
+    description: >
+      NFR-003 (SHOULD) coverage simulation (>=1000 replicate empirical CI coverage) is S3-02 /
+      eval-data S5 territory; track the >=1000-replicate coverage study to that successor (now noted
+      in the story Implements line per TRACE-S304-MINOR-1 remediation).
+  - id: REQCOV-S304-OBS-3
+    severity: OBSERVATION
+    status: TRACK-PASS-2
+    location: tests/test_coherent_significance.py (real-NUTS-with-ties integration)
+    description: >
+      The sole unverified-in-tree item — the real-NUTS Davidson tie RUN (convergence + planted-order
+      recovery + nu identifiability) — is importorskip(numpyro)-gated and SKIPs locally. Log the
+      real R-hat / ESS / divergence + nu posterior into the traceability Status Change Log when the
+      bayes-eval CI lane / Pass-2 executes. The Davidson likelihood math itself has in-tree teeth via
+      the softmax-equivalence bridge.
+  - id: AXIOM-S304-OBS-1
+    severity: OBSERVATION
+    status: TRACK-PASS-2
+    location: src/pii_anon/eval_framework/rating/bayes_bt.py:691-775
+    description: >
+      RRS separation holds because both state writes sit inside `if _store_state:` guards; forward-
+      looking hardening — add an in-tree test (or bayes-eval-lane test) asserting engine._ratings == {}
+      and last_posterior is None after a successful fit_rrs_posterior, so a future ungated state write
+      in the ties path can't silently re-merge RRS into de-id. Not blocking (structural guard correct).
+
+cross_reviewer_patterns:
+  - pattern: traceability-declaration hygiene
+    raised_by: [code-quality, traceability]
+    detail: >
+      Two reviewers independently flagged the same theme — test names not embedding IDs (code-quality)
+      and NFR-003 over-declared in Implements (traceability). Both MINOR, both REMEDIATED in d4330b3.
+  - pattern: honest Pass-2 boundary (no fabricated claim-grade path)
+    raised_by: [requirements-coverage, traceability, axiom-compliance, security-sast]
+    detail: >
+      Four reviewers independently affirm the same honesty split — all claim-grade pure-numpy paths
+      (coherence-by-construction, rank_one_probability=J, Davidson closed-form teeth, paired-set,
+      RRS separation, determinism, import isolation) run for real in-tree; only the real-NUTS sampler
+      RUN is Pass-2, and it is wired honestly (importorskip + AGENT_SIMULATED).
+
+outcome:
+  invariant: >
+    Coherent significance BY CONSTRUCTION is LIVE behind the claim-grade path: point / CI / sign /
+    verdict all derive from ONE joint-posterior difference vector d = theta[:,i] - theta[:,j], so the
+    three significance statements cannot disagree (eliminates the elo.py:243/542/561 defects in the
+    claim-grade tier; elo.py stays byte-identical as glicko-legacy). rank_one_probability(posterior,
+    name) is the SDO J primitive (sums-to-1, argmax over the system axis, deterministic). Davidson tie
+    term wired at the # DAVIDSON(S3-04) seam (pure-numpy teeth + importorskip real-NUTS). Tier-3 RRS is
+    a distinct posterior (FR-010/AX-004). assemble_paired_set is temp-local (# SWITCH-POINT(S6)).
+  tests: "full suite 2802 passed / 15 skipped / 0 failed (exit 0); rating cluster 105 passed / 3 skipped post-remediation"
+  coverage: "85.93% (>= 84 gate); significance.py + paired_set.py 100%"
+  quality: "ruff clean; mypy --strict 0 errors / 120 files (package-wide, after edc7ecc)"
+  safety: "elo.py + 7 callers byte-identical; numpyro/jax/arviz NOT installed; user-WIP md5 unchanged; narrow git add only"
+
+followups:
+  - "S4-CS-01 CompetitiveSupremacyGate (SDO) — J = rank_one_probability(posterior) (this story's primitive); now UNBLOCKED."
+  - "Pass-2 / bayes-eval CI lane: run real NUTS-with-ties (importorskip test executes); log R-hat/ESS/divergence + nu posterior into the traceability Status Change Log."
+  - "S3-02 / eval-data S5: NFR-003 >=1000-replicate empirical CI coverage study (tracked successor)."
+  - "Optional: in-tree Posterior-dataclass field-contract test (theta_samples/systems/nu_samples) so the S3-03 join is guarded without numpyro (AXIOM-S304-OBS-1 hardening)."
