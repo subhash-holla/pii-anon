@@ -56,7 +56,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pii_anon.eval_framework.rating.bradley_terry import BradleyTerryMLEEngine
-from pii_anon.eval_framework.rating.significance import rank_one_probability
+from pii_anon.eval_framework.rating.significance import rank_one_distribution
 
 from .competitor_tiers import (
     TIER_R_NAMES,
@@ -65,6 +65,7 @@ from .competitor_tiers import (
     default_registry,
     run_status_from_benchmark,
     unrun_tier_c,
+    unrun_tier_r,
     waive,
 )
 
@@ -77,6 +78,7 @@ __all__ = [
     "GuaranteeResult",
     "SupremacyVerdict",
     "f_beta",
+    "recall_floor_breachers",
 ]
 
 # -- SDO threshold literals: these ARE the completion contract (§3/§5). -------
@@ -101,6 +103,16 @@ _PROVENANCE_FIELDS: tuple[str, ...] = (
 # Guarantee order is load-bearing: the binding-constraint reporter names the
 # LOWEST-k failing guarantee, so G1 < G2 < ... < G7.
 _GUARANTEE_ORDER: tuple[str, ...] = ("G1", "G2", "G3", "G4", "G5", "G6", "G7")
+
+# -- RecallFloorVerdictGuard (story §3 G7): "a floor-breaching system can never
+# top-rank." The guard is RECALL-SPECIFIC: it keys ONLY on recall-floor signals,
+# never on the conflated ensemble `floor_pass` (which mixes in latency/throughput
+# floors). A non-qualifying qualification_status, a failing recall/f1 profile
+# floor-check, or (when the per-language ε artifact is present) a language ε >
+# EPS_RECALL_PER_LANG constitutes a recall-floor breach. Latency/throughput floor
+# failures are a DIFFERENT axis (the speed-floor) and never a recall breach.
+_QUALIFYING_STATUSES: frozenset[str] = frozenset({"core", "qualified"})
+_RECALL_FLOOR_METRICS: frozenset[str] = frozenset({"recall", "f1", "f2"})
 
 # Pending successors (named in the gate output as tracked work).
 _PENDING_SUCCESSORS: dict[str, str] = {
@@ -201,6 +213,18 @@ class SupremacyVerdict:
         The Tier-C competitor names still blocking ``CLAIM_GRADE``.
     axes_pending:
         Human-readable names of the PENDING successor guarantees.
+    j_rank1_system:
+        The system the SDO J-meter CROWNS as rank-1 (argmax of the rank-1
+        distribution over the recall-floor-COMPLIANT systems). A recall-floor
+        breacher can never appear here (the RecallFloorVerdictGuard). ``None``
+        only when J is unavailable.
+    recall_floor_breachers:
+        The systems flagged as recall-floor breachers (the guard's input set) —
+        a visible honesty field; populated whenever any system breaches.
+    unrun_tier_r:
+        The Tier-R competitor names still UNRUN (also CLAIM_GRADE blockers per
+        §5 — e.g. ``gliner2`` today); a visible honesty field distinct from
+        ``unrun_tier_c``.
     carve_out_note:
         The OpenAI raw-F1 honesty carve-out (always populated).
     """
@@ -213,6 +237,9 @@ class SupremacyVerdict:
     canonical_claim_run: bool
     unrun_tier_c: frozenset[str]
     axes_pending: tuple[str, ...]
+    j_rank1_system: str | None = None
+    recall_floor_breachers: frozenset[str] = frozenset()
+    unrun_tier_r: frozenset[str] = frozenset()
     carve_out_note: str = _CARVE_OUT_NOTE
     tier_registry: dict[str, TierEntry] = field(default_factory=default_registry)
 
@@ -235,6 +262,7 @@ class SupremacyVerdict:
         posterior_names: list[str] | None = None,
         pending_overrides: dict[str, bool | None] | None = None,
         tier_c_waivers: dict[str, str] | None = None,
+        unrun_tier_r_waivers: dict[str, str] | None = None,
     ) -> SupremacyVerdict:
         """Compute the SDO verdict from a benchmark dict (+ optional posterior).
 
@@ -247,7 +275,8 @@ class SupremacyVerdict:
             column names. When present, J is read off it (``j_source='bayes'``);
             otherwise J falls back to the in-tree MLE-bootstrap
             (``j_source='mle-bootstrap'``), or ``'unavailable'`` if there are no
-            competitor pairs to fit.
+            competitor pairs to fit. Either way the rank-1 argmax is restricted to
+            the recall-floor-COMPLIANT systems (the RecallFloorVerdictGuard).
         pending_overrides:
             Three-valued overrides for the successor guarantees (``"G2"``,
             ``"G4"``, ``"G5"``) — a successor story supplies its computed
@@ -255,12 +284,20 @@ class SupremacyVerdict:
         tier_c_waivers:
             ``{tier_c_name: reason}`` waivers (reason mandatory). Waived Tier-C
             entries stop blocking ``CLAIM_GRADE``.
+        unrun_tier_r_waivers:
+            ``{tier_r_name: reason}`` waivers for an UNRUN Tier-R adapter (today:
+            ``gliner2``). Per §5 the WHOLE Tier-R ∪ Tier-C set must be RUN-or-
+            WAIVED before ``CLAIM_GRADE``; an unrun-unwaived Tier-R member blocks
+            a claim just as an unrun Tier-C API does. Reason mandatory.
         """
         run_metadata = benchmark.get("run_metadata", {}) or {}
         canonical = bool(run_metadata.get("canonical_claim_run", False))
 
         systems = _systems_by_name(benchmark)
         overrides = pending_overrides or {}
+
+        # RecallFloorVerdictGuard input: the recall-floor-breaching systems (§3 G7).
+        breachers = recall_floor_breachers(benchmark, systems)
 
         guarantees = (
             _g1_recall_floor(benchmark, systems),
@@ -269,20 +306,24 @@ class SupremacyVerdict:
             _pending_guarantee("G4", overrides.get("G4")),
             _pending_guarantee("G5", overrides.get("G5")),
             _g6_raw_noninferiority(systems),
-            _g7_certified_run(run_metadata),
+            _g7_certified_run(run_metadata, systems, breachers),
         )
 
         # The Tier registry, with run-status derived from the benchmark + waivers.
+        # Tier-R and Tier-C waivers share the same `waive` (reason-mandatory) path.
         registry = apply_run_status(
             default_registry(), run_status_from_benchmark(benchmark)
         )
-        for name, reason in (tier_c_waivers or {}).items():
+        for name, reason in {**(tier_c_waivers or {}), **(unrun_tier_r_waivers or {})}.items():
             registry = waive(registry, name, reason)
         blocking_tier_c = unrun_tier_c(registry)
+        blocking_tier_r = unrun_tier_r(registry)
 
-        # J — the SDO objective (bayes if posterior supplied, else MLE-bootstrap).
-        j_value, j_source = _compute_j(
-            benchmark, systems, theta_samples, posterior_names
+        # J — the SDO objective (bayes if posterior supplied, else MLE-bootstrap);
+        # the rank-1 argmax excludes recall-floor breachers (a breacher can never
+        # be crowned), and `crowned` is the floor-compliant rank-1 system.
+        j_value, j_source, crowned = _compute_j(
+            benchmark, systems, theta_samples, posterior_names, breachers
         )
 
         verdict, binding = _decide(
@@ -290,6 +331,7 @@ class SupremacyVerdict:
             guarantees=guarantees,
             j_value=j_value,
             blocking_tier_c=blocking_tier_c,
+            blocking_tier_r=blocking_tier_r,
         )
 
         axes_pending = tuple(
@@ -307,6 +349,9 @@ class SupremacyVerdict:
             canonical_claim_run=canonical,
             unrun_tier_c=blocking_tier_c,
             axes_pending=axes_pending,
+            j_rank1_system=crowned,
+            recall_floor_breachers=breachers,
+            unrun_tier_r=blocking_tier_r,
             tier_registry=registry,
         )
 
@@ -329,6 +374,72 @@ def _systems_by_name(benchmark: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _competitor_names(systems: dict[str, dict[str, Any]]) -> list[str]:
     """The benchmarked competitor systems (everything outside the pii-anon ladder)."""
     return sorted(name for name in systems if name not in _LADDER_SYSTEMS)
+
+
+# ---------------------------------------------------------------------------
+# RecallFloorVerdictGuard — the recall-floor-breach predicate (story §3 G7)
+# ---------------------------------------------------------------------------
+
+
+def _run_breaches_recall_floor(benchmark: dict[str, Any]) -> bool:
+    """Does the RUN as a whole breach the recall floor? (recall-specific).
+
+    Uses only RECALL signals, never the conflated ensemble ``floor_pass``:
+
+    * a per-language ε artifact (``per_language_recall_delta``), if present, with
+      any language ε > :data:`EPS_RECALL_PER_LANG` is a breach. An ABSENT artifact
+      is PENDING-not-fabricated — it never manufactures a breach on its own;
+    * any per-profile ``floor_checks`` entry whose ``metric`` is recall-like
+      (recall / f1 / f2) and whose ``passed`` is ``False`` is a breach. A LATENCY
+      or throughput floor-check failure is explicitly NOT a recall breach.
+    """
+    per_lang = benchmark.get("per_language_recall_delta")
+    if isinstance(per_lang, dict) and per_lang:
+        worst = max((abs(float(v)) for v in per_lang.values()), default=0.0)
+        if worst > EPS_RECALL_PER_LANG:
+            return True
+
+    for profile in benchmark.get("profile_results", []) or []:
+        if not isinstance(profile, dict):
+            continue
+        for check in profile.get("floor_checks", []) or []:
+            if not isinstance(check, dict):
+                continue
+            metric = check.get("metric")
+            if metric in _RECALL_FLOOR_METRICS and check.get("passed") is False:
+                return True
+    return False
+
+
+def recall_floor_breachers(
+    benchmark: dict[str, Any], systems: dict[str, dict[str, Any]]
+) -> frozenset[str]:
+    """Return the systems that BREACH the recall floor (the guard's input set).
+
+    The RecallFloorVerdictGuard (story §3 G7) enforces that a recall-floor
+    breacher can never top-rank. A system breaches when EITHER:
+
+    * its per-system ``qualification_status`` is non-qualifying — i.e. NOT in
+      :data:`_QUALIFYING_STATUSES` (a disqualified / floor-breach / failed
+      status). A missing status is treated as non-qualifying (fail loud, never
+      silently pass); OR
+    * the RUN breaches the recall floor (:func:`_run_breaches_recall_floor` —
+      a per-language ε regression or a failing recall/f1 profile floor-check). A
+      run-level recall breach taints EVERY system in the run (no clean top-rank
+      crowning is possible while the run's recall floor is breached).
+
+    Pure: reads the benchmark, never mutates it. The conflated ensemble
+    ``floor_pass`` (which also folds in latency/throughput floors) is deliberately
+    NOT consulted — the guard is recall-specific (see module note).
+    """
+    run_breach = _run_breaches_recall_floor(benchmark)
+    breachers: set[str] = set()
+    for name, system in systems.items():
+        status = system.get("qualification_status")
+        status_ok = isinstance(status, str) and status in _QUALIFYING_STATUSES
+        if run_breach or not status_ok:
+            breachers.add(name)
+    return frozenset(breachers)
 
 
 # ---------------------------------------------------------------------------
@@ -470,11 +581,35 @@ def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResul
     return GuaranteeResult("G6", passed, core_f2, best_tier_r - EPS_F2, detail)
 
 
-def _g7_certified_run(run_metadata: dict[str, Any]) -> GuaranteeResult:
-    """G7 — canonical_claim_run True ∧ full provenance stamp present."""
+def _g7_certified_run(
+    run_metadata: dict[str, Any],
+    systems: dict[str, dict[str, Any]],
+    breachers: frozenset[str],
+) -> GuaranteeResult:
+    """G7 — canonical_claim_run True ∧ full provenance ∧ RecallFloorVerdictGuard.
+
+    The RecallFloorVerdictGuard sub-condition (story §3 G7): a recall-floor
+    breaching system can never top-rank, so G7 FAILS if either
+
+    * the highest-composite system in the benchmark is a recall-floor breacher
+      (a breacher would otherwise be crowned rank-1); or
+    * the pii-anon claimant itself breaches the recall floor.
+
+    Guard failure is reported with a ``floor``-bearing ``binding_detail``. The
+    guard is evaluated ALONGSIDE the canonical/provenance checks but is reported
+    only when canonical + provenance already hold, so the headline binding
+    constraint on a non-canonical run stays ``canonical_claim_run=False`` (the
+    canonical gate is binding-priority #1; the guard never displaces it).
+    """
     canonical = bool(run_metadata.get("canonical_claim_run", False))
     missing_prov = [f for f in _PROVENANCE_FIELDS if not run_metadata.get(f)]
-    passed = canonical and not missing_prov
+
+    top_system = _top_composite_system(systems)
+    core_breaches = _CORE_SYSTEM in breachers
+    top_breaches = top_system is not None and top_system in breachers
+    guard_ok = not (core_breaches or top_breaches)
+
+    passed = canonical and not missing_prov and guard_ok
     if not canonical:
         detail = (
             "G7 FAIL: canonical_claim_run=False — the run is a provisional smoke "
@@ -482,9 +617,37 @@ def _g7_certified_run(run_metadata: dict[str, Any]) -> GuaranteeResult:
         )
     elif missing_prov:
         detail = f"G7 FAIL: canonical run missing provenance stamp(s) {missing_prov}"
+    elif not guard_ok:
+        culprit = _CORE_SYSTEM if core_breaches else top_system
+        detail = (
+            f"G7 FAIL: RecallFloorVerdictGuard — {culprit!r} breaches the recall "
+            f"floor yet holds/contests the top composite; a recall-floor-breaching "
+            f"system can never top-rank (a floor-compliant claimant must be crowned)"
+        )
     else:
-        detail = "G7 PASS: canonical_claim_run=True with full provenance stamp"
+        detail = (
+            "G7 PASS: canonical_claim_run=True with full provenance stamp; "
+            "RecallFloorVerdictGuard satisfied (top-ranked claimant is "
+            "recall-floor-compliant)"
+        )
     return GuaranteeResult("G7", passed, float(canonical), 1.0, detail)
+
+
+def _top_composite_system(systems: dict[str, dict[str, Any]]) -> str | None:
+    """Name of the system with the highest ``composite_score`` (``None`` if none).
+
+    Ties broken by name for determinism. Only systems carrying a numeric
+    composite are considered.
+    """
+    scored = [
+        (name, float(s["composite_score"]))
+        for name, s in systems.items()
+        if isinstance(s.get("composite_score"), (int, float))
+    ]
+    if not scored:
+        return None
+    best = max(s for _, s in scored)
+    return sorted(name for name, s in scored if s == best)[0]
 
 
 def _pending_guarantee(axis: str, override: bool | None) -> GuaranteeResult:
@@ -512,24 +675,54 @@ def _compute_j(
     systems: dict[str, dict[str, Any]],
     theta_samples: NDArray[np.floating[Any]] | None,
     posterior_names: list[str] | None,
-) -> tuple[float | None, str]:
-    """Return ``(J, j_source)`` for pii-anon's rank-1 probability.
+    breachers: frozenset[str],
+) -> tuple[float | None, str, str | None]:
+    """Return ``(J, j_source, crowned_system)`` for pii-anon's rank-1 probability.
 
-    Prefers the supplied bayes posterior; otherwise falls back to the in-tree
-    MLE-BT paired bootstrap over composite-derived comparison records. Returns
-    ``(None, "unavailable")`` only when neither is possible (e.g. a
-    single-system benchmark with no competitor pairs and no posterior).
+    RecallFloorVerdictGuard coupling (story §3 G7): a recall-floor breaching
+    system can never be J-argmax. The rank-1 distribution is therefore computed
+    over the floor-COMPLIANT columns only — a breacher's rank-1 mass is dropped
+    (it can never be crowned), and if pii-anon ITSELF breaches, its J is forced to
+    ``0.0`` (it cannot be the crowned rank-1 system). ``crowned_system`` is the
+    argmax over the compliant set (``None`` only when J is unavailable).
+
+    Prefers the supplied bayes posterior; otherwise the in-tree MLE-BT paired
+    bootstrap. Returns ``(None, "unavailable", None)`` only when neither is
+    possible (e.g. a single-system benchmark with no competitor pairs and no
+    posterior).
     """
     if theta_samples is not None and posterior_names is not None:
-        return (
-            float(rank_one_probability(theta_samples, posterior_names, _CORE_SYSTEM)),
-            "bayes",
-        )
+        j_value, crowned = _guarded_rank1(theta_samples, posterior_names, breachers)
+        return j_value, "bayes", crowned
 
     draws, names = _mle_bootstrap_draws(systems)
     if draws is None or _CORE_SYSTEM not in (names or []):
-        return None, "unavailable"
-    return float(rank_one_probability(draws, names, _CORE_SYSTEM)), "mle-bootstrap"
+        return None, "unavailable", None
+    j_value, crowned = _guarded_rank1(draws, names, breachers)
+    return j_value, "mle-bootstrap", crowned
+
+
+def _guarded_rank1(
+    theta_samples: NDArray[np.floating[Any]],
+    names: list[str],
+    breachers: frozenset[str],
+) -> tuple[float, str | None]:
+    """Guarded rank-1: J(pii-anon) + crowned system over the COMPLIANT columns.
+
+    Drops every recall-floor-breaching column before the argmax so a breacher can
+    never be crowned (the RecallFloorVerdictGuard). If every system breaches (no
+    compliant column survives), J is ``0.0`` and no system is crowned. If pii-anon
+    is a breacher it is among the dropped columns, so its J is ``0.0``.
+    """
+    compliant = [n for n in names if n not in breachers]
+    if not compliant:
+        return 0.0, None
+    cols = [names.index(n) for n in compliant]
+    sub = theta_samples[:, cols]
+    dist = rank_one_distribution(sub, compliant)
+    crowned = max(dist, key=lambda n: (dist[n], n))
+    j_core = dist.get(_CORE_SYSTEM, 0.0)
+    return float(j_core), crowned
 
 
 def _mle_bootstrap_draws(
@@ -543,8 +736,9 @@ def _mle_bootstrap_draws(
     composite gap (``σ(γ·Δ)``). This is the same composite→outcome shape the
     ``bradley-terry-mle`` port path uses, but emitting BOTH directions keeps the
     design non-separable so the MM fit converges and the bootstrap draws are
-    finite. The draws are stacked ``(b, n_systems)`` for
-    :func:`significance.rank_one_probability`.
+    finite. The draws are stacked ``(b, n_systems)`` and fed to
+    :func:`_guarded_rank1` (which restricts the rank-1 argmax to the
+    recall-floor-compliant columns).
 
     Returns ``(None, [])`` when there are fewer than two systems (no pairs).
     """
@@ -590,12 +784,18 @@ def _decide(
     guarantees: tuple[GuaranteeResult, ...],
     j_value: float | None,
     blocking_tier_c: frozenset[str],
+    blocking_tier_r: frozenset[str],
 ) -> tuple[Verdict, str]:
     """The §5 verdict state machine + the single binding constraint.
 
     Binding priority (the program's next-thing-to-fix): canonical-run →
-    failed G (lowest k) → J gap → unrun Tier-C. ``binding_constraint`` is ``""``
-    IFF the verdict is ``CLAIM_GRADE_SOTA``.
+    failed G (lowest k) → J gap → unrun tiers (Tier-C, then unrun Tier-R).
+    ``binding_constraint`` is ``""`` IFF the verdict is ``CLAIM_GRADE_SOTA``.
+
+    §5 completion predicate: ``CLAIM_GRADE`` ⟺ canonical ∧ (every in-scope Gk
+    ``True``) ∧ J ≥ bar ∧ (Tier-R ∪ Tier-C ALL RUN-or-WAIVED). So an unrun-
+    unwaived Tier-R adapter (today ``gliner2``) blocks ``CLAIM_GRADE`` exactly as
+    an unrun Tier-C API does → at most ``PROVISIONAL``.
 
     Three-valued discipline: ``CLAIM_GRADE`` requires EVERY guarantee ``True``;
     a PENDING (``None``) guarantee never counts toward a ``PROVISIONAL`` blocker
@@ -616,7 +816,7 @@ def _decide(
     # -- 3. J gap (J must be computable and ≥ bar for any claim). ------------
     if j_value is None:
         # No failed G, but J cannot be computed → cannot be claim-grade; report
-        # it as the binding constraint (ahead of unrun Tier-C).
+        # it as the binding constraint (ahead of unrun tiers).
         return Verdict.NOT_YET, "J unavailable (no posterior and no competitor pairs to fit)"
     if j_value < J_BAR:
         return (
@@ -631,17 +831,24 @@ def _decide(
         if by_axis.get(axis) is not None and by_axis[axis].passed is None
     ]
 
-    # -- 5. unrun Tier-C blocks CLAIM_GRADE. ---------------------------------
-    tier_c_blocked = bool(blocking_tier_c)
+    # -- 5. unrun Tier-C OR unrun Tier-R blocks CLAIM_GRADE (§5: Tier-R ∪ Tier-C).
+    tier_blocked = bool(blocking_tier_c) or bool(blocking_tier_r)
 
-    if not pending and not tier_c_blocked:
+    if not pending and not tier_blocked:
         # Everything in scope is True, J ≥ bar, Tiers satisfied → CLAIM_GRADE.
         return Verdict.CLAIM_GRADE_SOTA, ""
 
     # Otherwise PROVISIONAL — report the binding constraint by priority:
-    # a PENDING guarantee outranks unrun Tier-C (it is closer to "real work").
+    # a PENDING guarantee outranks the unrun tiers (it is closer to "real work");
+    # within the tiers, unrun Tier-C (the cited cloud-API honesty boundary) leads,
+    # and any unrun Tier-R (gliner2) is surfaced alongside it.
     if pending:
         binding = "pending guarantee(s): " + ", ".join(g.binding_detail for g in pending)
     else:
-        binding = "unrun Tier-C (CLAIM_GRADE blocked): " + ", ".join(sorted(blocking_tier_c))
+        parts: list[str] = []
+        if blocking_tier_c:
+            parts.append("unrun Tier-C: " + ", ".join(sorted(blocking_tier_c)))
+        if blocking_tier_r:
+            parts.append("unrun Tier-R: " + ", ".join(sorted(blocking_tier_r)))
+        binding = "CLAIM_GRADE blocked — " + "; ".join(parts)
     return Verdict.PROVISIONAL_SOTA, binding

@@ -43,6 +43,7 @@ __all__ = [
     "waive",
     "apply_run_status",
     "unrun_tier_c",
+    "unrun_tier_r",
     "run_status_from_benchmark",
 ]
 
@@ -230,6 +231,21 @@ def unrun_tier_c(registry: dict[str, TierEntry]) -> frozenset[str]:
         name
         for name, entry in registry.items()
         if entry.tier is CompetitorTier.C and entry.run_status is RunStatus.UNRUN
+    )
+
+
+def unrun_tier_r(registry: dict[str, TierEntry]) -> frozenset[str]:
+    """Return the set of Tier-R names still ``UNRUN`` (also CLAIM_GRADE blockers).
+
+    The completion predicate (§5) requires the WHOLE Tier-R ∪ Tier-C set to be
+    RUN-or-WAIVED before ``CLAIM_GRADE`` — so an unrun-unwaived Tier-R adapter
+    (today: ``gliner2``, which is not in the benchmark run) blocks a claim just as
+    an unrun Tier-C API does. A ``RUN`` or ``WAIVED`` Tier-R entry drops out.
+    """
+    return frozenset(
+        name
+        for name, entry in registry.items()
+        if entry.tier is CompetitorTier.R and entry.run_status is RunStatus.UNRUN
     )
 
 

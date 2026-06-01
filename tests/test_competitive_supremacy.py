@@ -180,7 +180,9 @@ _ALL_PENDING_PASS = {"G2": True, "G4": True, "G5": True}
 
 def test_claim_grade_when_canonical_all_g_pass_j_high_and_tiers_run() -> None:
     """[CONTRACT-TEST] CLAIM_GRADE_SOTA ⟺ canonical ∧ all-Gk pass ∧ J≥0.95 ∧
-    (Tier-R ∪ Tier-C RUN-or-WAIVED). All Tier-C waived-with-reason here."""
+    (Tier-R ∪ Tier-C RUN-or-WAIVED). All Tier-C waived-with-reason AND the unrun
+    Tier-R adapter (gliner2) waived-with-reason — §5 requires the WHOLE Tier-R ∪
+    Tier-C set RUN-or-WAIVED, not Tier-C alone."""
     theta, names = _strong_posterior()
     verdict = SupremacyVerdict.from_artifacts(
         _canonical_benchmark(),
@@ -192,6 +194,7 @@ def test_claim_grade_when_canonical_all_g_pass_j_high_and_tiers_run() -> None:
             "azure-ai-language": "no API budget",
             "aws-comprehend": "vendor pending",
         },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
     )
     assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
     assert verdict.j_value is not None and verdict.j_value >= J_BAR
@@ -200,14 +203,16 @@ def test_claim_grade_when_canonical_all_g_pass_j_high_and_tiers_run() -> None:
 
 def test_provisional_when_blocked_only_by_unrun_tier_c() -> None:
     """[CONTRACT-TEST] PROVISIONAL_SOTA ⟺ everything else passes but Tier-C is
-    not yet run (the ONLY remaining blocker)."""
+    not yet run (the ONLY remaining blocker). gliner2 (Tier-R) is waived here so
+    Tier-C is genuinely the sole remaining tier blocker."""
     theta, names = _strong_posterior()
     verdict = SupremacyVerdict.from_artifacts(
         _canonical_benchmark(),
         theta_samples=theta,
         posterior_names=names,
         pending_overrides=_ALL_PENDING_PASS,
-        # No waivers → Tier-C stays UNRUN.
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+        # No Tier-C waivers → Tier-C stays UNRUN (the sole remaining blocker).
     )
     assert verdict.verdict is Verdict.PROVISIONAL_SOTA
     assert "openai-privacy-filter" in verdict.binding_constraint
@@ -305,14 +310,18 @@ def test_binding_priority_j_gap_outranks_unrun_tier_c() -> None:
 
 
 def test_binding_constraint_always_emitted_empty_only_when_claim_grade() -> None:
-    """[PROPERTY-TEST] binding_constraint is "" iff verdict is CLAIM_GRADE."""
+    """[PROPERTY-TEST] binding_constraint is "" iff verdict is CLAIM_GRADE. The
+    claim branch waives all of Tier-R ∪ Tier-C (incl. gliner2) so it genuinely
+    reaches CLAIM_GRADE and exercises the True side of the biconditional."""
     theta, names = _strong_posterior()
     claim = SupremacyVerdict.from_artifacts(
         _canonical_benchmark(), theta_samples=theta, posterior_names=names,
         pending_overrides=_ALL_PENDING_PASS,
         tier_c_waivers={n: "w" for n in
                         ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired"},
     )
+    assert claim.verdict is Verdict.CLAIM_GRADE_SOTA  # genuinely claim-grade here
     assert (claim.binding_constraint == "") is (claim.verdict is Verdict.CLAIM_GRADE_SOTA)
 
     provisional = SupremacyVerdict.from_artifacts(
@@ -546,14 +555,16 @@ def test_tier_c_unrun_caps_verdict_at_provisional() -> None:
 
 
 def test_tier_c_all_waived_unblocks_claim_grade() -> None:
-    """[CONTRACT-TEST] All Tier-C waived-with-reason satisfies the Tier predicate
-    so (with everything else passing) the verdict is CLAIM_GRADE."""
+    """[CONTRACT-TEST] The WHOLE Tier-R ∪ Tier-C set waived-with-reason (all
+    Tier-C + the unrun Tier-R gliner2) satisfies the §5 tier predicate so (with
+    everything else passing) the verdict is CLAIM_GRADE."""
     theta, names = _strong_posterior()
     verdict = SupremacyVerdict.from_artifacts(
         _canonical_benchmark(), theta_samples=theta, posterior_names=names,
         pending_overrides=_ALL_PENDING_PASS,
         tier_c_waivers={n: "documented reason" for n in
                         ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
     )
     assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
 

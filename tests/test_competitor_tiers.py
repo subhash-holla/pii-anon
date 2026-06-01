@@ -40,6 +40,7 @@ from pii_anon.eval_framework.evaluation.competitor_tiers import (
     default_registry,
     run_status_from_benchmark,
     unrun_tier_c,
+    unrun_tier_r,
     waive,
 )
 
@@ -116,6 +117,29 @@ def test_unrun_tier_c_excludes_waived_and_run_entries() -> None:
     blocking = unrun_tier_c(reg2)
     assert "openai-privacy-filter" not in blocking
     assert blocking == TIER_C_NAMES - {"openai-privacy-filter"}
+
+
+def test_unrun_tier_r_is_all_tier_r_in_bare_default_registry() -> None:
+    """[UNIT-TEST] §5: in the BARE default registry every Tier-R entry is UNRUN
+    (run-status is only derived once a benchmark is applied), so unrun_tier_r ==
+    the full Tier-R set. The interesting case (only gliner2 left) is the one
+    after run-status is applied — see the next test."""
+    reg = default_registry()
+    assert unrun_tier_r(reg) == TIER_R_NAMES
+
+
+def test_unrun_tier_r_excludes_run_and_waived_entries() -> None:
+    """[UNIT-TEST] A RUN or WAIVED Tier-R name drops out of the Tier-R blocking
+    set (symmetric to unrun_tier_c)."""
+    reg = apply_run_status(
+        default_registry(),
+        {"presidio": RunStatus.RUN, "scrubadub": RunStatus.RUN, "gliner": RunStatus.RUN},
+    )
+    assert unrun_tier_r(reg) == frozenset({"gliner2"})  # only gliner2 left unrun
+    reg2 = waive(reg, "gliner2", "adapter not yet wired; cited Tier-R")
+    assert unrun_tier_r(reg2) == frozenset()  # waived ⇒ no longer blocking
+    # Tier-C entries never appear in the Tier-R set.
+    assert unrun_tier_r(reg2).isdisjoint(TIER_C_NAMES)
 
 
 # ---------------------------------------------------------------------------
