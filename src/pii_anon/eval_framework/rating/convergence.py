@@ -47,6 +47,7 @@ Diagnostic definitions
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -78,7 +79,7 @@ class ConvergenceError(Exception):
     """
 
 
-def _as_chains_draws_params(samples: NDArray[np.floating]) -> NDArray[np.float64]:
+def _as_chains_draws_params(samples: NDArray[np.floating[Any]]) -> NDArray[np.float64]:
     """Coerce input to a float64 ``(n_chains, n_draws, n_params)`` array.
 
     A 2-D ``(n_chains, n_draws)`` input is treated as a single parameter.
@@ -111,7 +112,7 @@ def _split_chains(arr: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.concatenate([first, second], axis=0)
 
 
-def split_rhat(samples: NDArray[np.floating]) -> NDArray[np.float64]:
+def split_rhat(samples: NDArray[np.floating[Any]]) -> NDArray[np.float64]:
     """Per-parameter **split** R̂ (split Gelman-Rubin potential scale reduction).
 
     Parameters
@@ -184,7 +185,7 @@ def _autocov(chain: NDArray[np.float64], n_lags: int) -> NDArray[np.float64]:
     return acov_full[:n_lags]
 
 
-def bulk_ess(samples: NDArray[np.floating]) -> NDArray[np.float64]:
+def bulk_ess(samples: NDArray[np.floating[Any]]) -> NDArray[np.float64]:
     """Per-parameter bulk effective sample size (autocorrelation estimator).
 
     Parameters
@@ -325,7 +326,7 @@ class ConvergenceReport:
     @classmethod
     def from_samples(
         cls,
-        samples: NDArray[np.floating],
+        samples: NDArray[np.floating[Any]],
         *,
         n_divergences: NDArray[np.generic] | int | None = 0,
     ) -> ConvergenceReport:
