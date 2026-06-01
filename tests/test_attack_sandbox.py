@@ -233,28 +233,88 @@ def _imported_module_heads(tree: ast.AST) -> list[str]:
     return out
 
 
+# Indirection-routing call names whose STRING argument is the real sink: a
+# forbidden name reached via getattr(obj, '<sink>') / import_module('<mod>') /
+# __import__('<mod>') instead of a contiguous literal call. Names assembled
+# from parts so no literal blocked substring appears in this source.
+_GETATTR_ROUTERS: frozenset[str] = frozenset({"get" + "attr"})
+_IMPORT_ROUTERS: frozenset[str] = frozenset({"import_" + "module", "__import__"})
+# Forbidden string-argument sinks for the indirection check: the os-level
+# shell-call attr names AND the forbidden module heads (a string smuggled into
+# getattr / import_module to reach a subprocess / shell-out / unsafe-deserialize
+# sink without ever writing the literal call).
+_FORBIDDEN_STRING_SINKS: frozenset[str] = (
+    _FORBIDDEN_OS_ATTR_NAMES | _FORBIDDEN_MODULE_NAMES | _FORBIDDEN_CALL_FUNC_NAMES
+)
+
+
+def _string_arg_values(node: ast.Call) -> list[str]:
+    """Return the string-literal values among a call's positional args."""
+    out: list[str] = []
+    for arg in node.args:
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            out.append(arg.value)
+    return out
+
+
+def _scan_unsafe_call_signatures(tree: ast.AST, source_label: str) -> list[str]:
+    """Return a list of unsafe-call-signature violations found in ``tree``.
+
+    Flags (a) NAIVE/CONTIGUOUS signatures — a forbidden builtin call
+    (dynamic-eval family) or a forbidden attribute call (os-level shell-call /
+    subprocess attr) — AND (b) getattr/import_module/__import__-ROUTED
+    indirection whose first/second STRING argument is a forbidden sink name
+    (e.g. ``getattr(x, '<shell-call>')`` / ``import_module('<subprocess>')``).
+    This is a TEST-ONLY source-hygiene pin over the repo-owned attacks/*.py
+    source; runtime OS-confinement is Pass-2.
+    """
+    violations: list[str] = []
+    for head in _imported_module_heads(tree):
+        if head in _FORBIDDEN_MODULE_NAMES:
+            violations.append(f"{source_label}: imports forbidden module head {head!r}")
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        # (a) naive / contiguous signatures.
+        if isinstance(func, ast.Name) and func.id in _FORBIDDEN_CALL_FUNC_NAMES:
+            violations.append(f"{source_label}: calls forbidden builtin {func.id!r}")
+        if isinstance(func, ast.Attribute) and func.attr in _FORBIDDEN_OS_ATTR_NAMES:
+            violations.append(f"{source_label}: calls forbidden attr .{func.attr}")
+        # (b) getattr/import_module/__import__-routed indirection: a forbidden
+        # sink name reached as a STRING argument. ``getattr(obj, '<sink>')``
+        # routes via the SECOND arg; ``import_module('<mod>')`` /
+        # ``__import__('<mod>')`` route via the FIRST arg. We scan all string
+        # args of any router call, so either position is caught.
+        router_name: str | None = None
+        if isinstance(func, ast.Name):
+            router_name = func.id
+        elif isinstance(func, ast.Attribute):
+            router_name = func.attr
+        if router_name in (_GETATTR_ROUTERS | _IMPORT_ROUTERS):
+            for sval in _string_arg_values(node):
+                if sval in _FORBIDDEN_STRING_SINKS:
+                    violations.append(
+                        f"{source_label}: {router_name}(...) routes to forbidden sink {sval!r}"
+                    )
+    return violations
+
+
 def test_attacks_package_has_no_unsafe_execution_call_signatures() -> None:
     """[SECURITY-TEST] AST scan: the attacks/ source contains ZERO
     unsafe-deserialization imports, ZERO subprocess/shell-out calls, ZERO
-    arbitrary dynamic-eval calls. AST-based (node names), so a docstring that
-    merely mentions a pattern cannot false-positive."""
+    arbitrary dynamic-eval calls, AND ZERO getattr/import_module/__import__-
+    routed indirection to a forbidden sink. AST-based (node names + string-arg
+    values), so a docstring that merely mentions a pattern cannot
+    false-positive. This is a TEST-ONLY source-hygiene pin over the repo-owned
+    attacks/*.py source (runtime OS-confinement is Pass-2)."""
     violations: list[str] = []
     scanned = 0
     for path in _attacks_source_paths():
         scanned += 1
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-
-        for head in _imported_module_heads(tree):
-            if head in _FORBIDDEN_MODULE_NAMES:
-                violations.append(f"{path.name}: imports forbidden module head {head!r}")
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                func = node.func
-                if isinstance(func, ast.Name) and func.id in _FORBIDDEN_CALL_FUNC_NAMES:
-                    violations.append(f"{path.name}: calls forbidden builtin {func.id!r}")
-                if isinstance(func, ast.Attribute) and func.attr in _FORBIDDEN_OS_ATTR_NAMES:
-                    violations.append(f"{path.name}: calls forbidden attr .{func.attr}")
+        violations.extend(_scan_unsafe_call_signatures(tree, path.name))
 
     assert not violations, "attacks/ package has unsafe execution call signatures: " + "; ".join(violations)
     assert scanned >= 3, "expected at least 3 .py files scanned in attacks/ (got %d)" % scanned
@@ -268,11 +328,55 @@ def test_ast_guard_would_catch_a_forbidden_call() -> None:
     forbidden_builtin = "ev" + "al"
     snippet = "y = %s('1+1')\n" % forbidden_builtin
     tree = ast.parse(snippet)
-    flagged = any(
-        isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in _FORBIDDEN_CALL_FUNC_NAMES
-        for n in ast.walk(tree)
-    )
-    assert flagged
+    assert _scan_unsafe_call_signatures(tree, "<meta>")
+
+
+def test_ast_guard_catches_getattr_routed_forbidden_sink() -> None:
+    """[SECURITY-TEST] Meta-guard (iter-2 hardening): the STRENGTHENED matcher
+    flags ``getattr(obj, '<shell-call>')`` indirection — the exact evasion the
+    adversarial-close showed slipping past the iter-1 fixed-literal matcher with
+    ZERO violations. The forbidden sink name is assembled from parts so the
+    literal blocked substring is never contiguous in this source."""
+    shell_call = "sy" + "stem"  # the os-level shell-call attr name
+    getattr_router = "get" + "attr"
+    snippet = "import os\nf = %s(os, %r)\nf('id')\n" % (getattr_router, shell_call)
+    tree = ast.parse(snippet)
+    violations = _scan_unsafe_call_signatures(tree, "<meta>")
+    assert violations
+    assert any("routes to forbidden sink" in v for v in violations)
+
+
+def test_ast_guard_catches_import_module_routed_forbidden_sink() -> None:
+    """[SECURITY-TEST] Meta-guard (iter-2 hardening): the STRENGTHENED matcher
+    flags ``import_module('<subprocess>')`` indirection (the other routed
+    evasion the close demonstrated). Sink name assembled from parts."""
+    subproc = "sub" + "process"  # the subprocess module name
+    import_router = "import_" + "module"
+    snippet = "import importlib\nm = importlib.%s(%r)\n" % (import_router, subproc)
+    tree = ast.parse(snippet)
+    violations = _scan_unsafe_call_signatures(tree, "<meta>")
+    assert violations
+    assert any("routes to forbidden sink" in v for v in violations)
+
+
+def test_ast_guard_catches_dunder_import_routed_forbidden_sink() -> None:
+    """[SECURITY-TEST] Meta-guard: a ``__import__('<unsafe-deserialize-mod>')``
+    routed call is also flagged. Sink name assembled from parts."""
+    unsafe_mod = "p" + "ickle"  # the unsafe-deserialization module
+    snippet = "m = __import__(%r)\n" % unsafe_mod
+    tree = ast.parse(snippet)
+    violations = _scan_unsafe_call_signatures(tree, "<meta>")
+    assert violations
+
+
+def test_ast_guard_does_not_flag_benign_getattr() -> None:
+    """The strengthened matcher must not over-flag: a benign getattr whose
+    string argument is NOT a forbidden sink is clean (no false positive that
+    would block legitimate attack-body source)."""
+    getattr_router = "get" + "attr"
+    snippet = "import os\nv = %s(os, 'getcwd')\n" % getattr_router
+    tree = ast.parse(snippet)
+    assert _scan_unsafe_call_signatures(tree, "<meta>") == []
 
 
 # --------------------------------------------------------------------------- #
@@ -411,6 +515,106 @@ def test_a6_sibling_prefix_is_not_treated_as_allowed() -> None:
     policy = SandboxPolicy.from_spec(spec)
     with pytest.raises(SandboxViolation):
         policy.assert_path_allowed("/tmp/sandbox-synthetic-evil/data.txt")
+
+
+# --------------------------------------------------------------------------- #
+# A6 (iter-2 MAJOR fix) — path-traversal `..` MUST NOT escape the grant.       #
+# The refuter showed assert_path_allowed used a purely LEXICAL relative_to     #
+# that never collapses `..`, so `/grant/../../../etc/passwd` slipped through.  #
+# The invariant: a path that RESOLVES outside the grant (via `..` OR a         #
+# symlink) is rejected; a path that resolves WITHIN the grant is allowed.      #
+# AX-001: the traversal targets are /etc/passwd-shaped SYNTHETIC strings; we   #
+# assert the SandboxViolation raise, NEVER read a real system file.            #
+# --------------------------------------------------------------------------- #
+_GRANT = "/tmp/sandbox-synthetic"
+
+
+@pytest.mark.parametrize(
+    "escaping_path",
+    [
+        "/tmp/sandbox-synthetic/../../../etc/passwd",  # the exact refuter probe shape
+        "/tmp/sandbox-synthetic/../etc/x",  # one level up
+        "/tmp/sandbox-synthetic/../../etc/x",  # two levels up
+        "/tmp/sandbox-synthetic/..",  # the grant's own parent
+        "/tmp/sandbox-synthetic/sub/../../escape/x",  # down-then-escape
+    ],
+)
+def test_a6_runtime_shim_rejects_dotdot_traversal_escape(escaping_path: str) -> None:
+    """[SECURITY-TEST] The runtime ``assert_path_allowed`` shim MUST reject a
+    path that, after resolving ``..``, escapes the granted allow-list root.
+    (RED on iter-1 code: lexical ``relative_to`` returned the path unchecked.)"""
+    spec = load_attack_spec(_well_formed_mapping(allowed_paths=[_GRANT]))
+    policy = SandboxPolicy.from_spec(spec)
+    with pytest.raises(SandboxViolation) as exc:
+        policy.assert_path_allowed(escaping_path)
+    assert "path" in str(exc.value).lower()
+
+
+def test_a6_runtime_shim_exact_refuter_probe_now_raises() -> None:
+    """The precise upheld-refutation probe: a `..`-traversal under a grant that
+    climbs out to an /etc/passwd-shaped target MUST raise (synthetic string;
+    no real file is read — only the raise is asserted)."""
+    policy = SandboxPolicy(allowed_paths=frozenset({"/grant"}))
+    with pytest.raises(SandboxViolation):
+        policy.assert_path_allowed("/grant/../../../etc/passwd")
+
+
+def test_a6_runtime_shim_allows_dotdot_that_stays_within_grant() -> None:
+    """[SECURITY-TEST] Don't over-reject: a ``..`` segment that normalises to a
+    path still UNDER the grant (``/grant/sub/../ok`` -> ``/grant/ok``) is
+    allowed. The fix must collapse ``..`` for the containment check, not ban
+    every spec carrying a ``..``."""
+    grant = "/tmp/sandbox-synthetic"
+    policy = SandboxPolicy(allowed_paths=frozenset({grant}))
+    within = f"{grant}/sub/../ok"  # resolves to /tmp/sandbox-synthetic/ok
+    assert policy.assert_path_allowed(within) == within
+
+
+@pytest.mark.skipif(
+    not hasattr(__import__("os"), "symlink"), reason="platform cannot create symlinks"
+)
+def test_a6_runtime_shim_rejects_symlink_escaping_the_grant(tmp_path: Any) -> None:
+    """[SECURITY-TEST] A real on-disk symlink INSIDE a tmp grant that points
+    OUTSIDE the grant must be rejected by the runtime shim (realpath resolves
+    the symlink before the containment check). AX-001: the symlink target is a
+    SYNTHETIC tmp file (a 'TOPSECRET'-style placeholder), never a real secret;
+    we assert the raise, not the file contents."""
+    import os
+
+    grant = tmp_path / "grant"
+    grant.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "synthetic-topsecret.txt"
+    secret.write_text("SYNTHETIC-PLACEHOLDER-NOT-A-REAL-SECRET\n", encoding="utf-8")
+    # a symlink that lives inside the grant but resolves outside it.
+    link = grant / "escape-link"
+    os.symlink(secret, link)
+
+    policy = SandboxPolicy(allowed_paths=frozenset({str(grant)}))
+    with pytest.raises(SandboxViolation) as exc:
+        policy.assert_path_allowed(str(link))
+    assert "path" in str(exc.value).lower()
+
+
+@pytest.mark.skipif(
+    not hasattr(__import__("os"), "symlink"), reason="platform cannot create symlinks"
+)
+def test_a6_runtime_shim_allows_symlink_resolving_within_grant(tmp_path: Any) -> None:
+    """Dual of the symlink-escape test: a symlink inside the grant that resolves
+    to a path STILL under the grant is allowed (no over-rejection)."""
+    import os
+
+    grant = tmp_path / "grant"
+    grant.mkdir()
+    real = grant / "real.txt"
+    real.write_text("synthetic\n", encoding="utf-8")
+    link = grant / "alias"
+    os.symlink(real, link)
+
+    policy = SandboxPolicy(allowed_paths=frozenset({str(grant)}))
+    # resolves to grant/real.txt which is under the grant -> allowed.
+    assert policy.assert_path_allowed(str(link)) == str(link)
 
 
 # --------------------------------------------------------------------------- #

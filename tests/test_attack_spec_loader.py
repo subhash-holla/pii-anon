@@ -223,6 +223,60 @@ def test_a6_params_path_inside_allowed_paths_is_accepted() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# A6 (load, iter-2 MAJOR fix) — a `*_path` param using `..` traversal to       #
+# escape allowed_paths MUST be refused at LOAD time. The refuter showed the    #
+# lexical containment check let `/grant/../../../etc/passwd` through as a       #
+# valid AttackSpec. Load-time validation must normalise `..` (os.path.normpath #
+# — no filesystem dependence) and reject any path that escapes the normalised  #
+# grant. AX-001: targets are /etc/passwd-shaped SYNTHETIC strings; we assert   #
+# the SandboxViolation raise, never read a real file.                          #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "escaping_path",
+    [
+        "/tmp/sandbox-synthetic/../../../etc/passwd",  # the exact refuter probe shape
+        "/tmp/sandbox-synthetic/../etc/x",  # one level up
+        "/tmp/sandbox-synthetic/../../etc/x",  # two levels up
+        "/tmp/sandbox-synthetic/..",  # the grant's own parent
+        "/tmp/sandbox-synthetic/sub/../../escape/x",  # down-then-escape
+    ],
+)
+def test_a6_load_time_dotdot_traversal_path_is_refused(escaping_path: str) -> None:
+    """[SECURITY-TEST] A ``*_path`` param that uses ``..`` to climb out of the
+    declared ``allowed_paths`` is refused at load time naming the field/path.
+    (RED on iter-1 code: lexical containment accepted the escaping path.)"""
+    bad = _well_formed_mapping()
+    bad["allowed_paths"] = ["/tmp/sandbox-synthetic"]
+    bad["params"] = {"corpus_path": escaping_path}
+    with pytest.raises(SandboxViolation) as exc:
+        load_attack_spec(bad)
+    assert "corpus_path" in str(exc.value) or "path" in str(exc.value).lower()
+
+
+def test_a6_load_time_exact_refuter_probe_now_raises() -> None:
+    """The precise upheld-refutation probe at load time: a `..`-traversal
+    `corpus_path` under the grant that climbs out to an /etc/passwd-shaped
+    target MUST raise SandboxViolation (synthetic string; no real read)."""
+    bad = _well_formed_mapping()
+    bad["allowed_paths"] = ["/grant"]
+    bad["params"] = {"corpus_path": "/grant/../../../etc/passwd"}
+    with pytest.raises(SandboxViolation):
+        load_attack_spec(bad)
+
+
+def test_a6_load_time_dotdot_within_grant_is_accepted() -> None:
+    """[SECURITY-TEST] Don't over-reject at load: a ``*_path`` whose ``..``
+    normalises to a path STILL under the grant (``/grant/sub/../ok`` ->
+    ``/grant/ok``) is accepted (the fix collapses ``..`` for the containment
+    check; it does not ban every spec carrying a ``..``)."""
+    ok = _well_formed_mapping()
+    ok["allowed_paths"] = ["/tmp/sandbox-synthetic"]
+    ok["params"] = {"corpus_path": "/tmp/sandbox-synthetic/sub/../ok"}
+    spec = load_attack_spec(ok)
+    assert "/tmp/sandbox-synthetic" in spec.allowed_paths
+
+
+# --------------------------------------------------------------------------- #
 # Structural validation: unknown kind / missing required fields refused.      #
 # --------------------------------------------------------------------------- #
 def test_unknown_attack_kind_is_refused() -> None:
