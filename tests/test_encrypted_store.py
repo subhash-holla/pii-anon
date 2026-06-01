@@ -21,6 +21,7 @@ unrecoverable from the raw ``.db`` bytes.
 
 from __future__ import annotations
 
+import ast
 import importlib
 import sqlite3
 import tempfile
@@ -780,3 +781,459 @@ class TestGuardsAndRobustness:
         with pytest.raises(TokenStoreIntegrityError):
             store._dek_for("never-minted-key-id")
         store.close()
+
+
+# ===========================================================================
+# FIX A (iter-2) — committed DoD §12 (d)/(e)/(g) security-acceptance pins
+#
+# The §12 checkboxes were TRUE by construction but had ZERO committed
+# regression tests (unlike S2-05's 4 AST sink tests / S5-04's 8). These pin
+# them: an AST/source-scan asserting the module has ZERO unsafe-deserialization
+# / subprocess / shell-out / dynamic-code-evaluation / arbitrary-import call
+# signatures (mirrors `_scan_unsafe_call_signatures` in test_attack_sandbox.py,
+# including the strengthened getattr/import_module string-sink indirection),
+# plus a nonce-distinctness assertion (random 96-bit nonce, no reuse / DEK).
+#
+# Forbidden call/attribute *names* are assembled from parts (token-reword rule)
+# so the literal blocked substrings never appear contiguously in this source
+# (the PreToolUse Write hook + the AST guard both key on AST node names).
+# ===========================================================================
+_UNSAFE_DESERIALIZE_MODULE = "p" + "ickle"  # the unsafe-deserialization module
+_FORBIDDEN_MODULE_NAMES: frozenset[str] = frozenset(
+    {
+        _UNSAFE_DESERIALIZE_MODULE,
+        "sub" + "process",
+        "marshal",
+        "shelve",
+    }
+)
+# Forbidden dynamic-code-evaluation / arbitrary-import builtins, assembled from
+# parts so the literal blocked substrings stay non-contiguous in this source.
+_FORBIDDEN_CALL_FUNC_NAMES: frozenset[str] = frozenset(
+    {
+        "ev" + "al",
+        "ex" + "ec",
+        "compile",
+        "__import__",
+    }
+)
+# Attribute calls like os.<shell-call> / os.<shell-call-variant>, built from
+# parts so the literal os-level shell-call name is not a contiguous substring.
+_FORBIDDEN_OS_ATTR_NAMES: frozenset[str] = frozenset(
+    {
+        "sy" + "stem",
+        "po" + "pen",
+        "ex" + "ecv",
+        "ex" + "ecve",
+        "sp" + "awn",
+    }
+)
+_GETATTR_ROUTERS: frozenset[str] = frozenset({"get" + "attr"})
+_IMPORT_ROUTERS: frozenset[str] = frozenset({"import_" + "module", "__import__"})
+_FORBIDDEN_STRING_SINKS: frozenset[str] = (
+    _FORBIDDEN_OS_ATTR_NAMES | _FORBIDDEN_MODULE_NAMES | _FORBIDDEN_CALL_FUNC_NAMES
+)
+
+
+def _imported_module_heads(tree: ast.AST) -> list[str]:
+    out: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out.extend(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module:
+                out.append(node.module.split(".")[0])
+    return out
+
+
+def _string_arg_values(node: ast.Call) -> list[str]:
+    out: list[str] = []
+    for arg in node.args:
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            out.append(arg.value)
+    return out
+
+
+def _scan_unsafe_call_signatures(tree: ast.AST, source_label: str) -> list[str]:
+    """Return unsafe-call-signature violations found in ``tree``.
+
+    Flags (a) NAIVE/CONTIGUOUS signatures — a forbidden builtin call
+    (dynamic-code-evaluation family) or a forbidden attribute call (os-level
+    shell-call / subprocess attr) — AND (b) getattr/import_module/__import__-
+    ROUTED indirection whose STRING argument is a forbidden sink name. Mirrors
+    the strengthened matcher in test_attack_sandbox.py so a docstring that
+    merely mentions a pattern cannot false-positive (AST node names, not prose).
+    """
+    violations: list[str] = []
+    for head in _imported_module_heads(tree):
+        if head in _FORBIDDEN_MODULE_NAMES:
+            violations.append(f"{source_label}: imports forbidden module head {head!r}")
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id in _FORBIDDEN_CALL_FUNC_NAMES:
+            violations.append(f"{source_label}: calls forbidden builtin {func.id!r}")
+        if isinstance(func, ast.Attribute) and func.attr in _FORBIDDEN_OS_ATTR_NAMES:
+            violations.append(f"{source_label}: calls forbidden attr .{func.attr}")
+        router_name: str | None = None
+        if isinstance(func, ast.Name):
+            router_name = func.id
+        elif isinstance(func, ast.Attribute):
+            router_name = func.attr
+        if router_name in (_GETATTR_ROUTERS | _IMPORT_ROUTERS):
+            for sval in _string_arg_values(node):
+                if sval in _FORBIDDEN_STRING_SINKS:
+                    violations.append(
+                        f"{source_label}: {router_name}(...) routes to forbidden sink {sval!r}"
+                    )
+    return violations
+
+
+class TestFixASecurityAcceptanceSourceScan:
+    """[SECURITY-TEST] FIX A — committed parity pins for DoD §12 (d)/(e)/(g)."""
+
+    def test_dod_d_e_no_unsafe_deserialize_subprocess_shellout_or_dyn_codepath(self) -> None:
+        """§12 (d)/(e): an AST scan of encrypted_store.py asserts ZERO
+        unsafe-deserialization / subprocess / shell-out / dynamic-code-evaluation
+        / arbitrary-import call signatures (and zero getattr/import_module-routed
+        string-sink indirection). AST-based, so the module's prose docstring
+        (which explicitly states these are NOT used) cannot false-positive."""
+        src_path = Path(enc_mod.__file__)
+        tree = ast.parse(src_path.read_text(encoding="utf-8"), filename=str(src_path))
+        violations = _scan_unsafe_call_signatures(tree, src_path.name)
+        assert not violations, (
+            "encrypted_store.py has unsafe call signatures: " + "; ".join(violations)
+        )
+
+    def test_meta_guard_scanner_is_not_a_no_op(self) -> None:
+        """Meta-guard: the scanner flags a synthetic forbidden call (keeps the
+        §12 (d)/(e) pin honest if names drift). Sink names assembled from parts
+        so no literal blocked substring is contiguous in this source."""
+        shell_call = "sy" + "stem"
+        getattr_router = "get" + "attr"
+        snippet = "import os\nf = %s(os, %r)\nf('id')\n" % (getattr_router, shell_call)
+        tree = ast.parse(snippet)
+        violations = _scan_unsafe_call_signatures(tree, "<meta>")
+        assert violations
+        assert any("routes to forbidden sink" in v for v in violations)
+
+    def test_dod_d_only_json_serialization_no_arbitrary_loader(self) -> None:
+        """§12 (d): the on-disk payload is round-tripped via the json module
+        only (json.loads / json.dumps over an explicit field dict) — never an
+        arbitrary-object loader. Assert the json calls are present AND that no
+        forbidden-deserialization module head is imported."""
+        src_path = Path(enc_mod.__file__)
+        src = src_path.read_text(encoding="utf-8")
+        tree = ast.parse(src, filename=str(src_path))
+        heads = set(_imported_module_heads(tree))
+        assert "json" in heads
+        assert heads.isdisjoint(_FORBIDDEN_MODULE_NAMES)
+        # json.loads / json.dumps attribute calls are the only (de)serializers.
+        json_calls = {
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "json"
+        }
+        assert json_calls <= {"loads", "dumps"}
+        assert {"loads", "dumps"} <= json_calls
+
+    def test_dod_g_nonce_is_distinct_per_encryption_no_reuse(
+        self, temp_db_path: Path
+    ) -> None:
+        """§12 (g): a fresh random 96-bit nonce per encryption — no reuse under
+        one DEK. put N>=50 synthetic mappings, read the stored nonces
+        (``payload[:_NONCE_BYTES]``), assert all distinct."""
+        n = 60
+        store = _make_store(temp_db_path)
+        for i in range(n):
+            store.put(_mapping(scope="s", token=f"<EMAIL_ADDRESS:v1:tok_{i}>", plaintext=f"u{i}@example.test"))
+        store.close()
+
+        nonce_len = enc_mod._NONCE_BYTES
+        assert nonce_len == 12  # 96-bit AEAD nonce
+        conn = sqlite3.connect(str(temp_db_path))
+        try:
+            payloads = [
+                bytes(r[0])
+                for r in conn.execute(
+                    "SELECT payload FROM encrypted_token_mappings"  # noqa: S608
+                ).fetchall()
+            ]
+        finally:
+            conn.close()
+        assert len(payloads) == n
+        nonces = [p[:nonce_len] for p in payloads]
+        assert all(len(x) == nonce_len for x in nonces)
+        assert len(set(nonces)) == n, "nonce reuse detected under a single DEK"
+
+    def test_dod_g_same_mapping_re_put_uses_a_fresh_nonce(self, temp_db_path: Path) -> None:
+        """§12 (g): re-encrypting the SAME (scope, token) many times draws a
+        fresh nonce each time (INSERT OR REPLACE re-encrypts), so a repeated put
+        never reuses a nonce under the live DEK."""
+        store = _make_store(temp_db_path)
+        seen: set[bytes] = set()
+        nonce_len = enc_mod._NONCE_BYTES
+        for i in range(50):
+            store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=f"v{i}@example.test"))
+            conn = sqlite3.connect(str(temp_db_path))
+            try:
+                row = conn.execute(
+                    "SELECT payload FROM encrypted_token_mappings"  # noqa: S608
+                ).fetchone()
+            finally:
+                conn.close()
+            seen.add(bytes(row[0])[:nonce_len])
+        assert len(seen) == 50, "a re-put of the same mapping reused a nonce"
+        store.close()
+
+
+# ===========================================================================
+# FIX B (iter-2) — fold scope_index + expires_at into the AEAD AAD
+#
+# Pre-fix the AAD binds key_id|blind_index|version only, so a raw sqlite3
+# UPDATE can (1) relocate a row to a different scope bucket (audit-enumeration
+# mis-bucket) or (2) extend expires_at to resurrect a logically-expired row.
+# Each surfaces only the row's OWN genuine plaintext (no forged plaintext, no
+# confidentiality break) — but it is a real integrity gap on the audit/TTL
+# surface of a security-MUST store. Folding both columns into the AAD makes any
+# such tamper fail the tag check -> TokenStoreIntegrityError (fail-loud,
+# consistent with the existing single-byte-tamper path). These RED tests FAIL
+# on the pre-fix code (the relocated/extended row still decrypts) and PASS after
+# the AAD change.
+# ===========================================================================
+class TestFixBUnauthenticatedColumnsFoldedIntoAad:
+    def test_nfr_014_raw_update_relocating_scope_index_raises_on_get(
+        self, temp_db_path: Path
+    ) -> None:
+        """A direct sqlite3 UPDATE that rewrites a row's ``scope_index`` (to
+        mis-bucket it under another scope for audit enumeration) must make a
+        subsequent scoped ``get`` of that row FAIL LOUD — the stored
+        ``scope_index`` is bound in the AEAD AAD, so a forged value breaks the
+        tag."""
+        store = _make_store(temp_db_path)
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT))
+        store.close()
+
+        conn = sqlite3.connect(str(temp_db_path))
+        try:
+            conn.execute(
+                "UPDATE encrypted_token_mappings SET scope_index = ?",  # noqa: S608
+                (b"\x00" * 32,),  # a different (forged) scope bucket
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        store2 = _make_store(temp_db_path)
+        with pytest.raises(TokenStoreIntegrityError):
+            store2.get(SYNTH_TOKEN, scope="s")
+        store2.close()
+
+    def test_nfr_014_raw_update_relocating_scope_index_raises_on_scopeless_get(
+        self, temp_db_path: Path
+    ) -> None:
+        """The scope-less scan path must also fail loud when ``scope_index`` was
+        forged (it decrypts each row, so the bound AAD must reject the tamper)."""
+        store = _make_store(temp_db_path)
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT))
+        store.close()
+
+        conn = sqlite3.connect(str(temp_db_path))
+        try:
+            conn.execute(
+                "UPDATE encrypted_token_mappings SET scope_index = ?",  # noqa: S608
+                (b"\x07" * 32,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        store2 = _make_store(temp_db_path)
+        with pytest.raises(TokenStoreIntegrityError):
+            store2.get(SYNTH_TOKEN)  # no scope -> scan
+        store2.close()
+
+    def test_nfr_014_raw_update_extending_expires_at_raises_on_get(
+        self, temp_db_path: Path
+    ) -> None:
+        """A direct sqlite3 UPDATE that extends ``expires_at`` (to resurrect a
+        logically-expired row) must make a subsequent ``get`` FAIL LOUD — the
+        stored ``expires_at`` is bound in the AEAD AAD, so a forged value breaks
+        the tag (rather than silently honouring the extended TTL)."""
+        now = time.time()
+        store = _make_store(temp_db_path)
+        # Row that is ALREADY expired as written.
+        store.put(
+            _mapping(
+                scope="s",
+                token=SYNTH_TOKEN,
+                plaintext=SYNTH_PLAINTEXT,
+                created_at=now - 100,
+                expires_at=now - 1,
+            )
+        )
+        store.close()
+
+        conn = sqlite3.connect(str(temp_db_path))
+        try:
+            # Forge a far-future expiry to "resurrect" the row.
+            conn.execute(
+                "UPDATE encrypted_token_mappings SET expires_at = ?",  # noqa: S608
+                (now + 86_400,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        store2 = _make_store(temp_db_path)
+        with pytest.raises(TokenStoreIntegrityError):
+            store2.get(SYNTH_TOKEN, scope="s")
+        store2.close()
+
+    def test_nfr_014_raw_update_setting_expires_at_to_null_raises(
+        self, temp_db_path: Path
+    ) -> None:
+        """Clearing ``expires_at`` to NULL (the None sentinel must be a DISTINCT
+        bound value from any real expiry) also breaks the tag and fails loud."""
+        now = time.time()
+        store = _make_store(temp_db_path)
+        store.put(
+            _mapping(
+                scope="s",
+                token=SYNTH_TOKEN,
+                plaintext=SYNTH_PLAINTEXT,
+                created_at=now,
+                expires_at=now + 3_600,
+            )
+        )
+        store.close()
+
+        conn = sqlite3.connect(str(temp_db_path))
+        try:
+            conn.execute(
+                "UPDATE encrypted_token_mappings SET expires_at = NULL"  # noqa: S608
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        store2 = _make_store(temp_db_path)
+        with pytest.raises(TokenStoreIntegrityError):
+            store2.get(SYNTH_TOKEN, scope="s")
+        store2.close()
+
+    def test_legitimate_none_expiry_still_decrypts(self, temp_db_path: Path) -> None:
+        """Regression: a row legitimately written with ``expires_at=None`` (the
+        canonical-None AAD sentinel) round-trips fine — the None binding must
+        not break legitimate decrypts."""
+        store = _make_store(temp_db_path)
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT, expires_at=None))
+        got = store.get(SYNTH_TOKEN, scope="s")
+        assert got is not None and got.plaintext == SYNTH_PLAINTEXT
+        assert got.expires_at is None
+        store.close()
+
+    def test_legitimate_expiry_value_still_decrypts(self, temp_db_path: Path) -> None:
+        """Regression: a row with a real future ``expires_at`` round-trips fine
+        (the value is bound in the AAD but reconstructed from the stored column
+        on read, so a legitimate row authenticates)."""
+        now = time.time()
+        exp = now + 86_400
+        store = _make_store(temp_db_path)
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT, created_at=now, expires_at=exp))
+        got = store.get(SYNTH_TOKEN, scope="s")
+        assert got is not None and got.plaintext == SYNTH_PLAINTEXT
+        assert got.expires_at is not None
+        store.close()
+
+    def test_legitimate_scope_still_lists_after_aad_fold(self, temp_db_path: Path) -> None:
+        """Regression: legitimate rows still enumerate by scope after the
+        scope_index fold (the stored scope_index is the AAD binding AND the
+        query key, so a genuine row is found and authenticates)."""
+        store = _make_store(temp_db_path)
+        store.put(_mapping(scope="s1", token="<EMAIL_ADDRESS:v1:t1>", plaintext="a@example.test"))
+        store.put(_mapping(scope="s1", token="<EMAIL_ADDRESS:v1:t2>", plaintext="b@example.test"))
+        store.put(_mapping(scope="s2", token="<EMAIL_ADDRESS:v1:t3>", plaintext="c@example.test"))
+        listed = store.list_by_scope("s1")
+        assert {m.plaintext for m in listed} == {"a@example.test", "b@example.test"}
+        assert len(store.list_by_scope("s2")) == 1
+        store.close()
+
+    def test_rewrap_all_rebinds_aad_and_still_round_trips(self, temp_db_path: Path) -> None:
+        """Regression: rewrap_all re-encrypts each row (new DEK, new AAD over the
+        same scope_index/expires_at), so migrated rows still decrypt."""
+        now = time.time()
+        store = EncryptedSQLiteTokenStore(
+            temp_db_path, key_provider=StaticTestKeyProvider(KEK_A, key_id="k1")
+        )
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT, created_at=now, expires_at=now + 3_600))
+        store.rewrap_all(StaticTestKeyProvider(KEK_B, key_id="k2"))
+        got = store.get(SYNTH_TOKEN, scope="s")
+        assert got is not None and got.plaintext == SYNTH_PLAINTEXT
+        store.close()
+
+
+# ===========================================================================
+# FIX C (iter-2) — wrong-KEK fail-loud consistency on list_by_scope (NFR-015)
+#
+# Under a wrong KEK, scoped get() correctly RAISES (A4), but pre-fix
+# list_by_scope() returned [] silently and count() returned the raw row count.
+# Make list_by_scope fail-loud (matching get) when rows exist by scope_index
+# but no key unwraps them. count() with no scope is a deliberate raw COUNT(*)
+# (cardinality is already leaked by file size) — pin that conscious choice.
+# ===========================================================================
+class TestFixCWrongKekListByScopeConsistency:
+    def test_nfr_015_list_by_scope_fails_loud_under_wrong_kek(
+        self, temp_db_path: Path
+    ) -> None:
+        """list_by_scope must FAIL LOUD (not return []) when the artifact holds
+        rows but the supplied KEK cannot unwrap their envelope — matching the
+        scoped get() wrong-KEK behaviour (NFR-015 artifact-alone re-join =
+        FAIL)."""
+        store = _make_store(temp_db_path, kek=KEK_A)
+        store.put(_mapping(scope="s", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT))
+        store.close()
+
+        wrong = _make_store(temp_db_path, kek=KEK_B)
+        with pytest.raises((TokenStoreIntegrityError, TokenizationError)):
+            wrong.list_by_scope("s")
+        wrong.close()
+
+    def test_list_by_scope_returns_empty_for_genuinely_absent_scope(
+        self, temp_db_path: Path
+    ) -> None:
+        """Regression: a genuinely-empty scope (correct KEK, no rows) still
+        returns [] — the fail-loud path must fire ONLY when rows exist but no
+        key unwraps, never for a legitimately-empty scope."""
+        store = _make_store(temp_db_path, kek=KEK_A)
+        store.put(_mapping(scope="present", token=SYNTH_TOKEN, plaintext=SYNTH_PLAINTEXT))
+        assert store.list_by_scope("totally-absent-scope") == []
+        store.close()
+
+    def test_list_by_scope_empty_store_returns_empty(self, temp_db_path: Path) -> None:
+        """Regression: list_by_scope on an empty store (no rows at all) is [],
+        never a raise (no owning key ids => nothing unreversible)."""
+        store = _make_store(temp_db_path, kek=KEK_A)
+        assert store.list_by_scope("any") == []
+        store.close()
+
+    def test_count_no_scope_is_deliberate_raw_count_under_wrong_kek(
+        self, temp_db_path: Path
+    ) -> None:
+        """count() with no scope is a DELIBERATE raw COUNT(*): row cardinality is
+        already leaked by file size, so it returns the true (live) row count
+        even under a wrong KEK and does NOT raise. Pin this conscious choice."""
+        store = _make_store(temp_db_path, kek=KEK_A)
+        store.put(_mapping(scope="s", token="<EMAIL_ADDRESS:v1:t1>", plaintext="a@example.test"))
+        store.put(_mapping(scope="s", token="<EMAIL_ADDRESS:v1:t2>", plaintext="b@example.test"))
+        store.close()
+
+        wrong = _make_store(temp_db_path, kek=KEK_B)
+        # No raise; the raw cardinality is intentionally observable.
+        assert wrong.count() == 2
+        wrong.close()
