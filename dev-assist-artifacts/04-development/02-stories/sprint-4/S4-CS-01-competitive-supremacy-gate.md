@@ -77,6 +77,43 @@ Always emit `binding_constraint` (single most important failing item, priority: 
 
 **State**: REVIEW (in_progress→review 2026-06-01). *AGENT_SIMULATED execution: full suite + ruff + mypy ran on the dev `.venv` (numpy 2.0.2; numpyro/jax ABSENT → bayes-J path SKIPs). CLAIM_GRADE is itself gated on a regenerated canonical run (G7, S7) + the Tier-C Pass-2 API runs — neither is agent-simulated as real (methodology invariant).*
 
+---
+
+### Iteration 2 — in-loop gate remediation (REQUEST_CHANGES: 1 MAJOR axiom + minors)
+
+**Iteration-2 commit SHAs (RED precedes GREEN precedes REFACTOR):**
+- RED   `c407f52` — `test: S4-CS-01 RED (iter-2) — pin RecallFloorVerdictGuard (G7 AXIOM-S4CS01-001) + Tier-R∪Tier-C gating + strengthen J-unavailable assertion + correct boundary rationale`
+- GREEN `4a04d0f` — `feat: S4-CS-01 GREEN (iter-2) — RecallFloorVerdictGuard (G7 + ranking coupling) + Tier-R∪Tier-C CLAIM_GRADE gating`
+- REFACTOR `719df4b` — `refactor: S4-CS-01 (iter-2) — make _guarded_rank1 crown tie-break deterministic-consistent`
+
+**FIX 1 — MAJOR (AXIOM-S4CS01-001) RecallFloorVerdictGuard — IMPLEMENTED (not deferred):**
+- `recall_floor_breachers(benchmark, systems) -> frozenset[str]` (new, pure, exported) — a **recall-specific** breach predicate: a system breaches if its `qualification_status` is non-qualifying (∉ `{core, qualified}`, missing ⇒ non-qualifying/fail-loud) OR the run breaches (`_run_breaches_recall_floor`: per-language ε > `EPS_RECALL_PER_LANG` when the artifact is present — absent ⇒ PENDING-not-fabricated — OR a failing `recall`/`f1` profile floor-check). **Latency/throughput floor-checks are carved out** (the conflated ensemble `floor_pass` is deliberately NOT consulted; the real artifact's `floor_pass=False` is latency-driven, not a recall breach).
+- **Ranking/J coupling** (`_guarded_rank1`): the rank-1 argmax is computed over the floor-**compliant** columns only → a breacher can never be J-argmax; if pii-anon itself breaches, its J is forced to 0.0. New `j_rank1_system` field surfaces the crowned (compliant) system.
+- **G7 coupling** (`_g7_certified_run`): G7 FAILS if the top-composite system breaches OR the pii-anon claimant breaches — guard `binding_detail` names the floor breach.
+- **[PROPERTY-TEST] the teeth** — `test_floor_breacher_with_highest_composite_never_top_ranks` **PASSED**: a floor-breaching system with the STRICTLY highest composite (0.99 > pii-anon 0.80) is NOT J-argmax (`j_rank1_system != "rogue-sota"`), is in `recall_floor_breachers`, AND the verdict is not CLAIM_GRADE with `G7.passed is False`. Companion `test_floor_compliant_top_system_passes_the_recall_floor_guard` **PASSED** (clean top system → guard does not demote; crowned = `pii-anon`).
+- **CRITICAL invariant preserved** — `test_real_artifact_recall_floor_guard_does_not_perturb_headline` **PASSED**: on today's REAL artifact pii-anon is NOT a recall-floor breacher (latency-only floor failure correctly carved out), and the headline stays `NOT_YET` / `binding_constraint = canonical_claim_run=False (G7 certified-run gate)` (canonical = binding-priority #1, ahead of the guard sub-condition). Existing real-artifact test still green.
+
+**FIX 2 — substantive (requirements-coverage OBS) §5 Tier-R ∪ Tier-C gating — FIXED:**
+- `_decide` now gates `CLAIM_GRADE` on **(Tier-R ∪ Tier-C) all RUN-or-WAIVED** (was Tier-C only). New `unrun_tier_r` registry helper + honesty field + `from_artifacts(unrun_tier_r_waivers=...)` param (shares the reason-mandatory `waive` path). Binding-constraint message surfaces unrun Tier-C then unrun Tier-R.
+- `test_unrun_tier_r_gliner2_blocks_claim_grade` **PASSED** (gliner2 UNRUN, no waiver, all else satisfied ⟹ PROVISIONAL, `"gliner2" in binding_constraint`); `test_waived_tier_r_gliner2_unblocks_claim_grade` **PASSED** (gliner2 WAIVED-with-reason ⟹ CLAIM_GRADE, `binding_constraint == ""`). 3 pre-existing CLAIM_GRADE tests + 1 PROVISIONAL test updated to waive gliner2 (they encoded the Tier-C-only defect).
+
+**FIX 3 — code-quality MINOR — strengthened:** `test_j_unavailable_cannot_be_claim_grade` now asserts `verdict is Verdict.NOT_YET` (+ `"J" in binding_constraint`) with an inline §5 citation (J ≥ 0.95 required for CLAIM_GRADE *and* PROVISIONAL). **PASSED.**
+
+**FIX 4 — axiom MINOR-2 — boundary-test rationale corrected:** `tests/test_rating_import_boundary.py` docstring + section comment now state the real reason for the per-module scope (forward-proof the 2 gate modules). Corrected the mis-location: `competitor_compare.py`'s `from pii_anon.moe import …` (line 909) lives in the **sibling** `src/pii_anon/evaluation/` package — NOT under the scanned `eval_framework/evaluation/`, which the glob never reaches (verified: `find src -name competitor_compare.py` ⇒ `src/pii_anon/evaluation/competitor_compare.py` only).
+
+**Iteration-2 test counts:** +12 new tests (`test_competitive_supremacy.py` 37→47, +10: 6 RecallFloorVerdictGuard + 3 Tier-R-gate + 1 real-artifact guard invariant; `test_competitor_tiers.py` 19→21, +2 `unrun_tier_r` helper) + 1 strengthened (J-unavailable). Owned-file tests: **72 passed** (`test_competitive_supremacy.py` 47 + `test_competitor_tiers.py` 21 + `test_rating_import_boundary.py` 4).
+
+**Iteration-2 quality gates:**
+- Full suite: **2876 passed, 15 skipped, 9 deselected, 0 failed** (`python3 -m pytest`, 17m53s, exit 0). (+12 from 2864.)
+- Coverage: **86.17%** (`--cov-fail-under=84` reached).
+- ruff: **clean** (`All checks passed!`). mypy --strict: **clean** (`Success: no issues found in 122 source files`, `mypy src/pii_anon`).
+- `supremacy` CLI re-run on the REAL (read-only) artifact: `NOT_YET` / `binding canonical_claim_run=False` / `J=1.0 mle-bootstrap`, **exit 0**; `--canonical-claim` **exit 1**.
+- `evaluation/competitor_compare.py` **byte-identical** (md5 `7cae16c89f4c97136e1a12394dae2025` unchanged — RISK-6). No new deps (gate stays stdlib + numpy; bayes-J still importorskip). All user-WIP md5 unchanged (`orchestrator.py` `0afc6dee…`, `test_moe_enhancements.py` `910e9cd6…`, `benchmark-diagnostics.json` `47f9b116…`, `README.md` `8a0f1000…`); artifacts/benchmarks/* READ-ONLY (never written).
+
+---
+
+#### Iteration-1 evidence (original build)
+
 **Commit SHAs (RED precedes GREEN precedes REFACTOR):**
 - RED   `512311b` — `test: S4-CS-01 RED — pin SDO CompetitiveSupremacyGate verdict machine + Tier-R/Tier-C registry`
 - GREEN `b8c9d9b` — `feat: S4-CS-01 GREEN — CompetitiveSupremacyGate (SDO) + Tier-R/Tier-C registry`
@@ -122,3 +159,5 @@ Always emit `binding_constraint` (single most important failing item, priority: 
 - 2026-06-01 — GREEN `b8c9d9b`: gate + tier registry + `paired_bootstrap_draws` + `supremacy` CLI; 92 owned tests pass; real-artifact verdict NOT_YET / binding canonical_claim_run=False / J=1.0(mle-bootstrap).
 - 2026-06-01 — REFACTOR `27ce89a`: drop dead code (behaviour-identical); ruff + mypy --strict clean.
 - 2026-06-01 — Full suite 2864 passed / 15 skipped / 0 failed, coverage 86.13%. IN_PROGRESS → REVIEW. Awaiting story-gate (code-quality + axiom-compliance + traceability + requirements-coverage; security-sast on CLI/load; performance on G5 reads).
+- 2026-06-01 — **Story-gate iteration-1 = REQUEST_CHANGES** (6 reviewers): 1 MAJOR axiom-compliance (AXIOM-S4CS01-001: RecallFloorVerdictGuard absent) + minors (requirements-coverage §5 Tier-R∪Tier-C; code-quality weak J-unavailable assertion; axiom boundary-rationale mis-location).
+- 2026-06-01 — **Iteration-2 in-loop remediation** (TDD RED→GREEN→REFACTOR): RED `c407f52` → GREEN `4a04d0f` → REFACTOR `719df4b`. Implemented the RecallFloorVerdictGuard (recall-specific breach predicate + J/ranking exclusion + G7 sub-condition); fixed §5 to gate CLAIM_GRADE on (Tier-R ∪ Tier-C) all RUN-or-WAIVED (unrun gliner2 now blocks); strengthened the J-unavailable assertion to NOT_YET; corrected the boundary-test rationale (competitor_compare.py is in the sibling `evaluation/`, not the scanned `eval_framework/evaluation/`). +12 new tests; the property-test teeth (floor-breacher with top composite never crowned + cannot be CLAIM_GRADE) PASS; real-artifact headline UNCHANGED (NOT_YET / canonical_claim_run=False / J=1.0). Full suite 2876 passed / 15 skipped / 0 failed, coverage 86.17%; ruff + mypy --strict clean; competitor_compare.py byte-identical; user-WIP md5 unchanged. State remains REVIEW — gate re-runs.
