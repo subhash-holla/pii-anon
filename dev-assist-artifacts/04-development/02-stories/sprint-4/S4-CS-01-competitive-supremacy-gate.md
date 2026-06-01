@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E-CS Competitive-Supremacy** (new; DC-11 CanonicalRunGate / RecallFloorVerdictGuard family) |
-| State | **IN_PROGRESS** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; in_progress_at=2026-06-01; scaffold — phased; this story = skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7 + verdict machine + binding-constraint reporter + CI non-blocking wire) |
+| State | **REVIEW** (claimer=dev-assist-development-executor; claimed_at=2026-06-01; in_progress_at=2026-06-01; review_at=2026-06-01; scaffold — phased; this story = skeleton + Tier-R/Tier-C registry + G1/G3/G6/G7 + verdict machine + binding-constraint reporter + CI non-blocking wire) |
 | provisional_status | AGENT_SIMULATED (CLAIM_GRADE verdict is itself gated on a regenerated canonical run — see G7) |
 | Implements | FR-007/FR-008 (canonical-run gate + provenance), NFR-006 (canonical run), the SDO objective J; consumes FR-016/NFR-011 (G1 floor), FR-009/010 (G2), FR-005/NFR-017 (G4), latency NFRs (G5), FR-003/004/NFR-001/002 (G7) |
 | Traces | Program AMENDMENT — "SOTA-Dominance Objective (SDO)"; Design DC-11. POV: dominate-where-claimed (moat axes) + non-inferior on raw F1. |
@@ -65,13 +65,60 @@ Always emit `binding_constraint` (single most important failing item, priority: 
 `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` `[AUDIT]` `[INTEGRATION-TEST]` — reviewers: code-quality + axiom-compliance + traceability + requirements-coverage (always for this gate); security-sast (CLI/load path); performance (latency-budget G5 reads).
 
 ## 12. Definition of Done (this phase)
-- [ ] **RED**: `tests/test_competitive_supremacy.py` — verdict state machine (synthetic benchmark JSON + synthetic posterior → CLAIM_GRADE/PROVISIONAL/NOT_YET per the predicate); each Gk pass/fail with a synthetic fixture; binding-constraint priority; J-fallback rank-prob; **the honesty carve-out** (G6 does NOT fail when a Tier-C raw-F1 exceeds pii-anon, only on Tier-R non-inferiority); Tier-C-unrun ⟹ CLAIM_GRADE BLOCKED ⟹ at most PROVISIONAL. `tests/test_competitor_tiers.py` — registry tiers, run_status, waiver-with-reason. Written first & failing.
-- [ ] **GREEN**: gate + registry + G1/G3/G6/G7 + verdict machine + binding-constraint reporter + J-fallback; gliner2 adapter (graceful if pkg absent); Tier-C metadata (UNRUN). Non-blocking CI report wired (prints verdict + binding constraint; exit 0 unless `--canonical-claim`).
-- [ ] **G2/G4/J-bayes** left as explicit tracked successors (named in the gate output as "axes pending: G2←S4-01, G4←S4-03, J-bayes←bayes-eval run").
-- [ ] **Quality**: full suite green (Tier-C/real-API/numpyro tests SKIP); ruff + mypy --strict clean; import-boundary GREEN (gate ⊄ detection internals); coverage ≥ 84%.
-- [ ] **Honesty**: the gate output carries the visible Tier-C honesty boundary + the OpenAI raw-F1 carve-out + `canonical_claim_run=False` PROVISIONAL banner. Marks nothing CLAIM_GRADE without a canonical run.
-- [ ] **Untouched**: `competitor_compare.py` **byte-identical** (RISK-6 §2a — its `_COMPETITOR_META.keys()` drives the run set; Tier metadata lives in `competitor_tiers.py` instead). The only additive edit to an existing rating file is `bradley_terry.paired_bootstrap_draws` (new method, no behaviour change to existing methods). user WIP md5 unchanged (esp. `artifacts/benchmarks/*` + `benchmark-diagnostics.json` are READ-ONLY inputs — never written).
-- [ ] **Story-gate APPROVE** (`_reviews/story/S4-CS-01-gate.yaml`).
+- [x] **RED**: `tests/test_competitive_supremacy.py` — verdict state machine (synthetic benchmark JSON + synthetic posterior → CLAIM_GRADE/PROVISIONAL/NOT_YET per the predicate); each Gk pass/fail with a synthetic fixture; binding-constraint priority; J-fallback rank-prob; **the honesty carve-out** (G6 does NOT fail when a Tier-C raw-F1 exceeds pii-anon, only on Tier-R non-inferiority); Tier-C-unrun ⟹ CLAIM_GRADE BLOCKED ⟹ at most PROVISIONAL. `tests/test_competitor_tiers.py` — registry tiers, run_status, waiver-with-reason. Written first & failing (RED `512311b`).
+- [x] **GREEN**: gate + registry + G1/G3/G6/G7 + verdict machine + binding-constraint reporter + J-fallback; gliner2 adapter metadata (graceful if pkg absent); Tier-C metadata (UNRUN). Non-blocking CI report wired (`pii-anon supremacy` prints verdict + binding constraint; exit 0 unless `--canonical-claim`). (GREEN `b8c9d9b`.)
+- [x] **G2/G4/J-bayes** left as explicit tracked successors (named in the gate output `axes_pending`: `G2←S4-01`, `G4←S4-03`, `G5←S5/S6`; J-bayes path importorskip / Pass-2).
+- [x] **Quality**: full suite green (2864 passed, 15 skipped — Tier-C/real-API/numpyro SKIP; 9 deselected = performance); ruff + mypy --strict clean; import-boundary GREEN (gate ⊄ detection internals); coverage 86.13% ≥ 84%.
+- [x] **Honesty**: the gate output carries the visible Tier-C honesty boundary (`unrun_tier_c`) + the OpenAI raw-F1 carve-out (`carve_out_note`, always emitted) + `canonical_claim_run=False` banner. Marks nothing CLAIM_GRADE without a canonical run.
+- [x] **Untouched**: `competitor_compare.py` **byte-identical** (md5 `7cae16c89f4c97136e1a12394dae2025` unchanged). The only additive edit to an existing rating file is `bradley_terry.paired_bootstrap_draws` (new method, existing methods untouched). user-WIP md5 unchanged (`orchestrator.py`, `test_moe_enhancements.py`, `benchmark-diagnostics.json`, `README.md`, `docs/*`, and the READ-ONLY `artifacts/benchmarks/*` — never written).
+- [ ] **Story-gate APPROVE** (`_reviews/story/S4-CS-01-gate.yaml`) — pending orchestrator dispatch.
 
 ## Evidence (filled on completion)
-- RED/GREEN/REFACTOR SHAs · current verdict on the (provisional) benchmark JSON + the binding constraint · J value + j_source · per-guarantee table (G1..G7 pass/pending) · Tier-R/Tier-C run/unrun honesty boundary · ruff/mypy/suite/coverage · *AGENT_SIMULATED; CLAIM_GRADE gated on a regenerated canonical run (S7) + Tier-C Pass-2 runs.*
+
+**State**: REVIEW (in_progress→review 2026-06-01). *AGENT_SIMULATED execution: full suite + ruff + mypy ran on the dev `.venv` (numpy 2.0.2; numpyro/jax ABSENT → bayes-J path SKIPs). CLAIM_GRADE is itself gated on a regenerated canonical run (G7, S7) + the Tier-C Pass-2 API runs — neither is agent-simulated as real (methodology invariant).*
+
+**Commit SHAs (RED precedes GREEN precedes REFACTOR):**
+- RED   `512311b` — `test: S4-CS-01 RED — pin SDO CompetitiveSupremacyGate verdict machine + Tier-R/Tier-C registry`
+- GREEN `b8c9d9b` — `feat: S4-CS-01 GREEN — CompetitiveSupremacyGate (SDO) + Tier-R/Tier-C registry`
+- REFACTOR `27ce89a` — `refactor: S4-CS-01 — drop unused RunStatus import + dead _binding_constraint accessor`
+
+**Verdict on today's (provisional) benchmark JSON** (`artifacts/benchmarks/benchmark-results.json`, read-only):
+- `verdict = NOT_YET`
+- `binding_constraint = "canonical_claim_run=False (G7 certified-run gate)"` (value-independent; the #1 gate)
+- `canonical_claim_run = False`
+
+**J (the SDO objective):** `J = 1.0`, `j_source = mle-bootstrap` (pii-anon holds the top composite 0.7846; bayes path SKIP-gated — numpyro absent). J always reportable via the new `bradley_terry.paired_bootstrap_draws` → `significance.rank_one_probability`.
+
+**Per-guarantee table (three-valued):**
+
+| G | Axis | Verdict | Observed vs bar |
+|---|---|---|---|
+| G1 | Recall-floor by construction | **PENDING** | structural superset holds; per-language ε artifact ABSENT → never fabricated |
+| G2 | Pseudonymization-integrity / reversibility | **PENDING** | ←S4-01 anon/pseudo scorers |
+| G3 | Recall dominance | **PASS** | pii-anon-swarm recall 0.818 ≥ best competitor (gliner) 0.658 |
+| G4 | Calibration / selective-risk | **PENDING** | ←S4-03 reporter |
+| G5 | Audit + orchestration latency / interception | **PENDING** | ←S5/S6 |
+| G6 | Non-inferiority on raw F2 | **PASS** | core F2 0.7793 ≥ best Tier-R F2 0.6967 − ε_F(0.01); OpenAI raw-F1 carve-out recorded |
+| G7 | Certified run | **FAIL** | canonical_claim_run=False (provenance stamp present, but run is a 50-sample smoke) |
+
+**Tier-R / Tier-C run/unrun honesty boundary:**
+- Tier-R RUN (from benchmark `available_competitors` + per-system `available`): `gliner`, `presidio`, `scrubadub`.
+- Tier-R UNRUN: `gliner2` (new adapter — not yet in the run).
+- Tier-C UNRUN (Pass-2 real-API; the CLAIM_GRADE blocker until run-or-waived): `openai-privacy-filter`, `azure-ai-language`, `aws-comprehend`.
+- Carve-out note + `canonical_claim_run=False` banner ALWAYS emitted.
+
+**Threshold literals pinned:** `J_BAR=0.95`, `EPS_F2=0.01`, `ENTITY_COVERAGE_MIN=0.80`, `EPS_RECALL_PER_LANG=0.005`.
+
+**Quality gates:**
+- RED test count: 57 (`test_competitor_tiers.py` 23 + `test_competitive_supremacy.py` 30 incl. 1 real-artifact + boundary 4); GREEN owned-test pass count: **92** (the 57 + 4 `paired_bootstrap_draws` + 3 `supremacy` CLI + the bradley_terry pin set under the new file scope).
+- Full suite: **2864 passed, 15 skipped, 9 deselected, 0 failed** (`python3 -m pytest`, 18m11s).
+- Coverage: **86.13%** (`--cov-fail-under=84` reached).
+- ruff: **clean** (`All checks passed!`). mypy --strict: **clean** (`Success: no issues found in 122 source files`, `mypy src/pii_anon`).
+- Import-boundary: GREEN (the 2 new gate modules import only `eval_framework.rating` + read JSON; no swarm/moe/fusion/policy).
+- `competitor_compare.py` byte-identical; all user-WIP md5 unchanged.
+
+## History Log
+- 2026-06-01 — CLAIMED → IN_PROGRESS on RED `512311b` (claimer=dev-assist-development-executor).
+- 2026-06-01 — GREEN `b8c9d9b`: gate + tier registry + `paired_bootstrap_draws` + `supremacy` CLI; 92 owned tests pass; real-artifact verdict NOT_YET / binding canonical_claim_run=False / J=1.0(mle-bootstrap).
+- 2026-06-01 — REFACTOR `27ce89a`: drop dead code (behaviour-identical); ruff + mypy --strict clean.
+- 2026-06-01 — Full suite 2864 passed / 15 skipped / 0 failed, coverage 86.13%. IN_PROGRESS → REVIEW. Awaiting story-gate (code-quality + axiom-compliance + traceability + requirements-coverage; security-sast on CLI/load; performance on G5 reads).
