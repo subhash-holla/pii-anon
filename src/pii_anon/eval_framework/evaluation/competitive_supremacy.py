@@ -55,6 +55,7 @@ Completion predicate (story §5)
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -545,6 +546,74 @@ def _g1_recall_floor(
     return GuaranteeResult("G1", passed, worst_lang_eps, EPS_RECALL_PER_LANG, detail)
 
 
+def _finite_unit_score(value: object) -> float | None:
+    """Return ``value`` as a float IFF it is a real, finite, unit-interval score.
+
+    A *usable* score for the SDO moat axes (G2 pseudonymization-integrity, G4
+    per-class ECE, the NFR-014 unauthorized-reversal rate) is, by construction,
+    a real number in ``[0, 1]`` (e.g. ``deid_families.integrity_score`` is bounded
+    ``[0, 1]``; a calibration error / coverage fraction is a probability). This
+    guard returns the value only when it is ALL of:
+
+    * a genuine ``int``/``float`` and **not** a ``bool`` — ``isinstance(True, int)``
+      is ``True`` in Python, so a flag would otherwise coerce to ``1.0`` and
+      fabricate a perfect score / a vacuous dominance win;
+    * finite — ``NaN`` / ``±inf`` are not measurements (``+inf`` must never
+      "dominate", a ``NaN`` must never slip a ``x > bar`` comparison whose result
+      against ``NaN`` is silently ``False``);
+    * within ``[0, 1]`` — a value outside the unit interval is a corrupt artifact,
+      never a stronger score.
+
+    Returns ``None`` otherwise, so a caller can treat the field as ABSENT
+    (PENDING / fall back to a sanctioned bar) rather than trust a fabricated value.
+    Using ``type(v) is int/float`` (not ``isinstance``) keeps ``bool`` — and any
+    numeric subclass that is not a plain measurement — out without a second check.
+    """
+    if type(value) is not int and type(value) is not float:
+        return None
+    v = float(value)
+    if not math.isfinite(v) or v < 0.0 or v > 1.0:
+        return None
+    return v
+
+
+def _is_finite_number(value: object) -> bool:
+    """Is ``value`` a real, finite number (a plain ``int``/``float``, not a bool)?
+
+    Used where a finiteness check (not a unit-interval bound) is what's wanted —
+    e.g. a per-class ECE must be finite (a ``NaN`` must never slip ``ece > bar``,
+    which is silently ``False`` against ``NaN``) but its magnitude is bounded by the
+    bar comparison itself, not by ``[0, 1]``. Excludes ``bool`` (a flag is not a
+    measurement) via ``type(...)`` so ``True``/``False`` never count as numbers.
+    """
+    return (type(value) is int or type(value) is float) and math.isfinite(
+        float(value)
+    )
+
+
+def _g4_class_bar(artifact_threshold: object) -> float:
+    """The authoritative per-class ECE bar, TIGHTENED — never loosened — by the
+    artifact-supplied threshold.
+
+    The gate owns the sanctioned bars (NFR-017): high-resource
+    :data:`G4_ECE_BAR_HIGH_RESOURCE` (0.05) and long-tail
+    :data:`G4_ECE_BAR_LONG_TAIL` (0.08). The LOOSEST bar the gate will EVER permit
+    is the long-tail 0.08 — that is the hard sanctioned ceiling. An artifact-
+    supplied per-class threshold may only make the bar STRICTER:
+    ``bar = min(artifact_threshold, G4_ECE_BAR_LONG_TAIL)`` — so a legitimate
+    long-tail 0.08 (or a tighter 0.03) is honored, but a bar-loosening 0.99 is
+    clamped down to 0.08 and cannot mask a high ECE. A non-finite / out-of-range
+    artifact threshold (``NaN`` / ``+inf`` / negative / ``> 1``) is REJECTED and the
+    conservative high-resource 0.05 default stands. Absent ⇒ the high-resource 0.05
+    default (a class is long-tail only when the artifact explicitly requests the
+    looser bar). The gate's bar is authoritative, not artifact-overridable upward.
+    """
+    candidate = _finite_unit_score(artifact_threshold)
+    if candidate is None:
+        return G4_ECE_BAR_HIGH_RESOURCE
+    return min(candidate, G4_ECE_BAR_LONG_TAIL)
+
+
 def _g2_pseudonymization_integrity(
     systems: dict[str, dict[str, Any]],
 ) -> GuaranteeResult:
@@ -562,12 +631,24 @@ def _g2_pseudonymization_integrity(
     Three-valued outcome:
 
     * **PASS** iff pii-anon's ``pseudonymization_integrity_score`` STRICTLY
-      dominates every competitor's, the pii-anon ``unauthorized_reversal_rate`` is
-      0 (NFR-014), and BOTH family fields are present on the pii-anon claimant;
-    * **FAIL** iff the fields are present but pii-anon does not strictly dominate
-      (binding detail names the gap) OR the unauthorized-reversal rate is > 0;
-    * **PENDING** (``None``) iff the benchmark lacks the fields (the current smoke
-      artifact lacks them — NO fabrication; the S7 canonical run emits them).
+      dominates every *real* competitor's, the pii-anon
+      ``unauthorized_reversal_rate`` is 0 (NFR-014), and BOTH family fields are
+      present-and-valid (finite, in ``[0, 1]``, non-boolean) on the claimant;
+    * **FAIL** iff a real comparator exists but pii-anon does not strictly dominate
+      (binding detail names the gap), OR the unauthorized-reversal rate is > 0;
+    * **PENDING** (``None``) iff there is no real claimant score — both family
+      fields absent, a boolean masquerading as one (which would coerce to ``1.0``),
+      or a non-finite / out-of-``[0, 1]`` value (a corrupt artifact, never a
+      stronger score) — OR no competitor carries a real
+      ``pseudonymization_integrity_score`` (no comparator ⇒ dominance is unprovable
+      and must NEVER be fabricated against a phantom ``0``; this includes the
+      zero-competitor case). The current smoke artifact lacks the fields; the S7
+      canonical run emits them.
+
+    A *real* score is validated by :func:`_finite_unit_score` (finite, in
+    ``[0, 1]``, non-boolean): a bool is a flag, a non-finite float is not a
+    measurement, and an out-of-range value is corrupt — none may seed a dominance
+    claim or stand in as a comparator bar.
 
     Pure: reads the benchmark systems, never mutates them. Determinism: a pure
     function of the (numeric) fields (AX-002).
@@ -580,28 +661,60 @@ def _g2_pseudonymization_integrity(
             f"({_PENDING_SUCCESSORS['G2']})",
         )
 
-    pi_raw = core.get("pseudonymization_integrity_score")
-    anon_raw = core.get("anonymization_score")
-    # BOTH distinct family fields must be present-and-distinct (two-family
-    # contract); a missing field ⇒ PENDING (never fabricated).
-    if not isinstance(pi_raw, (int, float)) or not isinstance(anon_raw, (int, float)):
+    # BOTH distinct family fields must be present as REAL (finite, [0,1],
+    # non-boolean) scores (two-family contract). A missing field — a boolean
+    # masquerading as one (isinstance(True, int) is True, which would coerce to
+    # 1.0) — or a non-finite / out-of-range value (a corrupt artifact:
+    # deid_families.integrity_score is bounded [0,1] by construction) ⇒ PENDING
+    # (never fabricated, never a vacuous +inf/1.5 "win").
+    core_pi = _finite_unit_score(core.get("pseudonymization_integrity_score"))
+    core_anon = _finite_unit_score(core.get("anonymization_score"))
+    if core_pi is None or core_anon is None:
         return GuaranteeResult(
             "G2", None, float("nan"), float("nan"),
-            "G2 PENDING: benchmark lacks the distinct anon/pseudo family fields "
-            "(pseudonymization_integrity_score + anonymization_score); "
+            "G2 PENDING: benchmark lacks a valid (finite, in [0,1]) value for the "
+            "distinct anon/pseudo family fields (pseudonymization_integrity_score + "
+            f"anonymization_score); {_PENDING_SUCCESSORS['G2']} — emitted by the S7 "
+            "canonical run",
+        )
+
+    # The NFR-014 unauthorized-reversal rate is a fraction in [0,1]; a non-finite /
+    # out-of-range value is a corrupt artifact, not a real measurement ⇒ PENDING
+    # (we cannot certify "exactly 0" from a corrupt rate, and must not fabricate it).
+    unauthorized_raw = core.get("unauthorized_reversal_rate", 0.0)
+    unauthorized = _finite_unit_score(unauthorized_raw)
+    if unauthorized is None:
+        return GuaranteeResult(
+            "G2", None, float("nan"), float("nan"),
+            "G2 PENDING: pii-anon unauthorized_reversal_rate is not a valid "
+            "(finite, in [0,1]) rate — cannot certify NFR-014 from a corrupt value; "
             f"{_PENDING_SUCCESSORS['G2']} — emitted by the S7 canonical run",
         )
 
-    core_pi = float(pi_raw)
-    unauthorized = float(core.get("unauthorized_reversal_rate", 0.0) or 0.0)
-
-    # Competitors' pseudonymization-integrity (only those carrying the field).
+    # Competitors' pseudonymization-integrity — ONLY those carrying a REAL, finite,
+    # in-range, non-boolean score count as comparators (a bool / non-finite /
+    # out-of-range value is not a real measurement, so it is EXCLUDED rather than
+    # coerced or treated as a phantom bar).
     competitor_pis = [
-        float(systems[name]["pseudonymization_integrity_score"])
+        cp
         for name in _competitor_names(systems)
-        if isinstance(systems[name].get("pseudonymization_integrity_score"), (int, float))
+        if (cp := _finite_unit_score(systems[name].get("pseudonymization_integrity_score")))
+        is not None
     ]
-    best_competitor_pi = max(competitor_pis, default=0.0)
+    # No real comparator ⇒ strict dominance is UNPROVABLE. Return PENDING rather
+    # than fabricate a win against a phantom 0.0 baseline — symmetric with the
+    # core-side guard above. This covers BOTH "competitors present but none carry a
+    # valid field" and the zero-competitor case; never fabricated.
+    if not competitor_pis:
+        return GuaranteeResult(
+            "G2", None, float("nan"), float("nan"),
+            "G2 PENDING: no competitor carries a valid pseudonymization_integrity_"
+            "score — strict dominance is unprovable without a comparator (never "
+            f"fabricated against a phantom 0); {_PENDING_SUCCESSORS['G2']} — emitted "
+            "by the S7 canonical run",
+        )
+
+    best_competitor_pi = max(competitor_pis)
     dominates = core_pi > best_competitor_pi
     no_unauthorized = unauthorized == 0.0
 
@@ -668,26 +781,42 @@ def _g4_calibration_selective_risk(
     :class:`~pii_anon.eval_framework.metrics.selective_risk.SelectiveRiskReporter`
     emits (the S7 canonical run stamps it):
 
-    * ``per_class_ece`` — ``{entity_type: ece}`` (post-temperature-scaling);
-    * ``per_class_ece_threshold`` (optional) — ``{entity_type: bar}``; absent ⇒
-      the default :data:`G4_ECE_BAR_HIGH_RESOURCE` bar is applied;
+    * ``per_class_ece`` — ``{entity_type: ece}`` (post-temperature-scaling); each
+      ECE must be FINITE — a non-finite ECE (``NaN`` / ``±inf``) is a corrupt
+      present-but-unusable measurement and a breach (a ``NaN`` must never slip the
+      ``ece > bar`` comparison, whose result against ``NaN`` is silently ``False``);
+    * ``per_class_ece_threshold`` (optional) — ``{entity_type: bar}``; the gate's
+      OWN sanctioned bars (:data:`G4_ECE_BAR_HIGH_RESOURCE` 0.05 high-resource /
+      :data:`G4_ECE_BAR_LONG_TAIL` 0.08 long-tail) are AUTHORITATIVE. An artifact-
+      supplied per-class threshold may only TIGHTEN the bar, never loosen it:
+      ``bar = min(artifact_threshold, sanctioned_bar)``; a non-finite / out-of-
+      range artifact threshold is REJECTED (fall back to the sanctioned bar) so a
+      benchmark can never mask a high ECE with a loosened (e.g. ``0.99`` / ``+inf``)
+      threshold;
     * ``risk_coverage_curve`` — ``[{"coverage", "risk"}, …]`` ascending in
       coverage (the monotone-non-increasing selective-risk curve, NFR-019);
     * ``abstention_operating_points`` — ``≥3`` rows (NFR-021);
-    * ``calibrated_confidence_coverage`` — the NFR-020 audit (must be ``1.0``).
+    * ``calibrated_confidence_coverage`` — the NFR-020 audit; must be EXACTLY
+      ``1.0`` — finite AND in ``[0, 1]`` AND ``== 1.0`` (a value ``> 1.0`` / ``+inf``
+      is corrupt, never a pass; the lone MUST is exact 100% coverage).
 
     Three-valued outcome:
 
-    * **PASS** iff EVERY per-class ECE ≤ its bar AND the risk-coverage curve is
-      monotone non-increasing (risk never drops as coverage grows) AND there are
-      ≥ :data:`G4_MIN_ABSTENTION_POINTS` abstention points AND
-      ``calibrated_confidence_coverage == 1.0`` (NFR-020 — 0 bare-logit);
-    * **FAIL** iff the fields are present but a bar is breached (the binding detail
-      names the breach — the worst class, the coverage gap, the non-monotone
-      curve, or the missing operating points);
+    * **PASS** iff EVERY per-class ECE is finite AND ≤ its (clamped) bar AND the
+      risk-coverage curve is monotone non-increasing (risk never drops as coverage
+      grows) AND there are ≥ :data:`G4_MIN_ABSTENTION_POINTS` abstention points AND
+      ``calibrated_confidence_coverage`` is finite, in ``[0, 1]``, and ``== 1.0``
+      (NFR-020 — 0 bare-logit);
+    * **FAIL** iff the fields are present but a check is breached (the binding
+      detail names the breach — the worst / non-finite class, the coverage gap, the
+      non-monotone curve, or the missing operating points);
     * **PENDING** (``None``) iff the benchmark lacks the calibration fields (the
       current smoke artifact lacks them — NO fabrication; the S7 canonical run
       emits them).
+
+    The gate's bar is authoritative, NOT artifact-overridable upward, and no
+    artifact-supplied value (a non-finite ECE, a coverage ``> 1.0``, a loosened
+    threshold) can fabricate a PASS — the inputs are VALIDATED before they gate.
 
     Pure: reads the benchmark systems, never mutates them. Determinism (AX-002):
     a pure function of the (numeric) fields. The reporting MATH lives in
@@ -720,21 +849,41 @@ def _g4_calibration_selective_risk(
     if not isinstance(thresholds, dict):
         thresholds = {}
 
-    # 1. Per-class ECE ≤ its bar (worst class drives the FAIL detail). The bar is
-    #    read per class from the artifact (high-resource 0.05 / long-tail 0.08);
-    #    absent ⇒ the default high-resource bar.
-    worst_class: str | None = None
-    worst_ece = 0.0
-    worst_bar = G4_ECE_BAR_HIGH_RESOURCE
+    # 1. Per-class ECE ≤ its (clamped) bar (worst class drives the FAIL detail).
+    #    Each ECE must be FINITE — a non-finite ECE (NaN / ±inf) is a corrupt
+    #    present-but-unusable measurement and a breach (NaN would otherwise slip
+    #    `ece > bar`, which is silently False against NaN). The per-class bar is the
+    #    gate's sanctioned default (high-resource 0.05), TIGHTENED — never loosened —
+    #    by an artifact-supplied threshold via `_g4_class_bar` (so a benchmark cannot
+    #    mask a high ECE with a 0.99 / +inf threshold).
+    worst_detail = ""
+    worst_slack = -math.inf  # (ece - bar); a non-finite ECE is the worst breach
     ece_ok = True
+    finite_eces: list[float] = []
     for et in sorted(per_class_ece):
-        ece = float(per_class_ece[et])
-        bar = float(thresholds.get(et, G4_ECE_BAR_HIGH_RESOURCE))
+        raw = per_class_ece[et]
+        bar = _g4_class_bar(thresholds.get(et))
+        if not _is_finite_number(raw):
+            ece_ok = False
+            if worst_slack < math.inf:
+                worst_slack = math.inf
+                worst_detail = (
+                    f"per-class ECE on {et!r} is non-finite ({raw!r}) — a corrupt "
+                    f"measurement, not ≤ bar {bar:.4g} (NFR-017)"
+                )
+            continue
+        ece = float(raw)
+        finite_eces.append(ece)
         if ece > bar:
             ece_ok = False
-            if worst_class is None or (ece - bar) > (worst_ece - worst_bar):
-                worst_class, worst_ece, worst_bar = et, ece, bar
-    max_ece = max((float(v) for v in per_class_ece.values()), default=0.0)
+            slack = ece - bar
+            if slack > worst_slack:
+                worst_slack = slack
+                worst_detail = (
+                    f"per-class ECE breach on {et!r} (ECE={ece:.4g} > bar "
+                    f"{bar:.4g}; NFR-017)"
+                )
+    max_ece = max(finite_eces, default=0.0)
 
     # 2. Monotone-non-increasing risk-coverage curve (NFR-019): ordered by
     #    ascending coverage, risk must be non-decreasing (selective risk does not
@@ -746,9 +895,13 @@ def _g4_calibration_selective_risk(
     points = core.get("abstention_operating_points") or []
     points_ok = isinstance(points, list) and len(points) >= G4_MIN_ABSTENTION_POINTS
 
-    # 4. Calibrated-confidence-coverage == 1.0 (NFR-020 — the lone MUST).
+    # 4. Calibrated-confidence-coverage == 1.0 (NFR-020 — the lone MUST). The
+    #    coverage is a fraction: it must be FINITE and in [0, 1] (a value > 1.0 /
+    #    +inf is corrupt, never a pass) AND exactly 1.0 (100% calibrated-confidence
+    #    coverage; a tiny eps absorbs float round-trip noise but never admits >1.0).
     coverage_val = float(coverage)
-    coverage_ok = coverage_val >= G4_COVERAGE_REQUIRED
+    coverage_in_range = math.isfinite(coverage_val) and 0.0 <= coverage_val <= 1.0
+    coverage_ok = coverage_in_range and coverage_val >= G4_COVERAGE_REQUIRED - 1e-9
 
     passed = ece_ok and monotone_ok and points_ok and coverage_ok
     if passed:
@@ -759,16 +912,21 @@ def _g4_calibration_selective_risk(
             f"calibrated-confidence-coverage={coverage_val:.4g} (NFR-020 / AX-005)"
         )
     elif not coverage_ok:
-        detail = (
-            f"G4 FAIL: calibrated-confidence-coverage={coverage_val:.4g} < "
-            f"{G4_COVERAGE_REQUIRED} (NFR-020 — every finding MUST carry a "
-            "calibrated confidence + provenance; a bare-logit finding is a breach)"
-        )
+        if not coverage_in_range:
+            detail = (
+                f"G4 FAIL: calibrated-confidence-coverage={coverage_val!r} is not a "
+                f"valid fraction (finite, in [0,1]) — a value >1.0 / non-finite is a "
+                f"corrupt artifact, never a pass (NFR-020 requires EXACTLY 1.0)"
+            )
+        else:
+            detail = (
+                f"G4 FAIL: calibrated-confidence-coverage={coverage_val:.4g} < "
+                f"{G4_COVERAGE_REQUIRED} (NFR-020 — every finding MUST carry a "
+                "calibrated confidence + provenance; a bare-logit finding is a "
+                "breach)"
+            )
     elif not ece_ok:
-        detail = (
-            f"G4 FAIL: per-class ECE breach on {worst_class!r} "
-            f"(ECE={worst_ece:.4g} > bar {worst_bar:.4g}; NFR-017)"
-        )
+        detail = f"G4 FAIL: {worst_detail}"
     elif not monotone_ok:
         detail = (
             "G4 FAIL: risk-coverage curve is NOT monotone non-increasing — "

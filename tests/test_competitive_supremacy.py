@@ -1285,21 +1285,19 @@ def test_g2_pass_when_only_one_competitor_carries_lower_pi_guard_not_overbroad()
     assert g2.observed >= g2.bar
 
 
-def test_g2_fail_when_core_pi_non_finite_inf_is_not_a_win() -> None:
-    """[CONTRACT-TEST] A5 anti-fabrication: a non-finite pii-anon
-    pseudonymization_integrity_score is not a real measurement and must never seed
-    a dominance win. +inf previously PASSed vacuously (inf > any competitor); it
-    now FAILs. NaN (which already lost the dominance comparison) stays FAIL. The
-    +inf detail names the non-finite gap, not a misleading 'does not dominate'."""
-    for bad in (float("inf"), float("nan")):
+def test_g2_pending_when_core_pi_non_finite_or_out_of_range_not_a_win() -> None:
+    """[CONTRACT-TEST] A5 anti-fabrication: a non-finite or out-of-[0,1] pii-anon
+    pseudonymization_integrity_score is not a real measurement
+    (deid_families.integrity_score is bounded [0,1] by construction) and must
+    never seed a dominance win. +inf previously PASSed vacuously (inf > any
+    competitor); a corrupt score (NaN / ±inf / 1.5 / -0.1) is now treated as an
+    ABSENT measurement ⇒ G2 PENDING (None) — never a fabricated PASS, never a
+    misleading FAIL over a corrupt bar."""
+    for bad in (float("inf"), float("nan"), float("-inf"), 1.5, -0.1):
         g2 = _g2_pseudonymization_integrity(
             _g2_systems(bad, competitors={"gliner": 0.60})
         )
-        assert g2.passed is False
-    g2_inf = _g2_pseudonymization_integrity(
-        _g2_systems(float("inf"), competitors={"gliner": 0.60})
-    )
-    assert "finite" in g2_inf.binding_detail.lower()
+        assert g2.passed is None
 
 
 def test_g2_pending_when_core_pi_is_bool_not_coerced_to_one() -> None:
