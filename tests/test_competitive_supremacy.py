@@ -1153,3 +1153,233 @@ def test_g2_is_deterministic_on_identical_benchmarks() -> None:
     g2_a = SupremacyVerdict.from_artifacts(b1).guarantee("G2")
     g2_b = SupremacyVerdict.from_artifacts(b2).guarantee("G2")
     assert g2_a == g2_b
+
+
+# ---------------------------------------------------------------------------
+# S4-03: G4 — calibration / selective-risk (PASS/FAIL/PENDING teeth).
+#
+# G4 is now a pure (benchmark) -> GuaranteeResult computed by
+# `_g4_calibration_selective_risk` (replacing the hardcoded PENDING placeholder):
+#   * PASS  iff pii-anon's per-class ECE ≤ the NFR-017 thresholds (0.05
+#           high-resource / 0.08 long-tail) AND the selective-risk AURC curve is
+#           monotone non-increasing AND there are ≥3 abstention operating points
+#           AND calibrated_confidence_coverage == 1.0 (NFR-020, 0 bare-logit);
+#   * FAIL  iff the calibration fields are PRESENT but a threshold is breached
+#           (a class ECE over bar, a non-monotone AURC, <3 abstention points, or
+#           coverage < 1.0) — the binding detail names the breach;
+#   * PENDING (None) iff the benchmark lacks the calibration fields (NO
+#           fabrication — the current smoke artifact lacks them; the S7 canonical
+#           run emits them).
+# ---------------------------------------------------------------------------
+
+
+def _conforming_calibration() -> dict[str, object]:
+    """A SYNTHETIC pii-anon calibration block that MEETS every NFR threshold.
+
+    * per-class ECE (post-scaling) ≤ the per-class bar (0.05 high-resource;
+      0.08 long-tail);
+    * a monotone-non-increasing selective-risk curve (achieved risk does not
+      increase as coverage drops) with an AURC in [0, 1];
+    * ≥3 abstention operating points at selective-risk {1%, 2%, 5%};
+    * calibrated_confidence_coverage == 1.0 (0 bare-logit).
+    """
+    return {
+        "per_class_ece": {"EMAIL_ADDRESS": 0.02, "US_SSN": 0.03},
+        "per_class_ece_threshold": {"EMAIL_ADDRESS": 0.05, "US_SSN": 0.05},
+        "selective_risk_aurc": 0.04,
+        # risk-coverage curve as (coverage, risk) rows ascending in coverage;
+        # risk must be non-decreasing as coverage grows (monotone non-increasing
+        # as you abstain MORE).
+        "risk_coverage_curve": [
+            {"coverage": 0.25, "risk": 0.005},
+            {"coverage": 0.50, "risk": 0.01},
+            {"coverage": 0.75, "risk": 0.02},
+            {"coverage": 1.00, "risk": 0.04},
+        ],
+        "abstention_operating_points": [
+            {"target_risk": 0.01, "achieved_coverage": 0.50, "achieved_risk": 0.01},
+            {"target_risk": 0.02, "achieved_coverage": 0.75, "achieved_risk": 0.02},
+            {"target_risk": 0.05, "achieved_coverage": 1.00, "achieved_risk": 0.04},
+        ],
+        "calibrated_confidence_coverage": 1.0,
+    }
+
+
+def _with_calibration(
+    bench: dict[str, object], calibration: dict[str, object] | None
+) -> dict[str, object]:
+    """Inject a synthetic calibration block onto the pii-anon core system.
+
+    ``calibration=None`` injects nothing (the PENDING case). Mutates the
+    pii-anon system dict in place; competitors are left without calibration
+    fields (only the claimant is gated, mirroring G2's claimant-keyed read).
+    """
+    if calibration is None:
+        return bench
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "pii-anon":  # type: ignore[index]
+            s.update(calibration)  # type: ignore[attr-defined]
+    return bench
+
+
+def test_g4_pass_when_calibration_meets_all_thresholds() -> None:
+    """[CONTRACT-TEST] A7: G4 PASS — per-class ECE ≤ bar, AURC monotone, ≥3
+    abstention points, coverage == 1.0."""
+    bench = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    g4 = SupremacyVerdict.from_artifacts(bench).guarantee("G4")
+    assert g4.passed is True
+
+
+def test_g4_fail_when_a_class_ece_exceeds_threshold() -> None:
+    """[CONTRACT-TEST] A7: G4 FAIL — a class ECE over its NFR-017 bar; the binding
+    detail names the worst class."""
+    cal = _conforming_calibration()
+    cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.02, "US_SSN": 0.09}  # > 0.05 bar
+    bench = _with_calibration(_canonical_benchmark(), cal)
+    g4 = SupremacyVerdict.from_artifacts(bench).guarantee("G4")
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_fail_when_coverage_below_one_nfr020() -> None:
+    """[CONTRACT-TEST] A7 / NFR-020: G4 FAIL — calibrated_confidence_coverage < 1.0
+    (a bare-logit finding exists) fails G4 even with good ECE/AURC."""
+    cal = _conforming_calibration()
+    cal["calibrated_confidence_coverage"] = 0.98  # a bare-logit slipped through
+    bench = _with_calibration(_canonical_benchmark(), cal)
+    g4 = SupremacyVerdict.from_artifacts(bench).guarantee("G4")
+    assert g4.passed is False
+    assert (
+        "coverage" in g4.binding_detail.lower()
+        or "NFR-020" in g4.binding_detail
+    )
+
+
+def test_g4_fail_when_fewer_than_three_abstention_points() -> None:
+    """[CONTRACT-TEST] A7 / NFR-021: G4 FAIL — fewer than 3 abstention operating
+    points."""
+    cal = _conforming_calibration()
+    cal["abstention_operating_points"] = [
+        {"target_risk": 0.01, "achieved_coverage": 0.50, "achieved_risk": 0.01},
+        {"target_risk": 0.05, "achieved_coverage": 1.00, "achieved_risk": 0.04},
+    ]  # only 2
+    bench = _with_calibration(_canonical_benchmark(), cal)
+    g4 = SupremacyVerdict.from_artifacts(bench).guarantee("G4")
+    assert g4.passed is False
+
+
+def test_g4_fail_when_risk_coverage_not_monotone() -> None:
+    """[CONTRACT-TEST] A7 / NFR-019: G4 FAIL — the risk-coverage curve is NOT
+    monotone non-increasing (risk DROPS as coverage grows somewhere)."""
+    cal = _conforming_calibration()
+    cal["risk_coverage_curve"] = [
+        {"coverage": 0.25, "risk": 0.05},  # higher risk at LOW coverage — illegal
+        {"coverage": 0.50, "risk": 0.01},
+        {"coverage": 0.75, "risk": 0.02},
+        {"coverage": 1.00, "risk": 0.04},
+    ]
+    bench = _with_calibration(_canonical_benchmark(), cal)
+    g4 = SupremacyVerdict.from_artifacts(bench).guarantee("G4")
+    assert g4.passed is False
+    assert "monoton" in g4.binding_detail.lower()
+
+
+def test_g4_pending_when_fields_absent_never_fabricated() -> None:
+    """[CONTRACT-TEST] A7 / A8: G4 PENDING (None) when the benchmark lacks the
+    calibration fields — never a fabricated PASS (the current smoke artifact lacks
+    them)."""
+    bench = _canonical_benchmark()  # no calibration block injected
+    assert SupremacyVerdict.from_artifacts(bench).guarantee("G4").passed is None
+
+
+def test_g4_teeth_non_vacuous_worsening_a_class_ece_flips_pass_to_fail() -> None:
+    """[PROPERTY-TEST] A7 META-GUARD: the per-class ECE check is non-vacuous —
+    worsening ONE class's ECE past its bar flips the SAME fixture from PASS to
+    FAIL (G4 actually depends on the ECE thresholds)."""
+    passing = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    assert SupremacyVerdict.from_artifacts(passing).guarantee("G4").passed is True
+
+    worsened_cal = _conforming_calibration()
+    worsened_cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.02, "US_SSN": 0.07}
+    worsened = _with_calibration(_canonical_benchmark(), worsened_cal)
+    assert SupremacyVerdict.from_artifacts(worsened).guarantee("G4").passed is False
+
+
+def test_g4_long_tail_class_held_to_looser_bar() -> None:
+    """[CONTRACT-TEST] A7 / NFR-017: a long-tail class is held to the 0.08 bar, not
+    the 0.05 high-resource bar — an ECE of 0.07 on a class whose per-class
+    threshold is 0.08 still PASSES."""
+    cal = _conforming_calibration()
+    cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.02, "CRYPTO_WALLET": 0.07}
+    cal["per_class_ece_threshold"] = {"EMAIL_ADDRESS": 0.05, "CRYPTO_WALLET": 0.08}
+    bench = _with_calibration(_canonical_benchmark(), cal)
+    assert SupremacyVerdict.from_artifacts(bench).guarantee("G4").passed is True
+
+
+def test_g4_override_still_honoured_for_backward_compat() -> None:
+    """[CONTRACT-TEST] A7: an explicit pending_overrides['G4'] still wins (the
+    successor-override seam is preserved) — an injected G4=False overrides the
+    computed PASS, so existing tests driving G4 via overrides keep working."""
+    bench = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    verdict = SupremacyVerdict.from_artifacts(bench, pending_overrides={"G4": False})
+    assert verdict.guarantee("G4").passed is False
+
+
+def test_g4_pass_unblocks_claim_grade_with_all_else_satisfied() -> None:
+    """[CONTRACT-TEST] A7: a COMPUTED G4 PASS (from the fields, not an override)
+    participates in CLAIM_GRADE — with G2 fields + G5 override PASS, J≥0.95,
+    canonical run, and the whole Tier-R∪Tier-C set waived, the verdict reaches
+    CLAIM_GRADE (G4 is no longer a forced PENDING blocker)."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, _conforming_calibration())
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},  # G2 + G4 computed from fields
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is True
+    assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g4_is_deterministic_on_identical_benchmarks() -> None:
+    """[PROPERTY-TEST] A9 / AX-002: _g4_calibration_selective_risk is a pure
+    function — identical benchmarks yield identical G4 outcomes."""
+    b1 = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    b2 = copy.deepcopy(b1)
+    g4_a = SupremacyVerdict.from_artifacts(b1).guarantee("G4")
+    g4_b = SupremacyVerdict.from_artifacts(b2).guarantee("G4")
+    assert g4_a == g4_b
+
+
+def test_g4_successor_label_names_s4_03_when_pending() -> None:
+    """[AUDIT] A8: while G4 is PENDING (fields absent), the gate still names its
+    successor S4-03 as awaiting a run that emits the calibration fields."""
+    verdict = SupremacyVerdict.from_artifacts(_canonical_benchmark())
+    g4 = verdict.guarantee("G4")
+    assert g4.passed is None
+    assert "S4-03" in g4.binding_detail or any(
+        "S4-03" in p for p in verdict.axes_pending
+    )
+
+
+@pytest.mark.skipif(
+    not _REAL_ARTIFACT.exists(), reason="benchmark-results.json artifact absent"
+)
+def test_g4_real_artifact_stays_pending_and_verdict_not_yet() -> None:
+    """[CONTRACT-TEST] A8: on the REAL (smoke) artifact — which lacks the
+    calibration fields — G4 reads PENDING (no fabricated PASS) and the headline
+    verdict stays NOT_YET with binding canonical_claim_run=False."""
+    bench = json.loads(_REAL_ARTIFACT.read_text(encoding="utf-8"))
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.guarantee("G4").passed is None  # PENDING on missing fields
+    assert verdict.verdict is Verdict.NOT_YET
+    assert verdict.binding_constraint.startswith("canonical_claim_run=False")
