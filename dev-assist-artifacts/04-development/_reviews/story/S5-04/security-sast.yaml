@@ -1,0 +1,160 @@
+reviewer: security-sast
+gate: story
+scope_id: S5-04
+iteration: 1
+verdict: APPROVE
+role: PRIMARY
+summary: >
+  S5-04 seeds the DC-09 attacks/ package with a faithful, fail-loud in-process
+  capability + resource isolation substrate (safe structured spec loader +
+  AttackSandbox chokepoint). Every headline security claim in the story (A1-A8)
+  is realized in code and independently re-verified. The attacks/ source carries
+  ZERO unsafe-deserialization / subprocess / shell-out / dynamic-eval call
+  signatures (independent grep + the AST guard agree; the AST guard is
+  non-vacuous, asserts scanned>=3). The safe loader parses ONLY stdlib-structured
+  JSON/mapping, never an arbitrary-object deserializer, never constructs
+  data-named objects, and rejects every non-scalar params value naming the field
+  (incl. a @given property). Capability pre-check fires BEFORE the body
+  (non-allow-listed runner / network!=deny / out-of-allow-list path / non-scalar
+  param all refuse). Egress guard intercepts connect AND connect_ex against an
+  unroutable TEST-NET target and is restored in __exit__ on the exception path.
+  Budget terminator is a stdlib thread/timer watchdog (NEVER a subprocess); the
+  RLIMIT_CPU fix (eaf116c) is sound. Default-deny is the SandboxPolicy()
+  constructor default. No real PII / key / network target anywhere. 67/67 owned
+  tests pass; sandbox.py 99% / spec.py 100% / __init__.py 100% coverage.
+  0 SHOWSTOPPER, 0 CATASTROPHIC, 0 MAJOR, 0 MINOR. APPROVE.
+findings:
+  - id: SEC-S504-OBS-001
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/sandbox.py:150-179 (_EgressGuard) and :294-331 (_run_with_wall_watchdog)
+    description: >
+      The in-process egress guard monkeypatches the GLOBAL socket.socket.connect
+      / connect_ex for the run's duration, and the body executes in a daemon
+      worker thread launched by the wall-clock watchdog. Because the monkeypatch
+      is process-global (not thread-local), any other thread active during the
+      same window is also subject to the deny-connect wrapper, and an over-budget
+      worker is abandoned as a daemon (it is NOT forcibly killed; it finishes on
+      its own). This is correct and intentional for the AGENT_SIMULATED in-process
+      posture and is HONESTLY disclosed in the docstrings and story evidence (real
+      kernel-level egress blocking via namespaces and a real cgroup wall-clock
+      kill are explicitly Pass-2). Restore is exception-safe (__exit__ returns
+      None, restores both entrypoints, runs inside the with that wraps the worker
+      join). No current breach: the runner contract is single-attack/sequential
+      and the guard restores deterministically. Flagging only as a monitor item
+      for when concurrent attack execution or a real OS-isolation layer lands in a
+      successor story.
+    suggested_resolution: >
+      No change required for S5-04. When a successor wires concurrent attack
+      execution or the Pass-2 OS isolation, revisit thread-locality of the egress
+      interception (or move egress denial to the kernel/namespace layer) and
+      replace the abandoned-daemon model with a real terminator, so the
+      process-global monkeypatch window cannot interleave across attacks.
+    status: OPEN
+  - id: SEC-S504-OBS-002
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/sandbox.py:204-242 (_apply_soft_rlimits) and Evidence (AGENT_SIMULATED honesty)
+    description: >
+      RLIMIT_AS is refused by darwin (verified live: current limit == max ==
+      RLIM_INFINITY, so setrlimit raises 'current limit exceeds maximum limit')
+      and the guard degrades to a recorded platform_limit_unavailable audit note
+      with the wall-clock watchdog as the reliable primary terminator — never a
+      silent no-op (independently reproduced). The RLIMIT_CPU fix (eaf116c) sets
+      the soft limit RELATIVE to CPU already consumed (consumed + budget + 1s
+      ceil), correctly capping THIS attack's additional CPU without sending
+      SIGXCPU to the host process; it is restored in a finally and does NOT weaken
+      the termination guarantee (over-budget still raises SandboxBudgetExceeded
+      with terminated_for_budget=True via the watchdog). This is a faithful,
+      sound realization of "limit this attack's CPU" and is correctly recorded as
+      AGENT_SIMULATED with real OS isolation deferred to Pass-2. No action needed;
+      monitor that the Pass-2 platform story delivers the real memory ceiling that
+      RLIMIT_AS cannot provide on darwin.
+    suggested_resolution: >
+      None for S5-04. Pass-2 should provide a real address-space / memory ceiling
+      via the platform isolation layer (cgroup memory.max or equivalent), since
+      the in-process RLIMIT_AS is unavailable on darwin and degrades to the
+      wall-clock watchdog only.
+    status: OPEN
+context_bounds_respected: true
+notes: >
+  Independence + bounded context: reviewed ONLY the 5 changed files
+  (eval_framework/attacks/__init__.py, spec.py, sandbox.py;
+  tests/test_attack_sandbox.py, tests/test_attack_spec_loader.py) across the
+  declared commit range (RED e1e7273 -> GREEN d680515 -> REFACTOR ef63d35 ->
+  FIX eaf116c -> TEST 5059c56). No shared reviewer state; self-attested.
+
+  Common-findings catalog (15 patterns) walked — every applicable pattern PASSES:
+  (1) no production-crate ban relevant; (2) no pub fn grants a capability outside
+  the in-code allow-list registry (DEFAULT_ATTACK_REGISTRY is a plain dict, the
+  ONLY channel a spec selects code; the runner field is a dotted NAME validated
+  for membership, never a free dynamic import / arbitrary-object resolution);
+  (3) the AttackSandbox is the single mediator chokepoint, no adapter bypass;
+  (4) no unsafe block (Python, n/a); (5)/(11) no new dependency — stdlib only
+  (json, socket, threading, time, resource, pathlib) so no CVE / denied-license
+  surface; (6) n/a HSM; (7) no new egress route opened — the only socket usage is
+  the DENY interceptor and a synthetic unroutable test connect; (8) no hard-coded
+  credential / API-key shape (audit-line regex test pins email/SSN/long-hex
+  absence); (9) no SQL/NoSQL interpolation; (10) no git-pinned dep; (12) no
+  wildcard scope=* capability (default-deny: empty allowed_paths, network=deny);
+  (13) tokio n/a — the daemon worker thread is the watchdog mechanism and the
+  egress guard wraps it; (14) no replay/llm cross-import; (15) no weak hash
+  primitive introduced.
+
+  Headline gate verification (HARD):
+  1. AST/source guard is REAL + NON-VACUOUS: test_attacks_package_has_no_unsafe_
+     execution_call_signatures AST-walks _attacks_source_paths() (glob of *.py in
+     the package dir) and asserts scanned>=3; forbidden module heads
+     (unsafe-deserialization module, subprocess, marshal, shelve), forbidden
+     builtins (dynamic-eval/exec/compile/__import__), and forbidden os shell-out
+     attrs are all checked by AST NODE NAME (so a docstring mention cannot
+     false-positive). A meta-guard (test_ast_guard_would_catch_a_forbidden_call)
+     proves the scanner flags a synthetic forbidden builtin -> not a no-op.
+     Independent grep over the 3 source files returned ZERO real dangerous
+     usages (only json.loads, which is the SAFE stdlib structured parser, and
+     prose/identifier 'run' tokens). CONFIRMED.
+  2. Safe loader (A1): load_attack_spec -> _parse_structured uses json.loads on a
+     str or takes an already-parsed Mapping; refuses any other source type,
+     malformed JSON, and non-mapping top level. _validate_scalar_params rejects
+     EVERY non-scalar params value (nested mapping / list / None / tuple / object)
+     naming the offending field; @given property confirms zero non-scalars reach
+     the runner and the dual @given confirms every JSON scalar is accepted. No
+     arbitrary-object deserializer; never constructs a data-named object.
+     CONFIRMED.
+  3. Capability pre-check fail-loud BEFORE the body (A2/A6):
+     assert_no_unsafe_capability runs first in AttackSandbox.run and raises before
+     attack_callable is invoked (test proves the off-list callable is never
+     called). runner-not-in-registry, network!=deny, non-scalar param, and *_path
+     outside allowed_paths all refuse. assert_path_allowed delegates to
+     spec._is_within_allowed (PurePosixPath component containment) so a
+     sibling-prefix (/tmp/sandbox-synthetic-evil) is NOT allowed — no naive
+     startswith. Registry is an in-code dict. CONFIRMED.
+  4. Network-egress refusal (A3): _EgressGuard intercepts connect AND connect_ex,
+     raising SandboxViolation; restored in __exit__ on the exception path; the
+     test targets the unroutable synthetic 192.0.2.1 TEST-NET-1 and the guard
+     fires before any real egress. No real network target. CONFIRMED.
+  5. Budget terminator (A4) + RLIMIT_CPU FIX: the watchdog is a stdlib
+     threading.Thread + join(timeout=wall_seconds) — NEVER a subprocess; over
+     budget -> SandboxBudgetExceeded(terminated_for_budget=True). FIX eaf116c sets
+     RLIMIT_CPU soft = ceil(consumed_cpu + budget) + 1s, restored in finally — a
+     sound realization of "cap this attack's additional CPU" that does not send
+     SIGXCPU to the host and does not weaken termination (watchdog stays primary).
+     RLIMIT_AS degrades on darwin to an honest platform_limit_unavailable note
+     (reproduced live), never a silent no-op. CONFIRMED.
+  6. Least-privilege default-deny (A7): SandboxPolicy() -> allowed_paths ==
+     frozenset(), network == "deny". CONFIRMED.
+  7. No real secret/PII (AX-001): synthetic fixtures only; no real network target
+     (192.0.2.1 TEST-NET), no real key; audit-line regex test pins absence of
+     email/SSN/long-hex shapes. CONFIRMED.
+
+  Untouched verified: harness/attack.py + harness/stream_synth.py +
+  rating/port.py + rating/elo.py show NO diff across the S5-04 commit range
+  (git diff --stat empty); wrapped reconstruction_attack_score is pure over
+  in-memory strings (no I/O, no network, side-effect-free).
+
+  Owned tests re-run GREEN: 67 passed (test_attack_sandbox.py +
+  test_attack_spec_loader.py), exit 0. Per-module coverage: sandbox.py 99%,
+  spec.py 100%, __init__.py 100% (>=90% bar met). The single sandbox.py partial
+  branch (143->140) is the benign loop-continue in assert_no_unsafe_capability.
+
+  APPROVE: 0 unresolved MAJOR+ findings. Honesty boundary (AGENT_SIMULATED
+  in-process guards real in-tree; real seccomp/namespace/cgroup-kill +
+  real-adversary/real-key execution are Pass-2) is accurate and not overstated.

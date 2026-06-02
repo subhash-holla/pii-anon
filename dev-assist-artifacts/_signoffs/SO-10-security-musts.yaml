@@ -1,0 +1,119 @@
+sign_off_id: SO-10-security-musts
+date: 2026-06-01
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  The three D6 SME Security-MUST stories are CLOSED, hardened, and green in-tree: S2-05
+  (cryptographically sign + verify the MoE control-path gate_v1.json), S6-03 (encrypt the
+  reversible-pseudonymization token store at rest under AEAD), and S5-04 (sandbox the
+  adversarial attack-harness runner under capability + resource isolation). Each passed the
+  canonical 5-reviewer story gate (security-sast PRIMARY). A between-work-streams ADVERSARIAL
+  CLOSE (Workflow wqhzndsp3) then stress-tested all three with live break-probes and caught a
+  MAJOR the per-story gates missed + a set of completeness/hardening gaps; ALL were remediated
+  in-loop under strict TDD and re-verified by a focused RE-CLOSE (Workflow wy3urfrhc) returning
+  0 still-broken + security-sast re-gate APPROVE + integration PASS. The three SME Security
+  MAJORs from the Design stage are discharged.
+
+stories_closed:
+  - id: S2-05
+    title: cryptographically sign + verify gate_v1.json (detached HMAC-SHA256 + fail-loud verify-on-load + key rotation)
+    gate: _reviews/story/S2-05-gate.yaml   # 5/5 APPROVE (iter-1); adversarial close confirmed forge + silent-accept airtight (0 broken)
+    commits: { red: 2640fdc, green: d45a5e4, refactor: 04cf3c7, review: 5df2bd2 }
+    implements: [FR-018, NFR-006, NFR-005, NFR-015, AX-006, AX-002]
+    sme_major: "#1 sign+verify the auto-discovered learned-gate control-path artifact (privilege-escalation surface)"
+  - id: S6-03
+    title: encrypt the token store at rest (additive EncryptedSQLiteTokenStore — AEAD, AAD-bound rows, envelope-wrapped DEK, blind-index lookup, key rotation, fail-loud on tamper)
+    gate: _reviews/story/S6-03-gate.yaml   # iter-1 5/5 APPROVE; iter-2 adversarial-close completeness-FAIL closed → re-gate APPROVE
+    commits:
+      iter1: { red: b67befd, green: 1f91c8a, refactor: 36358f0, review: efbeecd }
+      iter2: { red: d949fab, green: de98c68, review: bec26fd }   # FIX-A AST+nonce parity, FIX-B scope_index/expires_at AAD-fold, FIX-C wrong-KEK list_by_scope
+    implements: [FR-019, FR-026, NFR-014, NFR-015, AX-006, AX-001, AX-002, AX-004]
+    sme_major: "#2 encrypt the token store at rest (SQLiteTokenStore stored raw plaintext PII)"
+  - id: S5-04
+    title: sandbox the attack harness (eval_framework/attacks/ isolation substrate — safe spec loader, capability pre-check, resource budget, egress refusal, fail-loud)
+    gate: _reviews/story/S5-04-gate.yaml   # iter-1 5/5 APPROVE BUT MISSED a MAJOR; iter-2 remediated + re-gated APPROVE
+    commits:
+      iter1: { red: e1e7273, green: d680515, refactor: ef63d35, fix: eaf116c, cov: 5059c56, review: 4ee40e1 }
+      iter2: { red: e4cf199, green: 6deacbe, review: 52e9bef }   # FIX-1 path canonicalization (the MAJOR), FIX-2 A2-guard getattr/import_module hardening
+    implements: [FR-011, FR-013, NFR-012, NFR-013, NFR-024, FR-026, AX-001, AX-006, AX-002]
+    sme_major: "#3 sandbox the attack harness (ingests adversarial material)"
+
+adversarial_close:
+  workflow: wqhzndsp3   # 6 read-only refuters (2/story) + integration sweep + completeness/epistemic-honesty critic
+  upheld_refutations: 1
+  major_caught: >
+    SEC-S504-PATHTRAVERSAL (MAJOR): the S5-04 path allow-list used PurePosixPath.relative_to (purely lexical,
+    never collapses '..'), so assert_path_allowed('/grant/../../../etc/passwd') with allowed_paths={'/grant'}
+    RETURNED the path — defeating BOTH the runtime shim AND the load-time A6 guard (demonstrated reading an
+    /etc/passwd-shaped target + a real symlink escape). All 5 iter-1 reviewers missed it; the '..' case had no test.
+    THIS IS THE VALUE OF THE ADVERSARIAL CLOSE — a real sandbox-escape caught after a clean 5/5 gate.
+  completeness_gaps_closed:
+    - "S6-03 DoD §12 (d)/(e)/(g) lacked committed AST/nonce regression tests (true-by-construction but unpinned vs S2-05/S5-04 parity) → FIX-A committed AST sink-scan + nonce-distinctness."
+    - "S6-03 scope_index + expires_at not in the AEAD AAD (raw-UPDATE mis-bucket / expired-row resurrection; NOT a confidentiality/forgery break — each surfaced only the row's own genuine plaintext) → FIX-B folded both into the AAD."
+    - "S6-03 wrong-KEK list_by_scope returned [] silently while get() raised (NFR-015 consistency) → FIX-C list_by_scope fail-loud."
+    - "S5-04 A2 AST guard non-vacuous but getattr/import_module-evadable + over-claimed wording → FIX-2 strengthened matcher + softened wording."
+  reclose:
+    workflow: wy3urfrhc   # 2 re-refuters + security-sast re-gate (both) + integration/SDO sweep
+    result: "reclose_pass=true — 2/2 re-refuters all_closed (0 still-broken; the exact probes now RAISE, no over-rejection); security-sast re-review APPROVE on both iter-2 diffs (0 new MAJOR+); integration PASS."
+  refuters_broken_false: >
+    S2-05 forge (28+ probes: wrong-key/length-extension/canonicalization-collision/scheme-downgrade/rotation-grace — all rejected) +
+    S2-05 silent-accept (50 probes: escape-hatch unreachable from production; present-broken always raises; absence→None) +
+    S6-03 plaintext-recovery (raw-.db scan + cut-paste + wrong-KEK + nonce-reuse + weaponized-AAD — no break) +
+    S6-03 integrity (544 byte-flips all raise; determinism + anon≠pseudo intact) — ALL confirmed broken=false.
+
+decisions_acknowledged:
+  - "S2-05: gate_v1.json is now unforgeable + fail-closed — detached HMAC-SHA256 over canonical serialization, verify-on-load (verify_on_load=True hard-wired at the production MoERouter seam), constant-time compare, key-ring rotation; absence→graceful static softmax (NFR-026), present-but-broken→raise. Optional Ed25519 behind a lazy import (gate-signing extra). Pure-stdlib default; zero new hard deps."
+  - "S6-03: additive EncryptedSQLiteTokenStore(TokenStore) — AEAD (AESGCM default), per-row fresh 96-bit nonce, AAD now binds key_id|blind_index|version|scope_index|expires_at (decrypt precedes the TTL short-circuit so a tampered-then-expired row can't be masked), envelope-wrapped DEK (KEK never on disk), keyed blind-index O(1) lookup, key rotation + rewrap_all, fail-loud TokenStoreIntegrityError. The plaintext-leaking SQLiteTokenStore + providers/reidentification/key_manager + pii_anon/__init__ stay byte-identical; orchestrator unchanged (accepts any TokenStore)."
+  - "S5-04: eval_framework/attacks/ seeded with the isolation substrate — safe structured spec loader (allow-list registry, scalars-only, no unsafe-deserialization), AttackSandbox capability pre-check (runner allow-listed, network=deny, path allow-list now canonicalized via realpath/normpath — closes the '..'/symlink escape), resource budget (RLIMIT_AS/CPU soft + a stdlib thread wall-clock watchdog, never a subprocess), in-process egress refusal, fail-loud SandboxViolation/SandboxBudgetExceeded. A2 AST source-hygiene guard now catches getattr/import_module/__import__ string-sink indirection. Every future real attack body (FR-011 Tier-3, FR-013 MIA) MUST run via run_attack_under_sandbox."
+  - "Methodology: the per-story 5-reviewer gate is necessary but not sufficient for security MUSTs; the between-work-streams ADVERSARIAL CLOSE (live break-probes) is the catch-net — it found a MAJOR a 5/5 gate missed. Keep this close as the standing pattern for security work-streams."
+
+findings_waived_or_deferred:
+  - id: SAST-S603-OBS-created-at
+    disposition: pass2-hardening
+    detail: "created_at is outside the S6-03 AAD (a raw UPDATE can forge it) but it gates nothing (not key selection / TTL / bucketing) — purely an audit timestamp. Optional Pass-2 fold-into-AAD."
+  - id: SAST-S603-OBS-mixed-key-partial-read
+    disposition: pass2-hardening
+    detail: "Post-rotation, reopening with a provider that unwraps only the newer key id silently omits older-key rows from list_by_scope (results non-empty → fail-loud guard skipped). Part of the dual-version rotation-grace model; omits rows, never reveals wrong plaintext."
+  - id: SAST-S504-OBS-runtime-confinement
+    disposition: pass2
+    detail: "The A2 AST guard is a TEST-ONLY source-hygiene pin over the 3 repo attacks/*.py files (a runtime-assembled non-literal sink is out of scope by design); real seccomp/namespace/cgroup OS confinement + a real over-budget force-kill + thread-local egress for concurrent execution are Pass-2 (SAST-S504-OBS-1/2)."
+  - id: SAST-S205-OBS-verify-on-load-escape-hatch
+    disposition: pass2
+    detail: "verify_on_load=False returns unverified content by design for offline tooling; provably unreachable from production (not a constructor param; the production seam hard-wires True). Consider gating behind an explicit non-production flag when real key custody lands."
+  - id: TRACE-matrix-backfill (S2-05/S5-04/S6-03)
+    disposition: deferred-to-sprint-gate
+    detail: "traceability-matrix Story/Test columns for the 3 stories backfilled at the respective S2/S5/S6 sprint gates (matrix defers DC/Story/Test to Stages 3-5; mirrors S4-CS-01)."
+  - id: real-crypto-custody (S2-05/S6-03) + real-OS-isolation (S5-04)
+    disposition: pass2
+    detail: "Real signing-key / KEK custody (env/secret-store/HSM/KMS) and real OS-level sandbox syscalls are Pass-2 — never agent-simulated as real. The in-tree HMAC + AEAD + in-process guards run for real against deterministic NON-PRODUCTION test keys + synthetic PII."
+
+sdo_verdict:
+  verdict: NOT_YET   # recomputed via `pii-anon supremacy` + the re-close integration agent — both agree; UNCHANGED by the security MUSTs (they harden posture but do not write the benchmark JSON)
+  binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+  j_value: 1.0
+  j_source: mle-bootstrap
+  guarantees: { G1: PENDING, G2: "PENDING<-S4-01", G3: PASS, G4: "PENDING<-S4-03", G5: "PENDING<-S5/S6", G6: PASS, G7: FAIL }
+  note: >
+    G5 (latency budgets + 4-channel interception) stays PENDING: S6-03 hardens the key-custody/at-rest posture
+    but the G5 sub-conditions need the S5/S6 FEATURE work + a canonical run; the gate reads no new flag from the
+    security MUSTs, so the verdict is honestly unchanged. The #1 binding constraint remains the S7 canonical run.
+
+quality:
+  suite: "3097 passed / 15 skipped / 9 deselected / 0 failed (exit 0); baseline 2876 + 221 new security-MUST tests (S2-05 62 + S6-03 72 + S5-04 87)"
+  coverage: "86.85% (>= 84 gate); moe_gate_signing.py 100%, encrypted_store.py 100%, attacks/sandbox.py 99%, attacks/spec.py 100%"
+  lint_type: "ruff clean; mypy --strict 0 errors / 127 files"
+  env: "AGENT_SIMULATED on the local .venv (cryptography present; numpyro/jax/arviz NOT installed). HMAC + AEAD + in-process sandbox guards run for real; real crypto custody + real OS isolation are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md 8a0f1000…, benchmark-diagnostics.json 47f9b116…, artifacts/benchmarks/* , docs/* all match session-start baseline
+  competitor_compare_byte_identical: true   # src/pii_anon/evaluation/competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6)
+  narrow_git_add_only: true
+  no_new_hard_dependency: true   # S2-05 stdlib HMAC (optional gate-signing extra for Ed25519); S6-03 reused [crypto]; S5-04 stdlib-only
+  byte_identical_preserved: "store.py, providers.py, reidentification.py, key_manager.py, pii_anon/__init__.py, harness/attack.py, harness/stream_synth.py, rating/port.py, rating/elo.py — all unchanged"
+
+next:
+  binding_objective: "S7 canonical run (canonical_claim_run=True) — THE #1 binding constraint toward CLAIM_GRADE."
+  immediate: "S4-01 (distinct anon/pseudo reversibility scorers → completes G2) then S4-03 (calibration/selective-risk reporter → completes G4); author each via /dev-assist-story-new, claim, 5-reviewer gate, recompute the SDO verdict at each landing."
+  milestone: "M4 (CODE v2) advances — the 3 security MUSTs are LIVE + adversarially hardened; the SDO optimization function stays code-computable."

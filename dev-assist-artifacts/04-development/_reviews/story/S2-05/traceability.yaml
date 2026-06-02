@@ -1,0 +1,116 @@
+reviewer: traceability
+gate: story
+scope_id: S2-05
+iteration: 1
+verdict: APPROVE
+summary: >
+  Forward FR/NFR -> Story -> Test -> DC chain is faithful and complete. All four
+  declared requirement IDs (FR-018, NFR-006, NFR-005, NFR-015) plus the two upheld
+  axioms (AX-002 determinism, AX-006 least-privilege) exist in
+  requirements-document.md / the axiom roster; each is pinned by a named test in the
+  two NEW test files; acceptance A1-A9 each map to >=1 named test; the Traces field
+  resolves verbatim to two real design lines (DC-02 :34 + SME Security MUST #1 :56).
+  Only open item is the traceability-matrix Story/Test backfill, which the matrix
+  header itself defers to Stages 3-5 and which S4-CS-01 precedent treats as a
+  DEFERRED-TO-SPRINT-GATE MINOR (not a story-gate blocker).
+findings:
+  - id: TRACE-S205-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:31
+    description: >
+      traceability-matrix row UC-15 maps FR-018 but its Story/Test columns are not
+      yet backfilled with S2-05 / the two new test files (NFR-005/NFR-006/NFR-015 do
+      not yet carry an S2-05 Story/Test edge either). The matrix header (line 3)
+      explicitly states "DC/Story/Test columns fill in Stages 3-5", so this is the
+      documented deferral pattern, not a missing trace.
+    suggested_resolution: >
+      Backfill at the S2 sprint gate: add S2-05 + tests/test_moe_gate_signing.py +
+      tests/test_moe_gate_verify_on_load.py to the FR-018 (UC-15) row and add an
+      S2-05 control-path-integrity edge for NFR-005/NFR-006/NFR-015. Mirrors
+      S4-CS-01-gate.yaml TRACE-S4CS01-MINOR-2 (status DEFERRED-TO-SPRINT-GATE,
+      disposition "Acceptable at story gate ... Backfill at the sprint gate").
+  - id: TRACE-S205-OBS-1
+    severity: OBSERVATION
+    status: NOTED
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-05-sign-verify-gate.md:10
+    description: >
+      The story declares NFR-006 (canonical-run provenance) as Implemented; the test
+      coverage for NFR-006 is indirect - the envelope carries a provenance stamp +
+      key_id (exercised in _payload() / test_a1_* and the key-id trust-root tests
+      test_a4_*), but no test embeds the literal token "NFR-006" the way A6 embeds
+      "NFR-005/AX-002". The mechanism (signed provenance + key id travels with the
+      gate) is present and tested; only the explicit ID-in-docstring marker is
+      absent. requirements-coverage owns whether the provenance semantics are fully
+      discharged; from a pure forward-trace view the edge is real.
+    suggested_resolution: >
+      Optional: add an NFR-006 mention to a provenance-stamp assertion docstring
+      (e.g. test_a1_round_trip_valid_signature_loads) at backfill time so the ID is
+      greppable in the test surface. Non-blocking.
+context_bounds_respected: true
+notes: >
+  ID -> requirement existence (all PRESENT in requirements-document.md):
+    FR-018  -> :30  "MoE-router: learned routing + span-dedup + selective activation + early-exit" (UC-15, MUST)
+    NFR-005 -> :64  "Scoring-run determinism ... byte-identical artifacts across N=5 replays" (MUST)
+    NFR-006 -> :65  "Canonical-run provenance ... provenance stamp" (MUST)
+    NFR-015 -> :76  "Key/state separation ... external secret required to reverse" (SHOULD)
+    AX-002  -> MANIFEST.md:133 "deterministic-pseudonymization" + design :6 "AX-002 determinism"
+    AX-006  -> MANIFEST.md:133 "least-privilege-agentic-interception" + design :6
+  .
+  ID -> pinning test(s) (grepped + read in the two NEW files):
+    FR-018  -> test_moe_gate_verify_on_load.py: the verify-on-load seam that gates the
+               learned gate onto MoERouter.route() (test_a7_* + test_a8_* +
+               test_no_gate_router_behaviour_unchanged / test_route_all_unchanged_with_no_gate).
+    NFR-005 + AX-002 -> test_moe_gate_signing.py: test_a6_replay_determinism_n5_identical_signature
+               (docstring cites "NFR-005/AX-002 determinism") + test_a6_canonical_bytes_*
+               + property test_a6_property_canonical_bytes_order_invariant.
+    NFR-006 -> envelope provenance + key_id fields in _payload() exercised by test_a1_* and
+               the trust-root tests test_a4_* (indirect; see TRACE-S205-OBS-1).
+    NFR-015 -> test_a4_unknown_key_id_raises ("ring is the trust root, not the file") +
+               test_a3_bare_legacy_gate_dict_rejected_not_trusted + test_key_provider_env_override
+               (artifact-alone never reverses; external secret/key required).
+    AX-006  -> test_a7_production_seam_uses_verify_on_load_true +
+               test_a7_constructor_raises_on_tampered_gate (control-path input authenticated
+               before it can steer experts).
+  .
+  Acceptance A1-A9 -> test mapping (each maps to >=1 named test; 1:1+):
+    A1 -> test_a1_round_trip_valid_signature_loads, test_a1_signature_value_is_base64_of_raw_hmac
+    A2 -> test_a2_tamper_value_flip_raises, _oracle_hash, _feature_version, _truncated_signature_value,
+          _non_base64_signature_value, _adding_unsigned_sibling_key, + properties
+          test_a2_property_every_payload_mutation_raises, test_a2_property_arbitrary_signature_bytes_rejected
+    A3 -> test_a3_missing_signature_raises, _empty_signature_value, _signature_not_a_dict,
+          _missing_payload, _bare_legacy_gate_dict_rejected_not_trusted, _missing_key_id, _envelope_not_a_dict
+    A4 -> test_a4_unknown_key_id_raises, _message_only_names_the_id
+    A5 -> test_a5_rotation_accept_in_grace_then_reject_after_retire, _signer_always_signs_with_current,
+          _keyring_resolve_prefers_current_then_previous
+    A6 -> test_a6_canonical_bytes_key_order_invariant, _no_whitespace, _value_sensitive,
+          _non_ascii_preserved, _replay_determinism_n5_identical_signature, property _order_invariant
+    A7 -> test_a7_valid_file_returns_verified_payload, _tampered_file_raises_and_returns_nothing,
+          _unknown_key_file_raises, _malformed_json_file_raises, _default_verify_on_load_is_true,
+          _production_seam_uses_verify_on_load_true, _constructor_raises_on_tampered_gate
+    A8 -> test_a8_absent_file_returns_none, _present_but_broken_raises_not_fallback,
+          _absent_gate_router_uses_static_softmax
+    A9 -> test_a9_verifier_uses_compare_digest, _compare_digest_is_actually_called,
+          _error_messages_leak_no_secret_on_tamper
+  .
+  Design trace (Traces field) verified verbatim:
+    D-implementation-ready-design.md:56 = SME Security MAJOR/MUST #1 "sign + verify the gate_v1.json
+      artifact (auto-discovered learned gate on the control path = privilege-escalation risk)" -> exact match.
+    D-implementation-ready-design.md:34 = DC-02 DistilledTopKGate "Artifact gate_v1.json carries
+      oracle-hash + gate_feature_version; absent -> static entity_strengths softmax (NFR-026)" -> exact match;
+      A8 correctly pins this NFR-026 absence-vs-tamper boundary.
+  .
+  Cascade / hygiene:
+    provisional_status = AGENT_SIMULATED. Source family DC-02 is not DIVERGED; the AGENT_SIMULATED
+      label is consistent with the design (in-tree HMAC-SHA256 runs real on a NON-PRODUCTION test key;
+      real key custody/HSM is Pass-2; optional Ed25519 importorskip-gated). No DIVERGED cascade owed.
+    Parent epic populated (E2 MoE-router / DC-02). Dependencies S2-01/S2-02 acknowledged with a
+      self-contained fallback (story ships the loader seam itself if S2-01 not landed) -> no hard
+      dependency-not-DONE blocker for THIS story's owned surface.
+    Files confirmed new/additive vs main: test_moe_gate_signing.py (+630) NEW, test_moe_gate_verify_on_load.py
+      (+262) NEW, moe_gate_signing.py (+313) NEW, moe.py (+102 additive load_verified_gate + keyword-only
+      gate_path/key_ring), errors.py (+14 GateSignatureError). Seam + error class exist as declared.
+  .
+  Verdict: APPROVE. Forward trace is faithful end-to-end; the single open item is the matrix
+  Story/Test backfill, which is the documented Stage 3-5 deferral and matches the S4-CS-01
+  DEFERRED-TO-SPRINT-GATE precedent -> acceptable deferred MINOR, not a story-gate blocker.

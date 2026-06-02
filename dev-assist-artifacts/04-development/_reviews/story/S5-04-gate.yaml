@@ -1,0 +1,216 @@
+# S5-04 — sandbox the attack harness (re-id / MIA adversary runner under capability + resource isolation)
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. One iteration.
+gate: story
+scope_id: S5-04
+final_iteration: 2
+date: 2026-06-01
+aggregate_verdict: APPROVE   # iter-2 final. iter-1 was 5/5 APPROVE but MISSED a MAJOR (caught by the adversarial close); iter-2 remediated + re-gated APPROVE.
+
+# ── ITER-2 AMENDMENT (adversarial-close-driven) ──────────────────────────────────────────────
+# The iter-1 5-reviewer gate (below) returned 5/5 APPROVE, but the between-work-streams adversarial
+# close Workflow (wqhzndsp3) caught a MAJOR the gate missed, plus a hardening gap:
+iter2_adversarial_close:
+  trigger: "Workflow wqhzndsp3 (6 refuters + integration + completeness critic) — 1 UPHELD refutation + completeness recommendations."
+  major_found:
+    id: SEC-S504-PATHTRAVERSAL
+    severity: MAJOR
+    description: >
+      Path allow-list bypass: spec._is_within_allowed / SandboxPolicy.assert_path_allowed used
+      PurePosixPath.relative_to (purely lexical, never collapses '..'), so
+      assert_path_allowed('/grant/../../../etc/passwd') with allowed_paths={'/grant'} RETURNED the path
+      (no raise) — defeating BOTH the runtime shim AND the load-time A6 `*_path` guard. Demonstrated reading an
+      /etc/passwd-shaped target + a real symlink escape. The A6 acceptance ("a path outside allowed_paths is
+      rejected") was UNVERIFIED for '..' traversal (only sibling-prefix was tested). All 5 iter-1 reviewers missed it.
+    remediation: >
+      RED e4cf199 → GREEN 6deacbe. FIX-1: canonicalize BEFORE the shared _components_contained boundary check —
+      runtime assert_path_allowed now os.path.realpath(candidate AND each root) (collapses '..' + resolves
+      symlinks); load-time _is_within_allowed now os.path.normpath (lexical, deterministic, no FS dependence).
+      +12 net-new tests pin: multi-depth '..' traversal (runtime + load-time) raises; real symlink-escape raises;
+      within-grant '..' + legit-in-grant + grant-root still ALLOWED; sibling-prefix still DENIED.
+    status: REMEDIATED-AND-REVERIFIED
+  hardening_found:
+    id: SEC-S504-A2-INDIRECTION
+    severity: MINOR (over-claim)
+    description: >
+      The A2 AST guard was non-vacuous but EVADABLE: getattr(os,'<shellcall>') / import_module('<subprocess>')-routed
+      indirection slipped past the fixed-literal node-name matcher (a shell-out runner ran rc=0 in a CUSTOM registry).
+      The guard is a TEST-ONLY source-hygiene pin over the 3 repo attacks/*.py files (honestly AGENT_SIMULATED;
+      runtime OS-confinement is Pass-2) but the §3 A2 / §12 DoD "proves ZERO ... call signatures" wording over-claimed.
+    remediation: >
+      FIX-2 (same RED/GREEN): strengthened _scan_unsafe_call_signatures to also flag getattr/import_module/__import__
+      calls whose string arg is a forbidden sink (+ 3 routed-sink meta-guards + a no-false-positive guard); §3 A2 +
+      §12 DoD wording softened to "pins out naive/contiguous AND getattr/import_module-routed signatures over the
+      repo-owned source (TEST-ONLY source-hygiene pin; runtime OS-confinement is Pass-2)".
+    status: REMEDIATED
+  reclose:
+    workflow: wy3urfrhc
+    result: "reclose_pass=true; 2/2 re-refuters all_closed (0 still-broken — the exact traversal probe RAISES, symlink-escape RAISES, no over-rejection, A2 indirection caught); security-sast re-review APPROVE (0 new MAJOR+); integration PASS."
+    suite: "3097 passed / 15 skipped / 9 deselected / 0 failed (exit 0)"
+    coverage: "86.85% (≥84); attacks/__init__.py 100%, sandbox.py 99%, spec.py 100%"
+    quality: "ruff clean; mypy --strict clean / 127 files"
+    owned_tests: "87 (iter-1 67 + iter-2 +20)"
+    tdd: "RED e4cf199 (path-traversal + A2-indirection pins fail on iter-1 code — refuter reproduced the old lexical bypass) → GREEN 6deacbe → docs 52e9bef; RED-before-GREEN git-confirmed"
+  iter2_reviewers_carried: >
+    Re-reviewed the dimension whose finding drove the remediation: security-sast (PRIMARY) → APPROVE on both fixes
+    (canonicalization sound + deterministic; strengthened guard non-vacuous + not over-broad; no new sink; scope-clean,
+    only the 4 owned files). code-quality re-confirmed via the integration sweep (RED-before-GREEN git-verified, ruff +
+    mypy clean, scope-disciplined). traceability / requirements-coverage / axiom-compliance iter-1 APPROVE carried
+    forward (the iter-2 change is within the security-sast blast radius + strengthens AX-006 least-privilege path
+    containment; no FR/NFR/trace change; the A6 acceptance is now genuinely test-pinned). Mirrors the S4-CS-01 iter-2 pattern.
+# ── end iter-2 amendment ; the iter-1 record (which stands, with the gap noted above) follows ──
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add). No performance reviewer (no latency surface).
+  - code-quality
+  - security-sast          # PRIMARY (security MUST: the loader/execution path + capability/resource isolation)
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:      "e1e7273  # test: pin FR-011/FR-013 attack-sandbox isolation substrate (A1–A8) — package absent"
+  green:    "d680515  # feat: attack-sandbox isolation substrate (FR-011/FR-013)"
+  refactor: "ef63d35  # refactor: single source of truth for path-allow-list containment (behaviour-identical)"
+  fix:      "eaf116c  # fix: set RLIMIT_CPU soft relative to CPU already consumed (resolves cumulative-rlimit SIGXCPU; watchdog stays primary)"
+  cov:      "5059c56  # test: pin fail-loud defensive branches (sandbox.py + spec.py to >=90%)"
+  review:   "4ee40e1  # docs: State -> REVIEW; evidence"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor e1e7273 d680515 → true; RED fails on ModuleNotFoundError: pii_anon.eval_framework.attacks
+  byte_identical: "harness/attack.py, harness/stream_synth.py, rating/port.py, rating/elo.py — ALL git diff --quiet UNCHANGED across the S5-04 range (verified by code-quality + security-sast + orchestrator)"
+
+owned_files:
+  new: [src/pii_anon/eval_framework/attacks/__init__.py, src/pii_anon/eval_framework/attacks/spec.py, src/pii_anon/eval_framework/attacks/sandbox.py, tests/test_attack_sandbox.py, tests/test_attack_spec_loader.py]
+
+reviewers:
+  - reviewer: security-sast      # PRIMARY
+    verdict: APPROVE
+    notes: >
+      Headline Security MUST (D6 SME MAJOR #3). All hard-verification items passed under INDEPENDENT re-check.
+      (1) AST/source guard REAL + NON-VACUOUS: walks all 3 attacks/ files, asserts scanned≥3, matches forbidden
+      imports/builtins/os-attrs by AST node name (docstring mentions can't false-positive); a meta-guard proves
+      the scanner flags a synthetic forbidden builtin; independent grep → zero real dangerous usages (the only
+      json.loads is the safe stdlib structured parser). (2) Safe loader: json/mapping only, never arbitrary-object
+      deserialization, never constructs data-named objects; every non-scalar params refused naming the field;
+      @given property → zero non-scalars reach the runner. (3) Capability pre-check fail-loud BEFORE the body;
+      off-list callable never invoked; assert_path_allowed uses PurePosixPath component containment (no startswith
+      sibling-prefix bypass); registry is a plain in-code dict. (4) Egress guard intercepts connect AND connect_ex,
+      restored on the exception path; target is unroutable 192.0.2.1 TEST-NET-1. (5) Watchdog is a stdlib thread
+      join, NEVER a subprocess; the eaf116c RLIMIT_CPU-relative-to-consumed fix is sound (caps the attack's
+      ADDITIONAL cpu at budget, soft+restored-in-finally, does not SIGXCPU the host, does not weaken
+      SandboxBudgetExceeded/terminated_for_budget=True); reproduced live that RLIMIT_AS is refused by darwin and
+      degrades to an honest platform_limit_unavailable audit note (never silent). (6) Default-deny constructor.
+      (7) Synthetic-only audit. 67/67 owned tests pass. 0 unresolved MAJOR+.
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED (e1e7273) ancestor of GREEN (d680515) git-confirmed; RED touches only tests+story. REFACTOR ef63d35
+      behaviour-identical (extract _is_within_allowed). FIX eaf116c narrow+sound (RLIMIT_CPU is cumulative
+      process-wide → relative-to-consumed is correct; determinism preserved by recording the stable budget value,
+      not the run-varying soft number, in the audit). TEST 5059c56 additive coverage only. ruff clean on owned
+      files; mypy --strict Success / 127 files. 67 owned tests pass. attacks modules 100/99/100% coverage. Scope
+      discipline: 6 commits touch only owned files; 4 byte-identical files unchanged. 3 non-blocking MINOR (2
+      public-method docstrings + test-naming convention).
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      Ships the isolation SUBSTRATE, not the FR-011/FR-013 attack bodies — and scopes the bodies HONESTLY as
+      deferred successors (DEFAULT_ATTACK_REGISTRY holds only the synthetic reconstruction_attack_score;
+      traceability-matrix tracks the real Tier-3/MIA bodies as S6-DATA-blocking). run_attack_under_sandbox is the
+      chokepoint; A5 proves a well-formed synthetic runner runs to completion inside it. NFR-024/AX-001 (no real
+      PII) → A7 audit regex. FR-026/AX-006 (least-privilege) → A7 default-deny + refusals. A1–A8 each map to a
+      named test; no in-scope security-DoD clause unmapped. No over-claim.
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      All 6 IDs exist + cites match: FR-011:22 MUST, FR-013:24 MUST, FR-026:39 MUST, NFR-012:73, NFR-013:74,
+      NFR-024:87; AX-001/006/002 in design D0:6. Design trace resolves: DC-09:19, SME Security MAJOR #3 :56,
+      CODE-owns attacks/ :66. A1–A8 each map to ≥1 named test; A2 AST guard non-vacuous (meta-guard). DC-09 also
+      names FR-012 which the story correctly does NOT claim (successor body concern). RED→GREEN→REFACTOR ordering
+      git-verified across all 5 SHAs. 1 MINOR (matrix backfill) DEFERRED-TO-SPRINT-GATE.
+  - reviewer: axiom-compliance
+    verdict: APPROVE   # 0 MAJOR+
+    notes: >
+      AX-006 (least-privilege, headline) saturated BY CONSTRUCTION: default-deny SandboxPolicy(); pre-check before
+      the body; refuses unsafe-deserialization / subprocess / shell-out / egress / out-of-allow-list paths. AX-001
+      synthetic-only (TEST-NET-1 egress target; audit carries no PII/secret-shaped value). AX-002 determinism:
+      AttackResult equality over (attack_id, outcome, terminated_for_budget, audit) with no timing field; two runs
+      equal; consumed-CPU correctly excluded. AX-003/AX-004 NOT-TRIGGERED (verified: 5-commit span touches zero
+      detection/router/floor/scoring; A8 import-boundary AST guard green — no swarm/moe/fusion/policy import).
+      AX-005 observation (becomes live when a real scoring body lands). eaf116c fix compromises no axiom.
+
+findings:
+  - id: CQ-S504-MINOR-1
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: src/pii_anon/eval_framework/attacks/sandbox.py:102 (SandboxPolicy.from_spec) + :124 (SandboxPolicy.assert_no_network)
+    description: >
+      Two public methods of the exported SandboxPolicy class lack a one-line docstring (the class + sibling
+      assert_no_network_value + most methods ARE documented).
+    disposition: >
+      Non-blocking (reviewer rated MINOR; method names are self-documenting and the surrounding surface is
+      documented). Trivial 1-line additions; scheduled as an S5 sprint-gate polish item (with the test-naming
+      cleanup), not a substantive correctness/security gap.
+  - id: CQ-S504-MINOR-2 / cross-story-recurring
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: tests/test_attack_sandbox.py, tests/test_attack_spec_loader.py
+    description: >
+      Test names key off acceptance IDs (A1–A8) rather than embedding FR/NFR IDs; the FR/NFR linkage is carried in
+      module docstrings + the story A→FR map (the established security-MUST convention, shared with S2-05/S6-03).
+    disposition: "Advisory; faithful forward trace (traceability APPROVE). Batch test-naming cleanup candidate at the S5 sprint gate."
+  - id: TRACE-S504-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md (UC-09/FR-011 :27, UC-10/FR-013 :28)
+    description: "Matrix carries no S5-04 row yet (UC-organized; defers DC/Story/Test to Stages 3-5)."
+    disposition: "Acceptable at story gate (forward trace faithful via metadata + acceptance-keyed tests). Backfill at the S5 sprint gate — mirrors S2-05/S6-03/S4-CS-01."
+  - id: SAST-S504-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: >
+      The egress guard monkeypatches the global socket connect/connect_ex for the run window and the over-budget
+      worker is an abandoned daemon thread (not force-killed) — correct + honestly disclosed for the single-attack
+      sequential in-process posture; revisit thread-locality / a real terminator at concurrent-exec or the Pass-2
+      OS-isolation layer.
+  - id: SAST-S504-OBS-2 / REQCOV-S504-OBS-2
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "RLIMIT_AS cannot provide a real memory ceiling on darwin (degrades to watchdog); the Pass-2 platform story should deliver a real memory cap (e.g. cgroup memory.max). The successor running a real memory-hungry body must confirm a real cap at Pass-2."
+  - id: REQCOV-S504-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "FR-011 + FR-013 (both MUST) are verified-substrate / body-deferred (S6-DATA-blocked successors), NOT body-verified. Track as such at the epic/release gate."
+  - id: AXIOM-S504-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "AX-005 (calibrated-abstention) is a detection/scoring-path axiom not triggered by an isolation substrate; becomes live when a real Tier-3/MIA scoring body lands in a successor DC-09 story."
+
+cross_reviewer_patterns:
+  - pattern: "honest substrate-vs-body deferral (no over-claim)"
+    raised_by: [requirements-coverage, traceability, axiom-compliance, security-sast]
+    detail: "Four reviewers independently affirm: this ships the isolation substrate; the real Tier-3 LLM-adversary (FR-011) + LiRA@128/Secret-Sharer MIA (FR-013) bodies + real seccomp/namespace/cgroup OS isolation are correctly Pass-2/successor, never simulated as real."
+  - pattern: "RLIMIT_CPU-relative-to-consumed fix adjudicated sound"
+    raised_by: [security-sast, code-quality, axiom-compliance]
+    detail: "Three reviewers independently confirm eaf116c is a faithful in-process realization that preserves the budget guarantee + AX-002 determinism and does not destabilize the host process; the wall-clock watchdog remains the primary terminator."
+  - pattern: "public-API docstring / test-name convention polish"
+    raised_by: [code-quality]
+    detail: "Recurring with S2-05/S6-03; non-blocking; batched for the S5 sprint gate."
+
+outcome:
+  invariant: >
+    The DC-09 eval_framework/attacks/ package now exists with its isolation SUBSTRATE: a safe structured spec
+    loader (allow-list registry only — no unsafe-deserialization, scalars-only params) + an AttackSandbox single
+    chokepoint enforcing a fail-loud capability pre-check (runner allow-listed, network=deny, path allow-list)
+    BEFORE the attack body, an in-process resource budget (RLIMIT_AS/RLIMIT_CPU soft where available + a stdlib
+    thread wall-clock watchdog — never a subprocess), and an in-process network-egress refusal. An AST/source
+    guard (non-vacuous, meta-guarded) proves the package carries ZERO unsafe-deserialization / subprocess /
+    shell-out / dynamic-eval call signatures. Every real attack body landed later (FR-011 Tier-3, FR-013 MIA)
+    MUST run via run_attack_under_sandbox. Discharges SME Security MUST #3.
+  tests: "full suite 3060 passed / 15 skipped / 9 deselected / 0 failed (exit 0); 67 owned tests passed; no skipif needed"
+  coverage: "86.83% (≥84); attacks/__init__.py 100%, sandbox.py 99%, spec.py 100%"
+  quality: "ruff clean (owned); mypy --strict 0 errors / 127 files"
+  safety: "harness/attack.py + stream_synth.py + rating/port.py + elo.py byte-identical; user-WIP md5 unchanged; narrow git add only; NO new dependency (stdlib only); attacks/ imports nothing from swarm/moe/fusion/policy"
+  provisional_status: "AGENT_SIMULATED — in-process guards (RLIMIT_CPU real soft+restored, watchdog, egress interceptor, load-time refusals) run for real on this darwin host; RLIMIT_AS degrades to an honest audit note; real seccomp/namespace/cgroup OS isolation + real Tier-3/MIA bodies + real key/adversary execution are Pass-2 (never simulated as real)."
+
+followups:
+  - "Successor DC-09 stories (S5-02 Tier-3 LLM-adversary FR-011 [⛓ eval-data S6 assemble_paired_set], S5-03 LiRA@128 MIA FR-013 [⛓ eval-data S6 canary]) MUST execute their attack bodies via run_attack_under_sandbox."
+  - "S5 sprint gate: backfill traceability-matrix S5-04 row; add the 2 SandboxPolicy docstrings + batch test-naming cleanup."
+  - "Pass-2: real OS-level isolation (seccomp/namespaces/cgroup memory.max + wall-clock kill); thread-local egress guard + a real over-budget terminator for concurrent execution."

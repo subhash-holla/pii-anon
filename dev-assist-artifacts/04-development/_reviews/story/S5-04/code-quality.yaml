@@ -1,0 +1,93 @@
+reviewer: code-quality
+gate: story
+scope_id: S5-04
+iteration: 1
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S504-01
+    severity: MINOR
+    location: src/pii_anon/eval_framework/attacks/sandbox.py:102
+    description: >
+      Public method SandboxPolicy.from_spec (classmethod) has no docstring. The class
+      SandboxPolicy is exported in __all__ and is the primary construction path from a
+      validated AttackSpec; the from_spec method is a named public surface item.
+      Pattern #4 (missing pydoc on a public surface item) applies here.
+    suggested_resolution: >
+      Add a one-line docstring, e.g.:
+        """Derive a least-privilege SandboxPolicy from a validated AttackSpec."""
+    status: open
+
+  - id: code-quality-S504-02
+    severity: MINOR
+    location: src/pii_anon/eval_framework/attacks/sandbox.py:124
+    description: >
+      Public method SandboxPolicy.assert_no_network has no docstring. The adjacent
+      assert_no_network_value method (line 119) does carry a docstring, making the
+      no-arg form a visible documentation gap on the exported SandboxPolicy class.
+    suggested_resolution: >
+      Add a one-line docstring, e.g.:
+        """Raise unless this policy's network posture is 'deny'."""
+    status: open
+
+  - id: code-quality-S504-03
+    severity: MINOR
+    location: tests/test_attack_sandbox.py:1, tests/test_attack_spec_loader.py:1
+    description: >
+      No test function name embeds an FR or NFR ID (pattern #6: test name does not pin
+      an FR/NFR ID). The story implements FR-011, FR-013, NFR-012, NFR-013, NFR-024 /
+      AX-001, FR-026 / AX-006. All 67 test names use acceptance-criteria labels (A1-A8)
+      which are story-local and not traceable to the requirements catalogue without
+      cross-referencing the story text. The module-level docstrings mention FR-011 /
+      FR-013 in the RED commit message but not in any test name.
+    suggested_resolution: >
+      Embed at least the primary FR IDs in key test names or docstrings — e.g., rename
+      test_a5_well_formed_synthetic_attack_runs_to_completion to include fr_011_fr_013
+      in the name, or add a pytest mark / docstring pinning the relevant FR/NFR IDs.
+      At a minimum, the two module docstrings already contain FR-011 / FR-013 references,
+      so adding them to the acceptance-gate test names (A5, A4) would suffice.
+    status: open
+
+notes: >
+  TDD evidence verified: RED commit e1e7273 precedes GREEN commit d680515 (git
+  merge-base --is-ancestor confirmed); GREEN precedes REFACTOR ef63d35 (confirmed).
+  The RED commit touches only test files and the story doc; the GREEN commit introduces
+  the three production source files. REFACTOR ef63d35 is behaviour-identical (extracts
+  _is_within_allowed as single source of truth; 47 owned tests stay green).
+  FIX eaf116c is narrow and sound: it corrects the RLIMIT_CPU set-point from a bare
+  budget value (which would fire SIGXCPU once the host process cumulative CPU exceeded
+  the budget) to consumed + budget + 1s headroom, making the rlimit safe to apply
+  inside a long-running test suite. The determinism invariant (AX-002 / A8) is
+  preserved by recording the stable budget value (not the run-varying consumed-relative
+  soft number) in the audit line. TEST 5059c56 is additive only (defensive-branch
+  coverage; no behaviour change). DOC 4ee40e1 updates the story state to REVIEW.
+  Scope discipline: all 6 S5-04 commits touch exclusively owned files (3 source + 2
+  test + 1 story doc). The four byte-identical files (harness/attack.py,
+  harness/stream_synth.py, rating/port.py, rating/elo.py) are verified unchanged via
+  git diff --quiet. git status --short shows only pre-existing user-WIP modifications
+  (orchestrator.py, test_moe_enhancements.py, artifacts/benchmarks/*, README.md,
+  docs/*) and untracked .claude/, docs/pii-rate-elo-value.md — none are S5-04 scope.
+  Lint and type: ruff check on owned files passes with zero issues; mypy src/pii_anon
+  --strict reports success across 127 source files (0 issues).
+  Owned-test run: 67 passed, 0 failed, 0 skipped (pytest --no-cov; 3.30s). The
+  coverage failure reported by the bare pytest invocation is the project-wide
+  --cov-fail-under=84 threshold firing against only the two test files, not the full
+  suite; that is expected and not a finding. The story evidence records 86.83% overall
+  and >=99% per module when the full suite runs.
+  The import of the private _is_within_allowed from spec.py into sandbox.py is the
+  intended single-source-of-truth pattern established by REFACTOR ef63d35; mypy
+  strict is clean and no module boundary is violated. This is a MINOR observation
+  (private symbol shared across sibling modules in the same package), not a finding.
+  Security-specific: the AST/source guard (test_attacks_package_has_no_unsafe_execution_call_signatures)
+  is live and verified non-trivially (the meta-guard test_ast_guard_would_catch_a_forbidden_call
+  proves the guard is not a no-op). The three owned source files contain zero
+  unsafe-deserialization imports, zero subprocess/shell-out calls, and zero
+  arbitrary dynamic-eval calls — confirmed independently. The in-process egress
+  guard uses try/finally-equivalent (context manager __exit__) and rlimit restore
+  uses an explicit finally; no resource leak path identified. The wall-clock watchdog
+  abandons the over-budget worker as a daemon thread (documented AGENT_SIMULATED
+  limitation; the worker finishes on its own without holding locks or fds).
+  The three MINORs are non-blocking. APPROVE.
+
+review_time_seconds: 612
+context_bounds_respected: true

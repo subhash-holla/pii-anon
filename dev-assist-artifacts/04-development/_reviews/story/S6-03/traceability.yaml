@@ -1,0 +1,103 @@
+reviewer: traceability
+gate: story
+scope_id: S6-03
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: TRACE-S6-03-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:32,34
+    description: >
+      The traceability-matrix is UC-organized (no per-story Story/Test columns) and
+      its rows for FR-019/NFR-014/NFR-015 (line 32, UC-16/17/18) and FR-026/AX-006
+      (line 34, UC-20/21) are not yet backfilled with an S6-03 / tests/test_encrypted_store.py
+      edge. This is the documented Stage 3-5 deferral: it mirrors the S2-05 traceability
+      review (verdict APPROVE, TRACE finding status DEFERRED-TO-SPRINT-GATE) which itself
+      cites the S4-CS-01-gate precedent (TRACE-S4CS01-MINOR-2). Forward trace is fully
+      faithful via the story metadata + the FR/NFR-embedded test names; the matrix-row
+      backfill is a batched sprint-gate housekeeping step, not a story-gate blocker.
+    suggested_resolution: >
+      At the Sprint-6 gate, add the S6-03 + tests/test_encrypted_store.py edge to the
+      FR-019/NFR-014/NFR-015 and FR-026/AX-006 matrix rows (cite a representative test id
+      e.g. test_fr_026_synthetic_plaintext_and_token_absent_from_raw_db so the FR-to-test
+      link is greppable from the matrix), consistent with the S2-05 / S4-CS-01 precedent.
+context_bounds_respected: true
+notes: >
+  Dimension: forward FR/NFR -> Story -> Test -> DC trace for S6-03 (read-only). VERDICT APPROVE
+  — the chain is faithful end-to-end.
+
+  (1) DECLARED IDs ALL EXIST in requirements-document.md: FR-019 (line 31, MUST,
+  reversible pseudonymization: deterministic surrogates + auditable key rotation + Art-4(5)
+  separation); FR-026 (line 39, MUST, persist no raw PII to any channel after masking, AX-006);
+  NFR-014 (line 75, MUST, pseudonymization integrity, unauthorized-reversal = 0);
+  NFR-015 (line 76, SHOULD, key/state separation, artifact-alone re-join = FAIL flagged);
+  FR-027 (line 40, SHOULD, stable session pseudonyms, authorized-only reversal). Axioms:
+  AX-006 (line 39, via FR-026), AX-001 (line 87, via NFR-024 no real PII in fixtures);
+  AX-002/AX-004 are project axioms referenced consistently with prior gates (determinism /
+  anon!=pseudo wall). No declared ID is fabricated -> no SHOWSTOPPER.
+
+  FR-027 SCOPE: declared as "the bundled SHOULD sub-scope" and §5 non-goals correctly defers
+  the full session-pseudonym sub-feature to a thin follow-up (scope field already provides the
+  session key). The load-bearing MUST deliverable (encryption-at-rest) is what this story tests.
+  This is honest scoping, not an orphaned/over-claimed FR -> no finding.
+
+  (2) DESIGN TRACE RESOLVES: DC-04 confirmed at D-implementation-ready-design.md:14
+  (Reversible pseudonymization + auditable key rotation + key/state separation -> FR-019,
+  NFR-014/015); DC-13 confirmed at :23 and elaborated :49 (no raw PII persisted post-masking,
+  FR-026/AX-006). SME Security MAJOR #2 "encrypt the token store at rest (SQLiteTokenStore
+  stores raw plaintext PII — tension with AX-001/key-separation)" confirmed at :56 (the
+  must-do-stories list — story cites §54, the finding text lands at :56; the §54/§56 region
+  is the same SME-MAJOR block, trace is sound). Test-ledger pinned item "Token-store-
+  encrypted-at-rest test" confirmed at :69 (the Verification Design->Testing section). All
+  three design anchors resolve to concrete tests below.
+
+  (3) ID -> TEST MAPPING (tests/test_encrypted_store.py, 782 lines, 44 test fns + 1 @given
+  property + a parametrized contract that runs x3 store builders). Test names embed the
+  FR/NFR IDs (greppable):
+    A1 (FR-019, NFR-014)  -> test_fr_019_roundtrip_equality_scoped_get:107,
+                             test_fr_019_roundtrip_survives_reopen:125,
+                             test_chacha20_algorithm_roundtrip:136, +
+                             TestContractSharedBehaviour (count/TTL/delete_expired x stores)
+    A2 (FR-026 / AX-006)  -> test_fr_026_synthetic_plaintext_and_token_absent_from_raw_db:290,
+                             test_fr_026_value_columns_are_blob_ciphertext:308,
+                             test_nfr_015_kek_and_dek_plaintext_absent_from_disk:340
+    A3 (NFR-014)          -> test_nfr_014_single_byte_tamper_raises_integrity_error:378,
+                             test_integrity_error_is_tokenization_error_subclass:390,
+                             test_nfr_014_tamper_never_returns_wrong_plaintext:393,
+                             test_nfr_014_row_relocation_aad_mismatch_raises:408,
+                             test_nfr_014_property_any_single_byte_flip_in_payload_raises:450 (@given)
+    A4 (NFR-014/NFR-015)  -> test_nfr_015_wrong_kek_cannot_reverse:496
+    A5 (FR-019; DC-04)    -> test_fr_019_rotation_old_rows_still_decrypt_new_rows_under_new_key:512,
+                             test_fr_019_rewrap_all_migrates_legacy_rows:535,
+                             test_a5_envelope_stores_only_wrapped_dek_not_bare_dek:550,
+                             test_a5_rewrapped_db_decrypts_only_under_new_key:565
+    A6 (AX-002)           -> test_ax_002_token_deterministic_through_encrypted_store:587
+    A7 (AX-004 / FR-010)  -> test_ax_004_imports_nothing_from_anon_or_eval_scoring:614,
+                             test_ax_004_exposes_only_reversible_mapping_surface:630
+    A8 (NFR-026)          -> test_nfr_026_missing_aead_provider_guard_raises_with_install_hint:645,
+                             test_nfr_026_missing_aead_store_ctor_guard_raises:657
+    A9 (CONTRACT)         -> test_isinstance_tokenstore:679, test_all_abstract_methods_overridden:684,
+                             test_get_returns_none_for_absent_distinct_from_tamper:688, +
+                             TestContractSharedBehaviour (Liskov shared-behaviour x stores)
+  Every acceptance criterion A1-A9 maps to >=1 named test; every MUST ID (FR-019/FR-026/
+  NFR-014) carries an FR/NFR-embedded test name -> no CATASTROPHIC (no MUST claimed-complete
+  without test evidence). SHOULD NFR-015 carries dedicated tests (A2/A4/A5). DC-04 rotation
+  evidenced by A5; DC-13 no-persist evidenced by A2.
+
+  (4) provisional_status CASCADE: story shows AGENT_SIMULATED. Source basis: the in-tree AEAD
+  round-trip / tamper / not-plaintext-on-disk run REAL in .venv with [crypto], but real external
+  key custody (KMS/HSM/keyring) is the honest Pass-2 boundary represented by StaticTestKeyProvider.
+  This is a correctly-marked AGENT_SIMULATED honesty boundary, NOT a DIVERGED DC -> no DIVERGED
+  cascade required (DC-04/DC-13 are not in a DIVERGED state). provisional_status is consistent
+  with the source -> no mismatch finding.
+
+  (5) DOMAIN PACK: developer-assistant.yaml domain_packs: [] (empty) — the financial
+  reviewer-extension patterns are NOT active and were not applied; no source_pack findings.
+
+  (6) DC<->module audit: not a surface/ story (owned files are tokenization/ + errors.py +
+  test) -> 1:1 surface-mapping check N/A.
+
+  Only open item: the UC-organized traceability-matrix Story/Test backfill (TRACE-S6-03-MINOR-1),
+  a documented Stage 3-5 deferral matching the S2-05 / S4-CS-01 DEFERRED-TO-SPRINT-GATE precedent.
+  Not a story-gate blocker. APPROVE.

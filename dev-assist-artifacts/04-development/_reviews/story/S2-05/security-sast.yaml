@@ -1,0 +1,94 @@
+reviewer: security-sast
+gate: story
+scope_id: S2-05
+iteration: 1
+verdict: APPROVE
+summary: >
+  S2-05 makes the MoE control-path artifact gate_v1.json unforgeable and fail-closed.
+  All 7 review dimensions verified against source + tests. Verification raises
+  GateSignatureError on tamper / missing-sig / unknown-key / retired-key / malformed
+  with NO payload-returning branch on failure (fail-closed); absence -> None,
+  present-but-broken -> raise (no silent-fallback to static softmax). Constant-time
+  hmac.compare_digest (no == on the digest). Error messages leak only key_id/scheme
+  (no key bytes, no correct-HMAC). JSON-only parse on the load seam; no
+  unsafe-deserialization / subprocess / shell-out / network in the new module
+  (AST-pinned + grep-confirmed). Only in-tree key is the labelled NON-PRODUCTION dummy;
+  real custody is Pass-2. cryptography is lazy-imported inside the Ed25519 functions
+  only (delta-import test: moe_gate_signing adds ZERO crypto modules). Key-ring is the
+  trust root; signer always signs with current; retired-out-of-ring key rejected.
+  62 owned tests pass (incl. the 10 named DoD/A9 fail-closed + no-sink + constant-time
+  + no-secret-leak pins). RED 2640fdc -> GREEN d45a5e4 -> REFACTOR 04cf3c7, owned-files-only.
+findings:
+  - id: SAST-S2-05-001
+    severity: OBSERVATION
+    location: "src/pii_anon/moe.py:87-95 (load_verified_gate verify_on_load=False escape hatch)"
+    description: >
+      The verify_on_load=False escape hatch returns the UNVERIFIED gate payload (the raw
+      payload from a present-but-unverifiable file). This is by-design per A7 / story DoD
+      (explicit offline-tooling opt-out), it is NOT the default (default is True, pinned by
+      test_a7_default_verify_on_load_is_true), and the production MoERouter construction seam
+      hard-codes verify_on_load=True (moe.py:294-296, pinned by
+      test_a7_production_seam_uses_verify_on_load_true). No production path reaches the opt-out,
+      so there is no current breach. Recorded only so a future caller cannot quietly route a
+      disk gate through verify_on_load=False on a privilege-bearing path. Monitor at epic/sprint
+      gate: keep an AST/grep guard that the orchestrator and any production wiring never pass
+      verify_on_load=False, and consider gating the opt-out behind an explicit non-production /
+      offline-tooling flag when real key custody lands (Pass-2).
+    suggested_resolution: >
+      No change required for this story. At Pass-2 (real key custody), add an
+      orchestrator-scope guard test asserting no production construction path passes
+      verify_on_load=False; optionally restrict the opt-out to a clearly-named offline-tooling
+      entry point.
+    status: noted
+  - id: SAST-S2-05-002
+    severity: OBSERVATION
+    location: "src/pii_anon/__init__.py (package init transitively imports cryptography)"
+    description: >
+      A naive 'is cryptography in sys.modules after import pii_anon.moe_gate_signing' check
+      reads True, but this is because the package __init__ (a sibling unrelated to S2-05, via
+      the pre-existing 'crypto' extra) drags cryptography in first. A delta-import probe
+      (modules added specifically by importing moe_gate_signing) returns an EMPTY crypto set:
+      moe_gate_signing itself imports zero cryptography modules at load. The module-level
+      no-hard-crypto-import contract is correctly pinned by the AST test
+      test_dod_default_path_has_no_hard_crypto_import (source-level, robust to the ambient
+      package import) and the cryptography import is lazy inside sign_ed25519 / verify_ed25519
+      (moe.py: src lines 258-263 / 291-297). The optional-dep honesty claim holds for this story's
+      module. Noted only so the AST/source pin remains the source of truth over a sys.modules check.
+    suggested_resolution: >
+      None for S2-05. Keep the source-level AST pin as the canonical optional-dep guard. If the
+      package-wide default cryptography dependency is itself undesirable, raise it as a separate
+      dependency-footprint story (out of scope here).
+    status: noted
+context_bounds_respected: true
+notes: >
+  Read-only review; no source modified. Evidence: (1) fail-closed — read verify()
+  (moe_gate_signing.py:209-242), _require_envelope (173-194), _decode_signature_value (197-206),
+  and load_verified_gate (moe.py:26-98); the only non-raising returns are the verified payload
+  on success and None on file ABSENCE (moe.py:74-75). No branch returns an unsigned/unverified
+  payload on a verification failure on the default path. Tests A2/A3/A4/A5/A7/A8 (incl. the
+  bare-legacy-dict, missing/empty/malformed-sig, unknown-key-with-self-consistent-HMAC, and
+  present-but-broken-not-fallback cases) all raise. (2) constant-time — verify uses
+  hmac.compare_digest (moe_gate_signing.py:239); grep found NO ==/!= on the digest; behavioural
+  spy test_a9_compare_digest_is_actually_called passes. (3) no secret leakage — every
+  GateSignatureError message interpolates only key_id/scheme (lines 227/234/240/301/303/312);
+  no key bytes or correct-HMAC; test_a9_error_messages_leak_no_secret_on_tamper passes.
+  (4) no dangerous sinks — load seam parses with json.loads only (moe.py:81); grep + the AST
+  tests test_dod_no_unsafe_deserialization_import / test_dod_no_subprocess_or_shell_out_import /
+  test_dod_no_network_import confirm no unsafe-object-deserialization module, no
+  subprocess/process-spawn module, no os-level shell-out (os.system/os.popen), no
+  socket/urllib/http/requests/httpx/ftplib import. (5) no real secret — only key literal is
+  _TEST_HMAC_KEY = b"S2-05-NON-PRODUCTION-TEST-KEY-DO-NOT-USE-IN-PROD" (line 83); no
+  PEM/private-key/cloud-credential anywhere; test_key_provider_is_a_non_production_dummy passes.
+  (6) optional-dep honesty — see SAST-S2-05-002; lazy import confirmed by delta probe + AST pin.
+  (7) key rotation — KeyRing.key_for resolves current-then-previous (lines 139-144), sign_payload
+  always signs with current (146-152); A4 rejects an out-of-ring key_id even with a self-consistent
+  HMAC (the ring is the trust root); A5 accepts a retired key in grace then rejects after retire.
+  Owned tests: 62 passed (clean run, coverage gate disabled to avoid the repo-global
+  --cov-fail-under firing on a 2-file subset — that is a harness artifact, not a test failure;
+  the story's own full-suite run is 2938 passed / 0 failed). Commit ordering RED 2640fdc ->
+  GREEN d45a5e4 -> REFACTOR 04cf3c7 verified; each commit touches owned files only. NOTE on
+  harness: the first parallel pytest invocation reported ModuleNotFoundError on
+  pii_anon.moe_gate_signing — a CWD/sys.path artifact of the agent-thread shell (the editable
+  .pth puts src/ on the path only once the venv site is processed from the repo root); re-running
+  with the venv active from repo root resolves the import and all 62 tests pass. No code defect.
+  Verdict APPROVE: 0 unresolved MAJOR+ (2 OBSERVATION items, both by-design / harness, no breach).

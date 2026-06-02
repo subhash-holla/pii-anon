@@ -1,0 +1,103 @@
+reviewer: code-quality
+gate: story
+scope_id: S6-03
+iteration: 1
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S6-03-01
+    severity: MINOR
+    location: src/pii_anon/tokenization/encrypted_store.py:208
+    description: >
+      `_new_aead` is typed `-> Any` with no justifying comment. The return
+      value is either `AESGCM` or `ChaCha20Poly1305`; these two classes share
+      no common structural base in the `cryptography` library (both have
+      `.encrypt`/`.decrypt` but no exported protocol/ABC), so `Any` is the
+      narrowest feasible mypy-strict-clean option here. However, codebase
+      convention (#3 in the common-findings catalog) requires a brief
+      justifying comment when `Any` appears on a public-or-module-internal
+      function signature.
+    suggested_resolution: >
+      Add a short inline comment on the return annotation, e.g.:
+      `-> Any:  # AESGCM | ChaCha20Poly1305 — no shared base in cryptography; narrowed by callers`
+    status: open
+
+  - id: code-quality-S6-03-02
+    severity: MINOR
+    location: tests/test_encrypted_store.py (TestContractSharedBehaviour and TestGuardsAndRobustness classes)
+    description: >
+      20 of the 39 test function names do not embed an FR / NFR / AX / acceptance-ID
+      tag. Affected functions include `test_put_get_count`, `test_scope_filtering_list`,
+      `test_scopeless_get_scan`, `test_absent_token_returns_none`, `test_replace_existing`,
+      `test_ttl_get_returns_none_for_expired`, `test_ttl_count_and_list_exclude_expired`,
+      `test_delete_expired_removes_only_expired`, `test_chacha20_algorithm_roundtrip`,
+      `test_integrity_error_is_tokenization_error_subclass`, `test_isinstance_tokenstore`,
+      `test_all_abstract_methods_overridden`, `test_get_returns_none_for_absent_distinct_from_tamper`,
+      `test_static_provider_is_envelope_key_provider`, `test_provider_rejects_bad_kek_length`,
+      `test_store_rejects_unsupported_algorithm_on_put`, `test_scopeless_get_skips_expired_then_finds_valid`,
+      `test_scopeless_get_skips_unreversible_row_then_fails_loud`, `test_row_key_id_returns_none_for_absent`,
+      `test_dek_for_missing_envelope_raises`. The containing class names (`TestA1`, `TestA9`,
+      `TestContractSharedBehaviour`, `TestGuardsAndRobustness`) and inline docstrings
+      partially compensate, and the parametrized contract suite explicitly maps to A1/A9.
+      This is advisory only — the test suite is functionally complete and all pass.
+    suggested_resolution: >
+      Prefix test names with their FR/NFR/AX identifier where one applies, e.g.
+      `test_a9_put_get_count` / `test_a1_chacha20_algorithm_roundtrip` /
+      `test_nfr_014_integrity_error_is_tokenization_error_subclass`.
+      For pure robustness/guard tests with no direct FR/NFR, add a brief docstring
+      citing the acceptance clause (A1, A9, etc.) that the guard supports.
+    status: open
+
+notes: >
+  TDD evidence confirmed: `git merge-base --is-ancestor b67befd 1f91c8a` exits 0
+  (RED is ancestor of GREEN). RED commit `b67befd` modifies only
+  `tests/test_encrypted_store.py` and the story file — no production code —
+  consistent with a genuine failing-test-first commit. REFACTOR `36358f0` touches
+  only `encrypted_store.py` (dedup `_encrypt_row`/`_write_row`).
+
+  Lint: `ruff check` on all 4 owned files — `All checks passed!`. No owned file
+  appears in the 46 pre-existing `scripts/*.py` ruff errors.
+
+  Type: `mypy src/pii_anon --strict` — `Success: no issues found in 124 source files`.
+
+  Owned tests: 55 passed / 0 failed (`python3 -m pytest tests/test_encrypted_store.py
+  --no-cov -q`). The coverage tool reports `encrypted_store.py` at 100% (285 stmts /
+  52 branches, 0 missed) in the full-suite run per story evidence.
+
+  Scope discipline: all 5 declared-byte-identical files (`store.py`, `providers.py`,
+  `reidentification.py`, `key_manager.py`, `pii_anon/__init__.py`) confirmed
+  unchanged via `git diff --quiet HEAD -- <path>`. `git status --short` shows only
+  the pre-existing user-WIP M files and the expected untracked entries (`.claude/`,
+  `docs/pii-rate-elo-value.md`); the 4 owned new/additive files are not shown as
+  unexpectedly modified.
+
+  `Any` on `_new_aead -> Any` (finding S6-03-01) is structurally unavoidable:
+  `AESGCM` and `ChaCha20Poly1305` share no exported Protocol/ABC in `cryptography`.
+  The two call-sites (`_encrypt_payload` / `_decrypt_payload`) immediately use the
+  returned object's `.encrypt`/`.decrypt` method, so the runtime behaviour is fully
+  typed through the callers' `bytes` return annotations. The finding is advisory
+  (MINOR) only — add a `# AEAD_PROTOCOL:` comment to make the justification
+  explicit.
+
+  The `dict[str, Any]` at lines 407/426/435 is justified: `json.loads` returns
+  `Any` by library contract, the shape is narrowed immediately by the `isinstance(decoded, dict)`
+  guard (line 427) and by `str(fields["…"])` / `int(fields["…"])` coercions in
+  `_fields_to_mapping`, and mypy --strict accepts this without complaint.
+
+  The three `# type: ignore[assignment, misc]` lines (91–93) follow the existing
+  `providers.py:13` optional-dep sentinel pattern exactly (RISK-3 compliance).
+
+  No `unwrap()` / `assert` / non-null-assertion on production paths without guards.
+  No subprocess / shell-out call anywhere in the owned files. No hard-coded real
+  key material (KEK bytes live only in `tests/` as obviously synthetic `b"A"*32` /
+  `b"B"*32`). No unsafe-deserialization loader — only `json.loads`/`json.dumps`
+  over an explicit field dict.
+
+  Public-API docstring completeness: every `pub` / `export` symbol
+  (`EncryptedSQLiteTokenStore`, `EnvelopeKeyProvider`, `StaticTestKeyProvider`,
+  `KeyEnvelope`, `TokenStoreIntegrityError`, and all public methods) carries a
+  docstring. `_new_aead` is module-internal (single underscore, not in `__all__`)
+  and also has a one-line docstring.
+
+review_time_seconds: 420
+context_bounds_respected: true

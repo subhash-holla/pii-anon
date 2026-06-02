@@ -1,0 +1,189 @@
+reviewer: security-sast
+gate: story
+scope_id: S6-03
+iteration: 1
+verdict: APPROVE
+role: PRIMARY (Security MUST — crypto + persistence path)
+review_mode: read-only
+findings:
+  - id: SEC-S603-OBS-01
+    severity: OBSERVATION
+    location: src/pii_anon/tokenization/encrypted_store.py:55-59 (module docstring) + dev-assist-artifacts/.../S6-03-encrypt-token-store.md §2/§5 (residual-leak note)
+    description: >
+      Documented, conscious residual leak: the keyed blind index
+      HMAC-SHA256(index_key, scope|token) reveals EQUALITY of (scope, token)
+      pairs across rows (needed for O(1) lookup). This is equality over derived
+      pseudonyms, not PII (FR-019 surrogates are deterministic by design), and is
+      explicitly recorded as a trade-off with a decrypt-and-scan switch-point. No
+      plaintext, token, scope, KEK, or DEK is exposed. The index_key is derived
+      from the DEK (domain-separated SHA-256 over a distinct label) and is itself
+      never persisted; an attacker with only the .db cannot compute the blind
+      index. No current breach — monitor only.
+    suggested_resolution: >
+      None required for this story. If a future deployment forbids any equality
+      leak, flip to the documented decrypt-and-scan lookup (O(n)) at that gate.
+    status: ACKNOWLEDGED
+  - id: SEC-S603-OBS-02
+    severity: OBSERVATION
+    location: dev-assist-artifacts/.../S6-03-encrypt-token-store.md §9/Evidence (cryptography version string)
+    description: >
+      Honesty nit, not a security defect. The Evidence text states cryptography
+      "48.0.0"; the runtime in .venv is 44.0.3. Both satisfy the [crypto] extra
+      constraint cryptography>=41.0 (unchanged from main — S6-03 commits did not
+      touch pyproject.toml). 44.0.3 has no open advisory affecting the AEAD
+      primitives used here (AESGCM / ChaCha20Poly1305). The discrepancy is a
+      stale version string in the narrative, not a dependency or CVE issue.
+    suggested_resolution: >
+      Correct the version string in Evidence to the actually-installed
+      cryptography version for honest provenance. No code change.
+    status: OPEN
+  - id: SEC-S603-OBS-03
+    severity: OBSERVATION
+    location: src/pii_anon/tokenization/encrypted_store.py:171-205 (StaticTestKeyProvider) + §1/§5 honesty boundary
+    description: >
+      AGENT_SIMULATED boundary correctly drawn and honestly marked. The in-tree
+      StaticTestKeyProvider takes raw KEK bytes in-process (no networking, no
+      shell-out, no subprocess) and is documented as a synthetic stand-in; real
+      external key custody (cloud KMS / HSM / OS keyring) is deferred to Pass-2
+      behind the same EnvelopeKeyProvider protocol as an in-process library call.
+      No real-KMS behaviour is claimed as real. Recorded so the release-gate
+      Security-MUST checklist tracks the residual Pass-2 custody work.
+    status: ACKNOWLEDGED
+crypto_posture:
+  not_plaintext_on_disk_A2:
+    status: VERIFIED
+    detail: >
+      tests/test_encrypted_store.py:290-306 reads raw .db bytes and asserts
+      b"jane.roe@example.test", b"Jane Roe", plaintext token
+      b"<EMAIL_ADDRESS:v1:tok_abc>", b"<PERSON:v1:tok_def>", and entity-type
+      cleartext b"EMAIL_ADDRESS" are ALL absent; :308-338 dumps every column of
+      every row via a plain sqlite3 connection, asserts value columns are BLOB
+      ciphertext and no string/BLOB cell equals the plaintext/token. Re-ran live:
+      PASS (3/3 A2 tests).
+  aead_construction:
+    status: VERIFIED
+    detail: >
+      AESGCM (default) / ChaCha20Poly1305 (selectable) from
+      cryptography.hazmat.primitives.ciphers.aead (encrypted_store.py:88-93,
+      208-218). Fresh os.urandom(12) 96-bit nonce per encryption
+      (encrypted_store.py:400, 192). Independently exercised: 50 encryptions of
+      identical plaintext under one DEK -> 50 distinct nonces (no reuse,
+      non-deterministic ciphertext).
+  kek_dek_never_on_disk:
+    status: VERIFIED
+    detail: >
+      Only wrapped_dek persisted in the _keys envelope table (encrypted_store.py
+      :323-328, KeyEnvelope frozen dataclass). Bare DEK lives only in the
+      in-memory _dek_cache. KEK is caller-supplied, never written. A2/A5 scans
+      (test:340-350, 550-563) assert KEK_A bytes and the live DEK bytes are
+      absent from the file and from every envelope blob. PASS.
+  fail_loud_tamper_and_wrong_key:
+    status: VERIFIED
+    detail: >
+      InvalidTag -> TokenStoreIntegrityError (subclass of TokenizationError) on
+      single-byte ciphertext/nonce/tag flip (A3), AAD/row-relocation mismatch
+      (A3), and wrong-KEK reopen (A4). Property test @given(120 ex.) over byte
+      position x XOR mask always raises, never a successful-but-wrong decrypt.
+      Independently traced + ran the scope-less (_get_scan) tamper path: a
+      tampered row on a scope-less get RAISES (the except-clause around _dek_for
+      only swallows the UNWRAP failure, not the per-row _decrypt_payload tag
+      check) — confirmed no silent-skip of a tampered row.
+  design_note_1_wrong_key_vs_absent:
+    status: ADJUDICATED_CORRECT
+    detail: >
+      _raise_if_unreversible() (encrypted_store.py:556-579) runs ONLY after a
+      lookup returns no row. It SELECTs DISTINCT key_id owning rows and attempts
+      _dek_for each; if any owning key_id's envelope cannot be unwrapped under the
+      supplied KEK it re-raises TokenStoreIntegrityError. Empirically confirmed:
+      absent token under the CORRECT KEK returns None (A9); wrong-KEK get RAISES
+      (A4/NFR-015). Clean absent(None) vs wrong-key(raise) separation — satisfies
+      A4 without conflating it with the legitimate absent case.
+  design_note_2_aad_blind_index_binding:
+    status: ADJUDICATED_EQUIVALENT
+    detail: >
+      AAD = key_id | blind_index | version, where blind_index =
+      HMAC-SHA256(index_key, scope|token) is the stored primary key
+      (encrypted_store.py:368-378, 357-359). Distinct (scope,token) -> distinct
+      blind index -> distinct AAD (verified injective), and the blind index is
+      always reconstructable at read time on every lookup path, so the verifier
+      always rebuilds the exact AAD. Binding the blind index is cryptographically
+      equivalent to binding literal scope|token for relocation resistance:
+      relocating a payload to a different slot changes the reconstructed AAD and
+      the tag fails. Confirmed by the row-relocation test and an independent
+      cut-and-paste swap (raises).
+  no_dangerous_sinks:
+    status: VERIFIED
+    detail: >
+      On-disk bytes parsed with json.loads over decrypted bytes into an explicit
+      field dict only (encrypted_store.py:389-398, 426-431) with an isinstance
+      guard — no unsafe-deserialization loader (no pickle / marshal / shelve /
+      yaml.load / __import__). No subprocess, no shell-out, no process-spawn (the
+      only matches in-file are docstring prose stating they are NOT used). No
+      eval/exec, no network/socket/urllib/requests. No md5/sha1 (only SHA-256 via
+      HMAC for the keyed blind index — a keyed-PRF use, not a weak-hash misuse).
+  no_hardcoded_real_key:
+    status: VERIFIED
+    detail: >
+      No KEK/DEK/secret literal in src/. The only bytes literals in
+      encrypted_store.py are the 1-byte AAD/blind-index separators (b"\x1f") and
+      domain-separation labels. KEK is caller-supplied. Synthetic test KEKs
+      (b"A"*32, b"B"*32) are confined to tests/test_encrypted_store.py:58-59.
+  determinism_not_weaponized:
+    status: VERIFIED
+    detail: >
+      Random nonce makes ciphertext non-deterministic by design, but the
+      pseudonymization token is DeterministicHMACTokenizer's HMAC output; the
+      store only persists/returns it. A6 confirms the same input yields the same
+      token through two independent stores and detokenizes to identical
+      plaintext.
+supply_chain:
+  new_dependency: false
+  detail: >
+    S6-03 commits (b67befd^..36358f0) did not touch pyproject.toml. The
+    [crypto] extra cryptography>=41.0 is unchanged from main. The pyproject diff
+    vs main is entirely sibling-story work (S2-05 gate-signing, S3-03 bayes-eval,
+    hypothesis dev-dep, rating-engine entry points) — out of S6-03 scope.
+  installed_cryptography: 44.0.3 (satisfies >=41.0; no open advisory for the AEAD primitives used)
+invariants_verified:
+  commit_lineage: "RED b67befd -> GREEN 1f91c8a -> REFACTOR 36358f0; merge-base ancestry confirmed both hops"
+  off_limits_byte_identical_vs_main:
+    - src/pii_anon/tokenization/store.py
+    - src/pii_anon/tokenization/providers.py
+    - src/pii_anon/tokenization/reidentification.py
+    - src/pii_anon/tokenization/key_manager.py
+    - src/pii_anon/__init__.py
+  additive_only:
+    - "src/pii_anon/errors.py (+TokenStoreIntegrityError; no removals)"
+    - "src/pii_anon/tokenization/__init__.py (append-only exports; no removals)"
+  owned_tests: "55 passed / 0 failed (tests/test_encrypted_store.py); 14 security-critical A2/A3/A4/A5/A9-distinction tests pass"
+  coverage_owned_module: "encrypted_store.py 100% (285 stmts / 52 branches, 0 missed); errors.py 100%"
+  mypy_strict: "Success: no issues found (owned files)"
+  ruff: "All checks passed! (owned files)"
+context_bounds_respected: true
+notes: >
+  APPROVE. S6-03 (Security MUST — encrypt the reversible-pseudonymization token
+  vault at rest) is cryptographically sound on every dimension this reviewer
+  owns. The headline FR-026/AX-006 not-plaintext-on-disk guarantee is genuinely
+  enforced and tested at the raw-bytes level; AEAD is correctly constructed
+  (AESGCM default, fresh CSPRNG 96-bit nonce per encryption, no reuse), the
+  envelope wraps the DEK so neither KEK nor DEK ever lands on disk, and tamper /
+  wrong-key both FAIL LOUD via TokenStoreIntegrityError with a tampered-vs-absent
+  separation that is correct by trace and by execution. I independently
+  adjudicated both executor design notes: (#1) the post-lookup
+  _raise_if_unreversible guard cleanly separates absent(None) from
+  wrong-key(raise) and satisfies A4/NFR-015; (#2) AAD-binding the blind index
+  (=HMAC(scope|token)) is equivalent to binding literal scope|token for
+  relocation resistance because the blind index is injective per (scope,token)
+  and always reconstructable at read time — confirmed by an independent
+  cut-and-paste swap raising. No unsafe-deserialization, no subprocess /
+  shell-out / process-spawn, no eval/exec, no network, no weak hash, no
+  hard-coded real key (synthetic KEKs confined to tests). No new dependency
+  (pyproject untouched by S6-03; the diff vs main is sibling-story work);
+  installed cryptography 44.0.3 is advisory-clean for the primitives used.
+  Off-limits files byte-identical vs main; errors/__init__ changes additive-only.
+  Three OBSERVATIONS only: the documented (scope,token)-equality blind-index leak
+  (conscious trade-off, no PII/key exposure), a stale cryptography version string
+  in the Evidence narrative (44.0.3 installed vs 48.0.0 claimed — honesty nit, no
+  CVE/dep impact), and the correctly-marked AGENT_SIMULATED key-custody boundary
+  (real KMS/HSM is Pass-2). Zero SHOWSTOPPER/CATASTROPHIC/MAJOR/MINOR findings;
+  0 unresolved MAJOR+. APPROVE.

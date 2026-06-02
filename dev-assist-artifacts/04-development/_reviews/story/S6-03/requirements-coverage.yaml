@@ -1,0 +1,137 @@
+reviewer: requirements-coverage
+gate: story
+scope_id: S6-03
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: RC-S603-001
+    severity: OBSERVATION
+    requirement: NFR-014
+    title: "AAD-bound `version` column not independently tamper-tested"
+    detail: >
+      The row AEAD binds `key_id | blind_index | version` as associated data
+      (encrypted_store.py:367-378). A3 exercises blind_index tamper via
+      row-relocation (test_nfr_014_row_relocation_aad_mismatch_raises) and a
+      @given property over payload (nonce|ct|tag) byte flips
+      (test_nfr_014_property_any_single_byte_flip_in_payload_raises). A direct
+      mutation of the stored `version` integer column alone (payload untouched,
+      AAD recomputed differently on read) is not its own test. This is NOT a
+      coverage hole for the claimed MUST: a version-column flip lands on the
+      identical _decrypt_payload AAD-mismatch -> InvalidTag -> raise path that
+      relocation already proves, so NFR-014 "unauthorized-reversal = 0" is fully
+      established. Noted only as an additional adjacent case the property test
+      could fold in.
+  - id: RC-S603-002
+    severity: OBSERVATION
+    requirement: FR-027
+    title: "FR-027 (session pseudonyms, SHOULD) honestly deferred — not falsely claimed"
+    detail: >
+      FR-027 is a SHOULD in the requirements doc (line 40). The story §5 and the
+      Implements row explicitly scope FR-027 as a thin bundled SHOULD sub-feature
+      satisfied only insofar as the existing `scope` field already serves as a
+      session key, with stable-session-pseudonym ergonomics named as a follow-up.
+      No test claims FR-027 as fully verified, and the load-bearing MUST
+      (encryption-at-rest) is what is tested. The deferral is honest and the
+      bundling is flagged for a cold picker. No successor-story id is named for
+      the FR-027 ergonomics follow-up; acceptable for a SHOULD at a story gate but
+      worth a sprint-plan line so it is not silently dropped.
+context_bounds_respected: true
+notes: >
+  DIMENSION: "are there gaps in what we've claimed?" — every claimed requirement
+  is either fully-verified-by-named-test or honestly-deferred. Tests run REAL:
+  55 passed / 0 failed (python3 -m pytest tests/test_encrypted_store.py, 0.86s;
+  the project-wide --cov-fail-under=84 that fires on a single-file run is the
+  inifile coverage gate, NOT a test failure — encrypted_store.py is itself 100%
+  line+branch per the DoD). GREEN 1f91c8a; module
+  src/pii_anon/tokenization/encrypted_store.py read in full and each acceptance
+  clause traced to real code.
+
+  REQUIREMENT -> TEST MAPPING (all VERIFIED unless noted):
+
+  FR-026 / AX-006 (MUST — persist no raw PII post-masking): VERIFIED. A2
+  byte-scan test_fr_026_synthetic_plaintext_and_token_absent_from_raw_db asserts
+  b"jane.roe@example.test", b"Jane Roe", the plaintext token, and b"EMAIL_ADDRESS"
+  are ABSENT from the raw .db; test_fr_026_value_columns_are_blob_ciphertext
+  dumps every column of every row via a plain sqlite3 connection and asserts the
+  value columns are BLOB ciphertext and no string cell equals the plaintext/token.
+  Backed by real AEAD (encrypt_payload, encrypted_store.py:380-403; payload is a
+  small explicit json field-dict — no arbitrary-object loader). CONFIRMED.
+
+  NFR-014 (MUST — pseudonymization integrity, unauthorized-reversal = 0):
+  VERIFIED. A3 tamper -> raise: test_nfr_014_single_byte_tamper_raises_integrity_error
+  + test_nfr_014_tamper_never_returns_wrong_plaintext (single-byte XOR via direct
+  UPDATE -> TokenStoreIntegrityError, never None/wrong bytes) +
+  test_nfr_014_row_relocation_aad_mismatch_raises (cut-and-paste / row-swap ->
+  AAD mismatch -> raise) + the @given property (120 ex.) over byte-position x
+  XOR-mask of the payload blob ALWAYS raises, NEVER a successful-but-wrong decrypt.
+  A4 wrong-key -> raise: test_nfr_015_wrong_kek_cannot_reverse. The fail-loud path
+  is _decrypt_payload (InvalidTag -> TokenStoreIntegrityError, encrypted_store.py:
+  419-425). test_integrity_error_is_tokenization_error_subclass pins the subclass
+  relation. The artifact alone / wrong secret cannot reverse. CONFIRMED.
+
+  NFR-015 (SHOULD — key/state separation; story says "advances"): VERIFIED for
+  the slice claimed. A4 wrong-KEK (test_nfr_015_wrong_kek_cannot_reverse) +
+  test_a5_rewrapped_db_decrypts_only_under_new_key +
+  test_scopeless_get_skips_unreversible_row_then_fails_loud prove artifact-alone /
+  wrong-external-secret re-join FAILs loudly (the _raise_if_unreversible guard,
+  encrypted_store.py:556-579, distinguishes wrong-KEK-RAISE from genuinely-absent-
+  None — I traced this path: wrong KEK -> _iter_live_keys empty -> _get_scoped
+  None -> _raise_if_unreversible re-raises). A2/A5 KEK + live-DEK-never-on-disk:
+  test_nfr_015_kek_and_dek_plaintext_absent_from_disk asserts KEK_A and the live
+  DEK bytes are ABSENT from the raw file. CONFIRMED. (SHOULD, so the partial
+  framing "advances" is appropriate.)
+
+  FR-019 (MUST — reversible pseudonymization + auditable key rotation + Art-4(5)
+  separation): VERIFIED. Round-trip A1 (test_fr_019_roundtrip_equality_scoped_get,
+  ..._survives_reopen, chacha20 variant). Auditable rotation A5:
+  test_fr_019_rotation_old_rows_still_decrypt_new_rows_under_new_key (dual-version
+  grace: old rows decrypt under stamped key_id, new under k2; list_key_ids()
+  enumerates {k1,k2} for audit) + test_fr_019_rewrap_all_migrates_legacy_rows
+  (rewrap_all re-encrypts legacy rows -> row_key_id == "k2") +
+  test_a5_envelope_stores_only_wrapped_dek_not_bare_dek (the _keys envelope holds
+  only wrapped_dek; bare DEK absent). Art-4(5) separation = the NFR-015 key/state
+  split above. CONFIRMED.
+
+  FR-027 (SHOULD — stable session pseudonyms): HONESTLY DEFERRED, not falsely
+  claimed (see RC-S603-002). Bundled SHOULD sub-scope; the MUST is
+  encryption-at-rest; only `scope`-as-session-key is provided today, ergonomics
+  flagged as a follow-up. Correctly scoped.
+
+  Bundled axiom guards (also verified): AX-002 determinism preserved end-to-end
+  (A6 test_ax_002_token_deterministic_through_encrypted_store — identical HMAC
+  token through two independent stores, detokenize identical). AX-004 anon!=pseudo
+  wall (A7 test_ax_004_imports_nothing_from_anon_or_eval_scoring +
+  ..._exposes_only_reversible_mapping_surface). AX-001 synthetic-only fixtures
+  throughout. NFR-026 graceful optional-dep (A8 both provider + store-ctor crypto
+  guards raise with the pip install pii-anon[crypto] hint, import still succeeds).
+  A9 Liskov contract (isinstance TokenStore; all 5 abstract methods overridden;
+  absent->None distinct from tamper->raise) + the parametrized shared-behaviour
+  suite running identical assertions x3 stores.
+
+  DoD CLAUSE SCAN (every DoD line mapped — no unmapped security DoD clause; a
+  MAJOR if any were unmapped): RED/GREEN/REFACTOR all have SHAs (b67befd /
+  1f91c8a / 36358f0). Security-specific acceptance (a)-(g) each map to a named
+  test: (a)A2 byte-scan, (b)A3 tamper-suite, (c)A2/A5 KEK+DEK absent, (d) src
+  confirmed json-only over an explicit dict — no pickle/eval/exec/yaml.load
+  loader, (e) src confirmed zero subprocess/shell/popen (only docstrings stating
+  they are NOT used), (f) no key bytes in src/ (KEK caller-supplied; synthetic
+  b"A"*32/b"B"*32 live only in tests), (g) random 96-bit nonce per encryption
+  (_NONCE_BYTES=12 via os.urandom in _encrypt_payload). The only OPEN DoD box is
+  "Story-gate APPROVE" (this gate) — expected.
+
+  HONESTY BOUNDARY: provisional_status AGENT_SIMULATED is correctly declared. The
+  in-tree StaticTestKeyProvider behind the EnvelopeKeyProvider protocol stands in
+  for real key custody; real cloud-KMS / HSM / OS-keyring custody is Pass-2 and is
+  NOT claimed as real here — this is an acceptable Pass-2 deferral with the seam
+  in place, consistent with the methodology invariant.
+
+  VERDICT: APPROVE. All 3 MUSTs (FR-019, FR-026, NFR-014) fully verified by named
+  passing tests; the 2 SHOULDs (NFR-015, FR-027) honestly scoped/deferred; no
+  unmapped MUST or security-DoD clause. Two OBSERVATIONs only (a non-load-bearing
+  adjacent tamper case; a sprint-plan note for the FR-027 ergonomics follow-up) —
+  neither blocks. Out of scope for this dimension (test quality -> code-quality;
+  AEAD-construction / nonce-uniqueness / no-shell-out depth -> security-sast;
+  trace-link integrity -> traceability; semantic axiom-hold -> axiom-compliance).
+  Self-attestation: read story + requirements-document.md + the full
+  encrypted_store.py + the full test file, ran the suite (55 pass), and traced the
+  A4 wrong-key and _get_scan skip paths by hand independently.
