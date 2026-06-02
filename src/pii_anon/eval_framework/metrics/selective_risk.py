@@ -46,8 +46,7 @@ from typing import Any
 
 import numpy as np
 
-from .calibration import reliability_diagram_data
-from .calibration import TemperatureScaler
+from .calibration import TemperatureScaler, reliability_diagram_data
 
 __all__ = [
     "ScoredFinding",
