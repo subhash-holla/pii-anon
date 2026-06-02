@@ -1,0 +1,127 @@
+reviewer: security-sast
+gate: story
+scope_id: S4-03
+iteration: 1
+verdict: APPROVE
+summary: >
+  S4-03 (calibration / selective-risk reporter + SDO G4 wiring) is an
+  eval-integrity story with no network / attack surface. All five security-sast
+  dimensions pass: zero new sink, no fabricated guarantee, NFR-020 coverage
+  audit has real teeth, synthetic-only corpora, and the disclosed RED->GREEN
+  fixture change is a genuine strengthening (not a weakened assertion masking a
+  bug). 92/92 owned tests pass; the live `pii-anon supremacy` run on the real
+  artifact returns NOT_YET / canonical_claim_run=False / G4 PENDING (no
+  fabricated PASS). The verdict machine, RecallFloorVerdictGuard, the S4-01
+  G2 function, the Tier-R-union-Tier-C gating, and competitor_compare.py
+  (md5 7cae16c89f4c97136e1a12394dae2025, RISK-6) are all byte-identical /
+  untouched.
+findings:
+  - id: SAST-S403-01
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:42-49
+    description: >
+      No-new-sink check PASSED. The new reporter imports ONLY `__future__`,
+      `dataclasses`, `typing`, `numpy`, and the sibling `.calibration` metric
+      (TemperatureScaler + reliability_diagram_data). A token scan for
+      unsafe-deserialization (pickle/marshal/yaml.load), subprocess / shell-out
+      (subprocess/os.system/os.popen/Popen), dynamic-eval (eval/exec/compile/
+      __import__/importlib), and network (socket/urllib/requests/http) returned
+      ZERO matches across the new module and the additive G4 diff. The only
+      `swarm/moe/fusion/policy` occurrences in selective_risk.py are docstring
+      prose (lines 35, 36, 91) — no imports. The G4 reader consumes already-
+      parsed in-memory dicts (read-only), opens no files. Boundary is clean.
+    suggested_resolution: None — informational; the import boundary is correct.
+    status: RESOLVED
+  - id: SAST-S403-02
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:327-808
+    description: >
+      No-fabricated-guarantee check PASSED. `_g4_calibration_selective_risk`
+      is three-valued and CANNOT return PASS without the calibration block:
+      it returns PENDING (None) when `per_class_ece` is missing/empty or
+      `calibrated_confidence_coverage` is not numeric; PASS requires
+      (every per-class ECE <= its bar) AND (risk-coverage monotone
+      non-increasing) AND (>=3 abstention points) AND (coverage == 1.0). A
+      malformed/empty risk-coverage curve fails-loud (not monotone). The only
+      two deleted lines in the whole file are the G4 docstring placeholder and
+      the `_pending_guarantee("G4", overrides.get("G4"))` line — the verdict
+      machine (`_decide`), RecallFloorVerdictGuard, the S4-01 `_g2_*`, the
+      J-meter, `_GUARANTEE_ORDER`, and the Tier-R-union-Tier-C gating are
+      untouched. The gate's `pending_overrides['G4']` seam is preserved
+      (backward-compat). Live `.venv/bin/pii-anon supremacy` on the real
+      artifact: verdict=NOT_YET, canonical_claim_run=false, binding_constraint=
+      "canonical_claim_run=False (G7 certified-run gate)", G4=PENDING, J=1.0
+      (mle-bootstrap) — no fabricated PASS. `competitor_compare.py` md5 verified
+      7cae16c89f4c97136e1a12394dae2025 (RISK-6); `calibration.py` md5
+      bcefe855c6854c4753dd6adc55b89fcb (consumed, byte-identical); neither in
+      the S4-03 commit range.
+    suggested_resolution: None — the no-fabrication contract is enforced and
+      pinned by 15 unchanged-since-RED G4 tests (PASS/FAIL/PENDING/non-vacuity/
+      real-artifact-NOT_YET).
+    status: RESOLVED
+  - id: SAST-S403-03
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:279-303
+    description: >
+      NFR-020 coverage-audit teeth check PASSED — the audit is NOT a no-op
+      that always reports 100%. `_coverage_audit` marks a finding COVERED only
+      when (calibrated AND confidence in [0,1] AND non-empty provenance);
+      `_is_probability` rejects bare logits (e.g. 3.7) and non-finite values.
+      Verified by tests: `test_a5_coverage_drops_and_flags_bare_logit_finding`
+      (confidence=3.7, calibrated=False, provenance=None -> coverage<1.0,
+      bare_logit_count==1, offending index flagged) and
+      `test_a5_provenance_less_but_in_range_still_flagged` (in-range conf but
+      provenance=None still drops coverage). The G4 gate enforces coverage==1.0
+      (`test_g4_fail_when_coverage_below_one_nfr020`). Teeth on both halves
+      (logit-shape AND provenance) confirmed.
+    suggested_resolution: None.
+    status: RESOLVED
+  - id: SAST-S403-04
+    severity: OBSERVATION
+    location: tests/test_selective_risk.py; tests/test_competitive_supremacy.py
+    description: >
+      No-real-secret/PII check PASSED. All fixtures are synthetic
+      prediction/confidence corpora (deterministic generators + entity-type
+      label strings like EMAIL_ADDRESS / US_SSN / CRYPTO_WALLET as keys, never
+      real values); the G4 fixtures inject hand-built numeric calibration blocks.
+      No credentials, tokens, or real PII present (AX-001).
+    suggested_resolution: None.
+    status: RESOLVED
+  - id: SAST-S403-05
+    severity: OBSERVATION
+    location: tests/test_selective_risk.py:176-187,338-360
+    description: >
+      Determinism + no flaky-test-masking check PASSED. The disclosed
+      RED->GREEN fixture change is a GENUINE STRENGTHENING, not a weakened
+      assertion hiding a bug. (a) Brier reconciliation: the RED tolerance
+      `approx(per_class_brier, abs=1e-6)` was tightened to the mathematically
+      EXACT binned-Brier Murphy identity `approx(binned_brier, abs=1e-9)` AND a
+      second assertion (raw MSE Brier ~ binned Brier) was ADDED — tolerance went
+      1e-6 -> 1e-9 with an extra check. (b) A6 NFR-017 fixture: a seed-dependent
+      `_well_calibrated_class(seed=...)` was replaced by a DETERMINISTIC
+      `_perfectly_calibrated_class` (ECE ~ 0 by construction) with ADDED
+      support-tier assertions (per_class_support vs LONG_TAIL_SUPPORT) — removes
+      flakiness, adds assertions. The 15 G4 teeth tests in
+      test_competitive_supremacy.py are BYTE-IDENTICAL RED->final (empty diff) —
+      pure TDD, no post-hoc assertion mutation. The AURC-monotone property test
+      runs across 8 random corpora over per-class + global curves; G4
+      determinism pinned by `test_g4_is_deterministic_on_identical_benchmarks`.
+      92/92 owned tests pass.
+    suggested_resolution: None — the strengthening is correct (the Murphy identity
+      holds exactly for the binned Brier; the RED target was looser).
+    status: RESOLVED
+context_bounds_respected: true
+notes: >
+  Read-only review (Read/Grep/Glob/Bash + the supremacy CLI). Scope held to the
+  7 declared S4-03 files (story + selective_risk.py + metrics/__init__.py +
+  scorecard.py + competitive_supremacy.py + 2 test files); the git range
+  646fd2d^..5207d56 confirms NONE of the off-limits files
+  (competitor_compare.py, metrics/calibration.py, orchestrator.py, bayes_bt.py,
+  elo.py, artifacts/benchmarks/*) were touched. scorecard.py changes are
+  purely additive (calibration_ece / selective_risk_aurc /
+  calibrated_confidence_coverage with safe defaults; existing fields incl.
+  privacy_score, the S4-01 anon/pseudo fields, and composite_score preserved and
+  pinned by test_scorecard_calibration_fields_are_additive_and_serialized).
+  Out of scope per charter: code style (code-quality), perf (no latency
+  surface), requirements/traceability/axiom mapping (sibling reviewers).
+  0 unresolved MAJOR+; APPROVE.

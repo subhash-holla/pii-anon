@@ -1,0 +1,182 @@
+# S4-01 — distinct anon-vs-pseudo reversibility scorers + no-merge CI guard (completes SDO guarantee G2)
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. One iteration.
+gate: story
+scope_id: S4-01
+final_iteration: 1
+date: 2026-06-01
+aggregate_verdict: APPROVE   # iter-1 5/5 APPROVE; a later G2/G4 adversarial close caught a no-fabrication MAJOR the gate missed → hardened + re-closed APPROVE (see hardening_iter).
+
+# ── HARDENING AMENDMENT (G2/G4 adversarial-close-driven, 2026-06-02) ───────────────────────────
+# The iter-1 5/5 gate APPROVED, but the between-work-streams G2/G4 close (Workflow wwty6wq9v)
+# caught a no-fabrication MAJOR in _g2 that the gate missed — the SDO gate is the program's
+# completion criterion, so a fabricated PASS would be catastrophic:
+hardening_iter:
+  trigger: "Workflow wwty6wq9v (G2/G4 fabricate-attempt) — fabrication_possible=true on G2."
+  major_found:
+    id: SDO-G2-FABRICATION
+    severity: MAJOR
+    description: >
+      _g2_pseudonymization_integrity used max(competitor_pis, default=0.0): if pii-anon carried
+      pseudonymization_integrity_score but NO competitor did (the natural SUT-only-scorer shape; no
+      contract test requires competitors to carry it), pii-anon vacuously "strictly dominated" a
+      PHANTOM 0.0 → false PASS → propagates to CLAIM_GRADE_SOTA. Plus: a Python bool slipped the
+      isinstance(_,(int,float)) presence check (True→1.0); non-finite/out-of-[0,1] PI (e.g. +inf
+      "dominates") was unclamped. Real smoke artifact still PENDING (latent until S7); UNTESTED path
+      (all G2 tests populated competitor_pi).
+    remediation: >
+      Shared hardening RED f385911 → GREEN 6aabeb2 → REFACTOR 97134ba (with S4-03). New validators:
+      _finite_unit_score (rejects bool/non-finite/out-of-[0,1]; via _is_finite_number TypeGuard) +
+      a no-real-comparator → PENDING guard (no phantom-0.0 win). Missing/zero/bogus-only competitor →
+      PENDING; bool/non-finite/out-of-range core PI → PENDING; unauthorized_reversal_rate range-validated.
+      Well-formed PASS preserved; real-artifact verdict UNCHANGED (NOT_YET / G2 PENDING).
+    status: REMEDIATED-AND-REVERIFIED
+  reclose:
+    workflow: wi1yj97h9   # 2 fab re-probes + security-sast + axiom-compliance re-review + integration/SDO sweep
+    result: "reclose_pass=true — G2 re-probe fabrication_possible=false, new_hole=false, wellformed_pass_preserved=true, real-artifact PENDING (40+ vectors incl. np.bool_/np.float64 edge cases); security-sast APPROVE; axiom-compliance APPROVE (AX-004 strengthened); integration PASS."
+    suite: "3186 passed / 15 skipped / 0 failed (exit 0; run to completion)"
+    coverage: "87.05% (≥84)"
+    quality: "ruff clean; BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` clean / 129 files"
+    safety: "competitor_compare.py 7cae16c… + bayes_bt.py + elo.py + scorecard.py + deid_families.py byte-identical; verdict machine + RecallFloorVerdictGuard + Tier-R∪Tier-C gating untouched; user-WIP md5 unchanged"
+  methodology_note: >
+    Same lesson as the security MUSTs (SO-10): a 5/5 story gate is necessary-but-not-sufficient for the
+    SDO gate; the adversarial close (live fabrication attempts) is the catch-net. Keep it standing for
+    any change to the program's completion-criterion gate.
+# ── end hardening amendment ; the iter-1 record (which stands, with the gap noted above) follows ──
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add)
+  - axiom-compliance       # KEY dimension (AX-004 anon≠pseudo + no-fabrication)
+  - security-sast
+  - code-quality
+  - requirements-coverage
+  - traceability
+
+tdd_evidence:
+  red:      "2143b6a  # test: pin FR-006/009/010 + NFR-014/015 + AX-004 (module absent; G2 PASS-fixture fails on the PENDING placeholder)"
+  green:    "2f69f89  # feat: distinct anon/pseudo de-id families + SDO G2 LIVE"
+  refactor: "e2ba3d8  # refactor: pin PseudonymizationIntegrityScorer empty-input guards (additive edge test; behaviour-identical)"
+  review:   "48380ed  # docs: State→REVIEW"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor 2143b6a 2f69f89 → true; RED fails on ModuleNotFoundError + G2 PASS/FAIL fixtures returning PENDING
+  scope_discipline: "diff 2143b6a~1..HEAD touches ONLY the 6 owned files (+story); competitor_compare.py md5 7cae16c… + bayes_bt.py + elo.py byte-identical"
+
+owned_files:
+  new: [src/pii_anon/eval_framework/metrics/deid_families.py, tests/test_deid_families.py]
+  additive: [src/pii_anon/eval_framework/metrics/__init__.py (re-export), src/pii_anon/eval_framework/rating/scorecard.py (anonymization_score + pseudonymization_integrity_score + to_dict; privacy_score PRESERVED), src/pii_anon/eval_framework/evaluation/competitive_supremacy.py (_g2_pseudonymization_integrity replacing the G2 placeholder), tests/test_competitive_supremacy.py (G2 PASS/FAIL/PENDING teeth + real-artifact-stays-NOT_YET)]
+
+reviewers:
+  - reviewer: axiom-compliance      # KEY
+    verdict: APPROVE
+    notes: >
+      AX-004 (anon≠pseudo, never merged) UPHELD HARD: DeidFamilyScores carries EXACTLY {anonymization,
+      pseudonymization_integrity} as two separate frozen sub-records (verified via __dataclass_fields__) — no
+      combined/deid_score/merged/overall field; the two sub-records share zero axes; neither scorer imports/
+      instantiates the other (AST-pinned). The no-merge guard is NON-VACUOUS — confirmed TWO ways (the in-tree
+      meta-guard flags a synthetic deid_score AND the reviewer's own re-implemented scan flags it). SystemScorecard
+      gained two distinct fields, no new merged field; privacy_score preserved as documented-deprecated backward-compat.
+      The G2 read seam is DECOUPLED (competitive_supremacy.py imports neither SystemScorecard nor deid_families — reads
+      raw JSON, requires BOTH family fields present-and-distinct, so a half-populated artifact → PENDING, can't
+      fabricate the missing half). AX-002 (pure, no random/uuid/time/secrets) + AX-001 (synthetic only) upheld. AX-003
+      + SDO gate integrity non-regressed (RecallFloorVerdictGuard / verdict machine / J-meter / Tier-R∪Tier-C / RISK-6
+      competitor_compare.py 7cae16c… byte-identical). NO-FABRICATION confirmed LIVE: pii-anon supremacy → NOT_YET /
+      canonical_claim_run=False / G2=PENDING. 0 MAJOR+; 1 OBSERVATION (privacy_score deprecation path, out of scope per §5).
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: >
+      Eval-integrity story (no network/attack surface). AST+grep over the 3 changed production files: ZERO
+      unsafe-deserialization / subprocess / shell-out / dynamic-eval / network / file-write sinks; deid_families.py
+      imports nothing from swarm/moe/fusion/policy; scorers pure, the G2 read never mutates the systems dict. NO
+      fabricated guarantee: _g2_pseudonymization_integrity cannot PASS unless both fields present-and-numeric ∧ PI
+      strictly dominates every competitor ∧ unauthorized-reversal=0; missing/half → PENDING; the only diff deletion is
+      the lone _pending_guarantee("G2",…) placeholder. Live pii-anon supremacy → NOT_YET / G2 PENDING (honest).
+      NFR-014 teeth real (wrong-key-succeeds → rate>0 → axis FAILS, G2 FAILS); NFR-015 real (artifact-alone → FAIL).
+      No real secret/PII (synthetic only). No-merge guard non-vacuous. competitor_compare/bayes_bt/elo byte-identical.
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED (2143b6a) ancestor of GREEN (2f69f89) git-confirmed; RED = tests+story only, names both failure modes.
+      REFACTOR e2ba3d8 additive edge test (behaviour-identical). ruff clean (owned); mypy --strict Success / 128 files.
+      80 owned tests pass. deid_families.py frozen-dataclass, typed, docstringed; _g2_pseudonymization_integrity mirrors
+      the _g1_recall_floor pure-guarantee pattern exactly. Scope-disciplined; competitor_compare.py byte-identical.
+      Public-API: privacy_score preserved as field + in to_dict (test_a9 confirms all 16 legacy keys remain);
+      composite_score numeric behavior unchanged; the 2 new fields additive (default 0.0). 1 MINOR (CQ below).
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      Every MUST maps to a named, passing, NON-VACUOUS test. FR-010/AX-004 → A2 guard + meta-guard. FR-006/FR-009 →
+      PseudonymizationIntegrityScorer computes all FR-009 axes (unauthorized-reversal, referential=1.0, collision TEETH,
+      key/state-separation), each tested. NFR-014 → A3 + TEETH (wrong-key-succeeds → FAILS) + G2-side FAIL. NFR-015 →
+      A4 both directions. SDO G2 → A5 PASS/FAIL/PENDING teeth (non-vacuous neutering flip) + A6 real-artifact stays
+      NOT_YET / G2 PENDING (honest deferral, not a falsely-claimed PASS; TRUE-on-real-data scoped to Pass-2/S7).
+      80 passed / 0 failed. 0 unmapped MUST. 2 OBSERVATION (Art-4(5) engineering proxy; no-merge denylist name-based).
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-006/009/010 (requirements-document.md:16/20/21) + NFR-014/015 (:75/76) all exist, story wording verbatim;
+      AX-004/AX-002 resolve to project-axioms.yaml (AX-pii-anon-004/002). Design trace resolves: DC-08 (:18) + the
+      test-ledger "Distinct-family CI guard" (:69) + the SDO G2 chain (placeholder at old :307 now calls
+      _g2_pseudonymization_integrity, real function at :526-605, successor label _PENDING_SUCCESSORS["G2"] :121).
+      A1–A9 each map to ≥1 named test. provisional_status AGENT_SIMULATED correct (DC-08 not DIVERGED → no cascade).
+      1 MINOR (matrix backfill) DEFERRED-TO-SPRINT-GATE + 1 OBSERVATION (axiom short-form, cosmetic).
+
+findings:
+  - id: CQ-S401-MINOR-1
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: tests/test_deid_families.py:252-275
+    description: "Two anonymization-family test fns lack an explicit FR/NFR/AX ID in name or docstring (the other 22 embed one)."
+    disposition: "Advisory; the tests are non-vacuous (exercise real AnonymizationScorer behaviour); citation can be added at the S4 sprint gate (batch with the recurring test-naming polish across stories)."
+  - id: TRACE-S401-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md
+    description: "No story-keyed S4-01 row binds FR-006/009/010 + NFR-014/015 to the new test evidence (requirement+design level documented; only the Story→Test backfill absent)."
+    disposition: "Acceptable at story gate; backfill at the S4 sprint gate — mirrors S2-05/S5-04/S6-03/S4-CS-01."
+  - id: AXIOM-S401-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "privacy_score (legacy merged field) remains in the public schema as the documented deprecation path — AX-004 is closed structurally on the NEW surface; the legacy half retires when composite_score is re-based onto the two families (out of scope per §5, gated on the S7 canonical schema)."
+  - id: REQCOV-S401-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "FR-009 Art-4(5) axis satisfied via the key_state_separation_ok engineering proxy (correct per the requirements-doc NFR-015 framing + SME caveat; a proxy, not a legal verdict)."
+  - id: REQCOV-S401-OBS-2 / TRACE-S401-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "The no-merge denylist is name-based + excludes the documented-deprecated privacy_score (RISK-1); forward-awareness that a future merged field under an off-denylist name wouldn't be auto-caught. Axiom short-form (AX-004 vs AX-pii-anon-004) is established shorthand — cosmetic."
+
+cross_reviewer_patterns:
+  - pattern: "no-fabrication of the G2 guarantee (verified LIVE by ≥2 reviewers)"
+    raised_by: [axiom-compliance, security-sast, requirements-coverage]
+    detail: "Three reviewers independently ran pii-anon supremacy + confirmed G2=PENDING / verdict NOT_YET on the real smoke artifact, and verified the G2 teeth are non-vacuous (neutering dominance flips PASS→FAIL); _g2 cannot fabricate a PASS (requires both fields present-and-distinct + strict dominance + unauthorized-reversal=0)."
+  - pattern: "RISK-6 + verdict-machine preservation"
+    raised_by: [axiom-compliance, security-sast, code-quality]
+    detail: "competitor_compare.py (7cae16c…) + bayes_bt.py + elo.py byte-identical; the only gate edit is the additive _g2 function replacing the placeholder; RecallFloorVerdictGuard + verdict machine + Tier-R∪Tier-C gating + _GUARANTEE_ORDER untouched."
+  - pattern: "test-name FR/NFR-ID citation polish (recurring, non-blocking)"
+    raised_by: [code-quality, traceability]
+    detail: "Same theme as S2-05/S6-03/S5-04; batch-cleanup candidate at the S4 sprint gate."
+
+outcome:
+  invariant: >
+    AX-004 is now enforced structurally on the scoring surface: two DISTINCT de-id scoring families
+    (AnonymizationScorer [irreversible] + PseudonymizationIntegrityScorer [reversible: unauthorized-reversal,
+    referential, collision, key/state separation]) carried as separate sub-records (no merged field), with a
+    non-vacuous no-merge CI guard. The SDO G2 guarantee is now CODE-COMPUTABLE: _g2_pseudonymization_integrity is a
+    pure three-valued (benchmark)->GuaranteeResult — PASS iff pii-anon's pseudonymization-integrity strictly
+    dominates + unauthorized-reversal=0 + both fields present-and-distinct; PENDING on missing fields (no
+    fabrication); FAIL on present-but-not-dominant. G2 is no longer an unbuilt placeholder.
+  sdo_recompute: >
+    pii-anon supremacy (re-run by 3 reviewers + the executor) → verdict NOT_YET (UNCHANGED), binding
+    canonical_claim_run=False. G2 moves from "PENDING ← S4-01 unbuilt" to "PENDING-on-missing-fields (code-computable;
+    awaiting a run that emits anonymization_score/pseudonymization_integrity_score — the S7 canonical run)". The smoke
+    artifact lacks the fields → G2 honestly PENDING (no fabricated PASS). A TRUE G2 is gated, like every guarantee, on
+    the S7 canonical run.
+  tests: "full suite 3129 passed / 15 skipped / 0 failed (exit 0; 3130 incl. the additive REFACTOR test); 80 owned tests passed"
+  coverage: "86.89% (≥84); deid_families.py 93% (configured) / 100% (own tests); competitive_supremacy.py 94%; scorecard.py 100%"
+  quality: "ruff clean (owned); mypy --strict 0 errors / 128 files"
+  safety: "competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6) + bayes_bt.py + elo.py byte-identical; verdict machine + RecallFloorVerdictGuard preserved; privacy_score preserved (no public-API regression); artifacts/benchmarks/* never written; user-WIP md5 unchanged; narrow git add"
+  provisional_status: "AGENT_SIMULATED — the scorers + no-merge guard + G2 PASS/FAIL/PENDING run for real in-tree against synthetic fixtures; a TRUE G2 verdict on real data needs the S7 canonical run that emits the two family fields (Pass-2/S7, never simulated as real)."
+
+followups:
+  - "S4-03 (calibration & selective-risk reporter → completes G4) — the sibling SDO-guarantee story; same code-computable-with-teeth + honest-PENDING-on-data pattern."
+  - "S7 canonical run: emit anonymization_score + pseudonymization_integrity_score into the benchmark artifact → G2 computes a real PASS/FAIL on real data."
+  - "S4 sprint gate: backfill traceability-matrix S4-01 row; add FR/NFR citations to the 2 anon-family test names (batch with the cross-story test-naming polish)."
+  - "Future: re-base composite_score onto the two distinct families + retire the deprecated privacy_score (gated on the S7 canonical schema)."

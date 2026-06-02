@@ -1,0 +1,101 @@
+sign_off_id: SO-11-g2-g4-guarantees
+date: 2026-06-02
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  The two computable-now SDO guarantee stories are CLOSED: S4-01 makes guarantee G2
+  (pseudonymization-integrity strict dominance) code-computable, and S4-03 makes G4
+  (calibration / selective-risk) code-computable — each replacing a hardcoded
+  `_pending_guarantee(...)` placeholder in the SDO gate with a real pure three-valued
+  GuaranteeResult function with in-tree teeth. Each passed the canonical 5-reviewer story
+  gate. A between-work-streams G2/G4 ADVERSARIAL CLOSE then caught a no-fabrication MAJOR
+  in BOTH gate functions that the per-story gates missed; it was remediated in-loop under
+  strict TDD (a shared SDO-gate input-validation hardening) and re-verified by a RE-CLOSE
+  (0 fabrication-possible + security-sast/axiom-compliance APPROVE + integration PASS). The
+  SDO verdict is UNCHANGED — NOT_YET, binding `canonical_claim_run=False` — because the
+  guarantees honestly read PENDING-on-missing-fields on the current smoke artifact; a TRUE
+  G2/G4 PASS on real data is gated (like every guarantee) on the S7 canonical run.
+
+stories_closed:
+  - id: S4-01
+    title: distinct anon-vs-pseudo reversibility scorers + no-merge CI guard (completes SDO G2)
+    gate: _reviews/story/S4-01-gate.yaml   # iter-1 5/5 APPROVE; + a G2/G4-close hardening amendment (fabrication MAJOR remediated + re-closed)
+    commits: { red: 2143b6a, green: 2f69f89, refactor: e2ba3d8, review: 48380ed }
+    implements: [FR-006, FR-009, FR-010, NFR-014, NFR-015, AX-004, AX-002]
+    effect: "AX-004 enforced structurally — SystemScorecard.privacy_score split into distinct anonymization_score + pseudonymization_integrity_score (privacy_score preserved, no public-API regression) + a non-vacuous no-merge CI guard; G2 = _g2_pseudonymization_integrity (PASS/FAIL/PENDING)."
+  - id: S4-03
+    title: calibration & selective-risk reporter (per-class ECE/Brier/AURC + abstention) (completes SDO G4)
+    gate: _reviews/story/S4-03-gate.yaml   # iter-1 4 APPROVE + code-quality CHANGES → iter-2 5/5 APPROVE (mypy-strict closure) + a G2/G4-close hardening amendment
+    commits:
+      iter1_2: { red: 646fd2d, green: 2511bc2, refactor: 5207d56, review: 82fa095, mypy_amend: 92a3356 }
+    implements: [FR-005, NFR-017, NFR-018, NFR-019, NFR-020, NFR-021, AX-005, AX-002]
+    effect: "SelectiveRiskReporter (eval_framework/metrics/selective_risk.py) — per-entity-class ECE/Brier/AURC + reliability + a ≥3-point abstention operating-point table + a calibrated-confidence-coverage audit (NFR-020); reuses metrics/calibration.py unchanged; G4 = _g4_calibration_selective_risk (PASS/FAIL/PENDING)."
+
+adversarial_close:
+  workflow: wwty6wq9v   # 2 fabricate-attempt agents (G2, G4) + integration/SDO sweep
+  fabrication_caught: true
+  major_caught:
+    - id: SDO-G2-FABRICATION
+      detail: "_g2 used max(competitor_pis, default=0.0): a SUT-only scorer (pii-anon has pseudonymization_integrity_score, NO competitor does — the natural shape, no contract test requires it) vacuously 'strictly dominates' a PHANTOM 0.0 → false PASS → CLAIM_GRADE. + bool slips isinstance(int,float); non-finite/out-of-[0,1] PI unclamped."
+    - id: SDO-G4-FABRICATION
+      detail: "_g4 trusted artifact-supplied values: NaN per-class ECE slips `ece>bar`; coverage>1.0/+inf admitted by `>=`; an artifact per_class_ece_threshold (0.99/+inf/NaN) loosens the bar unclamped → false PASS → CLAIM_GRADE."
+  both_latent_until_s7: "Real smoke artifact still → PENDING for both (the fields are absent); the false-PASS shapes require the S7 canonical run's artifact — but with no contract test enforcing competitor-field-presence / threshold-clamping, a natural SUT-only scorer would hit exactly the G2 shape. Fixed before it could matter."
+  remediation:
+    shared_commits: { red: f385911, green: 6aabeb2, refactor: 97134ba, docs: 371bb4d }   # one combined SDO-gate hardening (both _g2 + _g4 live in competitive_supremacy.py)
+    new_validators: "_finite_unit_score (rejects bool/non-finite/out-of-[0,1]; built on the _is_finite_number TypeGuard which excludes bool) + a G2 no-real-comparator → PENDING guard (no phantom-0.0) + _g4_class_bar (tighten-only ECE-threshold clamp min(artifact,0.08)) + finite∧[0,1]∧==1.0 coverage."
+    red_before_green: "16 RED vectors FALSE-PASSed at f385911 → PENDING/FAIL at GREEN 6aabeb2 (git-verified ancestor)."
+  reclose:
+    workflow: wi1yj97h9   # 2 fab re-probes + security-sast + axiom-compliance re-review + integration/code-quality/SDO sweep
+    result: "reclose_pass=true — BOTH re-probes fabrication_possible=false + new_hole=false + wellformed_pass_preserved=true + real-artifact PENDING (40+ G2 vectors incl. np.bool_/np.float64 edge cases; all G4 vectors); security-sast APPROVE; axiom-compliance APPROVE (AX-004/AX-005 strengthened); integration PASS."
+
+decisions_acknowledged:
+  - "G2/G4 are now CODE-COMPUTABLE pure three-valued guarantees with non-vacuous teeth, replacing hardcoded PENDING placeholders. They honestly read PENDING-on-missing-fields on the smoke artifact (no fabricated PASS); a TRUE PASS needs the S7 canonical run to emit the family/calibration fields."
+  - "The SDO gate now REFUSES artifact-supplied fabrication: missing/zero/bogus competitor → PENDING (no phantom-0.0 dominance); bool / non-finite / out-of-range scores rejected; the per-class ECE bar is the gate's authoritative sanctioned constant (artifact may tighten, never loosen); coverage must be exactly 1.0 (NFR-020) and bounded. The gate is the program's completion criterion — it must be un-fabricatable."
+  - "Methodology (carried from SO-10): a 5/5 story gate is necessary-but-not-sufficient for the SDO completion-criterion gate; the adversarial close (live fabrication attempts) is the standing catch-net. It earned its keep TWICE this milestone (S5-04 path-traversal; the G2/G4 fabrication holes)."
+  - "RISK-6 honoured: evaluation/competitor_compare.py byte-identical (md5 7cae16c89f4c97136e1a12394dae2025) throughout."
+  - "privacy_score preserved as a documented-deprecated backward-compat field (composite_score numeric behavior unchanged); the calibration summary fields are additive — no public-API regression."
+
+findings_waived_or_deferred:
+  - id: SDO-G4-OBS-bool-coverage
+    disposition: accepted-non-blocking
+    detail: "coverage==True coerces to 1.0 and passes the ==1.0 check — not a fabrication (True can only equal the required 1.0). Optional future consistency tightening (reject bool coverage)."
+  - id: TRACE-matrix-backfill (S4-01 + S4-03)
+    disposition: deferred-to-sprint-gate
+    detail: "traceability-matrix Story/Test columns for S4-01 (UC-05/07/08) + S4-03 (UC-04 row; correct the stale stats/calibration.py evidence cell; add NFR-020) backfilled at the S4 sprint gate."
+  - id: G2-G4-true-on-real-data
+    disposition: pass2-S7
+    detail: "A TRUE G2/G4 PASS requires the S7 canonical run to emit anonymization_score/pseudonymization_integrity_score (G2) + per-class calibration/abstention fields (G4) into the benchmark artifact. The S7 run should also carry a contract test requiring competitors to populate the family fields (so G2 never reads a missing-competitor → PENDING when a real comparison is expected)."
+
+sdo_verdict:
+  verdict: NOT_YET   # recomputed via `pii-anon supremacy` + the re-close integration agent — both agree; UNCHANGED by S4-01/S4-03 (the guarantees are code-computable but PENDING-on-missing-fields on the smoke artifact)
+  binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+  j_value: 1.0
+  j_source: mle-bootstrap
+  guarantees: { G1: PENDING, G2: "PENDING (code-computable + fabrication-hardened <-S4-01; PENDING-on-missing-fields until S7)", G3: PASS, G4: "PENDING (code-computable + fabrication-hardened <-S4-03; PENDING-on-missing-fields until S7)", G5: "PENDING<-S5/S6", G6: PASS, G7: FAIL }
+  note: >
+    G2 + G4 moved from "PENDING ← unbuilt placeholder" to "live, fabrication-hardened, teeth-tested
+    pure guarantees that read PENDING-on-missing-fields on the smoke artifact". G1 + G5 remain PENDING
+    (G1 per-language ε artifact + G5 latency/interception ← S5/S6 + canonical run). The #1 binding
+    constraint is unchanged: the S7 canonical run (canonical_claim_run=True).
+
+quality:
+  suite: "3186 passed / 15 skipped / 9 deselected / 0 failed (exit 0; run to completion); +22 over the post-security 3164 baseline (S4-01 +12, S4-03 +13/−ish, hardening +22 cumulative — see gate YAMLs)"
+  coverage: "87.05% (>= 84 gate); deid_families.py 93% / selective_risk.py 98% / competitive_supremacy.py 93%"
+  lint_type: "ruff clean; mypy clean under BOTH `mypy src/pii_anon` (canonical) AND `mypy src/pii_anon --strict` (explicit) / 129 files"
+  env: "AGENT_SIMULATED on the local .venv (numpy + cryptography; numpyro/jax NOT installed). The scorers + reporter + guarantee teeth run for real against synthetic fixtures; a TRUE G2/G4 on real data is Pass-2/S7."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md 8a0f1000…, benchmark-diagnostics.json 47f9b116…, artifacts/benchmarks/* , docs/* all match session-start baseline
+  competitor_compare_byte_identical: true   # md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6)
+  byte_identical_preserved: "bayes_bt.py, elo.py, the runtime calibration/* package, metrics/calibration.py, orchestrator.py — all unchanged (the fix is localized to the two _g* functions + shared validators in competitive_supremacy.py + the new scorer/reporter modules)"
+  verdict_machine_intact: true   # _decide + RecallFloorVerdictGuard + Tier-R∪Tier-C gating + _GUARANTEE_ORDER + the pending_overrides trusted-caller seam preserved
+  narrow_git_add_only: true
+  no_new_hard_dependency: true   # numpy/stdlib only (added typing.TypeGuard)
+
+next:
+  binding_objective: "S7 canonical run (canonical_claim_run=True) — THE #1 binding constraint toward CLAIM_GRADE; also emits the G2 family fields + G4 calibration fields so G2/G4 compute a real PASS, and should add a contract test requiring competitors to carry the family fields."
+  remaining_guarantees: "G1 (per-language ε artifact) + G5 (latency budgets + 4-channel interception ← S5/S6)."
+  feature_work: "S2 (MoE-router), S5 (attack bodies), S6 (agentic + BYO-SDK), S7 (multimodal + the canonical run + docs) + the release gate; the DATA track (pii-anon-eval-data S5→S6→S7) + Papers 1 & 2."
+  milestone: "M4 (CODE v2) advances — the 3 security MUSTs + the two computable-now SDO guarantees (G2/G4) are LIVE + adversarially hardened; the SDO optimization function stays code-computable + un-fabricatable."

@@ -1,0 +1,112 @@
+reviewer: security-sast
+gate: story
+scope_id: S4-01
+iteration: 1
+verdict: APPROVE
+summary: >
+  S4-01 (distinct anon/pseudo de-id scorers + no-merge CI guard + SDO G2 wiring) is an
+  eval-integrity story with NO network/attack surface. All six integrity dimensions verified:
+  zero new dangerous sink in the production diff; the G2 guarantee cannot fabricate a PASS
+  (honest PENDING on missing/half-populated fields, FAIL on present-but-not-dominant, PASS
+  only on strict dominance + unauthorized-reversal=0 + both family fields present); NFR-014
+  and NFR-015 axes have real teeth; the SDO verdict machine / RecallFloorVerdictGuard /
+  Tier-R∪Tier-C gating are untouched and competitor_compare.py is byte-identical (RISK-6);
+  all corpora/keys are synthetic. 80/80 owned tests pass; real-artifact supremacy reads
+  NOT_YET / canonical_claim_run=False / G2 PENDING (no fabricated PASS).
+findings:
+  - id: S4-01-SAST-01
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/metrics/deid_families.py:1-318
+    description: >
+      DIM-1 no-new-sink — CONFIRMED clean. AST + grep over the three changed production files
+      (deid_families.py, metrics/__init__.py, evaluation/competitive_supremacy.py) found ZERO
+      occurrences of dynamic-eval, unsafe-deserialization, subprocess, shell-out, socket /
+      urllib / requests / http.client network, or file-write sinks. deid_families.py imports
+      ONLY __future__, collections.abc, dataclasses, and the in-package .base/.privacy_metrics
+      (independent AST trace: no swarm/moe/fusion/policy root, level-0 import filter clean). Both
+      scorers are pure functions over in-memory synthetic data; the G2 read is pure and never
+      mutates the benchmark systems dict.
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+  - id: S4-01-SAST-02
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:526-610
+    description: >
+      DIM-2 no-fabricated-guarantee (SDO-gate integrity) — CONFIRMED. _g2_pseudonymization_integrity
+      is three-valued and cannot return PASS unless (a) the pii-anon core carries BOTH numeric
+      family fields (pseudonymization_integrity_score AND anonymization_score), (b) the PI score
+      strictly dominates every competitor's, and (c) unauthorized_reversal_rate == 0 (NFR-014).
+      Missing-field path returns None (PENDING) — no fabrication; a half-populated artifact (one
+      field present) also returns PENDING (cannot fabricate the missing half); present-but-not-
+      dominant or unauthorized>0 returns FAIL with a binding detail naming the gap. The single
+      diff deletion in competitive_supremacy.py is the lone _pending_guarantee("G2",...) placeholder
+      line; the verdict state machine, RecallFloorVerdictGuard, J-meter, _GUARANTEE_ORDER,
+      _PENDING_SUCCESSORS, and Tier-R∪Tier-C gating are otherwise untouched. competitor_compare.py
+      md5 = 7cae16c89f4c97136e1a12394dae2025 (byte-identical, RISK-6); bayes_bt.py and elo.py also
+      byte-identical. Live `pii-anon supremacy` over the real smoke artifact (read-only) returns
+      verdict=NOT_YET, binding_constraint=canonical_claim_run=False, G2=PENDING (successor label
+      G2<-S4-01 surfaced) — an honest PENDING, NOT a fabricated PASS. The explicit
+      pending_overrides['G2'] seam is preserved (computed PASS still overridable).
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+  - id: S4-01-SAST-03
+    severity: OBSERVATION
+    location: tests/test_deid_families.py:139-167; src/pii_anon/eval_framework/metrics/deid_families.py:276-285
+    description: >
+      DIM-3 NFR-014 unauthorized-reversal teeth — CONFIRMED non-vacuous. The scorer counts an
+      attempt as unauthorized iff key_used != authorized_key AND succeeded is True. A synthetic
+      wrong-key-that-succeeds raises the rate > 0 and flips unauthorized_reversal_ok to False
+      (test_a3_..._teeth_wrong_key_succeeding_fails); a wrong-key that correctly fails to reverse
+      is NOT counted (test_a3_wrong_key_that_fails...). The metric is not a no-op-always-zero. The
+      G2 gate also FAILs on unauthorized>0 even when PI dominates
+      (test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant).
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+  - id: S4-01-SAST-04
+    severity: OBSERVATION
+    location: tests/test_deid_families.py:175-197; src/pii_anon/eval_framework/metrics/deid_families.py:300-309
+    description: >
+      DIM-4 NFR-015 key/state separation — CONFIRMED real. key_state_separation_ok =
+      not artifact_alone_rejoinable; artifact_alone_rejoinable=True flags the axis as FAIL
+      (artifact-alone re-join requires no external secret = breach) and zeroes integrity_score,
+      while False (external secret required) passes. Both branches are pinned
+      (test_a4_artifact_alone_rejoin_is_flagged_fail / test_a4_external_secret_required_passes).
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+  - id: S4-01-SAST-05
+    severity: OBSERVATION
+    location: tests/test_deid_families.py:42-55,332-345; tests/test_competitive_supremacy.py
+    description: >
+      DIM-5 no-real-secret/PII — CONFIRMED. Secret/key-shape scan (private-key headers, AWS AKIA,
+      sk- tokens, bearer, password=) over all six changed files returned ZERO matches. Fixtures are
+      synthetic only: "Jane Roe", "jane.roe@example.test", authorized key "synthetic-test-key-0001",
+      wrong key "synthetic-WRONG-key-9999" (AX-001 upheld). The unauthorized-reversal probe uses a
+      caller-supplied synthetic wrong key, never real key material.
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+  - id: S4-01-SAST-06
+    severity: OBSERVATION
+    location: tests/test_deid_families.py:354-468; tests/test_competitive_supremacy.py:119-131
+    description: >
+      DIM-6 no-merge guard non-vacuity — CONFIRMED. The AX-004 no-merge guard is an AST denylist
+      over assigned/annotated targets + function names (cannot false-positive on prose). The
+      meta-guard test_a2_meta_guard_scan_is_non_vacuous proves a SYNTHETIC class declaring a
+      merged `deid_score` field IS flagged, so the scan would catch a real violation. Positive
+      separateness is asserted (DeidFamilyScores has exactly {anonymization,
+      pseudonymization_integrity}); the two scorers do not instantiate each other (AST call-set
+      check); the import-boundary AST test confirms no swarm/moe/fusion/policy import. The G2
+      dominance check is likewise proven non-vacuous (neutering by raising a competitor PI flips
+      PASS->FAIL on the same fixture). SystemScorecard keeps privacy_score as the documented
+      deprecated backward-compat field (explicitly excluded from the new-merged-field denylist) and
+      adds the two distinct fields additively; composite_score numeric behavior is unchanged.
+    suggested_resolution: None — informational confirmation.
+    status: resolved
+context_bounds_respected: true
+notes: >
+  Read-only review confined to the S4-01 diff (2143b6a~1..e2ba3d8) and its six owned files.
+  Owned tests: 80/80 pass (test_deid_families 22 + test_competitive_supremacy 58), zero F/E
+  (run with the global --cov-fail-under relaxed; the coverage-threshold gate is a full-suite
+  config knob, not a test failure, and is out of this reviewer's dimension — defer suite-wide
+  coverage to code-quality). RISK-6 verified: competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025
+  byte-identical; bayes_bt.py / elo.py byte-identical. No SHOWSTOPPER/CATASTROPHIC/MAJOR/MINOR
+  findings; all six dimensions are clean OBSERVATIONS. APPROVE.

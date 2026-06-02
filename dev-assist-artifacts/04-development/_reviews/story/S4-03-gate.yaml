@@ -1,0 +1,192 @@
+# S4-03 — calibration & selective-risk reporter (per-class ECE/Brier/AURC + abstention) — completes SDO guarantee G4
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. Two iterations.
+gate: story
+scope_id: S4-03
+final_iteration: 2
+date: 2026-06-02
+aggregate_verdict: APPROVE   # iter-2 5/5 APPROVE; a later G2/G4 adversarial close caught a no-fabrication MAJOR in _g4 → hardened + re-closed APPROVE (see hardening_iter).
+
+# ── HARDENING AMENDMENT (G2/G4 adversarial-close-driven, 2026-06-02) ───────────────────────────
+# The iter-2 5/5 gate APPROVED, but the G2/G4 close (Workflow wwty6wq9v) caught a no-fabrication
+# MAJOR in _g4 that the gate missed (the SDO gate is the program's completion criterion):
+hardening_iter:
+  trigger: "Workflow wwty6wq9v (G2/G4 fabricate-attempt) — fabrication_possible=true on G4."
+  major_found:
+    id: SDO-G4-FABRICATION
+    severity: MAJOR
+    description: >
+      _g4_calibration_selective_risk trusted artifact-supplied values without validation: (1) a NaN
+      per-class ECE slipped `ece > bar` (nan>bar is False) → false PASS; (2) coverage > 1.0 / +inf was
+      admitted by `coverage_ok = coverage_val >= G4_COVERAGE_REQUIRED` (NFR-020 the lone MUST satisfied
+      by a physically-impossible coverage); (3) an artifact-supplied per_class_ece_threshold was trusted
+      UNCLAMPED — a loosened 0.99 / +inf / NaN masked a real ECE 0.5 → false PASS → propagates to
+      CLAIM_GRADE_SOTA. Real smoke artifact still PENDING (latent until S7).
+    remediation: >
+      Shared hardening RED f385911 → GREEN 6aabeb2 → REFACTOR 97134ba (with S4-01). Now: every per-class
+      ECE must be finite (non-finite → FAIL, naming the class); coverage must be finite ∧ in [0,1] ∧
+      ==1.0 (a 1e-9 one-directional eps band — 1.0-1e-12 PASS, 1.0+1e-12 FAIL); the per-class bar uses
+      the gate's sanctioned constants via _g4_class_bar = min(artifact_threshold, 0.08) tighten-only
+      (non-finite/out-of-range threshold → 0.05 default; an artifact may TIGHTEN but never LOOSEN).
+      Boundary + long-tail (0.07≤0.08) + tighter-threshold (0.04>0.03→FAIL) all preserved; real-artifact
+      verdict UNCHANGED (NOT_YET / G4 PENDING).
+    status: REMEDIATED-AND-REVERIFIED
+  reclose:
+    workflow: wi1yj97h9
+    result: "reclose_pass=true — G4 re-probe fabrication_possible=false, new_hole=false, wellformed_pass_preserved=true, real-artifact PENDING; security-sast APPROVE; axiom-compliance APPROVE (AX-005 strengthened); integration PASS."
+    suite: "3186 passed / 15 skipped / 0 failed (exit 0; run to completion)"
+    coverage: "87.05% (≥84)"
+    quality: "ruff clean; BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` clean / 129 files"
+    safety: "metrics/calibration.py + selective_risk.py + competitor_compare.py (7cae16c…) byte-identical; verdict machine + RecallFloorVerdictGuard untouched; user-WIP md5 unchanged"
+  observation:
+    id: SDO-G4-OBS-bool-coverage
+    severity: OBSERVATION
+    status: ACCEPTED
+    detail: >
+      coverage == True (bool) coerces to float(True)==1.0 and passes the ==1.0 check — analyzed as NOT a
+      fabrication (True can only equal the REQUIRED 1.0; it cannot sneak a <1.0 coverage past). Optional
+      future consistency tightening: reject bool coverage like the other fields. Non-blocking.
+  methodology_note: "Same lesson as SO-10 + the S4-01 hardening: the adversarial close is the catch-net for the SDO completion-criterion gate; keep it standing."
+# ── end hardening amendment ; the iter-1/iter-2 record (which stands, with the gap noted above) follows ──
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add)
+  - axiom-compliance       # KEY dimension (AX-005 calibrated-abstention + no-fabrication)
+  - security-sast
+  - code-quality
+  - requirements-coverage
+  - traceability
+
+tdd_evidence:
+  red:      "646fd2d  # test: pin FR-005 / NFR-017..021 per-class ECE/Brier/AURC + abstention + G4 teeth (module absent; G4 PASS-fixture fails on the PENDING placeholder)"
+  green:    "2511bc2  # feat: SelectiveRiskReporter + SDO G4 LIVE"
+  refactor: "5207d56  # refactor: consolidate the calibration-module import (behaviour-identical)"
+  review:   "82fa095  # docs: State→REVIEW"
+  iter2_amend:
+    fix:    "92a3356  # fix: parametrize np.ndarray annotations (mypy --strict clean) + per_class_aurc doc"
+    docs:   "209addb  # docs: record the amend SHA in Evidence"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor 646fd2d 2511bc2 → true; RED fails on ModuleNotFoundError + G4 PASS/FAIL fixtures returning PENDING
+  fixture_corrections_strengthen: "RED→GREEN A2 (Brier reconciled exactly to the binned-Brier Murphy identity, abs 1e-9, via a new binned_brier field) + A6 (deterministic perfectly-calibrated fixture vs RNG-noisy) — both STRENGTHEN the assertions (verified by code-quality + security-sast)."
+
+owned_files:
+  new: [src/pii_anon/eval_framework/metrics/selective_risk.py, tests/test_selective_risk.py]
+  additive: [src/pii_anon/eval_framework/metrics/__init__.py (re-export), src/pii_anon/eval_framework/rating/scorecard.py (calibration summary fields + to_dict; existing incl. privacy_score + S4-01 fields untouched), src/pii_anon/eval_framework/evaluation/competitive_supremacy.py (_g4_calibration_selective_risk replacing the G4 placeholder), tests/test_competitive_supremacy.py (G4 PASS/FAIL/PENDING teeth + real-artifact-stays-NOT_YET)]
+
+iter1_outcome:
+  verdict: REQUEST_CHANGES
+  reviewers: { axiom-compliance: APPROVE, security-sast: APPROVE, requirements-coverage: APPROVE, traceability: APPROVE, code-quality: CHANGES_REQUESTED }
+  blocking: >
+    code-quality MAJOR (code-quality-story-01): an EXPLICIT `python3 -m mypy src/pii_anon --strict` flagged 2
+    [type-arg] errors (bare np.ndarray without type params) at selective_risk.py:390/418. NOTE: the CANONICAL
+    `mypy src/pii_anon` (pyproject [tool.mypy] strict=true — the DoD invocation + CI) was CLEAN (129 files); the
+    reviewer's explicit --strict flag is stricter than the project gate. Remediated anyway (cheap + closes under
+    both invocations) per the "remediate ALL MAJOR" discipline. + 2 MINOR (2nd ndarray annotation; per_class_aurc doc).
+
+iter2_reviewers:   # code-quality re-reviewed (the only dimension that changed); the other 4 iter-1 APPROVE carried forward (a pure type-annotation/doc edit is outside their domains)
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      All 3 iter-1 findings RESOLVED (commit 92a3356). `python3 -m mypy src/pii_anon --strict` → 0 errors (was 2);
+      `mypy src/pii_anon` (canonical) stays clean — clean under BOTH invocations. The bare np.ndarray at :390
+      (_monotone_risk_coverage return) + :418 (_abstention_table params) are now npt.NDArray[np.float64] (via
+      import numpy.typing as npt); per_class_aurc carries the discrete-estimator clarification (Geifman & El-Yaniv
+      2017). Amend diff = 2 files (+8/−3): 1 import + 4 annotation tokens + 3 comment lines — no logic line changed,
+      behaviour-identical. 92 owned tests pass; ruff clean; scope-disciplined (only selective_risk.py + story;
+      competitor_compare.py 7cae16c… + calibration.py + competitive_supremacy.py byte-identical).
+  - reviewer: axiom-compliance
+    verdict: APPROVE   # iter-1 (carried; the iter-2 type-annotation edit does not touch axiom saturation)
+    notes: >
+      AX-005 (calibrated-abstention) UPHELD WITH TEETH: per-class ECE (reuses reliability_diagram_data, never
+      re-derives — RISK-1), per-class Brier (Murphy decomposition), AURC (running-max monotone envelope), the
+      {1%,2%,5%} abstention table (≥3, NFR-021), and the NFR-020 coverage audit (calibrated AND _is_probability AND
+      non-empty provenance — a bare-logit finding drops coverage to 0.9091 + surfaces the index; not a no-op).
+      NO-FABRICATION confirmed LIVE: pii-anon supremacy → NOT_YET / canonical_claim_run=False / G4=PENDING; _g4
+      returns PENDING on missing fields, FAIL on breach (the NFR-020 coverage branch checked FIRST — the lone MUST),
+      PASS only on a conforming artifact (neutering flips PASS→FAIL). AX-002 determinism + AX-001 synthetic upheld.
+      RecallFloorVerdictGuard / verdict machine / S4-01 _g2_* / Tier-R∪Tier-C gating untouched; RISK-6 byte-identical;
+      runtime calibration/* + metrics/calibration.py + orchestrator.py byte-identical (eval reporting, not runtime cal).
+  - reviewer: security-sast
+    verdict: APPROVE   # iter-1 (carried)
+    notes: >
+      No new sink (selective_risk.py imports only __future__/dataclasses/typing/numpy/numpy.typing + sibling
+      .calibration; the swarm/moe/fusion/policy hits are docstring prose). No fabricated guarantee: _g4 is genuinely
+      three-valued; only 2 deleted lines (docstring placeholder + the _pending_guarantee("G4",…) line); verdict
+      machine + RecallFloorVerdictGuard + S4-01 _g2_* untouched; live supremacy → NOT_YET / G4 PENDING. NFR-020
+      coverage-audit teeth real. No real secret/PII. The RED→GREEN fixture changes STRENGTHEN (Brier tol 1e-6→1e-9
+      against the exact binned-Brier identity; A6 deterministic) — genuine, not assertion-weakening. 92 owned tests pass.
+  - reviewer: requirements-coverage
+    verdict: APPROVE   # iter-1 (carried)
+    notes: >
+      Severity split honest (NFR-020 MUST:82, NFR-017 SHOULD:79, NFR-018 COULD:80, NFR-019 SHOULD:81, NFR-021
+      SHOULD:83, FR-005 SHOULD:15 — story labels match; nothing over-claimed). The lone MUST (NFR-020) has teeth at
+      both layers (reporter coverage-audit + gate coverage==1.0, checked FIRST in the FAIL chain). NFR-017→A1/A6
+      (0.05/0.08 bars; ECE_post≤ECE_pre; reuses reliability_diagram_data), NFR-019→A3 (8-corpus monotone property +
+      gate FAIL), NFR-021→A4 (≥3-pt table + gate FAIL on 2), NFR-018→A2 (Murphy decomp 1e-9). G4→A7 teeth + non-vacuity
+      meta-guard + A8 real-artifact stays NOT_YET / G4 PENDING (honest deferral, TRUE-on-real-data → Pass-2/S7). 92 pass.
+  - reviewer: traceability
+    verdict: APPROVE   # iter-1 (carried)
+    notes: >
+      FR-005 + NFR-017..021 all exist with matching SHOULD/COULD/MUST status; AX-005/AX-002/AX-001 in project-axioms.
+      DC-10 (D-implementation-ready-design.md:20) byte-exact FR/NFR set. SDO G4 chain resolves: the placeholder
+      replaced by _g4_calibration_selective_risk; _PENDING_SUCCESSORS["G4"] names S4-03; the surviving
+      _pending_guarantee("G4",…) is the preserved backward-compat override seam (documented + tested). A1–A9 each map
+      to ≥1 named test. 1 MINOR (matrix backfill) DEFERRED-TO-SPRINT-GATE + 1 OBSERVATION (AX-002 shorthand, cosmetic).
+
+findings:
+  - id: CQ-S403-MAJOR-1
+    severity: MAJOR
+    status: RESOLVED   # iter-2 commit 92a3356
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:390/418
+    description: "Explicit `mypy --strict` flagged bare np.ndarray [type-arg] (canonical `mypy src/pii_anon` was clean)."
+    remediation: "Parametrized all np.ndarray → npt.NDArray[np.float64]; `mypy --strict` 2 errors → 0; canonical mypy stays clean. Behaviour-identical."
+  - id: CQ-S403-MINOR-1
+    severity: MINOR
+    status: RESOLVED   # iter-2 (same fix)
+    description: "2nd bare np.ndarray annotation (_abstention_table params) — parametrized."
+  - id: CQ-S403-MINOR-2
+    severity: MINOR
+    status: RESOLVED   # iter-2
+    description: "per_class_aurc field doc now states the discrete AURC estimator (mean of per-point cumulative risk; ≈ np.trapz under uniform 1/n spacing; Geifman & El-Yaniv 2017)."
+  - id: TRACE-S403-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:24
+    description: "No S4-03 forward-trace row yet (UC-04 calibration row lacks the story link + NFR-020 + has a stale stats/calibration.py evidence cell)."
+    disposition: "Backfill at the S4 sprint gate — mirrors S2-05/S5-04/S6-03/S4-CS-01/S4-01."
+  - id: REQCOV-S403-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "NFR-017 long-tail 0.08 bar is the documented R10 REVISE-LOOSER provisional threshold (exercised by test_g4_long_tail_class_held_to_looser_bar); whether 0.08 is the right number is an SME/Pass-2 concern, not a coverage gap. Per-class MCE is reused-but-unsurfaced (no S4-03 acceptance clause references it → not a gap)."
+  - id: AXIOM-S403-OBS-1 / TRACE-S403-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "AX-002 shorthand (vs AX-pii-anon-002 'deterministic-reproducible-pseudonymization', which carries a replay-determinism flavor; also backed by NFR-005) is defensible; the older S2-05 note calling AX-002 non-canonical is stale w.r.t. the current registry. Cosmetic."
+
+cross_reviewer_patterns:
+  - pattern: "no-fabrication of the G4 guarantee (verified LIVE)"
+    raised_by: [axiom-compliance, security-sast, requirements-coverage]
+    detail: "Reviewers independently ran pii-anon supremacy + confirmed G4=PENDING / verdict NOT_YET on the real smoke artifact; the G4 teeth are non-vacuous (worsening a class ECE flips PASS→FAIL); _g4 cannot fabricate a PASS (requires all 4 NFR conjuncts + fields present)."
+  - pattern: "canonical-vs-explicit mypy invocation"
+    raised_by: [code-quality]
+    detail: "The MAJOR arose from the explicit --strict flag being stricter than the pyproject gate; resolved by parametrizing the annotations so the new module is clean under BOTH invocations (defensive)."
+
+outcome:
+  invariant: >
+    The SDO G4 guarantee (calibration / selective-risk) is now CODE-COMPUTABLE: SelectiveRiskReporter produces
+    per-entity-class ECE/Brier/AURC + reliability + a ≥3-point abstention operating-point table + a calibrated-
+    confidence-coverage audit (NFR-020); _g4_calibration_selective_risk is a pure three-valued (benchmark)->
+    GuaranteeResult — PASS iff per-class ECE ≤ NFR-017 bars ∧ AURC monotone ∧ ≥3 abstention points ∧ coverage=1.0
+    (NFR-020 checked first); PENDING on missing fields (no fabrication); FAIL on breach. G4 is no longer an unbuilt
+    placeholder. The runtime calibration/ package + metrics/calibration.py are reused unchanged.
+  sdo_recompute: >
+    pii-anon supremacy (re-run by reviewers + the executor) → verdict NOT_YET (UNCHANGED), binding
+    canonical_claim_run=False. G4 moves from "PENDING ← S4-03 unbuilt" to "PENDING-on-missing-fields
+    (code-computable; awaiting a run that emits the calibration fields — the S7 canonical run)". Honest, no fabricated PASS.
+  tests: "full suite 3164 passed / 15 skipped / 0 failed (exit 0); 92 owned tests passed"
+  coverage: "87.03% (≥84); selective_risk.py 98%"
+  quality: "ruff clean (owned); mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` (0 errors / 129 files)"
+  safety: "metrics/calibration.py + runtime calibration/* + orchestrator.py + competitor_compare.py (7cae16c…, RISK-6) + bayes_bt.py + elo.py byte-identical; verdict machine + RecallFloorVerdictGuard + S4-01 _g2_* preserved; existing scorecard fields (incl. privacy_score + S4-01 + composite_score) preserved (no public-API regression); artifacts/benchmarks/* never written; user-WIP md5 unchanged; narrow git add"
+  provisional_status: "AGENT_SIMULATED — the reporter + G4 PASS/FAIL/PENDING run for real in-tree against synthetic fixtures; a TRUE G4 verdict on real data needs the S7 canonical run that emits the calibration fields (Pass-2/S7, never simulated as real)."
+
+followups:
+  - "Both SDO-guarantee stories landed (S4-01 G2 + S4-03 G4 code-computable); recompute the SDO verdict + sign off SO-11 + milestone commit (G2/G4 close)."
+  - "S7 canonical run: emit the per-class calibration + abstention fields into the benchmark artifact → G4 computes a real PASS/FAIL."
+  - "S4 sprint gate: backfill traceability-matrix S4-03 row (+ correct the stale stats/calibration.py evidence cell, add NFR-020 to the calibration row)."

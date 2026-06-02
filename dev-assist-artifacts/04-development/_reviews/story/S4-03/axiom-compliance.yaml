@@ -1,0 +1,158 @@
+reviewer: axiom-compliance
+gate: story
+scope_id: S4-03
+iteration: 1
+verdict: APPROVE
+self_attestation: >
+  Independent review. I read the project axiom registry
+  (dev-assist-artifacts/00-axioms/project-axioms.yaml), the S4-03 story, the new
+  reporter (selective_risk.py), the G4 gate function + its wiring point in
+  competitive_supremacy.py, both owned test suites, and the live CLI verdict. I
+  ran the owned suites (92 passed / 0 failed) and `pii-anon supremacy` against
+  the real artifact. Findings reflect my own verification, not the executor's
+  Evidence claims (which I independently corroborated).
+
+findings:
+  - id: AXIOM-S403-001
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:445-479
+    description: >
+      AX-005 (calibrated-abstention) headline UPHELD WITH TEETH. The
+      SelectiveRiskReporter is a real per-class selective-risk surface, not a
+      stub: per-class ECE reuses reliability_diagram_data (RISK-1 — never
+      re-derives ECE), per-class Brier carries the Murphy reliability/resolution/
+      uncertainty decomposition, AURC is the running-max monotone envelope of the
+      confidence-ranked cumulative error (the canonical optimal risk-coverage
+      curve), and _abstention_table emits exactly the {1%,2%,5%} operating points
+      (ABSTENTION_TARGETS, NFR-021 ≥3). The NFR-020 coverage audit is genuinely
+      teethed: a finding is COVERED only if calibrated AND _is_probability(conf)
+      in [0,1] AND non-empty provenance. test_a5_coverage_drops_and_flags_bare_logit_finding
+      drops coverage to 0.9091 and surfaces the offending index; a separate test
+      flags a provenance-less-but-in-range finding (the provenance half also has
+      teeth). Not a no-op always-100% audit. This is an exemplary realisation of
+      the AX-005 reviewer hook ("findings carry calibrated confidence + a
+      populated decision path; flag silently-dropped uncertain spans").
+    suggested_resolution: >
+      None — the abstention operating-point table + per-class ECE/Brier/AURC are
+      the selective-risk profile a deployer needs to pick an abstention point.
+      Saturates AX-005 at the eval-reporting layer. No action.
+    status: OPEN
+  - id: AXIOM-S403-002
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:661-782
+    description: >
+      No-fabrication invariant UPHELD. _g4_calibration_selective_risk is a pure,
+      three-valued read of the benchmark's pii-anon system block: PENDING (None)
+      when core absent or per_class_ece is not a non-empty dict or
+      calibrated_confidence_coverage is non-numeric (lines 696-717); PASS only
+      when EVERY per-class ECE ≤ its bar AND the risk-coverage curve is monotone
+      non-increasing AND ≥3 abstention points AND coverage == 1.0 (line 753);
+      FAIL with a binding detail naming the breach otherwise. Critically the
+      NFR-020 coverage check is the FIRST FAIL branch reported (lines 761-766),
+      correctly reflecting NFR-020 as the lone MUST. _risk_coverage_is_monotone
+      fails loud on an empty/malformed curve (lines 794-795) — a missing curve
+      cannot certify NFR-019. Live `pii-anon supremacy` on the real smoke
+      artifact returns verdict=NOT_YET, canonical_claim_run=false,
+      binding_constraint="canonical_claim_run=False (G7 certified-run gate)",
+      G4=PENDING, axes_pending names "G4←S4-03" — honest, no fabricated PASS.
+    suggested_resolution: >
+      None — the gate is honestly PENDING on the field-less smoke artifact and
+      PASSes only on a conforming fixture; a TRUE verdict on real data is the S7
+      canonical run (correctly out of this story's scope). No action.
+    status: OPEN
+  - id: AXIOM-S403-003
+    severity: OBSERVATION
+    location: tests/test_selective_risk.py:364-380 ; tests/test_competitive_supremacy.py:1353
+    description: >
+      AX-002 (determinism / A9 two-runs-equal) UPHELD. The reporter is pure with
+      stable tie-breaks (np.argsort(-c, kind="stable") in _monotone_risk_coverage;
+      sorted class keys throughout report()). test_a9_reporter_is_deterministic_
+      on_identical_inputs asserts per-class ECE/Brier/AURC + coverage + the
+      abstention table are equal across two runs on a deep-copied corpus;
+      test_g4_is_deterministic_on_identical_benchmarks pins the gate side. All
+      fixtures draw from a SEEDED np.random.default_rng(seed) (selective_risk
+      test lines 53/76), so the corpora are bit-reproducible. The executor's
+      disclosed RED→GREEN switch to a deterministic perfectly-calibrated A6
+      fixture STRENGTHENS determinism (a seeded/closed-form fixture is
+      bit-stable and removes flake), it does not weaken the property. Confirmed.
+    suggested_resolution: None — AX-002 saturated for this eval-reporting surface.
+    status: OPEN
+  - id: AXIOM-S403-004
+    severity: OBSERVATION
+    location: tests/test_selective_risk.py:44-80 ; tests/test_competitive_supremacy.py
+    description: >
+      AX-001 (synthetic-only-no-real-pii) UPHELD. All new corpora are synthetic:
+      the fixtures carry only entity-type LABELS (EMAIL_ADDRESS, US_SSN,
+      PHONE_NUMBER, CRYPTO_WALLET) plus seeded synthetic (confidence, correct)
+      draws — no real values are constructed for any class. A heuristic scan of
+      both new test files for real-PII-looking literals (named-provider emails,
+      SSN-shaped, Luhn-range card numbers) returns zero matches. No bundled
+      corpus is touched. Consistent with the AX-001 release-blocker posture.
+    suggested_resolution: None — no real PII introduced. No action.
+    status: OPEN
+  - id: AXIOM-S403-005
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:316-368
+    description: >
+      AX-003/AX-004 non-regression + SDO gate integrity UPHELD. The G4 wiring is
+      a single surgical swap (lines 327-334): the _pending_guarantee("G4", …)
+      placeholder is replaced by _g4_calibration_selective_risk(systems) while
+      the explicit overrides["G4"] seam is preserved (backward-compat;
+      test_g4_override_still_honoured_for_backward_compat green). UNTOUCHED and
+      verified byte-identical to baseline 48380ed (empty git diff): the runtime
+      calibration/* package, metrics/calibration.py, competitor_tiers.py,
+      bayes_bt.py, elo.py. evaluation/competitor_compare.py md5
+      7cae16c89f4c97136e1a12394dae2025 (RISK-6 — exact expected hash). The
+      RecallFloorVerdictGuard (recall_floor_breachers / _g7_certified_run guard),
+      _decide verdict machine, the S4-01 _g2_pseudonymization_integrity, the
+      J-computation/Tier-R∪Tier-C gating, and _GUARANTEE_ORDER are all preserved
+      (AX-003/AX-004, ensemble-recall-floor never weakened — G4 cannot crown a
+      breacher; the rank-1 argmax still excludes breachers). None of these
+      off-limits files appear in S4-03's commit range 646fd2d~1..5207d56.
+    suggested_resolution: None — gate integrity intact; no floor/verdict regression.
+    status: OPEN
+  - id: AXIOM-S403-006
+    severity: OBSERVATION
+    location: src/pii_anon/orchestrator.py ; src/pii_anon/calibration/
+    description: >
+      Runtime-vs-eval separation UPHELD (story RISK-2). This story is eval
+      REPORTING, not runtime calibration. The runtime calibration/* package
+      (OfflineCalibrator/OnlineCalibrator/CalibrationStore) and orchestrator.py
+      are correctly NOT in S4-03's commit range (the pre-existing orchestrator.py
+      working-tree delta is unrelated user-WIP, not introduced by RED/GREEN/
+      REFACTOR 646fd2d→2511bc2→5207d56). The reporter's AST import-boundary test
+      (test_a9_selective_risk_has_no_detection_layer_imports) confirms
+      selective_risk.py imports only numpy/stdlib + the sibling calibration
+      metric — nothing from swarm/moe/fusion/policy. Clean layering.
+    suggested_resolution: None — the off-limits seam is respected. No action.
+    status: OPEN
+
+context_bounds_respected: true
+notes: >
+  APPROVE — 0 MAJOR+. S4-03 is an exemplary AX-005 (calibrated-abstention)
+  saturation at the eval-reporting layer. The headline checks all hold: the
+  SelectiveRiskReporter is a real per-class selective-risk surface (per-class
+  ECE reusing reliability_diagram_data, per-class Brier + Murphy decomposition,
+  monotone-envelope AURC/risk-coverage, the {1%,2%,5%} ≥3-point abstention
+  operating-point table), and the NFR-020 calibrated-confidence-coverage audit
+  has genuine teeth — a bare-logit finding drops coverage to 0.9091 and a
+  provenance-less-but-in-range finding is also flagged (not a no-op always-100%
+  audit). AX-002 determinism is teethed (two-runs-equal on the reporter + the
+  gate; seeded fixtures, stable tie-breaks). AX-001 is clean (entity-type labels
+  + seeded synthetic confidences only; zero real-PII literals). AX-003/AX-004 +
+  SDO gate integrity are intact: the G4 wiring is a single surgical swap that
+  preserves the verdict machine, RecallFloorVerdictGuard, the S4-01 _g2_*, the
+  Tier gating, and the scoped import-boundary test; metrics/calibration.py, the
+  runtime calibration/* package, orchestrator.py, and competitor_compare.py
+  (md5 7cae16c… RISK-6) are byte-identical, and none appear in this story's
+  commit range. The no-fabrication invariant is the strongest signal:
+  _g4_calibration_selective_risk returns PENDING (None) on missing fields, FAIL
+  (NFR-020 coverage branch first) on breach, PASS only on a conforming artifact;
+  the live `pii-anon supremacy` verdict on the real smoke artifact is NOT_YET /
+  canonical_claim_run=false / G4=PENDING / axes_pending names G4←S4-03 — no
+  fabricated PASS. 92/92 owned tests pass. The NFR-017 long-tail looser-bar
+  (0.08) per-class ECE handling, the non-vacuity meta-guard (worsening US_SSN's
+  ECE flips PASS→FAIL), and the monotone-curve fail-loud are all present and
+  green. No SHOWSTOPPER / CATASTROPHIC / MAJOR / MINOR findings; six positive
+  OBSERVATIONs recorded. No subprocess / shell-out / unsafe-deserialization
+  surface in scope. Approve for the story gate.
