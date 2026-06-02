@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from pii_anon.eval_framework.metrics.selective_risk import (
+    LONG_TAIL_SUPPORT,
     AbstentionOperatingPoint,
     ScoredFinding,
     SelectiveRiskReport,
@@ -96,6 +97,29 @@ def _two_class_corpus() -> list[ScoredFinding]:
     )
 
 
+def _perfectly_calibrated_class(
+    entity_type: str, *, levels: list[float], per_level: int
+) -> list[ScoredFinding]:
+    """A DETERMINISTIC perfectly-calibrated class (no RNG): at confidence ``p``,
+    exactly ``round(p·per_level)`` of ``per_level`` findings are correct — so the
+    per-band confidence equals the per-band accuracy and ECE ≈ 0 by construction.
+    Robust (not seed-dependent) for the NFR-017 threshold assertion (A6)."""
+    out: list[ScoredFinding] = []
+    for p in levels:
+        n_correct = round(p * per_level)
+        for i in range(per_level):
+            out.append(
+                ScoredFinding(
+                    entity_type=entity_type,
+                    confidence=p,
+                    correct=i < n_correct,
+                    calibrated=True,
+                    provenance="ensemble:weighted_consensus",
+                )
+            )
+    return out
+
+
 # ---------------------------------------------------------------------------
 # A1 — per-class ECE (NFR-017) [UNIT-TEST]
 # ---------------------------------------------------------------------------
@@ -149,14 +173,18 @@ def test_a2_per_class_brier_low_for_calibrated_high_for_miscalibrated() -> None:
         assert 0.0 <= v <= 1.0
 
 
-def test_a2_brier_decomposition_reconciles_with_brier() -> None:
-    """[UNIT-TEST] A2 / NFR-018: the Murphy decomposition
-    (reliability − resolution + uncertainty) reconciles with the raw Brier for
-    each class (within numerical tolerance)."""
+def test_a2_brier_decomposition_reconciles_with_binned_brier() -> None:
+    """[UNIT-TEST] A2 / NFR-018: the Murphy calibration/refinement decomposition
+    reconciles EXACTLY (to machine epsilon) with the binned Brier:
+    ``reliability − resolution + uncertainty == binned_brier``. The raw per-class
+    Brier (true MSE) is also reported and tracks the binned Brier closely (the
+    only difference is the within-bin discretisation of a 15-bin diagram)."""
     report = SelectiveRiskReporter().report(_two_class_corpus())
     for et, decomp in report.per_class_brier_decomposition.items():
         recon = decomp.reliability - decomp.resolution + decomp.uncertainty
-        assert recon == pytest.approx(report.per_class_brier[et], abs=1e-6)
+        assert recon == pytest.approx(decomp.binned_brier, abs=1e-9)
+        # Raw MSE Brier and binned Brier agree up to the bin discretisation.
+        assert report.per_class_brier[et] == pytest.approx(decomp.binned_brier, abs=0.05)
 
 
 # ---------------------------------------------------------------------------
@@ -310,11 +338,19 @@ def test_a6_well_resourced_class_meets_high_resource_threshold() -> None:
     well-resourced (and originally well-calibrated) class is ≤ 0.05; the long-tail
     threshold 0.08 is applied to sparse classes (the reporter exposes which bar a
     class is held to)."""
-    # A big, well-calibrated class → high-resource bar 0.05.
-    corpus = _well_calibrated_class("EMAIL_ADDRESS", n=600, seed=11)
-    # A tiny class → long-tail bar 0.08.
-    corpus += _well_calibrated_class("CRYPTO_WALLET", n=8, seed=12)
+    # A big, perfectly-calibrated class (600 findings) → high-resource bar 0.05,
+    # ECE ≈ 0 by construction (robust, not seed-dependent).
+    bin_centres = [0.05 + 0.1 * i for i in range(10)]  # 0.05 .. 0.95
+    corpus = _perfectly_calibrated_class(
+        "EMAIL_ADDRESS", levels=bin_centres, per_level=60
+    )
+    # A tiny class (8 findings) → long-tail bar 0.08.
+    corpus += _perfectly_calibrated_class(
+        "CRYPTO_WALLET", levels=[0.5, 0.9], per_level=4
+    )
     report = SelectiveRiskReporter().report(corpus)
+    assert report.per_class_support["EMAIL_ADDRESS"] >= LONG_TAIL_SUPPORT
+    assert report.per_class_support["CRYPTO_WALLET"] < LONG_TAIL_SUPPORT
     assert report.per_class_ece_post["EMAIL_ADDRESS"] <= 0.05
     assert report.ece_threshold_for("EMAIL_ADDRESS") == 0.05
     assert report.ece_threshold_for("CRYPTO_WALLET") == 0.08
@@ -409,3 +445,53 @@ def test_empty_corpus_is_honest_not_a_crash() -> None:
     assert report.per_class_ece == {}
     assert report.abstention_table == ()
     assert report.bare_logit_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Scorecard additive calibration summary fields (S4-03 — additive; preserve all
+# existing fields incl. privacy_score + the S4-01 anon/pseudo fields).
+# ---------------------------------------------------------------------------
+
+
+def test_scorecard_calibration_fields_are_additive_and_serialized() -> None:
+    """[CONTRACT-TEST] SystemScorecard gains calibration summary fields
+    (calibration_ece, selective_risk_aurc, calibrated_confidence_coverage),
+    serialized in to_dict() — and ALL existing fields (privacy_score + the S4-01
+    anon/pseudo fields + composite_score) are preserved (no public-API
+    regression)."""
+    from pii_anon.eval_framework.rating.scorecard import SystemScorecard
+
+    sc = SystemScorecard(
+        system_name="pii-anon",
+        f1=0.85,
+        privacy_score=0.7,
+        anonymization_score=0.91,
+        pseudonymization_integrity_score=0.93,
+        composite_score=0.8,
+        calibration_ece=0.0234567,
+        selective_risk_aurc=0.0412,
+        calibrated_confidence_coverage=1.0,
+    )
+    d = sc.to_dict()
+    # New additive fields present + rounded.
+    assert d["calibration_ece"] == 0.023457
+    assert d["selective_risk_aurc"] == 0.0412
+    assert d["calibrated_confidence_coverage"] == 1.0
+    # Existing fields preserved (no regression).
+    assert d["privacy_score"] == 0.7
+    assert d["anonymization_score"] == 0.91
+    assert d["pseudonymization_integrity_score"] == 0.93
+    assert d["composite_score"] == 0.8
+    assert d["f1"] == 0.85
+
+
+def test_scorecard_calibration_fields_default_safely() -> None:
+    """[CONTRACT-TEST] The calibration summary fields default safely (coverage
+    defaults to 1.0 — the no-findings vacuous-pass; ece/aurc default 0.0) so an
+    older construction path that does not set them is unaffected."""
+    from pii_anon.eval_framework.rating.scorecard import SystemScorecard
+
+    d = SystemScorecard(system_name="x").to_dict()
+    assert d["calibration_ece"] == 0.0
+    assert d["selective_risk_aurc"] == 0.0
+    assert d["calibrated_confidence_coverage"] == 1.0

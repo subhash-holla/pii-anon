@@ -29,7 +29,12 @@ to ``False`` with ``all(...)``.
 * **G2** Pseudonymization-integrity / reversibility — PENDING ← S4-01 scorers.
 * **G3** Recall dominance — pii-anon recall ladder ≥ max(competitor recall).
   **computable now.**
-* **G4** Calibration / selective-risk — PENDING ← S4-03 reporter.
+* **G4** Calibration / selective-risk — per-class ECE ≤ NFR-017 bars ∧ AURC
+  monotone ∧ ≥3 abstention points ∧ calibrated-confidence-coverage = 1.0
+  (NFR-020). Computed by ``_g4_calibration_selective_risk`` from the per-class
+  calibration fields the S4-03 ``SelectiveRiskReporter`` emits; PENDING when the
+  artifact lacks those fields (the current smoke artifact does — never
+  fabricated). **computable now (S4-03).**
 * **G5** Audit + orchestration latency / interception — PENDING ← S5/S6.
 * **G6** Non-inferiority on raw detection — core F2 ≥ best **Tier-R** F2 − ε_F ∧
   entity coverage ≥ 0.80. A Tier-C raw-F1 (e.g. OpenAI ≈0.96) exceeding pii-anon
@@ -88,6 +93,15 @@ J_BAR: float = 0.95
 EPS_F2: float = 0.01
 ENTITY_COVERAGE_MIN: float = 0.80
 EPS_RECALL_PER_LANG: float = 0.005
+
+# G4 (calibration / selective-risk, S4-03) thresholds — the NFR-017/020/021 bars.
+# A per-class ECE bar is read per class from the artifact when present (a class
+# may be high-resource [0.05] or long-tail [0.08]); these are the DEFAULT bars the
+# gate falls back to when the artifact does not stamp a per-class threshold.
+G4_ECE_BAR_HIGH_RESOURCE: float = 0.05  # NFR-017 high-resource ECE bar
+G4_ECE_BAR_LONG_TAIL: float = 0.08  # NFR-017 long-tail ECE bar
+G4_MIN_ABSTENTION_POINTS: int = 3  # NFR-021 ≥3 operating points
+G4_COVERAGE_REQUIRED: float = 1.0  # NFR-020 calibrated-confidence-coverage (the MUST)
 
 # The system-under-test names (the "pii-anon recall ladder"); the moat axes are
 # measured on the best of these, raw non-inferiority on the core engine.
@@ -310,11 +324,19 @@ class SupremacyVerdict:
             if "G2" in overrides
             else _g2_pseudonymization_integrity(systems)
         )
+        # G4 is now COMPUTED from the benchmark's per-class calibration / selective-
+        # risk fields (S4-03); an explicit pending_overrides['G4'] still wins (the
+        # successor-override seam is preserved for callers that drive G4 directly).
+        g4 = (
+            _pending_guarantee("G4", overrides["G4"])
+            if "G4" in overrides
+            else _g4_calibration_selective_risk(systems)
+        )
         guarantees = (
             _g1_recall_floor(benchmark, systems),
             g2,
             _g3_recall_dominance(systems),
-            _pending_guarantee("G4", overrides.get("G4")),
+            g4,
             _pending_guarantee("G5", overrides.get("G5")),
             _g6_raw_noninferiority(systems),
             _g7_certified_run(run_metadata, systems, breachers),
@@ -634,6 +656,152 @@ def _g3_recall_dominance(systems: dict[str, dict[str, Any]]) -> GuaranteeResult:
         f"{best_competitor:.4g}"
     )
     return GuaranteeResult("G3", passed, swarm_recall, best_competitor, detail)
+
+
+def _g4_calibration_selective_risk(
+    systems: dict[str, dict[str, Any]],
+) -> GuaranteeResult:
+    """G4 — per-class calibration / selective-risk (S4-03; three-valued).
+
+    The SDO moat axis for calibrated abstention (AX-005 / FR-005 / NFR-017..021).
+    The benchmark must carry, on the pii-anon claimant, the calibration block the
+    :class:`~pii_anon.eval_framework.metrics.selective_risk.SelectiveRiskReporter`
+    emits (the S7 canonical run stamps it):
+
+    * ``per_class_ece`` — ``{entity_type: ece}`` (post-temperature-scaling);
+    * ``per_class_ece_threshold`` (optional) — ``{entity_type: bar}``; absent ⇒
+      the default :data:`G4_ECE_BAR_HIGH_RESOURCE` bar is applied;
+    * ``risk_coverage_curve`` — ``[{"coverage", "risk"}, …]`` ascending in
+      coverage (the monotone-non-increasing selective-risk curve, NFR-019);
+    * ``abstention_operating_points`` — ``≥3`` rows (NFR-021);
+    * ``calibrated_confidence_coverage`` — the NFR-020 audit (must be ``1.0``).
+
+    Three-valued outcome:
+
+    * **PASS** iff EVERY per-class ECE ≤ its bar AND the risk-coverage curve is
+      monotone non-increasing (risk never drops as coverage grows) AND there are
+      ≥ :data:`G4_MIN_ABSTENTION_POINTS` abstention points AND
+      ``calibrated_confidence_coverage == 1.0`` (NFR-020 — 0 bare-logit);
+    * **FAIL** iff the fields are present but a bar is breached (the binding detail
+      names the breach — the worst class, the coverage gap, the non-monotone
+      curve, or the missing operating points);
+    * **PENDING** (``None``) iff the benchmark lacks the calibration fields (the
+      current smoke artifact lacks them — NO fabrication; the S7 canonical run
+      emits them).
+
+    Pure: reads the benchmark systems, never mutates them. Determinism (AX-002):
+    a pure function of the (numeric) fields. The reporting MATH lives in
+    ``metrics/selective_risk.py``; this gate only READS the emitted summary.
+    """
+    core = systems.get(_CORE_SYSTEM)
+    if core is None:
+        return GuaranteeResult(
+            "G4", None, float("nan"), float("nan"),
+            "G4 PENDING: pii-anon core absent from benchmark systems "
+            f"({_PENDING_SUCCESSORS['G4']})",
+        )
+
+    per_class_ece = core.get("per_class_ece")
+    coverage = core.get("calibrated_confidence_coverage")
+    # The calibration block must be present (per-class ECE + the NFR-020 coverage
+    # are the load-bearing fields); a missing field ⇒ PENDING (never fabricated).
+    if not isinstance(per_class_ece, dict) or not per_class_ece or not isinstance(
+        coverage, (int, float)
+    ):
+        return GuaranteeResult(
+            "G4", None, float("nan"), float("nan"),
+            "G4 PENDING: benchmark lacks the per-class calibration / selective-risk "
+            "fields (per_class_ece + calibrated_confidence_coverage + "
+            "risk_coverage_curve + abstention_operating_points); "
+            f"{_PENDING_SUCCESSORS['G4']} — emitted by the S7 canonical run",
+        )
+
+    thresholds = core.get("per_class_ece_threshold")
+    if not isinstance(thresholds, dict):
+        thresholds = {}
+
+    # 1. Per-class ECE ≤ its bar (worst class drives the FAIL detail). The bar is
+    #    read per class from the artifact (high-resource 0.05 / long-tail 0.08);
+    #    absent ⇒ the default high-resource bar.
+    worst_class: str | None = None
+    worst_ece = 0.0
+    worst_bar = G4_ECE_BAR_HIGH_RESOURCE
+    ece_ok = True
+    for et in sorted(per_class_ece):
+        ece = float(per_class_ece[et])
+        bar = float(thresholds.get(et, G4_ECE_BAR_HIGH_RESOURCE))
+        if ece > bar:
+            ece_ok = False
+            if worst_class is None or (ece - bar) > (worst_ece - worst_bar):
+                worst_class, worst_ece, worst_bar = et, ece, bar
+    max_ece = max((float(v) for v in per_class_ece.values()), default=0.0)
+
+    # 2. Monotone-non-increasing risk-coverage curve (NFR-019): ordered by
+    #    ascending coverage, risk must be non-decreasing (selective risk does not
+    #    increase as you abstain MORE / does not drop as coverage grows).
+    curve = core.get("risk_coverage_curve") or []
+    monotone_ok = _risk_coverage_is_monotone(curve)
+
+    # 3. ≥3 abstention operating points (NFR-021).
+    points = core.get("abstention_operating_points") or []
+    points_ok = isinstance(points, list) and len(points) >= G4_MIN_ABSTENTION_POINTS
+
+    # 4. Calibrated-confidence-coverage == 1.0 (NFR-020 — the lone MUST).
+    coverage_val = float(coverage)
+    coverage_ok = coverage_val >= G4_COVERAGE_REQUIRED
+
+    passed = ece_ok and monotone_ok and points_ok and coverage_ok
+    if passed:
+        detail = (
+            f"G4 PASS: every per-class ECE ≤ its bar (worst {max_ece:.4g}); "
+            f"risk-coverage monotone non-increasing; {len(points)} abstention "
+            f"operating points (≥{G4_MIN_ABSTENTION_POINTS}); "
+            f"calibrated-confidence-coverage={coverage_val:.4g} (NFR-020 / AX-005)"
+        )
+    elif not coverage_ok:
+        detail = (
+            f"G4 FAIL: calibrated-confidence-coverage={coverage_val:.4g} < "
+            f"{G4_COVERAGE_REQUIRED} (NFR-020 — every finding MUST carry a "
+            "calibrated confidence + provenance; a bare-logit finding is a breach)"
+        )
+    elif not ece_ok:
+        detail = (
+            f"G4 FAIL: per-class ECE breach on {worst_class!r} "
+            f"(ECE={worst_ece:.4g} > bar {worst_bar:.4g}; NFR-017)"
+        )
+    elif not monotone_ok:
+        detail = (
+            "G4 FAIL: risk-coverage curve is NOT monotone non-increasing — "
+            "selective risk increases as coverage drops (NFR-019 violated)"
+        )
+    else:
+        detail = (
+            f"G4 FAIL: only {len(points)} abstention operating point(s) "
+            f"(< {G4_MIN_ABSTENTION_POINTS} required; NFR-021)"
+        )
+    return GuaranteeResult("G4", passed, max_ece, G4_ECE_BAR_HIGH_RESOURCE, detail)
+
+
+def _risk_coverage_is_monotone(curve: Any) -> bool:
+    """True iff the risk-coverage ``curve`` is monotone non-increasing in
+    abstention — i.e. ordered by ascending coverage, ``risk`` is non-decreasing.
+
+    The curve is a list of ``{"coverage", "risk"}`` dicts. An empty / malformed
+    curve is treated as NOT monotone (fail loud — a missing curve cannot certify
+    the NFR-019 property). Sorted by coverage before the check so emission order
+    does not matter.
+    """
+    if not isinstance(curve, list) or not curve:
+        return False
+    try:
+        pts = sorted(
+            ((float(p["coverage"]), float(p["risk"])) for p in curve),
+            key=lambda cr: cr[0],
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+    risks = [r for _, r in pts]
+    return all(hi >= lo - 1e-9 for lo, hi in zip(risks, risks[1:]))
 
 
 def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResult:

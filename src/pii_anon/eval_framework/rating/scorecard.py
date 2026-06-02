@@ -74,6 +74,18 @@ class SystemScorecard:
     anonymization_score: float = 0.0
     pseudonymization_integrity_score: float = 0.0
 
+    # Tier 2 — Calibration & selective-risk summary (S4-03; AX-005). Additive
+    # headline fields summarising the per-class SelectiveRiskReport that feeds the
+    # SDO G4 guarantee: ``calibration_ece`` the (worst/representative) post-scaling
+    # ECE; ``selective_risk_aurc`` the area under the risk-coverage curve (lower is
+    # better); ``calibrated_confidence_coverage`` the NFR-020 audit (1.0 = every
+    # finding carries a calibrated confidence + provenance, 0 bare-logit). These do
+    # NOT enter ``composite_score`` (preserved numeric behavior); a future story
+    # may re-base the composite once the canonical schema carries them.
+    calibration_ece: float = 0.0
+    selective_risk_aurc: float = 0.0
+    calibrated_confidence_coverage: float = 1.0
+
     # Composite
     composite_score: float = 0.0
 
@@ -103,6 +115,12 @@ class SystemScorecard:
             "anonymization_score": round(self.anonymization_score, 6),
             "pseudonymization_integrity_score": round(
                 self.pseudonymization_integrity_score, 6
+            ),
+            # Calibration & selective-risk summary (S4-03) — additive (AX-005).
+            "calibration_ece": round(self.calibration_ece, 6),
+            "selective_risk_aurc": round(self.selective_risk_aurc, 6),
+            "calibrated_confidence_coverage": round(
+                self.calibrated_confidence_coverage, 6
             ),
             "composite_score": round(self.composite_score, 6),
             "elo_rating": round(self.elo_rating, 2),

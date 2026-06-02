@@ -30,6 +30,14 @@ from .privacy_metrics import (
     ReidentificationRiskMetric,
     TClosenessMetric,
 )
+from .selective_risk import (
+    AbstentionOperatingPoint,
+    BrierDecomposition,
+    RiskCoveragePoint,
+    ScoredFinding,
+    SelectiveRiskReport,
+    SelectiveRiskReporter,
+)
 from .span_metrics import (
     DocumentLevelConsistencyMetric,
     EntityLevelF1Metric,
@@ -81,4 +89,11 @@ __all__ = [
     "EntityTypeFairnessMetric",
     "DifficultyFairnessMetric",
     "ScriptFairnessMetric",
+    # calibration & selective-risk (S4-03 — per-class ECE/Brier/AURC + abstention)
+    "SelectiveRiskReporter",
+    "SelectiveRiskReport",
+    "ScoredFinding",
+    "BrierDecomposition",
+    "RiskCoveragePoint",
+    "AbstentionOperatingPoint",
 ]
