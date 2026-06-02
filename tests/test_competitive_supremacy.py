@@ -956,3 +956,200 @@ def test_cli_supremacy_missing_artifact_is_bad_parameter(tmp_path: Path) -> None
         ["supremacy", "--artifact", str(tmp_path / "nope.json")],
     )
     assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# S4-01: G2 — pseudonymization-integrity strict dominance (PASS/FAIL/PENDING).
+#
+# G2 is now a pure (benchmark) -> GuaranteeResult computed by
+# `_g2_pseudonymization_integrity` (replacing the hardcoded PENDING placeholder):
+#   * PASS  iff pii-anon's pseudonymization_integrity_score STRICTLY dominates
+#           every competitor's AND unauthorized_reversal_rate == 0 AND BOTH family
+#           fields (anonymization_score + pseudonymization_integrity_score) are
+#           present-and-distinct on pii-anon;
+#   * FAIL  iff the fields are present but pii-anon does NOT dominate (or
+#           unauthorized-reversal > 0) — the binding detail names the gap;
+#   * PENDING (None) iff the benchmark lacks the fields (NO fabrication — the
+#           current smoke artifact lacks them; the S7 canonical run emits them).
+# ---------------------------------------------------------------------------
+
+
+def _with_pseudo_fields(
+    bench: dict[str, object],
+    *,
+    pii_anon_pi: float,
+    competitor_pi: float,
+    pii_anon_anon: float = 0.95,
+    unauthorized_reversal_rate: float = 0.0,
+) -> dict[str, object]:
+    """Inject the S4-01 family fields onto a benchmark fixture (synthetic).
+
+    pii-anon (and pii-anon-swarm) get ``pseudonymization_integrity_score`` =
+    ``pii_anon_pi`` + a distinct ``anonymization_score`` + an
+    ``unauthorized_reversal_rate``; every competitor gets ``competitor_pi`` (and a
+    competitor anonymization_score). Mutates a COPY-safe per-system dict in place.
+    """
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        name = s["system"]  # type: ignore[index]
+        if name in ("pii-anon", "pii-anon-swarm"):
+            s["pseudonymization_integrity_score"] = pii_anon_pi  # type: ignore[index]
+            s["anonymization_score"] = pii_anon_anon  # type: ignore[index]
+            s["unauthorized_reversal_rate"] = unauthorized_reversal_rate  # type: ignore[index]
+        else:
+            s["pseudonymization_integrity_score"] = competitor_pi  # type: ignore[index]
+            s["anonymization_score"] = 0.50  # type: ignore[index]
+            s["unauthorized_reversal_rate"] = 0.0  # type: ignore[index]
+    return bench
+
+
+def test_g2_pass_when_pii_anon_pi_strictly_dominates_and_no_unauthorized() -> None:
+    """[CONTRACT-TEST] A5: G2 PASS — pii-anon's pseudonymization_integrity_score
+    strictly dominates every competitor, unauthorized-reversal is 0, and both
+    family fields are present-and-distinct on pii-anon."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    g2 = verdict.guarantee("G2")
+    assert g2.passed is True
+    assert g2.observed >= g2.bar
+
+
+def test_g2_fail_when_present_but_not_dominant() -> None:
+    """[CONTRACT-TEST] A5: G2 FAIL — the fields are present but a competitor's
+    pseudonymization_integrity_score meets/exceeds pii-anon's (not strict
+    dominance); the binding detail names the gap."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.60, competitor_pi=0.90
+    )
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    g2 = verdict.guarantee("G2")
+    assert g2.passed is False
+    assert "G2" in g2.binding_detail
+
+
+def test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant() -> None:
+    """[CONTRACT-TEST] A5 / NFR-014: even with strict PI dominance, a nonzero
+    unauthorized-reversal rate on pii-anon FAILS G2 (NFR-014 must = 0)."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(),
+        pii_anon_pi=0.95,
+        competitor_pi=0.60,
+        unauthorized_reversal_rate=0.10,  # a leak — NFR-014 violated
+    )
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    g2 = verdict.guarantee("G2")
+    assert g2.passed is False
+    assert "reversal" in g2.binding_detail.lower()
+
+
+def test_g2_pending_when_fields_absent_never_fabricated() -> None:
+    """[CONTRACT-TEST] A5 / A6: G2 PENDING (None) when the benchmark lacks the
+    pseudonymization_integrity_score / anonymization_score fields — never a
+    fabricated PASS (the current smoke artifact lacks them)."""
+    bench = _canonical_benchmark()  # no family fields injected
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.guarantee("G2").passed is None
+
+
+def test_g2_pending_when_only_one_family_field_present() -> None:
+    """[CONTRACT-TEST] A5: BOTH family fields must be present-and-distinct; if only
+    pseudonymization_integrity_score is present (anonymization_score absent), G2 is
+    PENDING — the two-family contract is not satisfiable from a half-populated
+    artifact (no fabrication of the missing half)."""
+    bench = _canonical_benchmark()
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] in ("pii-anon", "pii-anon-swarm"):  # type: ignore[index]
+            s["pseudonymization_integrity_score"] = 0.95  # type: ignore[index]
+            # anonymization_score deliberately absent
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.guarantee("G2").passed is None
+
+
+def test_g2_teeth_non_vacuous_neutering_dominance_flips_pass_to_fail() -> None:
+    """[PROPERTY-TEST] A5 META-GUARD: the dominance check is non-vacuous — raising
+    a competitor's pseudonymization_integrity_score above pii-anon's flips the
+    SAME fixture from PASS to FAIL (the guarantee actually depends on dominance)."""
+    passing = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    assert SupremacyVerdict.from_artifacts(passing).guarantee("G2").passed is True
+
+    neutered = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.99
+    )
+    assert SupremacyVerdict.from_artifacts(neutered).guarantee("G2").passed is False
+
+
+def test_g2_pass_unblocks_claim_grade_with_all_else_satisfied() -> None:
+    """[CONTRACT-TEST] A5: a computed G2 PASS (from the fields, NOT a manual
+    override) participates in CLAIM_GRADE — with G4/G5 overridden PASS, J≥0.95,
+    canonical run, and the whole Tier-R∪Tier-C set waived, the verdict reaches
+    CLAIM_GRADE (G2 is no longer a forced PENDING blocker)."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        # G2 is computed from the fields; only the still-pending successors G4/G5
+        # are supplied PASS here.
+        pending_overrides={"G4": True, "G5": True},
+        tier_c_waivers={n: "w" for n in
+                        ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G2").passed is True
+    assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g2_override_still_honoured_for_backward_compat() -> None:
+    """[CONTRACT-TEST] A5: an explicit pending_overrides['G2'] still wins (the
+    successor-override seam is preserved) — an injected G2=False overrides the
+    computed PASS, so existing tests that drive G2 via overrides keep working."""
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    verdict = SupremacyVerdict.from_artifacts(
+        bench, pending_overrides={"G2": False}
+    )
+    assert verdict.guarantee("G2").passed is False
+
+
+@pytest.mark.skipif(
+    not _REAL_ARTIFACT.exists(), reason="benchmark-results.json artifact absent"
+)
+def test_g2_real_artifact_stays_pending_and_verdict_not_yet() -> None:
+    """[CONTRACT-TEST] A6: on the REAL (smoke) artifact — which lacks the family
+    fields — G2 reads PENDING (no fabricated PASS) and the headline verdict stays
+    NOT_YET with binding canonical_claim_run=False."""
+    bench = json.loads(_REAL_ARTIFACT.read_text(encoding="utf-8"))
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.guarantee("G2").passed is None  # PENDING on missing fields
+    assert verdict.verdict is Verdict.NOT_YET
+    assert verdict.binding_constraint.startswith("canonical_claim_run=False")
+
+
+def test_g2_successor_label_names_s4_01_when_pending() -> None:
+    """[AUDIT] A6: while G2 is PENDING (fields absent), the gate still names its
+    successor S4-01 as awaiting a run that emits the fields."""
+    verdict = SupremacyVerdict.from_artifacts(_canonical_benchmark())
+    g2 = verdict.guarantee("G2")
+    assert g2.passed is None
+    assert "S4-01" in g2.binding_detail or any(
+        "S4-01" in p for p in verdict.axes_pending
+    )
+
+
+def test_g2_is_deterministic_on_identical_benchmarks() -> None:
+    """[PROPERTY-TEST] A8 / AX-002: _g2_pseudonymization_integrity is a pure
+    function — identical benchmarks yield identical G2 outcomes."""
+    b1 = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    b2 = copy.deepcopy(b1)
+    g2_a = SupremacyVerdict.from_artifacts(b1).guarantee("G2")
+    g2_b = SupremacyVerdict.from_artifacts(b2).guarantee("G2")
+    assert g2_a == g2_b
