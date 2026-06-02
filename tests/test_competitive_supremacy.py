@@ -31,6 +31,8 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     J_BAR,
     SupremacyVerdict,
     Verdict,
+    _g2_pseudonymization_integrity,
+    _g4_calibration_selective_risk,
     f_beta,
     recall_floor_breachers,
 )
@@ -1002,6 +1004,80 @@ def _with_pseudo_fields(
     return bench
 
 
+def _with_core_pseudo_only(
+    bench: dict[str, object],
+    *,
+    pii_anon_pi: float,
+    pii_anon_anon: float = 0.95,
+    unauthorized_reversal_rate: float = 0.0,
+) -> dict[str, object]:
+    """Inject the S4-01 family fields ONLY onto the pii-anon ladder.
+
+    Every competitor is left WITHOUT a ``pseudonymization_integrity_score`` — the
+    no-comparator scenario the SDO gate must NOT fabricate a win against.
+    """
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] in ("pii-anon", "pii-anon-swarm"):  # type: ignore[index]
+            s["pseudonymization_integrity_score"] = pii_anon_pi  # type: ignore[index]
+            s["anonymization_score"] = pii_anon_anon  # type: ignore[index]
+            s["unauthorized_reversal_rate"] = unauthorized_reversal_rate  # type: ignore[index]
+    return bench
+
+
+def _with_core_pseudo_and_one_competitor(
+    bench: dict[str, object],
+    *,
+    pii_anon_pi: float,
+    one_competitor_pi: float,
+    competitor_name: str = "gliner",
+    pii_anon_anon: float = 0.95,
+) -> dict[str, object]:
+    """Inject the family fields onto the pii-anon ladder AND onto exactly ONE
+    competitor (``competitor_name``), leaving every OTHER competitor without a
+    ``pseudonymization_integrity_score``.
+
+    Exercises the boundary the new no-comparator guard must respect: a single real
+    comparator is enough to compute dominance — the guard fires only when NONE
+    carry the field.
+    """
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        name = s["system"]  # type: ignore[index]
+        if name in ("pii-anon", "pii-anon-swarm"):
+            s["pseudonymization_integrity_score"] = pii_anon_pi  # type: ignore[index]
+            s["anonymization_score"] = pii_anon_anon  # type: ignore[index]
+            s["unauthorized_reversal_rate"] = 0.0  # type: ignore[index]
+        elif name == competitor_name:
+            s["pseudonymization_integrity_score"] = one_competitor_pi  # type: ignore[index]
+    return bench
+
+
+def _g2_systems(
+    core_pi: object,
+    *,
+    anon: object = 0.95,
+    unauthorized: float = 0.0,
+    competitors: dict[str, object] | None = None,
+) -> dict[str, dict[str, object]]:
+    """Build a minimal name→system map for direct ``_g2_*`` unit tests.
+
+    ``competitors`` maps a competitor name to its
+    ``pseudonymization_integrity_score`` value; a name absent from the mapping (or
+    an empty/None mapping) yields ZERO competitors. To model a competitor that
+    carries NO score, simply omit it from ``competitors``.
+    """
+    systems: dict[str, dict[str, object]] = {
+        "pii-anon": {
+            "system": "pii-anon",
+            "pseudonymization_integrity_score": core_pi,
+            "anonymization_score": anon,
+            "unauthorized_reversal_rate": unauthorized,
+        },
+    }
+    for name, pi in (competitors or {}).items():
+        systems[name] = {"system": name, "pseudonymization_integrity_score": pi}
+    return systems
+
+
 def test_g2_pass_when_pii_anon_pi_strictly_dominates_and_no_unauthorized() -> None:
     """[CONTRACT-TEST] A5: G2 PASS — pii-anon's pseudonymization_integrity_score
     strictly dominates every competitor, unauthorized-reversal is 0, and both
@@ -1153,6 +1229,102 @@ def test_g2_is_deterministic_on_identical_benchmarks() -> None:
     g2_a = SupremacyVerdict.from_artifacts(b1).guarantee("G2")
     g2_b = SupremacyVerdict.from_artifacts(b2).guarantee("G2")
     assert g2_a == g2_b
+
+
+def test_g2_pending_when_no_competitor_carries_pi_never_fabricated() -> None:
+    """[CONTRACT-TEST] A5 / A6: pii-anon carries BOTH family fields but NO
+    competitor carries a pseudonymization_integrity_score. There is no comparator,
+    so the gate returns PENDING (None) — NOT a fabricated PASS against a phantom
+    0.0 baseline (the original false-PASS gap). Symmetric with the core-side guard:
+    PENDING when the artifact is absent — never fabricated."""
+    bench = _with_core_pseudo_only(_canonical_benchmark(), pii_anon_pi=0.95)
+    verdict = SupremacyVerdict.from_artifacts(bench)
+    assert verdict.guarantee("G2").passed is None  # PENDING, not a fabricated PASS
+
+
+def test_g2_no_competitor_pi_blocks_claim_grade_sota() -> None:
+    """[CONTRACT-TEST] A5 / §5 END-TO-END: the reported false-PASS exploit is
+    closed. With a canonical run, J≥0.95, G4/G5 overridden PASS, and the whole
+    Tier-R∪Tier-C set waived — but NO competitor carrying a
+    pseudonymization_integrity_score — G2 is PENDING and the headline verdict does
+    NOT reach CLAIM_GRADE_SOTA (previously it did, on a vacuous G2 PASS over a
+    phantom 0.0 comparator)."""
+    bench = _with_core_pseudo_only(_canonical_benchmark(), pii_anon_pi=0.95)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G4": True, "G5": True},
+        tier_c_waivers={n: "w" for n in
+                        ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")},
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G2").passed is None
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g2_pending_when_zero_competitors_no_comparator() -> None:
+    """[CONTRACT-TEST] A5 anti-fabrication: with NO competitor systems at all there
+    is no comparator, so strict dominance is unprovable. G2 is PENDING (None) — the
+    gate must not fabricate a win against a phantom 0.0 baseline."""
+    g2 = _g2_pseudonymization_integrity(_g2_systems(0.95, competitors={}))
+    assert g2.passed is None
+
+
+def test_g2_pass_when_only_one_competitor_carries_lower_pi_guard_not_overbroad() -> None:
+    """[PROPERTY-TEST] A5 META-GUARD: the new no-comparator PENDING guard is NOT
+    over-broad. When AT LEAST ONE competitor carries a (lower) real
+    pseudonymization_integrity_score, G2 still computes a PASS (dominance over the
+    real comparator) even though the OTHER competitors lack the field."""
+    bench = _with_core_pseudo_and_one_competitor(
+        _canonical_benchmark(), pii_anon_pi=0.95, one_competitor_pi=0.60
+    )
+    g2 = SupremacyVerdict.from_artifacts(bench).guarantee("G2")
+    assert g2.passed is True
+    assert g2.observed >= g2.bar
+
+
+def test_g2_fail_when_core_pi_non_finite_inf_is_not_a_win() -> None:
+    """[CONTRACT-TEST] A5 anti-fabrication: a non-finite pii-anon
+    pseudonymization_integrity_score is not a real measurement and must never seed
+    a dominance win. +inf previously PASSed vacuously (inf > any competitor); it
+    now FAILs. NaN (which already lost the dominance comparison) stays FAIL. The
+    +inf detail names the non-finite gap, not a misleading 'does not dominate'."""
+    for bad in (float("inf"), float("nan")):
+        g2 = _g2_pseudonymization_integrity(
+            _g2_systems(bad, competitors={"gliner": 0.60})
+        )
+        assert g2.passed is False
+    g2_inf = _g2_pseudonymization_integrity(
+        _g2_systems(float("inf"), competitors={"gliner": 0.60})
+    )
+    assert "finite" in g2_inf.binding_detail.lower()
+
+
+def test_g2_pending_when_core_pi_is_bool_not_coerced_to_one() -> None:
+    """[CONTRACT-TEST] A5 anti-fabrication: a boolean pseudonymization_integrity_
+    score is a flag, not a score — Python's isinstance(True, (int, float)) is True,
+    so True would otherwise coerce to 1.0 and vacuously dominate 0.60. A boolean
+    family field is treated as ABSENT ⇒ G2 PENDING (None), never a fabricated
+    PASS."""
+    g2 = _g2_pseudonymization_integrity(
+        _g2_systems(True, competitors={"gliner": 0.60})
+    )
+    assert g2.passed is None
+
+
+def test_g2_pending_when_only_competitor_pi_is_not_a_real_score() -> None:
+    """[CONTRACT-TEST] A5 anti-fabrication: a competitor whose only
+    pseudonymization_integrity_score is a bool or non-finite value carries NO real
+    comparator. When that is the sole competitor 'score', there is nothing to
+    dominate ⇒ G2 PENDING (None) — neither a fabricated PASS (phantom 0.0) nor a
+    misleading FAIL (coercing True→1.0 or treating +inf as a real bar)."""
+    for bogus in (True, float("inf"), float("nan")):
+        g2 = _g2_pseudonymization_integrity(
+            _g2_systems(0.95, competitors={"gliner": bogus})
+        )
+        assert g2.passed is None
 
 
 # ---------------------------------------------------------------------------
@@ -1383,3 +1555,279 @@ def test_g4_real_artifact_stays_pending_and_verdict_not_yet() -> None:
     assert verdict.guarantee("G4").passed is None  # PENDING on missing fields
     assert verdict.verdict is Verdict.NOT_YET
     assert verdict.binding_constraint.startswith("canonical_claim_run=False")
+
+
+# ---------------------------------------------------------------------------
+# S4-03 (iter-3 hardening): G4 anti-fabrication — the G2/G4-close (wwty6wq9v)
+#   found that `_g4_calibration_selective_risk` trusts artifact-supplied values
+#   without validation and can be driven to a FALSE PASS that propagates to
+#   CLAIM_GRADE_SOTA:
+#     (1) a NON-FINITE per-class ECE (NaN / -inf) slips `ece > bar`
+#         (`nan > bar` / `-inf > bar` are both False) so `ece_ok` stays True;
+#     (2) `coverage > 1.0` (or +inf) is admitted by `coverage_val >= 1.0`
+#         (NFR-020 is an EXACT 100% must — >1.0 is corrupt, not a pass);
+#     (3) an artifact-supplied per-class ECE threshold (e.g. 0.99 / +inf / NaN)
+#         is trusted UNCLAMPED and LOOSENS the bar, masking a real high ECE.
+#   These tests encode each fabrication vector and FAIL on the pre-hardening
+#   gate (which returns a FALSE PASS); the hardening makes each a FAIL while
+#   the well-formed PASS/FAIL/PENDING teeth above stay green. The gate's own
+#   sanctioned bars (0.05 high-resource / 0.08 long-tail) are authoritative — an
+#   artifact may TIGHTEN the bar but never LOOSEN it.
+# ---------------------------------------------------------------------------
+
+
+def _g4_core(**calibration: object) -> dict[str, dict[str, object]]:
+    """Build a minimal name→system map carrying a pii-anon calibration block for
+    direct ``_g4_calibration_selective_risk`` unit tests.
+
+    Seeded from :func:`_conforming_calibration` (which PASSes) so each test can
+    perturb exactly ONE field to the fabrication vector under test — proving the
+    FAIL is attributable to that vector, not to an unrelated malformed field.
+    """
+    block = _conforming_calibration()
+    block.update(calibration)
+    return {"pii-anon": {"system": "pii-anon", **block}}
+
+
+def test_g4_fail_when_per_class_ece_is_nan_never_slips_the_bar() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-017: a NaN per-class ECE must
+    NEVER satisfy 'every ECE ≤ bar'. ``nan > bar`` is False, so the pre-hardening
+    gate left ``ece_ok`` True and returned a FALSE PASS. A non-finite ECE is a
+    present-but-corrupt measurement → FAIL (not a pass over a NaN)."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": float("nan")})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_fail_when_per_class_ece_is_negative_infinity() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-017: a -inf per-class ECE also
+    slips ``ece > bar`` (``-inf > bar`` is False) → pre-hardening FALSE PASS. A
+    non-finite ECE → FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": float("-inf")})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_fail_when_per_class_ece_is_positive_infinity() -> None:
+    """[CONTRACT-TEST] A7 / NFR-017: a +inf per-class ECE already lost the
+    ``ece > bar`` comparison (so it FAILed pre-hardening too), but it must keep
+    FAILing AND be reported as the non-finite breach, not silently as 'over bar'
+    — the finiteness guard owns every non-finite ECE uniformly."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": float("inf")})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_fail_when_coverage_exceeds_one_nfr020_exact_must() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-020: ``calibrated_confidence_
+    coverage`` > 1.0 is a CORRUPT artifact, never a pass. The pre-hardening gate
+    used ``coverage_val >= 1.0`` so 1.5 was admitted → FALSE PASS. NFR-020 is the
+    lone EXACT 100% must: coverage must be finite AND in [0, 1] AND == 1.0; 1.5
+    → FAIL."""
+    g4 = _g4_calibration_selective_risk(_g4_core(calibrated_confidence_coverage=1.5))
+    assert g4.passed is False
+    assert (
+        "coverage" in g4.binding_detail.lower() or "NFR-020" in g4.binding_detail
+    )
+
+
+def test_g4_fail_when_coverage_is_positive_infinity() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-020: a +inf coverage is admitted
+    by ``>= 1.0`` → pre-hardening FALSE PASS. A non-finite coverage → FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(calibrated_confidence_coverage=float("inf"))
+    )
+    assert g4.passed is False
+    assert (
+        "coverage" in g4.binding_detail.lower() or "NFR-020" in g4.binding_detail
+    )
+
+
+def test_g4_fail_when_coverage_is_nan() -> None:
+    """[CONTRACT-TEST] A7 / NFR-020: a NaN coverage already lost ``>= 1.0`` (so it
+    FAILed pre-hardening), but it must keep FAILing AND be reported as the
+    coverage breach — the finiteness guard owns it uniformly (never a pass over a
+    NaN)."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(calibrated_confidence_coverage=float("nan"))
+    )
+    assert g4.passed is False
+    assert (
+        "coverage" in g4.binding_detail.lower() or "NFR-020" in g4.binding_detail
+    )
+
+
+def test_g4_fail_when_artifact_threshold_loosens_the_bar_masking_high_ece() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-017: an artifact-supplied
+    per-class ECE threshold must NEVER LOOSEN the gate's sanctioned bar. The
+    pre-hardening gate trusted ``bar = thresholds.get(et, 0.05)`` unclamped, so a
+    benchmark stamping ``per_class_ece_threshold = {EMAIL_ADDRESS: 0.99}`` masked a
+    real ECE of 0.5 → FALSE PASS. The gate clamps to ``min(artifact, sanctioned)``
+    so the real 0.5 ECE is measured against the 0.05 sanctioned bar → FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(
+            per_class_ece={"EMAIL_ADDRESS": 0.5},
+            per_class_ece_threshold={"EMAIL_ADDRESS": 0.99},
+        )
+    )
+    assert g4.passed is False
+    assert "EMAIL_ADDRESS" in g4.binding_detail
+
+
+def test_g4_fail_when_artifact_threshold_is_positive_infinity() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-017: a +inf per-class threshold
+    would loosen the bar to admit any ECE → pre-hardening FALSE PASS. A non-finite
+    artifact threshold is rejected (fall back to the sanctioned bar), so a real
+    ECE 0.5 is measured against 0.05 → FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(
+            per_class_ece={"EMAIL_ADDRESS": 0.5},
+            per_class_ece_threshold={"EMAIL_ADDRESS": float("inf")},
+        )
+    )
+    assert g4.passed is False
+    assert "EMAIL_ADDRESS" in g4.binding_detail
+
+
+def test_g4_fail_when_artifact_threshold_is_nan() -> None:
+    """[CONTRACT-TEST] A7 anti-fabrication / NFR-017: a NaN per-class threshold
+    makes ``ece > bar`` (``0.5 > nan``) False → pre-hardening FALSE PASS. A
+    non-finite artifact threshold is rejected (fall back to the sanctioned 0.05
+    bar), so a real ECE 0.5 → FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(
+            per_class_ece={"EMAIL_ADDRESS": 0.5},
+            per_class_ece_threshold={"EMAIL_ADDRESS": float("nan")},
+        )
+    )
+    assert g4.passed is False
+    assert "EMAIL_ADDRESS" in g4.binding_detail
+
+
+def test_g4_tighter_artifact_threshold_is_still_honored_clamp_only_tightens() -> None:
+    """[CONTRACT-TEST] A7 / NFR-017: the clamp is one-directional — an artifact may
+    TIGHTEN the bar but never loosen it. A per-class threshold of 0.03 (tighter
+    than the 0.05 sanctioned bar) is honored, so an ECE of 0.04 (which would PASS
+    the 0.05 bar) FAILs against the tighter 0.03 the artifact requested."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(
+            per_class_ece={"EMAIL_ADDRESS": 0.04},
+            per_class_ece_threshold={"EMAIL_ADDRESS": 0.03},
+        )
+    )
+    assert g4.passed is False
+    assert "EMAIL_ADDRESS" in g4.binding_detail
+
+
+def test_g4_coverage_exactly_one_still_passes_after_finiteness_hardening() -> None:
+    """[CONTRACT-TEST] A7 / NFR-020 regression: the finiteness/range hardening must
+    not break the well-formed path — an exact coverage of 1.0 (the NFR-020 must)
+    on an otherwise-conforming block still PASSes."""
+    g4 = _g4_calibration_selective_risk(_g4_core(calibrated_confidence_coverage=1.0))
+    assert g4.passed is True
+
+
+def test_g4_nan_ece_fabrication_does_not_reach_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END: the reported G4 false-PASS exploit is closed
+    at the verdict layer. With a canonical run, J≥0.95, G2 fields + G5 override
+    PASS, and the whole Tier-R∪Tier-C set waived — but a NaN per-class ECE in the
+    calibration block — G4 is FAIL and the headline verdict does NOT reach
+    CLAIM_GRADE_SOTA (pre-hardening it did, on a vacuous G4 PASS over a NaN ECE)."""
+    cal = _conforming_calibration()
+    cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.02, "US_SSN": float("nan")}
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, cal)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is False
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g4_coverage_overflow_fabrication_does_not_reach_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END: the coverage>1.0 fabrication is closed at the
+    verdict layer — a calibrated_confidence_coverage of 1.5 with everything else
+    satisfied yields G4 FAIL and a non-CLAIM_GRADE verdict (pre-hardening 1.5 was
+    admitted as a vacuous coverage pass)."""
+    cal = _conforming_calibration()
+    cal["calibrated_confidence_coverage"] = 1.5
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, cal)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is False
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g4_unclamped_threshold_fabrication_does_not_reach_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END: the unclamped-threshold fabrication is closed
+    at the verdict layer — a benchmark stamping a loosened per-class threshold
+    (0.99) to mask a real ECE 0.5 yields G4 FAIL and a non-CLAIM_GRADE verdict (the
+    gate's sanctioned bar is authoritative, not artifact-overridable upward)."""
+    cal = _conforming_calibration()
+    cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.5}
+    cal["per_class_ece_threshold"] = {"EMAIL_ADDRESS": 0.99}
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, cal)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is False
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g4_is_deterministic_on_fabrication_vectors() -> None:
+    """[PROPERTY-TEST] A9 / AX-002: the hardened guard is still a pure function —
+    each fabrication vector yields an identical (FAIL) outcome across two runs on
+    deep-copied inputs."""
+    for cal_over in (
+        {"per_class_ece": {"EMAIL_ADDRESS": 0.02, "US_SSN": float("nan")}},
+        {"calibrated_confidence_coverage": 1.5},
+        {
+            "per_class_ece": {"EMAIL_ADDRESS": 0.5},
+            "per_class_ece_threshold": {"EMAIL_ADDRESS": 0.99},
+        },
+    ):
+        s1 = _g4_core(**cal_over)
+        s2 = copy.deepcopy(s1)
+        assert _g4_calibration_selective_risk(s1) == _g4_calibration_selective_risk(s2)
