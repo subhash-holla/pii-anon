@@ -302,9 +302,17 @@ class SupremacyVerdict:
         # RecallFloorVerdictGuard input: the recall-floor-breaching systems (§3 G7).
         breachers = recall_floor_breachers(benchmark, systems)
 
+        # G2 is now COMPUTED from the benchmark's distinct anon/pseudo family
+        # fields (S4-01); an explicit pending_overrides['G2'] still wins (the
+        # successor-override seam is preserved for callers that drive G2 directly).
+        g2 = (
+            _pending_guarantee("G2", overrides["G2"])
+            if "G2" in overrides
+            else _g2_pseudonymization_integrity(systems)
+        )
         guarantees = (
             _g1_recall_floor(benchmark, systems),
-            _pending_guarantee("G2", overrides.get("G2")),
+            g2,
             _g3_recall_dominance(systems),
             _pending_guarantee("G4", overrides.get("G4")),
             _pending_guarantee("G5", overrides.get("G5")),
@@ -513,6 +521,88 @@ def _g1_recall_floor(
             f"{EPS_RECALL_PER_LANG}"
         )
     return GuaranteeResult("G1", passed, worst_lang_eps, EPS_RECALL_PER_LANG, detail)
+
+
+def _g2_pseudonymization_integrity(
+    systems: dict[str, dict[str, Any]],
+) -> GuaranteeResult:
+    """G2 — pseudonymization-integrity strict dominance (S4-01; three-valued).
+
+    The SDO moat axis for reversibility (AX-004 / FR-006 / FR-009 / NFR-014). The
+    benchmark must carry, per system, BOTH distinct de-id family fields written by
+    the S4-01 scorers (kept structurally separate — never one merged number):
+
+    * ``pseudonymization_integrity_score`` — the reversible-under-key family score;
+    * ``anonymization_score`` — the irreversible family score (present-and-distinct
+      is required so the two-family contract is actually satisfiable from the
+      artifact — a half-populated artifact cannot fabricate the missing half).
+
+    Three-valued outcome:
+
+    * **PASS** iff pii-anon's ``pseudonymization_integrity_score`` STRICTLY
+      dominates every competitor's, the pii-anon ``unauthorized_reversal_rate`` is
+      0 (NFR-014), and BOTH family fields are present on the pii-anon claimant;
+    * **FAIL** iff the fields are present but pii-anon does not strictly dominate
+      (binding detail names the gap) OR the unauthorized-reversal rate is > 0;
+    * **PENDING** (``None``) iff the benchmark lacks the fields (the current smoke
+      artifact lacks them — NO fabrication; the S7 canonical run emits them).
+
+    Pure: reads the benchmark systems, never mutates them. Determinism: a pure
+    function of the (numeric) fields (AX-002).
+    """
+    core = systems.get(_CORE_SYSTEM)
+    if core is None:
+        return GuaranteeResult(
+            "G2", None, float("nan"), float("nan"),
+            "G2 PENDING: pii-anon core absent from benchmark systems "
+            f"({_PENDING_SUCCESSORS['G2']})",
+        )
+
+    pi_raw = core.get("pseudonymization_integrity_score")
+    anon_raw = core.get("anonymization_score")
+    # BOTH distinct family fields must be present-and-distinct (two-family
+    # contract); a missing field ⇒ PENDING (never fabricated).
+    if not isinstance(pi_raw, (int, float)) or not isinstance(anon_raw, (int, float)):
+        return GuaranteeResult(
+            "G2", None, float("nan"), float("nan"),
+            "G2 PENDING: benchmark lacks the distinct anon/pseudo family fields "
+            "(pseudonymization_integrity_score + anonymization_score); "
+            f"{_PENDING_SUCCESSORS['G2']} — emitted by the S7 canonical run",
+        )
+
+    core_pi = float(pi_raw)
+    unauthorized = float(core.get("unauthorized_reversal_rate", 0.0) or 0.0)
+
+    # Competitors' pseudonymization-integrity (only those carrying the field).
+    competitor_pis = [
+        float(systems[name]["pseudonymization_integrity_score"])
+        for name in _competitor_names(systems)
+        if isinstance(systems[name].get("pseudonymization_integrity_score"), (int, float))
+    ]
+    best_competitor_pi = max(competitor_pis, default=0.0)
+    dominates = core_pi > best_competitor_pi
+    no_unauthorized = unauthorized == 0.0
+
+    passed = dominates and no_unauthorized
+    if passed:
+        detail = (
+            f"G2 PASS: pii-anon pseudonymization-integrity {core_pi:.4g} strictly "
+            f"dominates best competitor {best_competitor_pi:.4g}; "
+            "unauthorized-reversal=0 (NFR-014); both anon/pseudo family fields "
+            "present-and-distinct (AX-004)"
+        )
+    elif not no_unauthorized:
+        detail = (
+            f"G2 FAIL: pii-anon unauthorized-reversal rate {unauthorized:.4g} > 0 "
+            "(NFR-014 requires exactly 0 — a reversal without the authorized key "
+            "is a breach)"
+        )
+    else:
+        detail = (
+            f"G2 FAIL: pii-anon pseudonymization-integrity {core_pi:.4g} does not "
+            f"strictly dominate best competitor {best_competitor_pi:.4g}"
+        )
+    return GuaranteeResult("G2", passed, core_pi, best_competitor_pi, detail)
 
 
 def _g3_recall_dominance(systems: dict[str, dict[str, Any]]) -> GuaranteeResult:

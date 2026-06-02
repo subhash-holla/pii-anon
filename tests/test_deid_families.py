@@ -54,6 +54,12 @@ _PSEUDO_MAP = {
 _AUTHORIZED_KEY = "synthetic-test-key-0001"
 _WRONG_KEY = "synthetic-WRONG-key-9999"
 
+# A synthetic canary whose characters do NOT overlap the clean anonymized text
+# above (CanaryExposureMetric scores partial CHARACTER overlap, so a canary that
+# shares letters with "[person]/[email]/about/case" would partial-match a CLEAN
+# output and spuriously read as exposed). "ZZZQVWXYJ" shares no chars with it.
+_CANARY = "ZZZQVWXYJ"
+
 
 def _labels(original: str) -> list[LabeledSpan]:
     """Ground-truth spans for the two PII surfaces in ``original`` (synthetic)."""
@@ -80,7 +86,7 @@ def test_a1_two_distinct_family_subrecords_no_merged_field() -> None:
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_CLEAN,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     pseudo = PseudonymizationIntegrityScorer().score(
         pseudonym_map=_PSEUDO_MAP,
@@ -235,7 +241,7 @@ def test_anonymization_clean_output_has_low_reidentification_risk() -> None:
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_CLEAN,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     assert anon.reidentification_risk == 0.0
     assert anon.irreversibility_score >= 0.99
@@ -248,7 +254,7 @@ def test_anonymization_leaky_output_raises_reidentification_risk() -> None:
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_LEAKY,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     assert anon.reidentification_risk > 0.0
     assert anon.irreversibility_score < 1.0
@@ -266,13 +272,13 @@ def test_a8_scorers_are_deterministic_on_identical_inputs() -> None:
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_CLEAN,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     anon2 = AnonymizationScorer().score(
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_CLEAN,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     assert anon1 == anon2
 
@@ -302,7 +308,7 @@ def test_a7_anonymization_score_carries_no_pseudonymization_field() -> None:
         labels=_labels(_ORIGINAL),
         original_text=_ORIGINAL,
         anonymized_text=_ANON_CLEAN,
-        canary_strings=["canary-token-xyz"],
+        canary_strings=[_CANARY],
     )
     pseudo = PseudonymizationIntegrityScorer().score(
         pseudonym_map=_PSEUDO_MAP,
@@ -470,3 +476,75 @@ def test_a7_two_families_do_not_import_each_other_in_a_merging_way() -> None:
     assert "AnonymizationScore" not in class_calls.get(
         "PseudonymizationIntegrityScorer", set()
     )
+
+
+# ---------------------------------------------------------------------------
+# A9 — backward-compat / no public-API regression on SystemScorecard
+# ---------------------------------------------------------------------------
+
+
+def test_a9_scorecard_preserves_privacy_score_and_adds_two_distinct_fields() -> None:
+    """[CONTRACT-TEST] A9: SystemScorecard keeps ``privacy_score`` (backward-compat
+    public API) AND gains the two distinct additive family fields; all three are
+    serialized in to_dict()."""
+    from pii_anon.eval_framework.rating.scorecard import SystemScorecard
+
+    sc = SystemScorecard(
+        system_name="pii-anon",
+        privacy_score=0.70,
+        anonymization_score=0.95,
+        pseudonymization_integrity_score=0.93,
+        composite_score=0.80,
+    )
+    # The historical field is preserved (value unchanged, still addressable).
+    assert sc.privacy_score == 0.70
+    # The two new fields exist additively and are DISTINCT from privacy_score.
+    assert sc.anonymization_score == 0.95
+    assert sc.pseudonymization_integrity_score == 0.93
+
+    d = sc.to_dict()
+    assert d["privacy_score"] == 0.70  # backward-compat key preserved
+    assert d["anonymization_score"] == 0.95
+    assert d["pseudonymization_integrity_score"] == 0.93
+    # composite_score numeric behaviour unchanged (reads whatever it is given).
+    assert d["composite_score"] == 0.80
+
+
+def test_a9_scorecard_defaults_preserve_existing_leaderboard_shape() -> None:
+    """[CONTRACT-TEST] A9: the new fields default to 0.0 (additive — existing
+    leaderboard JSON callers that never set them keep their shape), and the
+    historical to_dict keys all remain present."""
+    from pii_anon.eval_framework.rating.scorecard import SystemScorecard
+
+    d = SystemScorecard(system_name="legacy").to_dict()
+    for legacy_key in (
+        "system_name", "available", "f1", "precision", "recall",
+        "latency_p50_ms", "docs_per_hour", "privacy_score", "utility_score",
+        "fairness_score", "composite_score", "elo_rating", "elo_rd",
+        "samples", "evaluation_track", "license_name",
+    ):
+        assert legacy_key in d, f"legacy to_dict key dropped: {legacy_key}"
+    assert d["anonymization_score"] == 0.0
+    assert d["pseudonymization_integrity_score"] == 0.0
+
+
+def test_a2_scorecard_has_no_merged_deid_field() -> None:
+    """[SECURITY-TEST][AUDIT] A2 / AX-004: SystemScorecard carries the two DISTINCT
+    family fields but NO single merged anon+pseudo de-id field (e.g.
+    ``deid_score``/``combined_deid_score``). ``privacy_score`` is allowed to remain
+    ONLY as the documented deprecated backward-compat field — it is NOT a NEW
+    merged de-id field and is explicitly excluded from this scan."""
+    from pii_anon.eval_framework.rating.scorecard import SystemScorecard
+
+    field_names = set(SystemScorecard("x").__dataclass_fields__.keys())
+    merged_new = {
+        "deid_score",
+        "combined_deid_score",
+        "merged_deid_score",
+        "overall_deid_score",
+        "unified_deid_score",
+    }
+    assert field_names & merged_new == set()
+    # Positive: BOTH distinct family fields are present and separately addressable.
+    assert "anonymization_score" in field_names
+    assert "pseudonymization_integrity_score" in field_names

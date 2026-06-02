@@ -10,6 +10,13 @@ from .base import (
     MatchMode,
     MultiLevelMetric,
 )
+from .deid_families import (
+    AnonymizationScore,
+    AnonymizationScorer,
+    DeidFamilyScores,
+    PseudonymizationIntegrityScore,
+    PseudonymizationIntegrityScorer,
+)
 from .fairness_metrics import (
     DifficultyFairnessMetric,
     EntityTypeFairnessMetric,
@@ -58,6 +65,12 @@ __all__ = [
     "LDiversityMetric",
     "TClosenessMetric",
     "LeakageDetectionMetric",
+    # de-id families (S4-01 — distinct anon vs pseudo, never merged)
+    "AnonymizationScore",
+    "AnonymizationScorer",
+    "PseudonymizationIntegrityScore",
+    "PseudonymizationIntegrityScorer",
+    "DeidFamilyScores",
     # utility
     "FormatPreservationMetric",
     "SemanticPreservationMetric",
