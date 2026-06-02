@@ -45,6 +45,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from .calibration import TemperatureScaler, reliability_diagram_data
 
@@ -155,6 +156,9 @@ class SelectiveRiskReport:
     per_class_ece_post: dict[str, float]  # post-temperature-scaling (NFR-017)
     per_class_brier: dict[str, float]
     per_class_brier_decomposition: dict[str, BrierDecomposition]
+    # AURC discrete estimator: mean of the per-point cumulative risk over the
+    # confidence-ordered coverage grid (≈ ``np.trapz`` under uniform ``1/n``
+    # spacing); Geifman & El-Yaniv 2017.
     per_class_aurc: dict[str, float]
     per_class_risk_coverage: dict[str, tuple[RiskCoveragePoint, ...]]
     per_class_support: dict[str, int]
@@ -387,7 +391,7 @@ def _brier(confs: list[float], correct: list[bool]) -> float:
 
 def _monotone_risk_coverage(
     confs: list[float], correct: list[bool]
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """The monotone (non-decreasing in coverage) selective-risk curve.
 
     Orders findings by DESCENDING confidence (most-confident first — the natural
@@ -415,7 +419,7 @@ def _monotone_risk_coverage(
 
 
 def _abstention_table(
-    coverage: np.ndarray, risk: np.ndarray
+    coverage: npt.NDArray[np.float64], risk: npt.NDArray[np.float64]
 ) -> tuple[AbstentionOperatingPoint, ...]:
     """The ≥3-point abstention operating-point table at :data:`ABSTENTION_TARGETS`.
 
