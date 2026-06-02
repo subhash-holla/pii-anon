@@ -229,6 +229,21 @@ def test_collision_rate_detects_two_plaintexts_sharing_one_surrogate() -> None:
     assert pseudo.collision_rate > 0.0
 
 
+def test_empty_inputs_are_safe_defensive_defaults() -> None:
+    """[UNIT-TEST] FR-009 edge: an empty pseudonym_map + no reversal attempts
+    yields safe defaults (rate 0.0, referential_integrity 1.0, collision 0.0) — no
+    division-by-zero. Pins the empty-input guard branches."""
+    pseudo = PseudonymizationIntegrityScorer().score(
+        pseudonym_map={},
+        authorized_key=_AUTHORIZED_KEY,
+        reversal_attempts=[],
+    )
+    assert pseudo.unauthorized_reversal_rate == 0.0
+    assert pseudo.referential_integrity == 1.0
+    assert pseudo.collision_rate == 0.0
+    assert pseudo.unauthorized_reversal_ok is True
+
+
 # ---------------------------------------------------------------------------
 # Anonymization family — irreversibility (aggregates Reid/Leakage/Canary)
 # ---------------------------------------------------------------------------
