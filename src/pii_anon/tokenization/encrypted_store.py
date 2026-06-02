@@ -17,13 +17,20 @@ every sensitive field under **authenticated encryption (AEAD)**:
   :class:`~cryptography.hazmat.primitives.ciphers.aead.ChaCha20Poly1305`
   (constructor-selectable). A fresh random 96-bit nonce is generated per
   encryption (no nonce reuse under one data key).
-* Row context — ``key_id | blind_index | version`` — is bound as the AEAD
-  **associated data (AAD)**, where ``blind_index = HMAC(index_key, scope|token)``
-  is the stored primary-key column. Because the AAD includes the blind index,
-  a row's ciphertext cannot be relocated to a different ``(scope, token)`` slot
-  without the authentication tag failing (this thwarts cut-and-paste / row-swap
-  tampering), and the blind index is always available at read time on every
-  lookup path, so decryption can always reconstruct the exact AAD.
+* Row context — ``key_id | blind_index | version | scope_index | expires_at`` —
+  is bound as the AEAD **associated data (AAD)**, where
+  ``blind_index = HMAC(index_key, scope|token)`` is the stored primary-key
+  column and ``scope_index = HMAC(index_key, scope)`` is the stored audit-bucket
+  column. Because the AAD includes the blind index, a row's ciphertext cannot be
+  relocated to a different ``(scope, token)`` slot without the authentication
+  tag failing (this thwarts cut-and-paste / row-swap tampering). Because it also
+  includes ``scope_index`` and a canonical encoding of ``expires_at`` — two
+  otherwise-unauthenticated columns a raw ``UPDATE`` could rewrite — a row
+  cannot be re-bucketed to another scope (audit-enumeration mis-bucket) nor have
+  its TTL extended to resurrect a logically-expired row without the tag failing.
+  All AAD components are stored columns available at read time on every lookup
+  path, so decryption can always reconstruct the exact AAD (a legitimate row
+  authenticates; any tampered binding raises).
 * The data-encryption key (DEK) is itself **envelope-wrapped** by a
   key-encryption key (KEK) that is supplied by a pluggable
   :class:`EnvelopeKeyProvider` and is **never written to the SQLite file in the
@@ -365,20 +372,57 @@ class EncryptedSQLiteTokenStore(TokenStore):
 
     # -- AEAD payload helpers ---------------------------------------------
     @staticmethod
-    def _aad(key_id: str, blind_index: bytes, version: int) -> bytes:
-        """Associated data binding a row to its key id, slot, and version.
+    def _canon_expiry(expires_at: float | None) -> bytes:
+        """Canonical AAD encoding of ``expires_at`` (a ``float | None``).
 
-        ``blind_index`` is the stored primary-key column ``HMAC(scope|token)``,
-        so the AAD is fully reconstructable at read time on every path, and a
+        ``None`` (no expiry) is bound as a distinct sentinel that cannot collide
+        with any real expiry value, so a raw ``UPDATE`` that clears or extends
+        ``expires_at`` produces a different AAD and fails the tag check. SQLite
+        stores the value as an IEEE-754 REAL, so ``float(stored)`` is bit-equal
+        to the original Python float and ``repr`` of equal floats is equal —
+        the AAD is reconstructable from the stored column on read.
+        """
+        if expires_at is None:
+            return b"\x00none"
+        return b"\x00exp:" + repr(float(expires_at)).encode("utf-8")
+
+    @staticmethod
+    def _aad(
+        key_id: str,
+        blind_index: bytes,
+        version: int,
+        scope_index: bytes,
+        expires_at: float | None,
+    ) -> bytes:
+        """Associated data binding a row to its key id, slot, version, scope
+        bucket, and expiry.
+
+        ``blind_index`` is the stored primary-key column ``HMAC(scope|token)``
+        and ``scope_index`` is the stored ``HMAC(scope)`` audit-bucket column,
+        so the AAD is fully reconstructable at read time on every path. A
         payload moved to a different ``(scope, token)`` slot (different blind
-        index) cannot authenticate.
+        index), re-bucketed to another ``scope_index`` (audit mis-bucket), or
+        ``expires_at``-extended (TTL resurrection) cannot authenticate —
+        ``scope_index`` and ``expires_at`` are otherwise-unauthenticated columns
+        a raw ``UPDATE`` could rewrite, so they are folded in here.
         """
         return _AAD_SEP.join(
-            (key_id.encode("utf-8"), blind_index, str(version).encode("utf-8"))
+            (
+                key_id.encode("utf-8"),
+                blind_index,
+                str(version).encode("utf-8"),
+                scope_index,
+                EncryptedSQLiteTokenStore._canon_expiry(expires_at),
+            )
         )
 
     def _encrypt_payload(
-        self, dek: bytes, mapping: TokenMapping, key_id: str, blind_index: bytes
+        self,
+        dek: bytes,
+        mapping: TokenMapping,
+        key_id: str,
+        blind_index: bytes,
+        scope_index: bytes,
     ) -> bytes:
         """JSON-serialize an explicit field dict and AEAD-encrypt it.
 
@@ -398,30 +442,40 @@ class EncryptedSQLiteTokenStore(TokenStore):
         ).encode("utf-8")
         aead = _new_aead(self._algorithm, dek)
         nonce = os.urandom(_NONCE_BYTES)
-        aad = self._aad(key_id, blind_index, mapping.version)
+        aad = self._aad(
+            key_id, blind_index, mapping.version, scope_index, mapping.expires_at
+        )
         ct: bytes = aead.encrypt(nonce, plain, aad)
         return nonce + ct
 
     def _decrypt_payload(
-        self, dek: bytes, payload: bytes, key_id: str, blind_index: bytes, version: int
+        self,
+        dek: bytes,
+        payload: bytes,
+        key_id: str,
+        blind_index: bytes,
+        version: int,
+        scope_index: bytes,
+        expires_at: float | None,
     ) -> dict[str, Any]:
         """Verify + decrypt a row payload; raise loudly on any tamper.
 
-        The AAD (``key_id | blind_index | version``) is reconstructed from the
-        row's stored coordinates, so a payload relocated to a different slot
-        fails the tag check and raises.
+        The AAD (``key_id | blind_index | version | scope_index | expires_at``)
+        is reconstructed from the row's stored coordinates, so a payload
+        relocated to a different slot, re-bucketed to another scope, or
+        TTL-extended fails the tag check and raises.
         """
         aead = _new_aead(self._algorithm, dek)
         nonce, ct = payload[:_NONCE_BYTES], payload[_NONCE_BYTES:]
-        aad = self._aad(key_id, blind_index, version)
+        aad = self._aad(key_id, blind_index, version, scope_index, expires_at)
         try:
             plain = aead.decrypt(nonce, ct, aad)
         except InvalidTag as exc:
             raise TokenStoreIntegrityError(
                 f"Integrity check failed for a row under key_id={key_id!r}: "
-                "ciphertext, nonce, tag, or bound row context (slot/version) "
-                "has been tampered with — refusing to return a "
-                "successful-but-wrong reversal."
+                "ciphertext, nonce, tag, or bound row context "
+                "(slot/version/scope-bucket/expiry) has been tampered with — "
+                "refusing to return a successful-but-wrong reversal."
             ) from exc
         decoded: Any = json.loads(plain.decode("utf-8"))
         if not isinstance(decoded, dict):  # pragma: no cover - defensive
@@ -457,7 +511,7 @@ class EncryptedSQLiteTokenStore(TokenStore):
         index_key = self._index_key_for(dek)
         bi = self._blind_index(index_key, mapping.scope, mapping.token)
         si = self._scope_index(index_key, mapping.scope)
-        payload = self._encrypt_payload(dek, mapping, key_id, bi)
+        payload = self._encrypt_payload(dek, mapping, key_id, bi, si)
         return (bi, si, key_id, mapping.version, payload, mapping.created_at, mapping.expires_at)
 
     def _write_row(
@@ -507,20 +561,26 @@ class EncryptedSQLiteTokenStore(TokenStore):
             index_key = self._index_key_for(dek)
             bi = self._blind_index(index_key, scope, token)
             row = self._conn.execute(
-                f"SELECT key_id, version, payload, created_at, expires_at "
+                f"SELECT key_id, version, payload, created_at, expires_at, scope_index "
                 f"FROM {self._TABLE} WHERE blind_index = ? AND key_id = ?",
                 (bi, key_id),
             ).fetchone()
             if row is None:
                 continue
             expires = row[4]
+            exp_val = float(expires) if expires is not None else None
+            # AAD binds the STORED scope_index/expires_at, so a tampered row
+            # raises in _decrypt_payload BEFORE any TTL short-circuit could mask
+            # it (a resurrection UPDATE must fail loud, not silently expire).
+            fields = self._decrypt_payload(
+                dek, bytes(row[2]), key_id, bi, int(row[1]), bytes(row[5]), exp_val
+            )
             if expires is not None and now > float(expires):
                 return None
-            fields = self._decrypt_payload(dek, bytes(row[2]), key_id, bi, int(row[1]))
             return self._fields_to_mapping(
                 fields,
                 float(row[3]) if row[3] else 0.0,
-                float(expires) if expires is not None else None,
+                exp_val,
             )
         return None
 
@@ -529,27 +589,31 @@ class EncryptedSQLiteTokenStore(TokenStore):
         # rows, decrypt each (the blind index is stored, so AAD is known), and
         # return the first whose decrypted token matches.
         rows = self._conn.execute(
-            f"SELECT blind_index, key_id, version, payload, created_at, expires_at "
-            f"FROM {self._TABLE}"
+            f"SELECT blind_index, key_id, version, payload, created_at, expires_at, "
+            f"scope_index FROM {self._TABLE}"
         ).fetchall()
         for row in rows:
             expires = row[5]
-            if expires is not None and now > float(expires):
-                continue
             key_id = str(row[1])
             try:
                 dek = self._dek_for(key_id)
             except TokenStoreIntegrityError:
                 continue
+            exp_val = float(expires) if expires is not None else None
+            # Decrypt (verifying the scope_index/expires_at-bound AAD) before the
+            # TTL skip, so a tampered row in the scan path fails loud rather than
+            # being silently skipped as "expired".
             fields = self._decrypt_payload(
-                dek, bytes(row[3]), key_id, bytes(row[0]), int(row[2])
+                dek, bytes(row[3]), key_id, bytes(row[0]), int(row[2]), bytes(row[6]), exp_val
             )
+            if expires is not None and now > float(expires):
+                continue
             if str(fields.get("token")) != token:
                 continue
             return self._fields_to_mapping(
                 fields,
                 float(row[4]) if row[4] else 0.0,
-                float(expires) if expires is not None else None,
+                exp_val,
             )
         return None
 
@@ -586,30 +650,50 @@ class EncryptedSQLiteTokenStore(TokenStore):
                 index_key = self._index_key_for(dek)
                 si = self._scope_index(index_key, scope)
                 rows = self._conn.execute(
-                    f"SELECT blind_index, version, payload, created_at, expires_at "
-                    f"FROM {self._TABLE} WHERE scope_index = ? AND key_id = ?",
+                    f"SELECT blind_index, version, payload, created_at, expires_at, "
+                    f"scope_index FROM {self._TABLE} WHERE scope_index = ? AND key_id = ?",
                     (si, key_id),
                 ).fetchall()
                 for row in rows:
                     expires = row[4]
+                    exp_val = float(expires) if expires is not None else None
+                    # Decrypt (verifying the scope_index/expires_at-bound AAD,
+                    # using the STORED scope_index column) before the TTL skip,
+                    # so a re-bucketed or TTL-extended row in this audit-
+                    # enumeration path fails loud rather than mis-listing.
+                    fields = self._decrypt_payload(
+                        dek, bytes(row[2]), key_id, bytes(row[0]), int(row[1]),
+                        bytes(row[5]), exp_val,
+                    )
                     if expires is not None and now > float(expires):
                         continue
-                    fields = self._decrypt_payload(
-                        dek, bytes(row[2]), key_id, bytes(row[0]), int(row[1])
-                    )
                     results.append(
                         self._fields_to_mapping(
                             fields,
                             float(row[3]) if row[3] else 0.0,
-                            float(expires) if expires is not None else None,
+                            exp_val,
                         )
                     )
+            # FIX C (NFR-015): if no row was readable but the artifact DOES hold
+            # rows owned by a key id this KEK cannot unwrap, fail loud — matching
+            # scoped get(). A genuinely-empty scope (all owning envelopes unwrap)
+            # still returns [] (the guard is a no-op then).
+            if not results:
+                self._raise_if_unreversible()
         return results
 
     def count(self, scope: str | None = None) -> int:
         now = time.time()
         with self._lock:
             if scope is None:
+                # CONSCIOUS CHOICE (NFR-015): a scope-less count is a raw
+                # COUNT(*) and does NOT fail loud under a wrong KEK. Row
+                # cardinality is already leaked by the file size, so refusing to
+                # report it would buy no confidentiality; this returns the true
+                # live-row count even when the supplied KEK cannot unwrap any
+                # envelope. (list_by_scope, by contrast, DOES fail loud under a
+                # wrong KEK — it is the audit-enumeration surface that must not
+                # silently mis-report an empty bucket; see FIX C.)
                 row = self._conn.execute(
                     f"SELECT COUNT(*) FROM {self._TABLE} "
                     f"WHERE expires_at IS NULL OR expires_at > ?",
@@ -742,21 +826,23 @@ class EncryptedSQLiteTokenStore(TokenStore):
     def _decrypt_all_rows(self) -> list[TokenMapping]:
         """Decrypt every stored row into TokenMappings (rewrap snapshot)."""
         rows = self._conn.execute(
-            f"SELECT blind_index, key_id, version, payload, created_at, expires_at "
-            f"FROM {self._TABLE}"
+            f"SELECT blind_index, key_id, version, payload, created_at, expires_at, "
+            f"scope_index FROM {self._TABLE}"
         ).fetchall()
         out: list[TokenMapping] = []
         for row in rows:
             key_id = str(row[1])
             dek = self._dek_for(key_id)
+            exp_val = float(row[5]) if row[5] is not None else None
             fields = self._decrypt_payload(
-                dek, bytes(row[3]), key_id, bytes(row[0]), int(row[2])
+                dek, bytes(row[3]), key_id, bytes(row[0]), int(row[2]),
+                bytes(row[6]), exp_val,
             )
             out.append(
                 self._fields_to_mapping(
                     fields,
                     float(row[4]) if row[4] else 0.0,
-                    float(row[5]) if row[5] is not None else None,
+                    exp_val,
                 )
             )
         return out
