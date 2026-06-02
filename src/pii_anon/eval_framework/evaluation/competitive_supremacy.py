@@ -58,7 +58,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, TypeGuard
 
 import numpy as np
 from numpy.typing import NDArray
@@ -546,6 +546,22 @@ def _g1_recall_floor(
     return GuaranteeResult("G1", passed, worst_lang_eps, EPS_RECALL_PER_LANG, detail)
 
 
+def _is_finite_number(value: object) -> TypeGuard[int | float]:
+    """Is ``value`` a real, finite number (an ``int``/``float`` that is not a bool)?
+
+    A :data:`~typing.TypeGuard` so callers narrow ``value`` to ``int | float`` after
+    the check. Used where a finiteness check (not a unit-interval bound) is what's
+    wanted — e.g. a per-class ECE must be finite (a ``NaN`` must never slip
+    ``ece > bar``, which is silently ``False`` against ``NaN``) but its magnitude is
+    bounded by the bar comparison itself, not by ``[0, 1]``. Excludes ``bool``
+    (``isinstance(True, int)`` is ``True`` in Python, but a flag is not a
+    measurement) so ``True`` / ``False`` never count as numbers.
+    """
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    return math.isfinite(value)
+
+
 def _finite_unit_score(value: object) -> float | None:
     """Return ``value`` as a float IFF it is a real, finite, unit-interval score.
 
@@ -566,29 +582,15 @@ def _finite_unit_score(value: object) -> float | None:
 
     Returns ``None`` otherwise, so a caller can treat the field as ABSENT
     (PENDING / fall back to a sanctioned bar) rather than trust a fabricated value.
-    Using ``type(v) is int/float`` (not ``isinstance``) keeps ``bool`` — and any
-    numeric subclass that is not a plain measurement — out without a second check.
+    Built on :func:`_is_finite_number` (the shared type-and-finiteness predicate);
+    this adds only the unit-interval bound.
     """
-    if type(value) is not int and type(value) is not float:
+    if not _is_finite_number(value):
         return None
     v = float(value)
-    if not math.isfinite(v) or v < 0.0 or v > 1.0:
+    if v < 0.0 or v > 1.0:
         return None
     return v
-
-
-def _is_finite_number(value: object) -> bool:
-    """Is ``value`` a real, finite number (a plain ``int``/``float``, not a bool)?
-
-    Used where a finiteness check (not a unit-interval bound) is what's wanted —
-    e.g. a per-class ECE must be finite (a ``NaN`` must never slip ``ece > bar``,
-    which is silently ``False`` against ``NaN``) but its magnitude is bounded by the
-    bar comparison itself, not by ``[0, 1]``. Excludes ``bool`` (a flag is not a
-    measurement) via ``type(...)`` so ``True``/``False`` never count as numbers.
-    """
-    return (type(value) is int or type(value) is float) and math.isfinite(
-        float(value)
-    )
 
 
 def _g4_class_bar(artifact_threshold: object) -> float:
