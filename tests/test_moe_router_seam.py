@@ -323,8 +323,17 @@ def test_ax003_hostile_gate_cannot_drop_floored_shared_span() -> None:
         if f.entity_type == "US_SSN" and f.span_start == 0 and f.span_end == 11
     ]
     assert survivors, "hostile advisory gate dropped a floored shared span"
-    assert any("shared_floor" in (f.explanation or "") for f in survivors) or any(
-        "regex-oss" in f.engines for f in survivors
+    # Tightened (axiom-compliance OBS-2): pin the re-injection MECHANISM, not mere
+    # survival. The bare inner MoE merge drops this span (the hostile gate zeroes
+    # regex-oss ⇒ total_weight==0 ⇒ cluster skipped), so the ONLY way it appears in
+    # the full pipeline output is the SharedLayerProjector re-injecting it with the
+    # `shared_floor` provenance marker (FR-016/AX-003). Asserting that marker
+    # specifically (dropping the loose `regex-oss in engines` fallback, which a
+    # normally-merged span would also satisfy) proves the floor did the saving.
+    assert any("shared_floor" in (f.explanation or "") for f in survivors), (
+        "floored span survived but NOT via shared_floor re-injection — the AX-003 "
+        "floor mechanism is not what saved it "
+        f"(explanations={[f.explanation for f in survivors]})"
     )
 
 
@@ -405,7 +414,7 @@ def test_ax002_routecontext_default_is_empty_features() -> None:
     assert RouteContext().features == ()
 
 
-def test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol() -> None:
+def test_fr018_routing_gate_protocol_is_a_fusionstrategy_independent_symbol() -> None:
     """A3 guard: RoutingGate is a Protocol, not accidentally a FusionStrategy."""
     assert not issubclass(_ReweightingGate, FusionStrategy)
 
