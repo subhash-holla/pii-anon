@@ -36,6 +36,7 @@ from pii_anon.moe import (
     MoERouter,
     RouteContext,
     RoutingGate,
+    _normalize_weights,
     build_default_registry,
 )
 from pii_anon.routing.floor_fusion import FloorProjectingFusion
@@ -407,3 +408,39 @@ def test_ax002_routecontext_default_is_empty_features() -> None:
 def test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol() -> None:
     """A3 guard: RoutingGate is a Protocol, not accidentally a FusionStrategy."""
     assert not issubclass(_ReweightingGate, FusionStrategy)
+
+
+# --------------------------------------------------------------------------- #
+# REFACTOR edge tests for the shared `_normalize_weights` helper (additive).
+# Pins the contract of the single normalizer the static path and the gate-output
+# validator both rely on — no behaviour change, additive coverage only.
+# --------------------------------------------------------------------------- #
+
+
+def test_nfr005_normalize_weights_empty_is_empty_distribution() -> None:
+    """REFACTOR: empty input ⇒ empty list (a degenerate-but-valid distribution)."""
+    assert _normalize_weights([]) == []
+
+
+def test_nfr005_normalize_weights_posinf_is_invalid_returns_none() -> None:
+    """REFACTOR: a +inf weight is non-finite ⇒ None (signals fall-back-to-base)."""
+    assert _normalize_weights([("a", float("inf")), ("b", 0.5)]) is None
+
+
+def test_nfr005_normalize_weights_neginf_is_invalid_returns_none() -> None:
+    """REFACTOR: a -inf weight is non-finite ⇒ None (fall-back-to-base)."""
+    assert _normalize_weights([("a", float("-inf"))]) is None
+
+
+def test_nfr005_normalize_weights_all_nonpositive_returns_none() -> None:
+    """REFACTOR: all-zero/negative mass cannot normalize ⇒ None."""
+    assert _normalize_weights([("a", 0.0), ("b", -3.0)]) is None
+
+
+def test_nfr005_normalize_weights_clamps_negatives_and_renormalizes() -> None:
+    """REFACTOR: a single negative is clamped to 0; the rest re-normalize to 1.0."""
+    out = _normalize_weights([("a", -1.0), ("b", 3.0), ("c", 1.0)])
+    assert out is not None
+    assert dict(out)["a"] == 0.0
+    assert math.isclose(sum(w for _, w in out), 1.0, abs_tol=1e-9)
+    assert [eid for eid, _ in out] == ["a", "b", "c"]  # order preserved
