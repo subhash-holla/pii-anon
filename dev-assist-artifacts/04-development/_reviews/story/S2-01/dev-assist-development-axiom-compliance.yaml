@@ -1,0 +1,134 @@
+reviewer: dev-assist-development-axiom-compliance
+
+scope_id: S2-01
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: axiom-S2-01-01
+    severity: OBSERVATION
+    location: src/pii_anon/fusion.py:build_fusion (v2-consult branch, ~line 625-635)
+    description: |
+      The v2 construction seam carries `gate_path` and `key_ring` on
+      `FusionBuildSpec`, but `build_fusion` hardwires both to `None` when it
+      assembles the spec (and `top_k=3`), since they are not yet sourced from
+      build_fusion's public signature. This is correct and INTENTIONAL for a
+      seam-only story (documented in the inline comment "carried, not yet sourced
+      ... keeping it stable"), and it is the SAFE default w.r.t. AX-002 / the
+      S2-05 verify-on-load trust boundary: no attacker-controllable gate path can
+      flow through the v2 path in this story (empirically confirmed: `gate_path=None`
+      / `key_ring=None` literal in the assembly; `_CUSTOM_FACTORIES_V2` starts empty).
+      Logged purely so the successor wiring (S2-02) is reminded that a real
+      gate path arriving through this seam must re-enter the fail-closed
+      verify-on-load path (verify_on_load=True), never be trusted raw.
+    suggested_resolution: |
+      No change required in this story. When S2-02 wires a learned gate through
+      register_fusion_strategy_v2, ensure the FusionBuildSpec.gate_path is
+      consumed ONLY via load_verified_gate(..., verify_on_load=True) + a real
+      KeyRing, preserving the S2-05 fail-closed boundary (and keep determinism:
+      no unsigned/unverified payload reaching route()).
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-002
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-01-widen-route-and-construction-seam.md
+
+  - id: axiom-S2-01-02
+    severity: OBSERVATION
+    location: tests/test_moe_router_seam.py:test_ax003_hostile_gate_cannot_drop_floored_shared_span (line 326-328)
+    description: |
+      A4's final survivor predicate asserts via an `or` between two acceptance
+      conditions: floor-provenance ("shared_floor" in explanation) OR
+      ("regex-oss" in f.engines). Independently verified that the floor-provenance
+      branch is the one that actually fires here (the re-injected EnsembleFinding
+      carries explanation="provenance=shared_floor: re-injected by
+      SharedLayerProjector ..." and engines=["regex-oss"]), so the assertion is
+      sound. The `or` is marginally looser than necessary — both disjuncts happen
+      to hold for the floor-re-injected finding, so a future inner-strategy change
+      that passed the span through WITHOUT the floor (engines containing regex-oss
+      but no shared_floor tag) could still satisfy the predicate. The test is NOT
+      vacuous (proven below), but tightening the assertion to require the
+      floor-provenance marker would make it strictly pin re-injection, not mere
+      survival.
+    suggested_resolution: |
+      Optional hardening (not blocking): assert that at least one survivor is
+      `is_shared_floor(f)` True (import from routing.shared_layer) so the test
+      pins floor RE-INJECTION specifically, not survival-by-any-means.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-003
+
+notes: |
+  AXIOM SCORECARD (story-gate slice — only axioms triggered by the S2-01 diff):
+
+  AX-pii-anon-003 (ensemble-recall-floor-guarantee — the load-bearing T1
+  invariant; reviewer_hook severity_default CATASTROPHIC) — UPHELD BY CONSTRUCTION.
+    * The new RoutingGate is genuinely advisory-on-weighting-only: route() computes
+      the static-softmax `base` exactly as pre-S2-01, then calls gate.adjust(...)
+      ONLY when `self.gate is not None`; default gate=None ⇒ base returned unchanged.
+    * routing/floor_fusion.py (md5 39f325bd61b152fd3e6b00b0995e524b) and
+      routing/shared_layer.py (md5 929c18b12da5fab0ede98f0c577b9579) are
+      BYTE-IDENTICAL to the pre-story tree — NOT in the diff. The no-drop authority
+      is untouched.
+    * A4 IS NON-VACUOUS AND LOAD-BEARING (independently falsified the alternative):
+      I ran the exact A4 scenario WITHOUT the FloorProjectingFusion wrapper. The
+      hostile gate zeroes regex-oss's routing weight; because regex-oss IS the top
+      routed expert for US_SSN, route("US_SSN") returns [('regex-oss',0.0),
+      ('scrubadub-compatible',1.0)]; the single regex-oss input span forms its own
+      cluster whose weight = routed_dict.get('regex-oss', floor_weight) = 0.0 (the
+      gate's zeroed value is consulted, NOT the floor fallback, since regex-oss is a
+      key) ⇒ total_weight==0 ⇒ `if total_weight <= 0: continue` ⇒ the span is
+      DROPPED. The bare (no-floor) inner.merge yields 0 survivors. Only the REAL
+      FloorProjectingFusion re-injection (provenance=shared_floor,
+      is_shared_floor()==True) restores it. So the advisory gate's scope is
+      structurally bounded by the post-fusion projection exactly as AX-003 requires.
+      The test exercises the genuine FloorProjectingFusion(MoEFusionStrategy(...
+      gate=hostile ...)) path on a checksum-gated shared span and proves SURVIVAL.
+
+  AX-pii-anon-002 (deterministic-reproducible) — UPHELD.
+    * grep: no random/uuid/secrets/time.{time,monotonic,perf_counter} in moe.py or
+      fusion.py.
+    * RouteContext is frozen+hashable; mutation raises FrozenInstanceError; hash is
+      stable across equal instances (verified at runtime).
+    * Cache key widened to (entity_type, context) is order-stable: the None-context
+      key reproduces the pre-S2-01 cache byte-identically; distinct contexts get
+      distinct keys with no collision (es/fr/None coexist). Verified at runtime.
+    * _normalize_weights is pure (no global state); two route() calls on the same
+      (entity_type, context) are equal. A9 (test_ax002_*) pins all of this.
+
+  AX-pii-anon-001 (synthetic-only-no-real-pii) — UPHELD. All new fixtures use
+    synthetic data only: entity-type string literals (PERSON_NAME, US_SSN, EMAIL_
+    ADDRESS, etc.), synthetic expert ids (expert-alpha/beta, regex-oss,
+    presidio/gliner/scrubadub-compatible), a synthetic US_SSN span (no Luhn-valid
+    card / structurally-real SSN value / real secret / real person+contact pair).
+
+  AX-pii-anon-004 / -005 / -006 — CORRECTLY NOT-TRIGGERED. Diff keyword-scan
+    surfaces only incidental matches: "collision" appears in a RouteContext
+    docstring; "calibrated_majority" is a fusion-mode string literal in
+    _BUILTIN_FUSION_MODES. The diff touches NO anonymization/pseudonymization
+    scoring entry point (AX-004), NO calibration/abstention/needs_review/ECE logic
+    (AX-005), and NO agentic-interception/trace/memory/tool-IO path (AX-006). This
+    is purely a swarm-routing construction seam in moe.py/fusion.py; verified the
+    diff name-only is exactly {moe.py, fusion.py, test_moe_router_seam.py,
+    test_fusion_construction_seam.py}.
+
+  Supporting gate checks (independently re-run, not just trusting the Evidence
+  block): 34/34 owned tests pass (-o addopts="" to drop the full-suite coverage
+  gate); ruff check clean on all four owned files; mypy clean under BOTH
+  `mypy src/pii_anon` (canonical, pyproject strict) AND `mypy src/pii_anon --strict`
+  (explicit, after a .mypy_cache clear — the first explicit run hit an unrelated
+  mypy-internal crash on third-party charset_normalizer cache, resolved by clearing
+  the cache; not a finding against this diff). v1 fusion symbols
+  (CustomFusionFactory + register_fusion_strategy) are character-for-character
+  byte-identical pre/post (only line numbers shifted by additive insertion).
+
+  Self-attestation: reviewed only the bounded context (story file, the full
+  RED..REFACTOR diff for the four owned files, the two byte-identical floor modules
+  that AX-003 depends on, MoEFusionStrategy.merge as the gate->emission path, and
+  targeted runtime probes). Independent of the other four reviewers. The A4
+  non-vacuity result OVERTURNED my initial static read (I had hypothesized the gate
+  could not reach a drop path); the empirical probe corrected it and confirmed the
+  floor is load-bearing.
+
+review_time_seconds: 540
+
+context_bounds_respected: true

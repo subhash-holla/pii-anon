@@ -1,0 +1,130 @@
+reviewer: dev-assist-development-axiom-compliance
+
+scope_id: S2-02
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: axiom-S2-02-01
+    severity: OBSERVATION
+    location: src/pii_anon/routing/distilled_gate.py:224
+    description: |
+      AX-006 (least-privilege) observation, non-blocking. `DistilledTopKGate.adjust`
+      accepts a `RouteContext | None` for Protocol conformance but routes on
+      `entity_type` alone (documented in the docstring: "deterministically
+      independent of `context` today"). This is correct and intentional for this
+      story — it actually STRENGTHENS AX-002 (one fewer input the payload depends
+      on) and keeps the gate's capability surface minimal (a dict lookup + a
+      multiply, no file/network/exec). Logged only so a future feature-conditioning
+      story (S2-03/S2-04 which consume the advisory signal) is on notice that
+      widening `adjust` to read `context` re-opens the determinism + replay-equality
+      teeth (A6) and must re-thread the `seed`/feature-version provenance.
+    suggested_resolution: |
+      No change required this story. When a later story conditions `adjust` on
+      `context`, add a replay-equality property test over the context-bearing path
+      and stamp the context feature-version into the payload so AX-002 stays pinned.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-006
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-002
+
+notes: |
+  Story-gate axiom review of S2-02 (DistilledTopKGate + offline distillation),
+  iteration 1. Read-only, independent. Reviewed the full diff
+  `git diff 7e9882a^..6184def` (7 owned files) against the project axiom registry.
+  All four dispatched key dimensions independently VERIFIED — no SHOWSTOPPER /
+  CATASTROPHIC / MAJOR / MINOR. Verdict: APPROVE.
+
+  AX-006 (least-privilege — the headline for this control-path artifact) — UPHELD.
+  * `load_distilled_gate` is the ONLY production construction path and routes the
+    artifact through `moe.load_verified_gate(..., verify_on_load=True)` (source
+    distilled_gate.py:277). The source contains NO `verify_on_load=False` token,
+    and `test_a1_no_unverified_construction_path_in_distilled_gate_module` walks
+    the AST and asserts EVERY `load_verified_gate` call passes an explicit
+    `verify_on_load=True` *constant* (not omitted-then-defaulted) — a rigorous,
+    non-vacuous guard. No raw-dict public constructor on the production seam.
+  * The production wiring `fusion.py::_build_distilled_moe` ALSO loads only through
+    `load_distilled_gate`, and a `gate_path` WITHOUT a `key_ring` raises
+    `ValueError` (fails closed, never silently skips verification) — pinned by
+    `test_distilled_moe_factory_gate_path_without_key_ring_fails_closed`. A tampered
+    `gate_path` raises `GateSignatureError` (`..._tampered_gate_fails_closed`).
+  * Tamper / wrong-key ⇒ `GateSignatureError` (A1: `_tampered_payload_...`,
+    `_wrong_key_...`, the latter matching "unknown key id"); verified-but-malformed
+    ⇒ `GatePayloadError` (A9, incl. NaN/±inf/negative/bool/non-mapping/wrong-schema).
+  * The gate is least-privilege: advisory re-weight only (a `dict.get` + multiply),
+    no file/network/exec capability; `errors.py` edit is additive (`GatePayloadError`
+    only, `GateSignatureError` byte-identical).
+
+  AX-003 (recall-floor by construction — MUST NOT be weakened) — UPHELD, and A4 is
+  NON-VACUOUS as the dispatch requires.
+  * `test_a4_distilled_gate_cannot_drop_floored_shared_span` runs the REAL
+    `FloorProjectingFusion(MoEFusionStrategy(... MoERouter(gate=<gate that zeroes
+    regex-oss for US_SSN>) ...))` on a checksum-gated US_SSN shared span and asserts
+    the survivor carries the `shared_floor` provenance marker in its explanation —
+    i.e. it PINS THE MECHANISM: the inner MoE merge DROPS the span (gate→0 weight ⇒
+    total_weight==0 ⇒ cluster skipped) and `SharedLayerProjector` RE-INJECTS it.
+    Survival alone would be vacuous; this proves the floor, not the gate's mercy.
+    The `_valid_payload` US_SSN cell is literally `{"regex-oss": 0.0}` (the adversary).
+  * `adjust()` (source 237-243) only re-weights experts ALREADY in `base` (never
+    invents an expert), returns `base` unchanged on unknown entity / empty opinion,
+    and the validator REJECTS negative weights while ADMITTING 0.0 — correct, since
+    zeroing-then-floor-survives is exactly the AX-003 case A4 exercises.
+  * The wired v2 path is double-covered: `_with_signed_gate_still_floors` repeats the
+    shared_floor assertion through `_build_distilled_moe`; `_no_gate_floors_a_shared_span`
+    confirms the gate_path=None (NFR-026 inert) path still floors.
+  * `routing/floor_fusion.py` (md5 39f325bd61b152fd3e6b00b0995e524b) and
+    `routing/shared_layer.py` (929c18b12da5fab0ede98f0c577b9579) confirmed
+    byte-identical (NOT in the diff) — the no-drop authority is untouched.
+
+  AX-002 (determinism) — UPHELD.
+  * `test_a6_distill_is_byte_identical_across_replays` asserts
+    `canonical_gate_bytes(p1) == canonical_gate_bytes(p2)` for the same
+    `(oracle, records, temperature, seed)`; `oracle_hash` + `gate_feature_version`
+    stable; re-emit byte-identical (A7).
+  * A10 AST guards (both modules) prove neither imports `random`/`uuid`/`time`/
+    `secrets`; the trainer imports no xgboost at top level (Protocol-decoupled).
+    Independently confirmed the consumed `compute_sample_weights_from_records` +
+    `select_f2_threshold` (swarm_learner.py, byte-identical 79fcb177...) have NO
+    nondeterminism source. The closed-form is grouped means + softmax (math-only),
+    records grouped first-seen-order, experts sorted before softmax.
+  * XGBoost seeded (seed=42) ONLY in the `importorskip("xgboost")` A8 arm — which
+    RAN and PASSED (xgboost 3.2.0 present; independently re-ran A8 = 1 passed).
+  * `DistilledGatePayload` (distilled_gate.py:89) and `RouteContext` (moe.py:237)
+    are both `@dataclass(frozen=True)`.
+
+  AX-001 (synthetic-only) — UPHELD. `TEST_KEY =
+  b"S2-05-NON-PRODUCTION-TEST-KEY-DO-NOT-USE-IN-PROD"`; all records/oracles/keys
+  synthetic; the story declares real custody as Pass-2. (Real-PII checksum scanning
+  is security-sast's hook for AX-001; nothing in this diff bundles identifiers.)
+
+  AX-004 (anonymization/pseudonymization separation) and AX-005 (calibrated
+  uncertainty / auditable abstention) — NOT-TRIGGERED. Grep of the production diff
+  found zero anonymization/pseudonymization-SCORING, residual-risk, ECE/Brier,
+  calibration, abstention, or needs_review surface — this story is a routing-gate
+  control-path artifact, it touches no de-id scoring or calibration path.
+
+  GREEN independently confirmed (not merely asserted): the two owned test files
+  run 61 passed / 0 failed (clean addopts); both new modules at 100% statement
+  coverage by their own tests (distilled_gate.py 86 stmts, gate_distillation.py
+  56 stmts). The one `# pragma: no cover` (degenerate softmax) is genuinely
+  unreachable (max-subtraction forces an exp(0)=1.0 term).
+
+  Untouched-boundary claims independently verified by md5: moe.py
+  (1ba0bea31ee9dab1a26a401784f50b1e), moe_gate_signing.py
+  (c85741765eb34b9a7860ff5e4844fe07), swarm_learner.py, floor_fusion.py,
+  shared_layer.py, evaluation/competitor_compare.py
+  (7cae16c89f4c97136e1a12394dae2025) all match the story's stated hashes;
+  orchestrator.py + tests/test_moe_enhancements.py are NOT in the diff.
+
+  Cross-reviewer note (OBSERVATION-equivalent, non-binding): `gate_v1.json` is a
+  control-path / privilege-escalation artifact; concurring with the story's
+  recommendation that the orchestrator run the standing adversarial-close catch-net
+  after the 5/5 APPROVE (independent attempts to construct/route a gate that skips
+  verify-on-load, forge a re-weight, or defeat the advisory-floor bound; bar = 0).
+  Per local methodology this catch-net has twice caught control-path MAJORs that the
+  5-reviewer gate missed — it is necessary-but-not-sufficient here too.
+
+review_time_seconds: 760
+
+context_bounds_respected: true

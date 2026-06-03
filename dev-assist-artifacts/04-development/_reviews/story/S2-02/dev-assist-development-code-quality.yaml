@@ -1,0 +1,112 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S2-02
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S2-02-01
+    severity: OBSERVATION
+    location: src/pii_anon/routing/distilled_gate.py:237-243
+    description: |
+      The `adjust` early-return guard `if not cell:` correctly handles an empty
+      MappingProxyType (falsy), but the comment "Unknown entity type, or an empty
+      opinion" slightly conflates two distinct cases: (1) entity_type not in
+      weights at all (cell is None, which is also falsy), and (2) entity_type
+      present but with an empty cell dict (cell is an empty MappingProxyType,
+      also falsy). Both are handled correctly by the same guard — the behaviour
+      is right, but the comment could be more precise ("None or empty cell").
+      Non-blocking style note only.
+    suggested_resolution: |
+      Optionally split the comment into: "# entity_type absent from gate weights
+      (None) or present with an empty cell — both mean no opinion (identity)."
+      No code change needed; the guard is correct for both sub-cases.
+
+  - id: code-quality-S2-02-02
+    severity: OBSERVATION
+    location: src/pii_anon/fusion.py:727
+    description: |
+      `key_ring: Any = spec.key_ring` uses `Any` to side-step the import cycle
+      (`fusion.py` cannot import `KeyRing` without a circular dependency chain).
+      The justification is clearly documented in the `FusionBuildSpec` docstring
+      ("Typed loosely to avoid an import cycle; a v2 factory narrows it as
+      needed") and the field-level comment in `_build_distilled_moe`. This is the
+      same cycle-avoidance pattern used by `FusionBuildSpec.key_ring: Any | None`
+      (line 489). Pattern is consistent and documented; no action required.
+    suggested_resolution: |
+      No change needed. If the import cycle is resolved in a future story (e.g.,
+      by a `TYPE_CHECKING` guard or a protocols module), the `Any` annotation
+      could be tightened to `KeyRing | None`. Defer to that follow-up.
+
+notes: |
+  RED-before-GREEN (strict TDD):
+    - RED commit 7e9882a: tests-only diff (+872 lines, 2 new test files). The
+      commit message and git show --stat confirm no production code. At RED,
+      collection fails on ImportError (GatePayloadError absent from errors.py)
+      and ModuleNotFoundError (routing.distilled_gate / routing.gate_distillation
+      do not exist). `git merge-base --is-ancestor 7e9882a c2cef8e` exits 0
+      (RED is a confirmed ancestor of GREEN). TDD discipline: STRICT.
+
+  Quality gates (all re-run, all clean):
+    - `ruff check src/ tests/` -> All checks passed.
+    - `.venv/bin/mypy src/pii_anon` -> no issues (131 source files).
+    - `.venv/bin/python -m mypy src/pii_anon --strict` -> no issues (131 files).
+      No numpy generics in the new modules (producer is pure-math/stdlib), so
+      the npt.NDArray gotcha from the mypy memory note does not arise.
+    - Owned tests: 44 (test_distilled_gate.py) + 18 (test_gate_distillation.py)
+      = 62 tests, all PASSED, 0 failed.
+    - A8 importorskip arm: xgboost 3.2.0 IS installed; test_a8_real_xgboost_
+      oracle_distillation PASSED (not skipped). The xgboost-internal re-import
+      PytestDeprecationWarning is a non-blocking xgboost-internal issue.
+
+  Scope discipline:
+    - `git diff --stat 7e9882a^..6184def` shows exactly 7 files: the 5 production
+      files and 2 test files listed in story §8 "Files owned". Zero out-of-scope
+      touches. orchestrator.py, test_moe_enhancements.py, artifacts/benchmarks/*,
+      competitor_compare.py all untouched.
+
+  Closed-form distillation math (independently verified):
+    - The proof sketch in gate_distillation.py module docstring is correct.
+      Minimising sum_i w_i * CE(p, t_i) over scalar p yields stationary point
+      p* = (sum w_i * t_i) / (sum w_i) — the weighted mean. Gradient at p* is
+      1.44e-15 (machine epsilon), CE is strictly higher at p* ± 0.1, confirming
+      a minimum. The production `_temperature_softmax` and the test's
+      `_expected_softmax` are algebraically identical and produce byte-identical
+      results (verified numerically).
+    - `_temperature_softmax`: max-subtraction before math.exp is numerically
+      stable; the `# pragma: no cover` on the degenerate fallback is correct
+      (max-subtraction forces at least one exp(0)=1.0 term, making total > 0
+      unreachable for any finite input).
+
+  Public API documentation:
+    - All new public symbols carry complete docstrings with Parameters, Returns,
+      and Raises sections: `DistilledGatePayload`, `DistilledTopKGate.adjust`,
+      `load_distilled_gate`, `SurvivalOracle`, `distill_topk_gate`,
+      `emit_signed_gate`. Module-level docstrings are thorough and reference
+      AX-006, NFR-026, NFR-005, AX-002, AX-003 inline.
+    - `DISTILLED_MOE_MODE` constant has a `#:` inline doc. `_build_distilled_moe`
+      is private (underscore-prefixed); no public doc obligation.
+
+  No unwrap()/panic-equivalent patterns on production paths (Python None-checks
+  are explicit; _is_finite_number TypeGuard rejects bools and non-finite values;
+  MappingProxyType freezes every inner cell at construction time).
+
+  No Any without justification — the one Any in fusion.py:727 is documented
+  (cycle-avoidance pattern, consistent with FusionBuildSpec.key_ring: Any | None).
+
+  Test isolation: every test uses tmp_path (pytest fixture) for filesystem
+  operations; no shared mutable state; no real time/network/filesystem beyond
+  tmpdir. Test names embed acceptance IDs (a1_, a2_, ... a10_) pinning FR-018,
+  NFR-026, NFR-005, AX-002, AX-003, AX-006. Determinism-property tests
+  (A6) explicitly assert byte-identical replay.
+
+  REFACTOR commit 6184def: KEY_* payload-field constants extracted to
+  distilled_gate.py and imported by gate_distillation.py — eliminates the
+  string-literal drift risk between producer and consumer. A drift-guard test
+  (test_refactor_producer_stamps_exactly_the_consumer_required_keys) pins it.
+  Behaviour-identical.
+
+review_time_seconds: 612
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

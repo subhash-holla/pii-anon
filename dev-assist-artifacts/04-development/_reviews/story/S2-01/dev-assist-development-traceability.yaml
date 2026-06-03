@@ -1,0 +1,152 @@
+reviewer: dev-assist-development-traceability
+scope_id: S2-01
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: traceability-S2-01-01
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:31
+    description: |
+      The traceability-matrix Story/Test backfill for S2-01 is not yet present.
+      The UC-15 MoE-router row (line 31) traces FR-018 to the design but carries
+      no Story column entry for S2-01 nor a Test column linking
+      tests/test_moe_router_seam.py / tests/test_fusion_construction_seam.py.
+      Per the established S2-05 / S4-01 convention this backfill is DEFERRED to
+      the sprint gate (the row is added once the sprint's stories settle), so
+      this is non-blocking at the story gate. The forward chain FR-018 -> story
+      -> test is otherwise fully resolvable from the story's `Implements` /
+      `Traces` fields and the in-diff test names.
+    suggested_resolution: |
+      At the Sprint-2 gate, add the S2-01 row to traceability-matrix.md: Story
+      = S2-01, Test = tests/test_moe_router_seam.py + tests/test_fusion_construction_seam.py
+      (route()-widening + RoutingGate + v2-construction-seam + drift-guard),
+      against the FR-018 / NFR-026 / NFR-005 facets this story lands. No story-gate
+      action required.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-018
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md
+
+notes: |
+  FORWARD-TRACE CHAIN VERIFIED (FR/NFR -> Story -> Test -> DC), independent read.
+
+  (1) Every declared ID exists with matching wording at the cited anchor:
+      - FR-018  requirements-document.md:30  "MoE-router: learned routing + span-dedup
+        + selective activation + early-exit" (UC-15, swarm, MUST) — MATCHES.
+      - NFR-005 requirements-document.md:64  "Scoring-run determinism / byte-identical
+        artifacts across N=5 replays given (seed,key,scope)" (eval, MUST) — MATCHES.
+      - NFR-026 requirements-document.md:89  "Optional-dependency graceful degradation /
+        runs on shared layer, 0 unhandled exceptions, no silent recall loss" (swarm,
+        SHOULD) — MATCHES.
+      - AX-002 project-axioms.yaml:42 (AX-pii-anon-002 deterministic-reproducible) — EXISTS.
+      - AX-003 project-axioms.yaml:67 (AX-pii-anon-003 ensemble-recall-floor-guarantee) — EXISTS.
+    No story-declared ID is absent from the canon (no SHOWSTOPPER).
+
+  (2) DESIGN TRACE RESOLVES. DC-02 (D-implementation-ready-design.md:12) =
+      "MoE-router: DistilledTopKGate + rules-first Depth-1 early-exit (orchestrator
+      hook) -> FR-018, NFR-007/008/009". The story honestly scopes itself to the
+      SEAM subset of DC-02 (not the gate body / early-exit / SLA-bias, which are
+      named as successor stories S2-02/03/04). The D5 seam-correction MAJORs at
+      :38 are implemented EXACTLY and all three are present in the GREEN diff
+      (fb591a5):
+        - "widen MoERouter.route() beyond a bare entity_type string" ->
+          moe.py route(self, entity_type, *, context: RouteContext | None = None)
+          + RouteContext frozen dataclass + @runtime_checkable RoutingGate Protocol.
+        - "add a richer construction seam (frozen register_fusion_strategy)" ->
+          fusion.py FusionBuildSpec + CustomFusionFactoryV2 + _CUSTOM_FACTORIES_V2
+          + register_fusion_strategy_v2 + additive build_fusion v2-consult; v1
+          register_fusion_strategy signature line is byte-identical in the diff
+          (no -/+ on the signature; only additive lines around @@ -434,6 +436 @@).
+        - "fix available_fusion_modes() to register the new mode in BOTH places" ->
+          single-source _BUILTIN_FUSION_MODES tuple + the A7 [AUDIT] drift guard.
+      The D4 DECISION-1 advisory framing (:34 "ADVISORY only ... can never drop a
+      Shared span") is upheld structurally: route() threads gate only `if self.gate
+      is not None`, and A4 proves a hostile zeroing gate cannot drop a floored
+      shared span (the FloorProjectingFusion re-injects post-fusion; FR-016/AX-003).
+
+  (2b) NFR-005 / NFR-026 trace provenance (NOT a finding, recorded for the gate):
+      DC-02's own row lists FR-018 + NFR-007/008/009 (latency), not NFR-005/NFR-026.
+      The story additionally claims NFR-026 and NFR-005. Both are legitimately
+      design-anchored elsewhere: NFR-026 ("absent gate -> static entity_strengths
+      softmax (NFR-026)") is named verbatim in the DECISION-1 DistilledTopKGate
+      bullet at design:34; NFR-005 ("stable expert-id tie-break for top-k
+      (determinism NFR-005)") at the Perf-MAJORs bullet design:57. So the story's
+      NFR-026/NFR-005 claims are not free-floating — they trace to the same
+      DECISION-1 / seam-correction program, and the no-gate-default + frozen+hashable
+      RouteContext directly serve them. No mis-trace.
+
+  (3) ACCEPTANCE -> NAMED-TEST mapping (every A1-A9 maps to >=1 test; the convention
+      embeds the FR/NFR/AX id in the test name; AUDIT items use test_audit_*):
+        A1 -> test_fr018_route_no_context_is_byte_identical_to_static_base,
+              test_fr018_route_accepts_routecontext_kwarg_no_typeerror,
+              test_fr018_context_keyed_cache_does_not_collide,
+              test_nfr026_route_on_default_registry_matches_recorded_reference
+        A2 -> test_fr018_route_all_identical_to_independent_oracle,
+              test_nfr005_moefusion_merge_unaffected_by_widening
+        A3 -> test_fr018_routinggate_is_runtime_checkable,
+              test_fr018_gate_adjust_invoked_with_static_base,
+              test_nfr026_gate_none_is_never_consulted,
+              test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol
+        A4 -> test_ax003_hostile_gate_cannot_drop_floored_shared_span
+        A5 -> test_nfr005_nan_gate_output_never_propagates,
+              test_nfr005_negative_gate_output_never_propagates,
+              test_nfr005_unnormalized_gate_output_is_renormalized
+        A6 -> test_fr018_register_v2_factory_receives_populated_buildspec,
+              test_fr018_fusion_buildspec_is_frozen,
+              test_fr018_v1_register_fusion_strategy_unchanged_and_constructs,
+              test_fr018_v1_factory_signature_is_positional_weights_min_consensus,
+              test_fr018_v2_does_not_shadow_builtin_modes
+        A7 -> test_audit_single_source_builtin_modes_constant_exists,
+              test_audit_every_advertised_builtin_mode_is_constructible,
+              test_audit_drift_guard_is_non_vacuous_unadvertised_branch_caught,
+              test_audit_drift_guard_catches_constructable_but_unadvertised,
+              test_audit_swarm_mode_is_advertised_and_constructible,
+              test_audit_unknown_mode_still_raises_fusionerror
+        A8 -> test_nfr026_no_gate_runs_pure_static_softmax_no_exceptions
+        A9 -> test_ax002_route_deterministic_for_same_entity_and_context,
+              test_ax002_routecontext_is_frozen_and_hashable,
+              test_ax002_routecontext_default_is_empty_features
+      Ran the two files (cov gate neutralized): 34 passed, 0 failed — matches the
+      executor's claimed REFACTOR=34. The diff contains tests whose names embed
+      fr_018 / nfr_005 / nfr_026 / ax002 / ax003 (Common-Finding #1 does NOT apply).
+
+  (4) RED -> GREEN -> REFACTOR ordering GIT-VERIFIED:
+      git merge-base --is-ancestor 4ba234f fb591a5 -> exit 0 (RED ancestor of GREEN);
+      fb591a5 ancestor of b38f65a -> exit 0; log 4ba234f^..b38f65a is exactly
+      RED(test-only, 2 new files) -> GREEN(src moe.py+fusion.py only) -> REFACTOR
+      (test-only edge tests). RED touched ONLY the two new test files; GREEN touched
+      ONLY src/pii_anon/{moe,fusion}.py; REFACTOR touched ONLY test_moe_router_seam.py.
+      Clean strict-TDD shape.
+
+  (5) provisional_status: AGENT_SIMULATED is CORRECT. DC-02 is not DIVERGED (D1
+      table line 12 carries no DIVERGED marker), so no Pass-2 DIVERGED cascade is
+      owed; no §10 Pass-2 commitment is required for cascade. The AGENT_SIMULATED
+      label is justified in-story (the seam runs for real in-tree against synthetic
+      experts; the learned DistilledTopKGate body + gate_v1.json are S2-02; a gate
+      distilled on real survival labels is the story's own Pass-2 boundary). No
+      DIVERGED-cascade finding.
+
+  OWNERSHIP / coordination (Common-Finding #3 / #12 checked — clean):
+      FR-018 is a multi-story MUST. S2-01 owns the *learned-routing seam* facet;
+      S2-05 (DONE) owns the *sign/verify gate-artifact protection* facet and also
+      references FR-018; S4-03 references FR-018 only adjacently. The facets are
+      disjoint and the story names its successors S2-02/03/04 explicitly — no two
+      stories claim the SAME FR-018 facet without coordination, no ambiguous
+      ownership. "Depends on: none hard (S2-05 ... DONE)" verified: S2-05 State =
+      DONE. Successor stories S2-02/03/04 are listed under Blocks (not Depends on),
+      and their story files do not yet exist — so no false/unsatisfied dependency
+      is declared (Common-Finding #6 does not apply).
+
+  SCOPE BOUNDARIES (handed off, not adjudicated here):
+      Whether tests are well-written / idiomatic -> code-quality. FR-018 seam-scope
+      honesty + NFR-026/NFR-005 semantic coverage beyond G/W/T -> requirements-coverage.
+      AX-002 determinism / AX-003 floor-not-weakened semantics -> axiom-compliance.
+      No latency NFR (007/008/009) threshold is met or asserted here (deferred to
+      S2-04/S7-04 per the story's own reviewer-set note) -> not a traceability gap.
+
+  Zero SHOWSTOPPER / CATASTROPHIC / MAJOR. One MINOR (matrix backfill, DEFERRED
+  to sprint gate per convention). APPROVE.
+
+review_time_seconds: 540
+
+context_bounds_respected: true
