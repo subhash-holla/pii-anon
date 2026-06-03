@@ -50,10 +50,26 @@ from pii_anon.moe_gate_signing import KeyRing
 #: is an operator/version error, never a best-effort parse.
 SUPPORTED_SCHEMA_VERSION = 1
 
-#: The required top-level keys of a distilled-gate payload (single source of truth
-#: shared with :mod:`pii_anon.routing.gate_distillation` semantics — the producer
-#: stamps exactly these).
-_REQUIRED_KEYS = ("schema_version", "gate_feature_version", "oracle_hash", "temperature", "weights")
+# ── Canonical payload key names ──────────────────────────────────────────────
+# Single source of truth for the distilled-gate payload field names, shared by
+# the runtime validator (below) AND the offline producer
+# (:mod:`pii_anon.routing.gate_distillation`), so the producer and consumer can
+# never drift on a key string. The producer stamps exactly KEY_* ; the validator
+# requires exactly :data:`_REQUIRED_KEYS`.
+KEY_SCHEMA_VERSION = "schema_version"
+KEY_GATE_FEATURE_VERSION = "gate_feature_version"
+KEY_ORACLE_HASH = "oracle_hash"
+KEY_TEMPERATURE = "temperature"
+KEY_WEIGHTS = "weights"
+
+#: The required top-level keys of a distilled-gate payload.
+_REQUIRED_KEYS = (
+    KEY_SCHEMA_VERSION,
+    KEY_GATE_FEATURE_VERSION,
+    KEY_ORACLE_HASH,
+    KEY_TEMPERATURE,
+    KEY_WEIGHTS,
+)
 
 
 def _is_finite_number(value: Any) -> TypeGuard[float]:
@@ -119,7 +135,7 @@ class DistilledGatePayload:
             if key not in payload:
                 raise GatePayloadError(f"gate payload missing required key: {key!r}")
 
-        schema_version = payload["schema_version"]
+        schema_version = payload[KEY_SCHEMA_VERSION]
         if not isinstance(schema_version, int) or isinstance(schema_version, bool):
             raise GatePayloadError("gate payload 'schema_version' must be an int")
         if schema_version != SUPPORTED_SCHEMA_VERSION:
@@ -128,19 +144,19 @@ class DistilledGatePayload:
                 f"(this runtime supports {SUPPORTED_SCHEMA_VERSION})"
             )
 
-        gate_feature_version = payload["gate_feature_version"]
+        gate_feature_version = payload[KEY_GATE_FEATURE_VERSION]
         if not isinstance(gate_feature_version, int) or isinstance(gate_feature_version, bool):
             raise GatePayloadError("gate payload 'gate_feature_version' must be an int")
 
-        oracle_hash = payload["oracle_hash"]
+        oracle_hash = payload[KEY_ORACLE_HASH]
         if not isinstance(oracle_hash, str) or not oracle_hash:
             raise GatePayloadError("gate payload 'oracle_hash' must be a non-empty string")
 
-        temperature = payload["temperature"]
+        temperature = payload[KEY_TEMPERATURE]
         if not _is_finite_number(temperature) or temperature <= 0.0:
             raise GatePayloadError("gate payload 'temperature' must be a finite number > 0")
 
-        raw_weights = payload["weights"]
+        raw_weights = payload[KEY_WEIGHTS]
         if not isinstance(raw_weights, Mapping):
             raise GatePayloadError("gate payload 'weights' must be a mapping")
 

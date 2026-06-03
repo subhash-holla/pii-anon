@@ -460,3 +460,19 @@ def test_distill_records_advisory_emission_threshold() -> None:
     payload = distill_topk_gate(oracle, _records(), temperature=1.0, seed=42)
     assert "emission_threshold" in payload and isinstance(payload["emission_threshold"], float)
     assert "emission_f_beta" in payload and isinstance(payload["emission_f_beta"], float)
+
+
+def test_refactor_producer_stamps_exactly_the_consumer_required_keys() -> None:
+    """REFACTOR (drift guard): the producer stamps exactly the runtime validator's
+    required key set (shared KEY_* constants), so a distilled payload always parses.
+    Round-trips every distilled payload through DistilledGatePayload.from_payload."""
+    from pii_anon.routing.distilled_gate import _REQUIRED_KEYS, DistilledGatePayload
+
+    payload = distill_topk_gate(_LinearSurvivalOracle(), _records(), temperature=1.0, seed=42)
+    # Every required runtime key is present in what the producer stamped.
+    assert set(_REQUIRED_KEYS).issubset(payload), (
+        f"producer dropped a required key: {set(_REQUIRED_KEYS) - set(payload)}"
+    )
+    # And the produced payload validates cleanly (no GatePayloadError).
+    view = DistilledGatePayload.from_payload(payload)
+    assert view.schema_version == 1

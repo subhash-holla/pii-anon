@@ -45,7 +45,14 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from pii_anon.moe_gate_signing import KeyRing
-from pii_anon.routing.distilled_gate import SUPPORTED_SCHEMA_VERSION
+from pii_anon.routing.distilled_gate import (
+    KEY_GATE_FEATURE_VERSION,
+    KEY_ORACLE_HASH,
+    KEY_SCHEMA_VERSION,
+    KEY_TEMPERATURE,
+    KEY_WEIGHTS,
+    SUPPORTED_SCHEMA_VERSION,
+)
 from pii_anon.swarm_learner import compute_sample_weights_from_records, select_f2_threshold
 
 
@@ -182,11 +189,12 @@ def distill_topk_gate(
     emission_threshold, emission_f_beta = select_f2_threshold(all_scores, labels)
 
     return {
-        "schema_version": SUPPORTED_SCHEMA_VERSION,
-        "gate_feature_version": feature_version,
-        "oracle_hash": _oracle_hash(oracle),
-        "temperature": float(temperature),
-        "weights": weights,
+        KEY_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+        KEY_GATE_FEATURE_VERSION: feature_version,
+        KEY_ORACLE_HASH: _oracle_hash(oracle),
+        KEY_TEMPERATURE: float(temperature),
+        KEY_WEIGHTS: weights,
+        # Advisory metadata (not part of the validated runtime contract).
         "emission_threshold": float(emission_threshold),
         "emission_f_beta": float(emission_f_beta),
     }
