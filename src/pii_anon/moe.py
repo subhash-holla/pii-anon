@@ -16,7 +16,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from pii_anon.fusion import FusionStrategy, _cluster_overlapping_spans
 from pii_anon.moe_gate_signing import KeyRing, verify
@@ -234,6 +234,112 @@ class ExpertRegistry:
         return [e for eid in expert_ids if (e := self._experts.get(eid)) is not None]
 
 
+@dataclass(frozen=True)
+class RouteContext:
+    """Feature-conditioned routing signal threaded into :meth:`MoERouter.route`.
+
+    Carries the per-decision features a learned gate (S2-02 ``DistilledTopKGate``)
+    reads — everything *beyond* the ``entity_type`` positional, which stays the
+    first argument so existing call sites are untouched. The context is purely
+    additive: with no gate it is **inert** (the static-softmax ``base`` is
+    returned unchanged), and it is the distinct cache key that lets two different
+    contexts for the same entity type coexist without collision.
+
+    Frozen + hashable by construction (AX-002 / NFR-005): ``features`` is a
+    tuple-of-pairs (not a dict) so the whole context is hashable for cache keying
+    and immutable for determinism. It deliberately does NOT carry ``entity_type``.
+
+    Attributes
+    ----------
+    language : str | None
+        Language code of the field under routing (e.g. ``"es"``). ``None`` when
+        unknown / not yet detected.
+    field_path : str | None
+        Name of the field being routed (e.g. ``"notes"``). ``None`` for
+        unstructured text.
+    checksum_gated : bool | None
+        Whether the shared-layer span at this location was checksum/keyword-gated
+        — the S2-03 rules-first early-exit signal. ``None`` when not applicable.
+    features : tuple[tuple[str, float], ...]
+        An extensible, order-stable feature vector (name -> value) the distilled
+        gate reads. Tuple-of-pairs keeps the context hashable; empty by default.
+    """
+
+    language: str | None = None
+    field_path: str | None = None
+    checksum_gated: bool | None = None
+    features: tuple[tuple[str, float], ...] = ()
+
+
+@runtime_checkable
+class RoutingGate(Protocol):
+    """Advisory re-weighting hook for :class:`MoERouter` (the S2-02 plug point).
+
+    A gate sees the static-softmax ``base`` weights for an entity type plus the
+    optional :class:`RouteContext`, and returns advisory re-weighted / re-ordered
+    ``(expert_id, weight)`` pairs. The router **re-normalizes and validates** the
+    output (finite, ≥0, Σ=1.0) before use, and falls back to ``base`` on an
+    invalid return — a misbehaving gate can never emit NaN/negative weights
+    downstream (AX-002 / NFR-005).
+
+    The gate is **advisory on weighting/selection only**: it can re-order or
+    re-weight experts but it can **never cause a shared-layer span to be
+    dropped** — the recall-floor no-drop invariant (FR-016 / AX-003) is enforced
+    downstream by :class:`~pii_anon.routing.floor_fusion.FloorProjectingFusion`
+    /:class:`~pii_anon.routing.shared_layer.SharedLayerProjector`, which re-inject
+    a floored span post-fusion regardless of how the gate re-weighted it.
+
+    This story (S2-01) ships only the Protocol + the plug; the first concrete
+    implementation is S2-02's ``DistilledTopKGate``.
+    """
+
+    def adjust(
+        self,
+        entity_type: str,
+        context: RouteContext | None,
+        base: list[tuple[str, float]],
+    ) -> list[tuple[str, float]]:
+        """Return advisory re-weighted ``(expert_id, weight)`` pairs.
+
+        Parameters
+        ----------
+        entity_type : str
+            The entity type being routed.
+        context : RouteContext | None
+            The feature-conditioned routing signal (``None`` for the bare path).
+        base : list[tuple[str, float]]
+            The static-softmax weights the router computed (sums to 1.0).
+        """
+        ...
+
+
+def _normalize_weights(
+    pairs: list[tuple[str, float]],
+) -> list[tuple[str, float]] | None:
+    """Normalize ``(id, weight)`` pairs to a valid distribution, or ``None``.
+
+    Returns a finite, non-negative, sum-to-1.0 distribution over the SAME ids in
+    the SAME order. Returns ``None`` (signalling "invalid — fall back to base")
+    when the input cannot be coerced to a valid distribution: a non-finite weight
+    (NaN / ±inf), or a non-positive total mass after clamping negatives to zero.
+
+    This is the single weight-normalizer shared by the static-softmax path and
+    the gate-output validator (one definition, no drift). Empty input returns an
+    empty list (a degenerate-but-valid distribution).
+    """
+    if not pairs:
+        return []
+    clamped: list[tuple[str, float]] = []
+    for eid, w in pairs:
+        if not math.isfinite(w):
+            return None
+        clamped.append((eid, w if w > 0.0 else 0.0))
+    total = sum(w for _, w in clamped)
+    if total <= 0.0:
+        return None
+    return [(eid, w / total) for eid, w in clamped]
+
+
 class MoERouter:
     """Sparse Top-K router for expert selection per entity type.
 
@@ -278,11 +384,22 @@ class MoERouter:
         performance_floor: bool = True,
         gate_path: str | Path | None = None,
         key_ring: KeyRing | None = None,
+        gate: RoutingGate | None = None,
     ) -> None:
         self.registry = registry
         self.top_k = max(1, top_k)
         self.performance_floor = performance_floor
-        self._route_cache: dict[str, list[tuple[str, float]]] = {}
+        # Optional advisory re-weighting hook (S2-02 DistilledTopKGate). Default
+        # None ⇒ route() returns the static-softmax base unchanged (NFR-026). The
+        # gate is advisory on weighting only; the recall-floor (FR-016/AX-003) is
+        # enforced downstream by FloorProjectingFusion and cannot be defeated by it.
+        self.gate = gate
+        # Cache widened from `entity_type` to `(entity_type, context)`. A frozen
+        # RouteContext is hashable; the `None`-context key reproduces the
+        # pre-S2-01 cache EXACTLY (byte-identical on every existing call site).
+        self._route_cache: dict[
+            tuple[str, RouteContext | None], list[tuple[str, float]]
+        ] = {}
         # Verified learned-gate payload (None on the no-gate static-softmax path,
         # NFR-026). Loaded ONLY through the fail-closed verify-on-load seam — the
         # production construction path always passes verify_on_load=True so a
@@ -295,17 +412,38 @@ class MoERouter:
                 gate_path, key_ring=key_ring, verify_on_load=True
             )
 
-    def route(self, entity_type: str) -> list[tuple[str, float]]:
+    def route(
+        self,
+        entity_type: str,
+        *,
+        context: RouteContext | None = None,
+    ) -> list[tuple[str, float]]:
         """Compute routing for a single entity type.
 
         Returns the top-K experts (by strength score) for the given entity
         type, with softmax-normalized weights. If performance_floor is True,
         the highest-strength expert is always included.
 
+        The optional ``context`` carries feature-conditioned routing signal
+        (language / field / checksum-gated / a feature vector) for an advisory
+        :class:`RoutingGate`. **The widening is additive and inert**: with no
+        ``context`` and no ``gate`` the computation, the result, and the cache
+        are byte-identical to the pre-S2-01 static softmax. When a ``gate`` is
+        configured, the static ``base`` is computed exactly as before and then
+        handed to ``gate.adjust(...)``; the gate's output is re-normalized and
+        validated (finite, ≥0, Σ=1.0) before use, falling back to ``base`` on an
+        invalid return so a misbehaving gate can never propagate NaN/negative
+        weights (AX-002 / NFR-005). The gate is advisory on weighting only — it
+        cannot drop a floored shared span (FR-016 / AX-003, enforced downstream).
+
         Parameters
         ----------
         entity_type : str
             Entity type to route (e.g., "PERSON_NAME", "EMAIL_ADDRESS").
+        context : RouteContext | None
+            Feature-conditioned routing signal for the advisory gate. ``None``
+            (the default, every pre-S2-01 caller) reproduces today's behaviour
+            and today's cache exactly.
 
         Returns
         -------
@@ -313,8 +451,9 @@ class MoERouter:
             List of (expert_id, weight) tuples summing to 1.0.
             Empty list if no experts available or entity unknown.
         """
-        # Check cache
-        cached = self._route_cache.get(entity_type)
+        # Check cache (keyed on (entity_type, context); None-context == today).
+        cache_key = (entity_type, context)
+        cached = self._route_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -354,12 +493,23 @@ class MoERouter:
 
         if total <= 0:
             # Fallback to equal weights
-            normalized = [(eid, 1.0 / len(selected)) for eid, _ in selected]
+            base = [(eid, 1.0 / len(selected)) for eid, _ in selected]
         else:
-            normalized = [(eid, es / total) for eid, es in exp_scores]
+            base = [(eid, es / total) for eid, es in exp_scores]
+
+        # Advisory gate (S2-02). Default gate=None ⇒ `base` is returned UNCHANGED
+        # (byte-identical to the pre-S2-01 static softmax). When present, the gate
+        # may re-weight/re-order; its output is re-normalized + validated, and any
+        # invalid return (non-finite / all-zero) falls back to `base` so a
+        # misbehaving gate can never emit NaN/negative weights downstream.
+        normalized = base
+        if self.gate is not None:
+            adjusted = self.gate.adjust(entity_type, context, list(base))
+            validated = _normalize_weights(adjusted)
+            normalized = validated if validated is not None else base
 
         # Cache result
-        self._route_cache[entity_type] = normalized
+        self._route_cache[cache_key] = normalized
         return normalized
 
     def route_all(self) -> dict[str, list[tuple[str, float]]]:

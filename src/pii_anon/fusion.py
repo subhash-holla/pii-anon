@@ -15,7 +15,9 @@ Custom strategies can be registered via ``register_fusion_strategy()``.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
 
 from pii_anon.errors import FusionError
 from pii_anon.types import EngineFinding, EnsembleFinding, FusionAuditRecord, FusionMode
@@ -434,6 +436,105 @@ def register_fusion_strategy(mode: str, factory: CustomFusionFactory) -> None:
     _CUSTOM_FACTORIES[mode] = factory
 
 
+# --------------------------------------------------------------------------- #
+# v2 construction seam (S2-01 — ADDITIVE; the frozen v1 above is UNCHANGED).
+#
+# The v1 ``CustomFusionFactory = Callable[[dict, int], FusionStrategy]`` signature
+# is a real public API (``available_fusion_modes()`` discovers it; selectable via
+# ``ProcessingProfileSpec.mode``) and cannot carry the richer config a
+# feature-conditioned MoE / a verify-on-load gate needs (a gate path, a key-ring,
+# a top-k, per-entity weights). The v2 seam adds that capacity ALONGSIDE v1 — a
+# single :class:`FusionBuildSpec` carrier + a factory taking it — leaving v1 100%
+# byte-identical. This is the path S2-02 registers its gate-configured MoE mode
+# through.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class FusionBuildSpec:
+    """Immutable, richer construction spec for a v2 fusion factory.
+
+    Carries everything :func:`build_fusion` plus a feature-conditioned MoE need,
+    including the S2-05 verify-on-load gate path / key-ring. Frozen so the spec a
+    factory receives is a deterministic, tamper-evident value (NFR-005). All
+    fields are assembled by :func:`build_fusion` from its own kwargs — a v2
+    factory never has to re-derive them.
+
+    Attributes
+    ----------
+    mode : str
+        The selected fusion mode (the registration key).
+    weights : dict[str, float]
+        Per-engine global weights (the v1 ``weights`` arg).
+    min_consensus : int
+        Consensus threshold (the v1 ``min_consensus`` arg).
+    entity_weights : dict[str, dict[str, float]] | None
+        Per-engine per-entity-type weight overrides.
+    iou_threshold : float
+        Minimum Intersection-over-Union for span overlap.
+    gate_path : str | Path | None
+        Optional ``gate_v1.json`` path for a learned gate (S2-05 verify-on-load).
+    key_ring : Any | None
+        Optional trust root (a ``KeyRing``) for verifying ``gate_path``. Typed
+        loosely to avoid an import cycle; a v2 factory narrows it as needed.
+    top_k : int
+        Number of experts to activate per entity type (MoE seam).
+    """
+
+    mode: str
+    weights: dict[str, float]
+    min_consensus: int
+    entity_weights: dict[str, dict[str, float]] | None
+    iou_threshold: float
+    gate_path: str | Path | None
+    key_ring: Any | None
+    top_k: int
+
+
+CustomFusionFactoryV2 = Callable[[FusionBuildSpec], FusionStrategy]
+_CUSTOM_FACTORIES_V2: dict[str, CustomFusionFactoryV2] = {}
+
+
+def register_fusion_strategy_v2(mode: str, factory: CustomFusionFactoryV2) -> None:
+    """Register a richer (v2) custom fusion strategy.
+
+    Unlike the frozen v1 :func:`register_fusion_strategy` (whose factory takes
+    only ``(weights, min_consensus)``), a v2 factory receives a populated
+    :class:`FusionBuildSpec` carrying the full construction context (gate path,
+    key-ring, top-k, per-entity weights, iou threshold). Use this to register a
+    mode that needs more than the v1 two-argument signature can express.
+
+    Parameters
+    ----------
+    mode : str
+        Strategy name (the dispatch key for :func:`build_fusion`).
+    factory : CustomFusionFactoryV2
+        Callable ``(spec: FusionBuildSpec) -> FusionStrategy``.
+
+    Notes
+    -----
+    v2 factories are consulted by :func:`build_fusion` ADDITIVELY — after the
+    builtin dispatch and ahead of the v1 fall-through — so registering a v2 mode
+    never shadows a builtin and never disturbs the frozen v1 path.
+    """
+    _CUSTOM_FACTORIES_V2[mode] = factory
+
+
+#: Single source of truth for the BUILTIN fusion modes (S2-01 drift guard).
+#: ``available_fusion_modes()`` reads this and :func:`build_fusion` dispatches
+#: exactly these branches, so a mode added to one place but not the other is
+#: caught by the drift-guard test. Must stay in lockstep with the ``if mode ==``
+#: branches in :func:`build_fusion`.
+_BUILTIN_FUSION_MODES: tuple[str, ...] = (
+    "union_high_recall",
+    "weighted_consensus",
+    "calibrated_majority",
+    "intersection_consensus",
+    "mixture_of_experts",
+    "swarm",
+)
+
+
 def available_fusion_modes() -> list[str]:
     """List all available fusion strategies (built-in and registered).
 
@@ -442,14 +543,11 @@ def available_fusion_modes() -> list[str]:
     list[str]
         Sorted list of strategy names.
     """
-    builtin = [
-        "union_high_recall",
-        "weighted_consensus",
-        "calibrated_majority",
-        "intersection_consensus",
-        "mixture_of_experts",
-    ]
-    return sorted(set(builtin + list(_CUSTOM_FACTORIES.keys())))
+    return sorted(
+        set(_BUILTIN_FUSION_MODES)
+        | set(_CUSTOM_FACTORIES.keys())
+        | set(_CUSTOM_FACTORIES_V2.keys())
+    )
 
 
 def build_fusion(
@@ -518,6 +616,24 @@ def build_fusion(
         # Layer-4 emission/corroboration gate drops is re-injected (FR-016/AX-003).
         from pii_anon.routing.floor_fusion import FloorProjectingFusion
         return FloorProjectingFusion(SwarmFusionStrategy())
+    # v2 construction seam (S2-01) — consulted ADDITIVELY after the builtin
+    # dispatch and ahead of the frozen v1 fall-through, so a v2 mode never
+    # shadows a builtin and the v1 path stays byte-identical. The richer
+    # FusionBuildSpec is assembled from this function's kwargs (gate_path /
+    # key_ring default to None, top_k to the builtin default — they are carried,
+    # not yet sourced from build_fusion's public signature, keeping it stable).
+    if mode in _CUSTOM_FACTORIES_V2:
+        spec = FusionBuildSpec(
+            mode=mode,
+            weights=weights,
+            min_consensus=min_consensus,
+            entity_weights=entity_weights,
+            iou_threshold=iou_threshold,
+            gate_path=None,
+            key_ring=None,
+            top_k=3,
+        )
+        return _CUSTOM_FACTORIES_V2[mode](spec)
     if mode in _CUSTOM_FACTORIES:
         return _CUSTOM_FACTORIES[mode](weights, min_consensus)
     raise FusionError(f"Unknown fusion mode `{mode}`")
