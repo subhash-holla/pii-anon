@@ -412,6 +412,94 @@ def test_a9_malformed_verified_artifact_raises_on_load(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# A9 (additive edge coverage) — every shape-validation branch is loud.
+# --------------------------------------------------------------------------- #
+
+
+def test_a9_non_mapping_payload_raises() -> None:
+    """A9: a non-mapping payload ⇒ GatePayloadError (defensive type guard)."""
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(["not", "a", "mapping"])  # type: ignore[arg-type]
+
+
+def test_a9_non_int_schema_version_raises() -> None:
+    """A9: a non-int schema_version ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["schema_version"] = "1"
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_bool_schema_version_raises() -> None:
+    """A9: a bool schema_version (bool is an int subclass) ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["schema_version"] = True
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_non_int_gate_feature_version_raises() -> None:
+    """A9: a non-int gate_feature_version ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["gate_feature_version"] = 1.5
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_empty_oracle_hash_raises() -> None:
+    """A9: an empty oracle_hash string ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["oracle_hash"] = ""
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+@pytest.mark.parametrize("bad_temp", [0.0, -1.0, float("nan"), float("inf"), "1.0", True])
+def test_a9_bad_temperature_raises(bad_temp: object) -> None:
+    """A9: a non-positive / non-finite / non-numeric / bool temperature ⇒
+    GatePayloadError."""
+    payload = _valid_payload()
+    payload["temperature"] = bad_temp
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_non_string_entity_type_key_raises() -> None:
+    """A9: a non-string weights key (entity type) ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["weights"] = {123: {"regex-oss": 1.0}}
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_non_mapping_inner_cell_raises() -> None:
+    """A9: a weights cell that is not a mapping ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["weights"] = {"PERSON_NAME": [("regex-oss", 1.0)]}
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_non_string_expert_id_raises() -> None:
+    """A9: a non-string expert-id key inside a cell ⇒ GatePayloadError."""
+    payload = _valid_payload()
+    payload["weights"] = {"PERSON_NAME": {7: 1.0}}
+    with pytest.raises(GatePayloadError):
+        DistilledGatePayload.from_payload(payload)
+
+
+def test_a9_valid_payload_view_is_immutable_and_exposed() -> None:
+    """A9: a valid payload builds an immutable view; the gate exposes it (the
+    weights mapping is read-only — no in-place mutation of a verified gate)."""
+    payload = DistilledGatePayload.from_payload(_valid_payload())
+    gate = DistilledTopKGate(payload)
+    assert gate.payload is payload
+    assert payload.weights["PERSON_NAME"]["gliner-compatible"] == 4.0
+    with pytest.raises(TypeError):
+        payload.weights["PERSON_NAME"]["gliner-compatible"] = 9.9  # type: ignore[index]
+
+
+# --------------------------------------------------------------------------- #
 # A10 (runtime slice) — import-boundary / no-new-dep / determinism  [AUDIT]
 # --------------------------------------------------------------------------- #
 
@@ -462,3 +550,94 @@ def test_a10_distilled_gate_is_advisory_and_deterministic(tmp_path: Path) -> Non
     first = gate.adjust("PERSON_NAME", ctx, list(base))
     second = gate.adjust("PERSON_NAME", ctx, list(base))
     assert first == second
+
+
+# --------------------------------------------------------------------------- #
+# Optional "distilled_moe" v2 wiring (the wired control-path mode).  [INTEGRATION]
+# Proves the gate plugs the v2 registry/factory closure WITHOUT changing
+# build_fusion's public signature (the public gate_path thread is DEFERRED).
+# --------------------------------------------------------------------------- #
+
+
+def test_distilled_moe_mode_is_registered() -> None:
+    """The 'distilled_moe' v2 mode is discoverable via available_fusion_modes()."""
+    from pii_anon.fusion import available_fusion_modes
+
+    assert "distilled_moe" in available_fusion_modes()
+
+
+def test_distilled_moe_factory_no_gate_floors_a_shared_span() -> None:
+    """v2 factory with gate_path=None ⇒ a floor-wrapped MoE that still floors a
+    shared span (NFR-026 static-softmax path + AX-003 floor)."""
+    from pii_anon.fusion import FusionBuildSpec, _build_distilled_moe
+
+    spec = FusionBuildSpec(
+        mode="distilled_moe", weights={}, min_consensus=1, entity_weights=None,
+        iou_threshold=0.5, gate_path=None, key_ring=None, top_k=3,
+    )
+    pipeline = _build_distilled_moe(spec)
+    shared_span = EngineFinding(
+        entity_type="US_SSN", confidence=0.99, field_path="ssn",
+        span_start=0, span_end=11, engine_id="regex-oss", language="en",
+    )
+    out = pipeline.merge([shared_span])
+    assert any(
+        f.entity_type == "US_SSN" and f.span_start == 0 and f.span_end == 11 for f in out
+    )
+
+
+def test_distilled_moe_factory_with_signed_gate_still_floors(tmp_path: Path) -> None:
+    """v2 factory with a real signed gate_path (zeroing regex-oss for US_SSN) ⇒ the
+    gate loads through verify-on-load and the floor STILL re-injects the shared span
+    with the shared_floor marker (AX-003 — the wired gate is advisory)."""
+    from pii_anon.fusion import FusionBuildSpec, _build_distilled_moe
+
+    gate_file = tmp_path / "gate_v1.json"
+    _write_signed_gate(gate_file, _ring(), _valid_payload())
+    spec = FusionBuildSpec(
+        mode="distilled_moe", weights={}, min_consensus=1, entity_weights=None,
+        iou_threshold=0.5, gate_path=gate_file, key_ring=_ring(), top_k=3,
+    )
+    pipeline = _build_distilled_moe(spec)
+    shared_span = EngineFinding(
+        entity_type="US_SSN", confidence=0.99, field_path="ssn",
+        span_start=0, span_end=11, engine_id="regex-oss", language="en",
+    )
+    out = pipeline.merge([shared_span])
+    survivors = [
+        f for f in out
+        if f.entity_type == "US_SSN" and f.span_start == 0 and f.span_end == 11
+    ]
+    assert survivors and any("shared_floor" in (f.explanation or "") for f in survivors)
+
+
+def test_distilled_moe_factory_gate_path_without_key_ring_fails_closed(tmp_path: Path) -> None:
+    """v2 factory with a gate_path but no key_ring fails CLOSED (ValueError) — a gate
+    that cannot be verified must never be loaded with verification skipped."""
+    from pii_anon.fusion import FusionBuildSpec, _build_distilled_moe
+
+    gate_file = tmp_path / "gate_v1.json"
+    _write_signed_gate(gate_file, _ring(), _valid_payload())
+    spec = FusionBuildSpec(
+        mode="distilled_moe", weights={}, min_consensus=1, entity_weights=None,
+        iou_threshold=0.5, gate_path=gate_file, key_ring=None, top_k=3,
+    )
+    with pytest.raises(ValueError, match="key_ring"):
+        _build_distilled_moe(spec)
+
+
+def test_distilled_moe_factory_tampered_gate_fails_closed(tmp_path: Path) -> None:
+    """v2 factory pointed at a tampered gate_path fails CLOSED (GateSignatureError)
+    — the wired control-path mode never silently degrades on a broken signature."""
+    from pii_anon.fusion import FusionBuildSpec, _build_distilled_moe
+
+    gate_file = tmp_path / "gate_v1.json"
+    envelope = _ring().sign_payload(_valid_payload())
+    envelope["payload"]["weights"]["PERSON_NAME"]["gliner-compatible"] = 999.0  # type: ignore[index]
+    gate_file.write_text(json.dumps(envelope), encoding="utf-8")
+    spec = FusionBuildSpec(
+        mode="distilled_moe", weights={}, min_consensus=1, entity_weights=None,
+        iou_threshold=0.5, gate_path=gate_file, key_ring=_ring(), top_k=3,
+    )
+    with pytest.raises(GateSignatureError):
+        _build_distilled_moe(spec)

@@ -60,3 +60,19 @@ class GateSignatureError(PiiAnonError):
     they never include key bytes or any correct-HMAC material (a failure must
     not be a forgery oracle).
     """
+
+
+class GatePayloadError(PiiAnonError):
+    """Raised when a *verified* control-path gate payload is structurally
+    malformed: a missing required key, a non-finite or negative advisory weight,
+    a non-mapping ``weights`` block, or an unknown ``schema_version``.
+
+    This is the fail-loud signal for the S2-02 ``DistilledTopKGate`` payload
+    validator (``DistilledGatePayload.from_payload``). The SIGNATURE is checked
+    upstream by ``GateSignatureError`` / ``load_verified_gate``; this validates
+    the SHAPE of the already-verified content. A structurally-broken *signed*
+    gate is a loud operator error — it is never coerced into a partial/best-effort
+    gate and never degraded to the static-softmax fallback (present-and-broken
+    != absent). Messages name only the offending field and a generic reason; they
+    never include key material.
+    """

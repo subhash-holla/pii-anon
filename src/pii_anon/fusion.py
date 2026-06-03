@@ -688,3 +688,58 @@ def build_fusion_audit(
             )
         )
     return audits
+
+
+# --------------------------------------------------------------------------- #
+# S2-02 — the wired "distilled_moe" control-path mode (ADDITIVE, v2 seam only).
+#
+# Registers a v2 fusion factory that builds the recall-floor-wrapped MoE strategy
+# whose inner MoERouter carries a verify-on-load DistilledTopKGate loaded from the
+# spec's gate_path / key_ring (or no gate when gate_path is None ⇒ static softmax,
+# NFR-026). This keeps the gate wiring behind the v2 registry + a factory closure;
+# build_fusion's PUBLIC signature is intentionally NOT changed to source gate_path
+# (the v2 seam in build_fusion currently carries gate_path=None — threading the
+# public signature is DEFERRED to a follow-up, per the S2-02 non-goal). A caller
+# that hand-builds a FusionBuildSpec with a real gate_path/key_ring gets the wired
+# gated path today; the floor wrap is preserved so the gate stays advisory (AX-003).
+# --------------------------------------------------------------------------- #
+DISTILLED_MOE_MODE = "distilled_moe"
+
+
+def _build_distilled_moe(spec: FusionBuildSpec) -> FusionStrategy:
+    """v2 factory for the gate-configured, floor-wrapped MoE strategy."""
+    from pii_anon.moe import MoEFusionStrategy, MoERouter, get_default_registry
+    from pii_anon.routing.distilled_gate import load_distilled_gate
+    from pii_anon.routing.floor_fusion import FloorProjectingFusion
+
+    registry = get_default_registry()
+    inner = MoEFusionStrategy(
+        registry=registry,
+        top_k=spec.top_k,
+        iou_threshold=spec.iou_threshold,
+        performance_floor=True,
+        min_expert_weight=0.15,
+    )
+    # Load the verified gate ONLY through the fail-closed verify-on-load seam.
+    # gate_path is None ⇒ no gate ⇒ the inner router's static softmax (NFR-026).
+    gate = None
+    if spec.gate_path is not None:
+        key_ring: Any = spec.key_ring
+        if key_ring is None:
+            # A gate_path with no key_ring cannot be verified — fail closed rather
+            # than silently skip verification (mirrors MoERouter's construction seam).
+            raise ValueError("distilled_moe gate_path requires a key_ring for verify-on-load")
+        gate = load_distilled_gate(spec.gate_path, key_ring=key_ring)
+    # Replace the inner strategy's default (no-gate) router with a gate-equipped
+    # one — the advisory-weighting layer. The floor wrap below keeps the gate from
+    # ever dropping a shared span (AX-003).
+    inner.router = MoERouter(
+        registry,
+        top_k=spec.top_k,
+        performance_floor=True,
+        gate=gate,
+    )
+    return FloorProjectingFusion(inner)
+
+
+register_fusion_strategy_v2(DISTILLED_MOE_MODE, _build_distilled_moe)

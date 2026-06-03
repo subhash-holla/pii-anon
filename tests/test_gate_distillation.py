@@ -406,3 +406,57 @@ def test_a10_trainer_path_has_no_nondeterminism_sources() -> None:
             imported.add(node.module.split(".")[0])
     for banned in ("random", "uuid", "time", "secrets"):
         assert banned not in imported, f"distill path must not import {banned!r}"
+
+
+# --------------------------------------------------------------------------- #
+# Additive edge coverage — oracle_hash fallbacks + temperature guard.
+# --------------------------------------------------------------------------- #
+
+
+def test_oracle_hash_falls_back_to_repr_without_model_bytes() -> None:
+    """An oracle WITHOUT model_bytes() still gets a stable oracle_hash (repr-based),
+    deterministic across replays."""
+    class _NoBytesOracle:
+        def predict(self, features: list[list[float]]) -> list[float]:
+            return [0.5 for _ in features]
+
+        def __repr__(self) -> str:
+            return "_NoBytesOracle(fixed)"
+
+    p1 = distill_topk_gate(_NoBytesOracle(), _records(), temperature=1.0, seed=42)
+    p2 = distill_topk_gate(_NoBytesOracle(), _records(), temperature=1.0, seed=42)
+    assert isinstance(p1["oracle_hash"], str) and len(p1["oracle_hash"]) == 64
+    assert p1["oracle_hash"] == p2["oracle_hash"]
+
+
+def test_oracle_hash_handles_non_bytes_model_bytes() -> None:
+    """An oracle whose model_bytes() returns a non-bytes object is repr-coerced (the
+    hash never raises on an odd teacher serialization)."""
+    class _StrBytesOracle:
+        def predict(self, features: list[list[float]]) -> list[float]:
+            return [0.5 for _ in features]
+
+        def model_bytes(self) -> str:  # intentionally not bytes
+            return "not-actually-bytes"
+
+    payload = distill_topk_gate(_StrBytesOracle(), _records(), temperature=1.0, seed=42)
+    assert isinstance(payload["oracle_hash"], str) and len(payload["oracle_hash"]) == 64
+
+
+def test_distill_rejects_non_positive_temperature() -> None:
+    """A non-positive temperature ⇒ ValueError (a degenerate softmax temperature is
+    a caller error, not a silent clamp)."""
+    oracle = _LinearSurvivalOracle()
+    with pytest.raises(ValueError, match="temperature"):
+        distill_topk_gate(oracle, _records(), temperature=0.0, seed=42)
+    with pytest.raises(ValueError, match="temperature"):
+        distill_topk_gate(oracle, _records(), temperature=-1.0, seed=42)
+
+
+def test_distill_records_advisory_emission_threshold() -> None:
+    """The payload records an advisory emission_threshold (via select_f2_threshold)
+    plus its f_beta — metadata only, never a hard cut in the gate."""
+    oracle = _LinearSurvivalOracle()
+    payload = distill_topk_gate(oracle, _records(), temperature=1.0, seed=42)
+    assert "emission_threshold" in payload and isinstance(payload["emission_threshold"], float)
+    assert "emission_f_beta" in payload and isinstance(payload["emission_f_beta"], float)
