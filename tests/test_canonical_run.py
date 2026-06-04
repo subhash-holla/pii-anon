@@ -599,6 +599,102 @@ def test_g2_attach_keeps_anon_and_pseudo_separate_keys() -> None:
             assert s["pseudonymization_integrity_score"] == 0.0  # honest incumbent 0.0
 
 
+def test_resolve_sampler_falls_back_to_in_tree_when_data_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """[UNIT-TEST] RISK-5: when the DATA ``pii_anon_datasets`` import fails inside
+    ``_resolve_sampler``, it falls back to the in-tree representative fixture with
+    scope ``representative-in-tree`` (NEVER ``data-v2.0.0``). The corpus hash is a
+    real sha256 of the resolved record projection (never fabricated)."""
+    import importlib
+
+    from pii_anon.evaluation import canonical_run as cr
+
+    real_import_module = importlib.import_module
+
+    def _blocked_import_module(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "pii_anon_datasets":
+            raise ImportError("simulated: DATA package unavailable")
+        return real_import_module(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", _blocked_import_module)
+    scope, sampler = cr._resolve_sampler()
+    assert scope == "representative-in-tree"
+    assert isinstance(sampler, cr._InTreeFixtureSampler)
+    assert sampler.dataset_version != "2.0.0"
+    assert len(sampler.corpus_bytes) > 0  # a real projection digest input
+    assert sampler.power_cells(sample_size=8)["verdict"] == "n/a-in-tree"
+
+
+def test_gate_rejects_malformed_run_metadata() -> None:
+    """[SECURITY-TEST] Fail-closed: a non-dict ``run_metadata`` is REJECTED outright
+    (never a fail-open on a malformed artifact)."""
+    ok, missing = CanonicalRunGate().validate({"run_metadata": "not-a-dict"})
+    assert ok is False
+    assert any("run_metadata" in m for m in missing), missing
+
+
+def test_gate_rejects_absent_provenance_block_and_g2_g4_fields() -> None:
+    """[SECURITY-TEST] Fail-closed: an artifact missing the provenance block, the
+    per-language delta, the core G2 family fields AND the G4 block accumulates ALL
+    the missing reasons (no single field silently passes)."""
+    payload = {
+        "run_metadata": {
+            "git_sha": "x",
+            "dataset_sha256": "y",
+            "matrix_sha256": "z",
+            "timestamp_utc": "t",
+            # canonical_provenance block deliberately absent
+        },
+        # per_language_recall_delta deliberately absent
+        "systems": [
+            {"system": "pii-anon"},  # no G2 family fields, no G4 block
+            {"system": "gliner"},  # no competitor pseudo field
+        ],
+    }
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    joined = " | ".join(missing)
+    assert "canonical_provenance" in joined
+    assert "per_language_recall_delta" in joined
+    assert "pseudonymization_integrity_score" in joined
+    assert "per_class_ece" in joined
+    assert "no competitor carries" in joined
+
+
+def test_gate_rejects_per_language_delta_with_non_numeric_value() -> None:
+    """[SECURITY-TEST] A non-numeric per-language ε (a string / bool) is REJECTED —
+    the gate never coerces a non-measurement into a passing ε."""
+    payload = _synthetic_produced_shape()
+    payload["per_language_recall_delta"] = {"en": "tiny"}  # not a real number
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("per_language_recall_delta.en" in m for m in missing), missing
+
+
+def test_gate_rejects_absent_core_system() -> None:
+    """[SECURITY-TEST] Fail-closed: an artifact whose ``systems`` lacks pii-anon is
+    REJECTED (the claimant must be present to certify its moat-axis fields)."""
+    payload = _synthetic_produced_shape()
+    payload["systems"] = [{"system": "gliner", "pseudonymization_integrity_score": 0.0}]
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("'pii-anon'" in m and "absent" in m for m in missing), missing
+
+
+def test_git_sha_and_matrix_sha_are_real_digests() -> None:
+    """[UNIT-TEST] NFR-006: ``_git_sha`` returns a non-blank string and
+    ``_matrix_sha256`` returns a 64-hex sha256 (a real digest, never a fabricated
+    fixed value)."""
+    from pii_anon.evaluation.canonical_run import _git_sha, _matrix_sha256
+
+    sha = _git_sha()
+    assert isinstance(sha, str) and sha.strip()
+    matrix = _matrix_sha256()
+    assert isinstance(matrix, str) and len(matrix) == 64
+    int(matrix, 16)  # valid hex (raises if not)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
