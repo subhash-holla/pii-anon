@@ -730,6 +730,30 @@ def test_gate_rejects_non_finite_g4_coverage() -> None:
     assert any("calibrated_confidence_coverage" in m for m in missing), missing
 
 
+def test_gate_rejects_negative_per_class_ece() -> None:
+    """[SECURITY-TEST] close-3 (defense-in-depth, symmetric with the SDO gate): a
+    NEGATIVE per_class_ece value is non-physical (ECE ≥ 0 by construction). The real
+    selective_risk scorer never emits one, but the fail-closed gate must REJECT it
+    so the producer can never certify a sub-zero ECE — mirroring the gate-side fix
+    where a negative ECE is a breach, not a vacuous 'within bar' PASS."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["per_class_ece"] = {"EMAIL": -1.0}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("per_class_ece" in m for m in missing), missing
+
+
+def test_gate_accepts_zero_per_class_ece() -> None:
+    """[UNIT-TEST] close-3 CARDINAL-RULE regression: an HONEST per_class_ece of
+    exactly 0.0 (a perfectly calibrated class — what the real scorer emits on the
+    synthetic well-calibrated set) is ≥ 0 and still ACCEPTED by the gate."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["per_class_ece"] = {"EMAIL_ADDRESS": 0.0, "US_SSN": 0.0}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is True, missing
+    assert missing == []
+
+
 def test_gate_rejects_laundered_scope() -> None:
     """[SECURITY-TEST] Adversarial vector #7 (scope laundering): a provenance scope
     outside the two honest values is REJECTED (no laundered ``full-census`` /

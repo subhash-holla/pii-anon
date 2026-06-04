@@ -1925,6 +1925,107 @@ def test_g4_is_deterministic_on_fabrication_vectors() -> None:
 
 
 # ---------------------------------------------------------------------------
+# S7-02 close-3 — G4 NEGATIVE per-class ECE fabrication. The close found the LAST
+# hole in `_g4_calibration_selective_risk`: a per-class ECE is validated only for
+# FINITENESS (`_is_finite_number`), with NO LOWER BOUND. An Expected Calibration
+# Error is ``≥ 0`` by construction, so a forged NEGATIVE ECE (e.g. -1.0) is
+# ``< bar`` ⇒ counts as "within bar" ⇒ G4.passed=True ("worst -1.0") — a fabricated
+# moat-axis PASS that flips the honest PENDING/FAIL and can escalate to
+# CLAIM_GRADE_SOTA via the trusted-caller waiver seam. A negative ECE is a corrupt
+# present-but-unusable measurement (non-physical, symmetric with rejecting a
+# coverage outside [0,1]) → a BREACH, never "within bar"; it is also excluded from
+# `finite_eces` so garbage never stands in as the worst observed ECE.
+# ---------------------------------------------------------------------------
+
+
+def test_g4_fail_when_per_class_ece_is_negative_one() -> None:
+    """[CONTRACT-TEST] close-3 anti-fabrication / NFR-017: a per-class ECE of -1.0
+    is non-physical (ECE ≥ 0 by construction). The pre-hardening gate validated only
+    finiteness, so -1.0 < bar slipped 'every ECE ≤ bar' → a FALSE PASS ("worst
+    -1.0"). A negative ECE is a corrupt measurement → G4 FAIL, with the offending
+    class named in the breach detail."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "EMAIL": -1.0})
+    )
+    assert g4.passed is False
+    assert "EMAIL" in g4.binding_detail
+    # The garbage value must NOT stand in as the worst observed ECE.
+    assert g4.observed >= 0.0
+
+
+def test_g4_fail_when_per_class_ece_is_small_negative() -> None:
+    """[CONTRACT-TEST] close-3 / NFR-017: even a small negative ECE (-0.001) is a
+    corrupt measurement — the lower bound is exactly 0, not 'approximately 0'. A
+    sub-zero ECE FAILs (it is below the only physical floor)."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": -0.001})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_fail_when_per_class_ece_is_large_negative() -> None:
+    """[CONTRACT-TEST] close-3 / NFR-017: a large negative ECE (-5.0) is the same
+    fabrication class — magnitude does not matter, the sign does. FAIL."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": -5.0})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+
+
+def test_g4_co_located_negative_and_over_bar_reports_over_bar_as_headline() -> None:
+    """[CONTRACT-TEST] close-3 detail-ranking: when a NEGATIVE ECE (-1.0) co-exists
+    with a GENUINE over-bar class (SSN 0.5 > 0.05 bar, slack > 0), the over-bar
+    class stays the HEADLINE breach (it has the larger physical slack) — the lone
+    negative is reported only when it is the sole breach. Either way G4 FAILs."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL": -1.0, "US_SSN": 0.5})
+    )
+    assert g4.passed is False
+    assert "US_SSN" in g4.binding_detail
+    assert "0.5" in g4.binding_detail
+
+
+def test_g4_pass_unchanged_when_ece_is_exactly_zero() -> None:
+    """[CONTRACT-TEST] close-3 CARDINAL-RULE regression: the lower-bound hardening
+    must not move the floor — an HONEST ECE of exactly 0.0 (a perfectly calibrated
+    class) is ≥ 0 and ≤ bar, so it still PASSes."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.0, "US_SSN": 0.0})
+    )
+    assert g4.passed is True
+
+
+def test_g4_negative_ece_fabrication_does_not_reach_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END: the negative-ECE false-PASS is closed at the
+    verdict layer. With a canonical run, J≥0.95, G2 fields + G5 override PASS, and
+    the whole Tier-R∪Tier-C set waived — but a NEGATIVE per-class ECE (-1.0) in the
+    calibration block — G4 is FAIL and the headline verdict does NOT reach
+    CLAIM_GRADE_SOTA (pre-hardening it did, on a vacuous G4 PASS over -1.0)."""
+    cal = _conforming_calibration()
+    cal["per_class_ece"] = {"EMAIL_ADDRESS": 0.02, "EMAIL": -1.0}
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, cal)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is False
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# ---------------------------------------------------------------------------
 # S7-02 adversarial-close hardening — the no-fabrication invariant's 3 gate
 # holes (the close's exact repros). The shared root-cause: an artifact-numeric
 # field that DRIVES a verdict was read with bare ``float()`` /
