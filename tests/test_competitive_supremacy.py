@@ -31,8 +31,10 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     J_BAR,
     SupremacyVerdict,
     Verdict,
+    _finite_unit_score,
     _g2_pseudonymization_integrity,
     _g4_calibration_selective_risk,
+    _is_finite_number,
     f_beta,
     recall_floor_breachers,
 )
@@ -1338,6 +1340,64 @@ def test_g2_pending_when_core_pi_is_bool_not_coerced_to_one() -> None:
         _g2_systems(True, competitors={"gliner": 0.60})
     )
     assert g2.passed is None
+
+
+def test_vector11_is_finite_number_rejects_unbounded_int_fail_closed() -> None:
+    """[SECURITY-TEST] S7-02 vector #11: ``_is_finite_number`` REJECTS a Python int
+    wider than a C double (``10**400``) — ``math.isfinite`` raises OverflowError on
+    such a value, so the predicate must guard it and fail CLOSED (return ``False``),
+    never crash. This is the ONE sanctioned hardening of the SDO gate under the S7-02
+    close (story §9 / vector #11). Ordinary finite values are unaffected."""
+    assert _is_finite_number(10**400) is False
+    assert _is_finite_number(-(10**400)) is False
+    # The unguarded math.isfinite WOULD raise on these; the guard must not.
+    import math
+
+    with pytest.raises(OverflowError):
+        math.isfinite(10**400)  # documents WHY the guard is needed
+    # Ordinary values keep their semantics.
+    assert _is_finite_number(0.5) is True
+    assert _is_finite_number(1) is True
+    assert _is_finite_number(True) is False
+    assert _is_finite_number(float("nan")) is False
+    assert _finite_unit_score(10**400) is None
+    assert _finite_unit_score(0.42) == 0.42
+
+
+def test_vector11_g2_pending_on_huge_int_field_no_crash() -> None:
+    """[SECURITY-TEST] S7-02 vector #11 in G2: a huge-int (out-of-float-range)
+    pseudonymization_integrity_score is treated as an ABSENT measurement ⇒ G2 PENDING
+    (None), never an OverflowError crash and never a fabricated win. Probed on BOTH
+    the SUT field and the sole-competitor field."""
+    # Huge int on the SUT ⇒ no real SUT score ⇒ PENDING (not a crash).
+    g2_core = _g2_pseudonymization_integrity(
+        _g2_systems(10**400, competitors={"gliner": 0.60})
+    )
+    assert g2_core.passed is None
+    # Huge int as the sole competitor 'score' ⇒ no real comparator ⇒ PENDING.
+    g2_comp = _g2_pseudonymization_integrity(
+        _g2_systems(0.95, competitors={"gliner": 10**400})
+    )
+    assert g2_comp.passed is None
+
+
+def test_vector11_g4_fail_on_huge_int_per_class_ece_no_crash() -> None:
+    """[SECURITY-TEST] S7-02 vector #11 in G4: a huge-int per-class ECE is a
+    present-but-out-of-range measurement ⇒ G4 FAIL (it must never slip ``ece ≤ bar``
+    via an OverflowError crash). The artifact-supplied ECE-threshold clamp is also
+    robust to a huge-int threshold (it falls back to the sanctioned bar)."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(per_class_ece={"EMAIL_ADDRESS": 0.02, "US_SSN": 10**400})
+    )
+    assert g4.passed is False  # not a crash, not a vacuous pass
+    # A huge-int threshold must not loosen the bar (clamped to the sanctioned ceiling).
+    g4b = _g4_calibration_selective_risk(
+        _g4_core(
+            per_class_ece={"EMAIL_ADDRESS": 0.5},
+            per_class_ece_threshold={"EMAIL_ADDRESS": 10**400},
+        )
+    )
+    assert g4b.passed is False
 
 
 def test_g2_pending_when_only_competitor_pi_is_not_a_real_score() -> None:

@@ -559,7 +559,14 @@ def _is_finite_number(value: object) -> TypeGuard[int | float]:
     """
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
-    return math.isfinite(value)
+    # math.isfinite raises OverflowError on a Python int wider than a C double
+    # (e.g. 10**400 — "int too large to convert to float"). A control-path
+    # validator must REJECT such an out-of-float-range field (fail CLOSED), never
+    # crash on adversarial input (vector #11 — a fail-loud denial-of-verdict).
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        return False
 
 
 def _finite_unit_score(value: object) -> float | None:

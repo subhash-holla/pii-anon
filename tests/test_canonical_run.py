@@ -9,28 +9,39 @@ A fail-closed :class:`CanonicalRunGate` validates ALL required fields BEFORE
 allowing ``canonical_claim_run=True``.
 
 The KEYSTONE TEETH (A6–A11): after the producer builds the artifact, route it
-through the UNMODIFIED SDO gate ``SupremacyVerdict.from_artifacts`` and assert
-G1/G2/G4 are NOT PENDING, G7 PASS, and the verdict is **PROVISIONAL_SOTA**
-(canonical + G1/G2/G4/G3/G6 PASS + J≥0.95; G5 PENDING; blocked from CLAIM_GRADE by
-the unrun Tier-C cloud APIs + the unrun Tier-R ``gliner2``).
+through the UNMODIFIED SDO gate ``SupremacyVerdict.from_artifacts`` and assert the
+MACHINERY is honest — G1/G2/G4 are NOT PENDING (they compute from the real
+scorers), G7 PASS (canonical_claim_run True + provenance), and the verdict is
+whatever ``from_artifacts`` HONESTLY computes from the FRESH-measured detection
+metrics. The verdict is scale-dependent and NOT hardcoded: the composite/J
+dominance genuinely requires full-census scale (a sub-census sample's
+regex-vs-neural composite race is razor-thin / flips to a neural competitor), so at
+fast CI scale the honest verdict is one of {PROVISIONAL_SOTA, NOT_YET}, and IF
+NOT_YET the binding constraint is an honest raw-detection axis (the composite/J or
+a raw-detection guarantee), NEVER a fabrication. PROVISIONAL_SOTA is certified by
+the documented full-census re-run on the current code (the user's Pass-2; see the
+artifact's ``pass2_full_census_reference`` block).
 
 No-fabrication contract (story §2a): every emitted field is a REAL scorer output
-the gate's validators ACCEPT (finite, in-range, non-bool). The composites the
-gate's J/G3/G6 read are produced by the real ``compute_composite`` scorer over the
-full-census-validated representative detection profiles (AX-001 — a real scorer
-output, honestly representative of the measured census, never a hardcoded pass);
-the small in-tree detection run is a genuine but noisy estimator and is recorded
-separately. G2/G4 are real ``deid_families`` / ``selective_risk`` scorer outputs on
-synthetic-but-real-shaped inputs (AX-001). G1 is the real S1-02 floored-fusion
-recall-floor primitive. All corpora are SYNTHETIC (AX-001 — never real PII).
+the gate's validators ACCEPT (finite, in-range, non-bool). The gate-read detection
+metrics (``recall`` / ``precision`` / ``per_entity_recall`` and the
+``composite_score`` derived from them with a fixed reference speed) are the FRESH
+measurement on the current code — NO prior-run numbers in the gate-read path. The
+documented PRIOR full-census run is surfaced as TRANSPARENT
+``pass2_full_census_reference`` data, NEVER gate-read. G2/G4 are real
+``deid_families`` / ``selective_risk`` scorer outputs on synthetic-but-real-shaped
+inputs (AX-001). G1 is the real S1-02 floored-fusion recall-floor primitive. All
+corpora are SYNTHETIC (AX-001 — never real PII).
 
-Determinism (NFR-005 / AX-002): seed-driven; ``enable_parallel=False``; canonical
-sorted JSON + ``round(., 6)``; ``timestamp_utc`` is the LONE field excluded from
-the determinism comparison.
+Determinism (NFR-005 / AX-002): seed-driven; the gate-read detection-quality
+metrics are a pure function of the record set (IDENTICAL whether ``enable_parallel``
+is ``True`` or ``False``); canonical sorted JSON + ``round(., 6)``; ``timestamp_utc``
+is the LONE field excluded from the determinism comparison.
 
 The integration tests build the artifact via ``produce_canonical_artifact`` with a
-tightly-capped representative sample so they stay FAST (representative, not a full
-census). Scope is stamped HONESTLY from the actual sampler used.
+SMALL ``max_samples`` so they stay FAST (a high-variance estimator — NOT a census);
+the REAL produced artifact uses ``max_samples=None`` (the FULL in-tree dataset).
+Scope is stamped HONESTLY from the actual sampler used.
 """
 
 from __future__ import annotations
@@ -52,13 +63,14 @@ from pii_anon.evaluation.canonical_run import (
     produce_canonical_artifact,
 )
 
-# A tight representative cap so the real detection run stays FAST in CI.
+# A SMALL cap so the real detection run stays FAST in CI (a high-variance estimator,
+# NOT a census — the real produced artifact uses max_samples=None / the full dataset).
 _REPRESENTATIVE_MAX_SAMPLES = 8
 _SEED = 20240601
 
 
 # ---------------------------------------------------------------------------
-# A session-scoped produced artifact (the real detection run is the slow part;
+# A module-scoped produced artifact (the real detection run is the slow part;
 # build it ONCE and share the read-only dict across the keystone-teeth tests).
 # ---------------------------------------------------------------------------
 
@@ -67,13 +79,16 @@ _SEED = 20240601
 def produced(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """Produce the canonical artifact ONCE (real detection + real scorers).
 
-    Writes ONLY under a pytest tmp dir (never the repo's ``artifacts/*``).
+    Single-threaded (``enable_parallel=False``) for the deterministic CI run, at a
+    SMALL ``max_samples`` so it is FAST. Writes ONLY under a pytest tmp dir (never the
+    repo's ``artifacts/*``).
     """
     out_dir = tmp_path_factory.mktemp("canonical_out")
     return produce_canonical_artifact(
         seed=_SEED,
         output_dir=str(out_dir),
         max_samples=_REPRESENTATIVE_MAX_SAMPLES,
+        enable_parallel=False,
     )
 
 
@@ -207,41 +222,61 @@ def test_g7_passes_canonical_and_provenance(produced: dict[str, Any]) -> None:
     assert g7.passed is True, g7.binding_detail
 
 
-def test_verdict_is_provisional_sota_on_produced_artifact(
+def test_verdict_is_honest_on_produced_artifact(
     produced: dict[str, Any],
 ) -> None:
-    """[INTEGRATION-TEST] A10 (the keystone): the gate's verdict on the produced
-    artifact is **PROVISIONAL_SOTA** — canonical + G1/G2/G4/G3/G6 PASS + J≥0.95;
-    G5 PENDING; blocked from CLAIM_GRADE by the unrun Tier-C cloud APIs + the unrun
-    Tier-R gliner2 (NOT by a failed/missing guarantee)."""
+    """[INTEGRATION-TEST] A10 (the keystone — INTEGRITY OVER OUTCOME): the gate's
+    verdict on the produced artifact is whatever ``from_artifacts`` HONESTLY computes
+    from the FRESH-measured detection metrics — it is NOT hardcoded to
+    PROVISIONAL_SOTA.
+
+    The MACHINERY is asserted (canonical_claim_run True; G7 PASS; G5 PENDING). The
+    verdict is one of {PROVISIONAL_SOTA, NOT_YET} (scale-dependent — the composite/J
+    crown genuinely requires full-census scale, so a small CI sample typically lands
+    NOT_YET), and IF NOT_YET the binding constraint is an HONEST raw-detection axis
+    (the composite/J gap, or a raw-detection guarantee G1/G3/G6/G7) — NEVER a
+    fabrication. PROVISIONAL_SOTA is certified by the documented full-census re-run
+    (Pass-2)."""
     verdict = SupremacyVerdict.from_artifacts(produced)
-    assert verdict.verdict is Verdict.PROVISIONAL_SOTA, (
-        f"{verdict.verdict} — binding: {verdict.binding_constraint}"
-    )
+    # The run IS certified (the gate validated the fields) — the machinery is honest.
     assert verdict.canonical_claim_run is True
-    assert verdict.j_value is not None and verdict.j_value >= 0.95, verdict.j_value
-    # G1/G2/G3/G4/G6 all PASS; G5 PENDING (honest — no G5 field this pass).
-    for axis in ("G1", "G2", "G3", "G4", "G6", "G7"):
-        assert verdict.guarantee(axis).passed is True, (
-            axis,
-            verdict.guarantee(axis).binding_detail,
-        )
+    assert verdict.guarantee("G7").passed is True, verdict.guarantee("G7").binding_detail
     assert verdict.guarantee("G5").passed is None  # PENDING (S7-04 follow-up)
-    # The CLAIM_GRADE blocker is an unrun tier, not a failed guarantee.
-    assert verdict.unrun_tier_c or verdict.unrun_tier_r
+    # The verdict is honest, scale-dependent — NOT a manufactured PROVISIONAL_SOTA.
+    assert verdict.verdict in (Verdict.PROVISIONAL_SOTA, Verdict.NOT_YET), verdict.verdict
+    if verdict.verdict is Verdict.PROVISIONAL_SOTA:
+        # If it honestly clears the bar at this scale: J ≥ bar + an unrun-tier blocker.
+        assert verdict.j_value is not None and verdict.j_value >= 0.95, verdict.j_value
+        assert verdict.unrun_tier_c or verdict.unrun_tier_r
+    else:
+        # NOT_YET must bind on an HONEST axis — the composite/J or a raw-detection
+        # guarantee — never a missing/fabricated field. (canonical is True, so the
+        # binding is NOT 'canonical_claim_run=False'.)
+        binding = verdict.binding_constraint
+        assert "canonical_claim_run=False" not in binding, binding
+        honest_axis = (
+            "J=" in binding  # the composite-rank J gap
+            or "J unavailable" in binding
+            or any(
+                f"{ax} FAIL" in binding for ax in ("G1", "G3", "G6", "G7")
+            )  # a raw-detection guarantee
+        )
+        assert honest_axis, f"NOT_YET must bind on an honest axis, got: {binding}"
 
 
 def test_produced_artifact_round_trips_through_from_artifacts_without_overrides(
     produced: dict[str, Any],
 ) -> None:
-    """[INTEGRATION-TEST] A11: the produced artifact drives the gate to
-    PROVISIONAL_SOTA WITHOUT any ``pending_overrides`` — G2/G4 compute from the
-    emitted fields alone (the override seam is NOT relied upon)."""
+    """[INTEGRATION-TEST] A11: the produced artifact drives the gate WITHOUT any
+    ``pending_overrides`` — G1/G2/G3/G4 all COMPUTE from the emitted fields alone (the
+    override seam is NOT relied upon). The only PENDING axis is G5 (honest — no G5
+    field this pass); the verdict is whatever the fresh metrics honestly yield."""
     verdict = SupremacyVerdict.from_artifacts(produced)  # no pending_overrides
-    assert verdict.verdict is Verdict.PROVISIONAL_SOTA
-    # No PENDING guarantee among the in-scope axes except G5.
+    # G1/G2/G3/G4 compute (NOT PENDING) from the emitted fields; only G5 is PENDING.
     pending = [g.axis for g in verdict.guarantees if g.passed is None]
     assert pending == ["G5"], pending
+    # The verdict is honestly computed (one of the two valid endpoints) — not hardcoded.
+    assert verdict.verdict in (Verdict.PROVISIONAL_SOTA, Verdict.NOT_YET), verdict.verdict
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +456,188 @@ def test_competitive_supremacy_unchanged() -> None:
         "_g7_certified_run",
     ):
         assert hasattr(g, name), name
+
+
+# ---------------------------------------------------------------------------
+# Vector #11 — the SDO gate's _is_finite_number hardened against a huge-int field
+# (the ONE sanctioned gate change; carried from SO-13/SO-14). A Python int wider
+# than a C double raises OverflowError in math.isfinite — a control-path validator
+# must REJECT it (fail CLOSED), never crash (a fail-loud denial-of-verdict).
+# ---------------------------------------------------------------------------
+
+
+def test_vector11_is_finite_number_rejects_unbounded_int_no_crash() -> None:
+    """[SECURITY-TEST] Vector #11: ``_is_finite_number(10**400)`` returns ``False``
+    (fail-CLOSED) rather than raising OverflowError. The huge int is wider than a C
+    double, so ``math.isfinite`` would crash without the guard."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _is_finite_number,
+    )
+
+    assert _is_finite_number(10**400) is False
+    assert _is_finite_number(-(10**400)) is False
+    # Ordinary values still behave.
+    assert _is_finite_number(0.5) is True
+    assert _is_finite_number(1) is True
+    assert _is_finite_number(True) is False  # a bool is not a measurement
+
+
+def test_vector11_finite_unit_score_rejects_unbounded_int_no_crash() -> None:
+    """[SECURITY-TEST] Vector #11: ``_finite_unit_score(10**400)`` returns ``None``
+    (treat-as-absent) rather than raising — the moat-axis validator is robust to a
+    huge-int field."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _finite_unit_score,
+    )
+
+    assert _finite_unit_score(10**400) is None
+    assert _finite_unit_score(0.73) == 0.73
+
+
+def test_vector11_canonical_gate_rejects_huge_int_g2_field_no_crash() -> None:
+    """[SECURITY-TEST] Vector #11 reaching the NEW gate: a huge-int
+    ``pseudonymization_integrity_score`` makes ``CanonicalRunGate.validate`` return
+    ``(False, [...])`` (fail-CLOSED) instead of raising OverflowError."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["pseudonymization_integrity_score"] = 10**400
+    ok, missing = CanonicalRunGate().validate(payload)  # must NOT raise
+    assert ok is False
+    assert any("pseudonymization_integrity_score" in m for m in missing), missing
+
+
+def test_vector11_sdo_gate_g2_pending_on_huge_int_field_no_crash(
+    produced: dict[str, Any],
+) -> None:
+    """[SECURITY-TEST] Vector #11 in the SDO gate's own G2 path: a huge-int moat
+    field on every competitor of the produced artifact drives G2 to PENDING (no valid
+    comparator), never a crash — the gate stays robust against an adversarial
+    artifact (the full ``from_artifacts`` path, not just the CanonicalRunGate)."""
+    payload = copy.deepcopy(produced)
+    ladder = {"pii-anon", "pii-anon-swarm"}
+    for s in payload["systems"]:
+        if s["system"] not in ladder:
+            s["pseudonymization_integrity_score"] = 10**400  # wider than a C double
+    g2 = SupremacyVerdict.from_artifacts(payload).guarantee("G2")  # must NOT raise
+    assert g2.passed is None, g2.binding_detail  # PENDING — every comparator rejected
+    assert "no competitor" in g2.binding_detail.lower()
+
+
+def test_vector11_g4_class_bar_rejects_huge_int_threshold_no_crash() -> None:
+    """[SECURITY-TEST] Vector #11 on the G4 ECE-threshold clamp: a huge-int
+    artifact-supplied per-class threshold is REJECTED (the conservative sanctioned
+    bar stands) rather than crashing ``_g4_class_bar``."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import _g4_class_bar
+
+    bar = _g4_class_bar(10**400)  # must NOT raise
+    assert bar <= 0.08  # falls back to the sanctioned bar, never loosened
+
+
+# ---------------------------------------------------------------------------
+# Scope honesty — the gate-read metrics are FRESH-measured + the documented census
+# is a TRANSPARENT Pass-2 reference (NEVER gate-read). The remediation core.
+# ---------------------------------------------------------------------------
+
+
+def test_gate_read_systems_are_fresh_not_census_literals(
+    produced: dict[str, Any],
+) -> None:
+    """[AUDIT] The gate-read ``systems`` recall/precision are the FRESH in-tree
+    measurement (no prior-run census numbers in the gate-read path). They match the
+    separately-surfaced fresh ``representative_in_tree_detection`` block exactly, and
+    do NOT equal the documented census literals (e.g. pii-anon census recall
+    0.7958)."""
+    fresh = produced["representative_in_tree_detection"]["systems"]
+    for s in produced["systems"]:
+        name = s["system"]
+        # The gate-read recall/precision == the fresh detection measurement verbatim.
+        assert s["recall"] == fresh[name]["recall"], name
+        assert s["precision"] == fresh[name]["precision"], name
+    # The census recall for pii-anon (0.7958) must NOT appear as the gate-read recall
+    # (the laundering the remediation removed) — the fresh small-sample value differs.
+    core = _system(produced, "pii-anon")
+    assert core["recall"] != 0.7958, "gate-read recall must be fresh, not the census literal"
+
+
+def test_pass2_full_census_reference_present_and_not_gate_read(
+    produced: dict[str, Any],
+) -> None:
+    """[AUDIT] The documented PRIOR full-census run is surfaced as a TRANSPARENT
+    ``pass2_full_census_reference`` block (source git_sha 2761a27,
+    canonical_claim_run=False, 148994 records) — clearly labelled Pass-2 reference
+    data, and NEVER read by the gate (it lives outside the ``systems`` block)."""
+    ref = produced["pass2_full_census_reference"]
+    assert ref["source_git_sha"].startswith("2761a27")
+    assert ref["source_record_count"] == 148994
+    assert ref["source_canonical_claim_run"] is False
+    assert ref["source_dataset_source"] == "auto"
+    assert ref["pii_anon_composite"] == 0.784583
+    assert ref["gliner_composite"] == 0.680213
+    assert "Pass-2" in ref["note"] or "Pass-2".lower() in ref["note"].lower()
+    # It is NOT in the gate-read systems list (the gate only reads payload["systems"]).
+    system_names = {s["system"] for s in produced["systems"]}
+    assert "pass2_full_census_reference" not in system_names
+
+
+def test_no_census_literals_module_attribute() -> None:
+    """[AUDIT] The scope-laundering census-profile machinery is REMOVED from the
+    gate-read path — ``_CENSUS_PROFILES`` / ``_DetectionProfile`` no longer exist as
+    module attributes (the remediation's structural guarantee)."""
+    from pii_anon.evaluation import canonical_run as cr
+
+    assert not hasattr(cr, "_CENSUS_PROFILES")
+    assert not hasattr(cr, "_DetectionProfile")
+    assert not hasattr(cr, "_PII_ANON_PER_ENTITY")
+
+
+def test_detection_scope_labels_fresh_run_honestly(produced: dict[str, Any]) -> None:
+    """[AUDIT] The fresh-detection sub-block is labelled by what it IS — a fresh
+    in-tree detection at the actual record count — NOT stamped ``data-v2.0.0`` (the
+    MINOR-(b) mislabel the remediation fixed)."""
+    block = produced["representative_in_tree_detection"]
+    assert block["measurement"] == "fresh-in-tree-detection"
+    assert block["detection_scope"].startswith("in-tree-fresh-")
+    # The fresh small-sample block is NOT labelled with the corpus scope data-v2.0.0.
+    assert block["detection_scope"] != "data-v2.0.0"
+
+
+def test_gate_rejects_non_finite_per_language_eps_nan() -> None:
+    """[SECURITY-TEST] MINOR-(a): a NaN per-language ε is REJECTED by the gate's
+    ``_is_finite_number`` guard (it must never slip ``abs(ε) > bound``, whose result
+    against NaN is silently False)."""
+    payload = _synthetic_produced_shape()
+    payload["per_language_recall_delta"] = {"en": 0.0, "de": float("nan")}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("per_language_recall_delta.de" in m for m in missing), missing
+
+
+def test_gate_read_composite_is_deterministic_across_parallel_modes(
+    tmp_path: Path,
+) -> None:
+    """[PROPERTY-TEST] NFR-005: the gate-read detection-quality metrics
+    (recall / precision / composite_score) are a pure function of the record set —
+    IDENTICAL whether ``enable_parallel`` is True or False at the same scale. This is
+    what lets the real artifact run multi-threaded while staying byte-deterministic."""
+    a = produce_canonical_artifact(
+        seed=_SEED,
+        output_dir=str(tmp_path / "seq"),
+        max_samples=_REPRESENTATIVE_MAX_SAMPLES,
+        enable_parallel=False,
+    )
+    b = produce_canonical_artifact(
+        seed=_SEED,
+        output_dir=str(tmp_path / "par"),
+        max_samples=_REPRESENTATIVE_MAX_SAMPLES,
+        enable_parallel=True,
+    )
+
+    def _systems(p: dict[str, Any]) -> dict[str, Any]:
+        return {
+            s["system"]: (s["recall"], s["precision"], s["composite_score"])
+            for s in p["systems"]
+        }
+
+    assert _systems(a) == _systems(b)
 
 
 # ---------------------------------------------------------------------------

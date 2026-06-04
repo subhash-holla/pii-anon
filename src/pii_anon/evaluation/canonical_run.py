@@ -42,16 +42,22 @@ threshold, no scope-laundering). Specifically:
   SYNTHETIC well-calibrated finding set (AX-001); emitted verbatim via
   ``selective_risk_report_to_dict``.
 * **G3 / G6 / J** ``recall`` / ``precision`` / ``per_entity_recall`` /
-  ``composite_score`` — the producer runs REAL :func:`compare_competitors`
-  detection at representative scale (the genuine small-sample measurement is
-  recorded under ``representative_in_tree_detection``). The ``composite_score`` the
-  gate's J/G3/G6 read is produced by the REAL :func:`compute_composite` scorer over
-  the **full-census-validated** representative detection profiles
-  (:data:`_CENSUS_PROFILES`) — a real scorer output, honestly representative of the
-  measured census (the published 148 994-record run), NOT a hardcoded score. A
-  small in-tree sample is a genuine but noisy estimator of those profiles, so the
-  representative-validated profile is the honest signal (AX-001); the full-census
-  re-run with the real bayes-NUTS J is Pass-2.
+  ``composite_score`` — the producer runs REAL :func:`compare_competitors` detection
+  on the in-tree benchmark dataset at a representative scale on the CURRENT code, and
+  the gate-read ``recall`` / ``precision`` / ``per_entity_recall`` are THOSE FRESH
+  measurements (no prior-run numbers in the gate-read path). The ``composite_score``
+  the gate's J/G3/G6 read is produced by the REAL :func:`compute_composite` scorer
+  over the FRESH-measured detection-quality axes (recall / precision / F1 / entity
+  coverage) plus a FIXED, EQUAL-ACROSS-SYSTEMS reference operating point for the
+  speed axis (:data:`_REFERENCE_LATENCY_MS` / :data:`_REFERENCE_DOCS_PER_HOUR`).
+  Wall-clock latency / throughput are non-reproducible (NFR-005 excludes them from
+  determinism), so feeding the SAME reference speed to every system keeps the
+  gate-read composite (a) DETERMINISTIC and (b) a fair detection-QUALITY comparison
+  at this scale — it never fabricates a speed advantage. The verdict this honestly
+  yields at in-tree scale is reported as-is (the composite/J dominance genuinely
+  requires full-census scale — see :data:`pass2_full_census_reference`, the
+  documented PRIOR census the user re-runs as Pass-2 to certify the composite/J
+  crown on the current code).
 
 Scope honesty (story §2a RISK-5)
 --------------------------------
@@ -147,115 +153,49 @@ _SDO_PROVENANCE_FIELDS: tuple[str, ...] = (
 
 
 # ---------------------------------------------------------------------------
-# Full-census-validated representative detection profiles (the honest signal).
+# Fixed reference operating point for the speed axis of the gate-read composite.
 #
-# These are the per-system detection profiles MEASURED on the published, real
-# 148 994-record canonical run (artifacts/benchmarks/benchmark-results.json):
-# pii-anon composite 0.7846 (rank-1, lead +0.10 over gliner 0.6802). A small
-# in-tree representative sample is a genuine but high-variance estimator of these
-# profiles (the regex-vs-neural composite race resolves only at census scale), so
-# the producer feeds these representative-validated profiles through the REAL
-# compute_composite scorer (AX-001 — a real scorer output, honestly representative,
-# never a hardcoded score). The full-census re-run + the real bayes-NUTS J is
-# Pass-2.
+# The gate-read composite_score is the REAL compute_composite over the FRESH-measured
+# detection-QUALITY axes (recall / precision / F1 / entity coverage). The composite
+# also weights a speed axis (latency / throughput), but wall-clock speed is NOT
+# reproducible (NFR-005 excludes it from determinism), so we feed the SAME fixed
+# reference operating point to EVERY system. Equal speed across systems makes the
+# gate-read composite a fair detection-QUALITY comparison at this scale and keeps it
+# byte-deterministic — it deliberately does NOT fabricate a per-system speed
+# advantage. (The published full-census run DID fold in measured per-system speed;
+# certifying the composite/J crown on the current code at full-census scale is the
+# user's Pass-2 — see pass2_full_census_reference.)
 # ---------------------------------------------------------------------------
-@dataclass(frozen=True)
-class _DetectionProfile:
-    """One system's census-measured detection + operational profile (AX-001).
-
-    ``per_entity_recall`` is the published per-entity recall map MEASURED at census
-    (the recall-floor-by-construction property — the ladder's keys are a structural
-    superset of every competitor's detected entities — is a measured fact of these
-    maps, not fabricated). ``entity_types_detected`` / ``entity_types_total`` are
-    derived from the map (the count with recall > 0, and the map size).
-    """
-
-    recall: float
-    precision: float
-    latency_ms: float
-    docs_per_hour: float
-    per_entity_recall: dict[str, float]
-
-    @property
-    def entity_types_total(self) -> int:
-        return len(self.per_entity_recall)
-
-    @property
-    def entity_types_detected(self) -> int:
-        return sum(1 for r in self.per_entity_recall.values() if r > 0.0)
+_REFERENCE_LATENCY_MS = 10.0
+_REFERENCE_DOCS_PER_HOUR = 100_000.0
 
 
-# The published per-entity recall maps (artifacts/benchmarks/benchmark-results.json,
-# the 148 994-record census; _BENCHMARK_IGNORE dropped). These are REAL measurements
-# — the ladder's keys are a structural superset of every competitor's detected
-# entities (the recall-floor-by-construction invariant; verified, never fabricated).
-_PII_ANON_PER_ENTITY: dict[str, float] = {
-    "ADDRESS": 0.975702, "BANK_ACCOUNT": 0.914953, "BAR_NUMBER": 0.0,
-    "CREDIT_CARD": 0.887816, "CRYPTO_WALLET": 1.0, "CVV": 1.0,
-    "DATE_OF_BIRTH": 0.813921, "DEA_NUMBER": 0.0, "DOCKET_NUMBER": 0.0,
-    "DRIVERS_LICENSE": 0.402606, "EMAIL_ADDRESS": 0.948347, "EMPLOYEE_ID": 0.890492,
-    "IP_ADDRESS": 1.0, "LICENSE_PLATE": 0.098849, "LOCATION": 1.0,
-    "MAC_ADDRESS": 0.977954, "MEDICAL_RECORD_NUMBER": 0.761172, "NATIONAL_ID": 0.592413,
-    "NPI_NUMBER": 0.0, "ORGANIZATION": 0.760093, "PASSPORT": 0.770478,
-    "PERSON_NAME": 0.852688, "PHONE_NUMBER": 1.0, "PIN": 1.0,
-    "ROUTING_NUMBER": 0.97341, "USERNAME": 0.721921, "US_SSN": 0.982534, "VIN": 1.0,
-}
-_PII_ANON_SWARM_PER_ENTITY: dict[str, float] = {
-    "ADDRESS": 0.975702, "BANK_ACCOUNT": 0.993802, "BAR_NUMBER": 0.0,
-    "CREDIT_CARD": 0.937641, "CRYPTO_WALLET": 1.0, "CVV": 1.0,
-    "DATE_OF_BIRTH": 0.995665, "DEA_NUMBER": 0.0, "DOCKET_NUMBER": 0.0,
-    "DRIVERS_LICENSE": 0.900472, "EMAIL_ADDRESS": 0.99984, "EMPLOYEE_ID": 0.890492,
-    "IP_ADDRESS": 1.0, "LICENSE_PLATE": 0.098849, "LOCATION": 1.0,
-    "MAC_ADDRESS": 0.977954, "MEDICAL_RECORD_NUMBER": 0.761172, "NATIONAL_ID": 0.592413,
-    "NPI_NUMBER": 0.0, "ORGANIZATION": 0.760093, "PASSPORT": 0.770478,
-    "PERSON_NAME": 0.864739, "PHONE_NUMBER": 1.0, "PIN": 1.0,
-    "ROUTING_NUMBER": 0.97341, "USERNAME": 0.976143, "US_SSN": 0.991306, "VIN": 1.0,
-}
-_GLINER_PER_ENTITY: dict[str, float] = {
-    "ADDRESS": 0.985244, "BANK_ACCOUNT": 0.615122, "BAR_NUMBER": 0.0,
-    "CREDIT_CARD": 0.820731, "CRYPTO_WALLET": 0.0, "CVV": 0.0,
-    "DATE_OF_BIRTH": 0.956848, "DEA_NUMBER": 0.0, "DOCKET_NUMBER": 0.0,
-    "DRIVERS_LICENSE": 0.631319, "EMAIL_ADDRESS": 0.990655, "EMPLOYEE_ID": 0.0,
-    "IP_ADDRESS": 0.994387, "LICENSE_PLATE": 0.0, "LOCATION": 0.0,
-    "MAC_ADDRESS": 0.0, "MEDICAL_RECORD_NUMBER": 0.0, "NATIONAL_ID": 0.137589,
-    "NPI_NUMBER": 0.0, "ORGANIZATION": 0.0, "PASSPORT": 0.770478,
-    "PERSON_NAME": 0.756268, "PHONE_NUMBER": 0.994173, "PIN": 0.0,
-    "ROUTING_NUMBER": 0.0, "USERNAME": 0.926569, "US_SSN": 0.759943, "VIN": 0.0,
-}
-_PRESIDIO_PER_ENTITY: dict[str, float] = {
-    "ADDRESS": 0.1691, "BANK_ACCOUNT": 0.773454, "BAR_NUMBER": 0.0,
-    "CREDIT_CARD": 0.125128, "CRYPTO_WALLET": 0.0, "CVV": 0.0,
-    "DATE_OF_BIRTH": 0.047068, "DEA_NUMBER": 0.0, "DOCKET_NUMBER": 0.0,
-    "DRIVERS_LICENSE": 0.900921, "EMAIL_ADDRESS": 0.977828, "EMPLOYEE_ID": 0.081534,
-    "IP_ADDRESS": 1.0, "LICENSE_PLATE": 0.0, "LOCATION": 0.159872,
-    "MAC_ADDRESS": 0.123071, "MEDICAL_RECORD_NUMBER": 0.07289, "NATIONAL_ID": 0.099968,
-    "NPI_NUMBER": 0.0, "ORGANIZATION": 0.139336, "PASSPORT": 0.467921,
-    "PERSON_NAME": 0.85836, "PHONE_NUMBER": 0.840784, "PIN": 0.0,
-    "ROUTING_NUMBER": 0.066061, "USERNAME": 0.025562, "US_SSN": 0.980322, "VIN": 0.0,
-}
-_SCRUBADUB_PER_ENTITY: dict[str, float] = {
-    "ADDRESS": 0.0, "BANK_ACCOUNT": 0.0, "BAR_NUMBER": 0.0, "CREDIT_CARD": 0.0,
-    "CRYPTO_WALLET": 0.0, "CVV": 0.0, "DATE_OF_BIRTH": 0.0, "DEA_NUMBER": 0.0,
-    "DOCKET_NUMBER": 0.0, "DRIVERS_LICENSE": 0.0, "EMAIL_ADDRESS": 0.819435,
-    "EMPLOYEE_ID": 0.0, "IP_ADDRESS": 0.0, "LICENSE_PLATE": 0.0, "LOCATION": 0.0,
-    "MAC_ADDRESS": 0.0, "MEDICAL_RECORD_NUMBER": 0.0, "NATIONAL_ID": 0.0,
-    "NPI_NUMBER": 0.0, "ORGANIZATION": 0.0, "PASSPORT": 0.0, "PERSON_NAME": 0.0,
-    "PHONE_NUMBER": 0.494658, "PIN": 0.0, "ROUTING_NUMBER": 0.0, "USERNAME": 0.027266,
-    "US_SSN": 0.872378, "VIN": 0.0,
-}
-
-
-_CENSUS_PROFILES: dict[str, _DetectionProfile] = {
-    # pii-anon (regex core): the recall/precision MEASURED at census; FAST.
-    "pii-anon": _DetectionProfile(0.7958, 0.7197, 0.9, 4_000_000.0, _PII_ANON_PER_ENTITY),
-    # pii-anon-swarm (recall-optimised ladder): highest recall; slower.
-    "pii-anon-swarm": _DetectionProfile(
-        0.8180, 0.4864, 85.0, 42_000.0, _PII_ANON_SWARM_PER_ENTITY
+# ---------------------------------------------------------------------------
+# pass2_full_census_reference — TRANSPARENT Pass-2 reference data (NEVER gate-read).
+#
+# The DOCUMENTED PRIOR full-census detect_only run from
+# artifacts/benchmarks/benchmark-results.json (git_sha=2761a27, dataset_source=auto,
+# canonical_claim_run=False, 148 994 records) on which pii-anon core is rank-1 by
+# composite. This block is emitted onto the artifact as TRANSPARENT REFERENCE data so
+# a Paper-1 reader can see the documented census basis — it is NEVER read by the
+# CanonicalRunGate or the SDO gate, and it predates the current HEAD. A fresh
+# full-census re-run on the CURRENT code is the user's Pass-2 to certify the
+# composite/J dominance — it is NOT this run's measurement.
+# ---------------------------------------------------------------------------
+_PASS2_FULL_CENSUS_REFERENCE: dict[str, Any] = {
+    "source": "artifacts/benchmarks/benchmark-results.json",
+    "source_git_sha": "2761a27b65af24616358de8e418a0b3e092c4aa6",
+    "source_record_count": 148994,
+    "source_dataset_source": "auto",
+    "source_canonical_claim_run": False,
+    "pii_anon_composite": 0.784583,
+    "gliner_composite": 0.680213,
+    "note": (
+        "the documented PRIOR full-census run (predates the current HEAD); pii-anon "
+        "core rank-1 by composite at 148,994 records. A fresh full-census re-run on "
+        "the CURRENT code is the user's Pass-2 to certify the composite/J dominance "
+        "— this is NOT this run's measurement."
     ),
-    # gliner (Tier-R neural): strong precision, slower throughput.
-    "gliner": _DetectionProfile(0.6581, 0.9096, 85.0, 42_000.0, _GLINER_PER_ENTITY),
-    "presidio": _DetectionProfile(0.6308, 0.4021, 40.0, 90_000.0, _PRESIDIO_PER_ENTITY),
-    "scrubadub": _DetectionProfile(0.2064, 0.8566, 5.0, 720_000.0, _SCRUBADUB_PER_ENTITY),
 }
 
 
@@ -378,64 +318,64 @@ def _assemble_base_payload(
 ) -> dict[str, Any]:
     """Assemble the per-system base payload (G1/G3/G6 fields).
 
-    Each system carries ``system`` / ``recall`` / ``precision`` /
+    Each system carries ``system`` / ``recall`` / ``precision`` / ``f1`` /
     ``per_entity_recall`` / ``composite_score`` / ``qualification_status`` —
     the fields the gate's G1 (structural superset), G3 (recall dominance), G6
     (raw F2 + coverage) and J (composite rank-1) read.
 
-    For every system carrying a census profile (:data:`_CENSUS_PROFILES`), the
-    ``recall`` / ``precision`` / ``composite_score`` / ``per_entity_recall`` are the
-    full-census-validated values — the ``composite_score`` scored through the REAL
-    ``compute_composite`` (AX-001), and the published census per-entity recall map
-    (the G1 structural-superset ensemble ⊇ shared, the G6 entity coverage, and the
-    G3 recall dominance are MEASURED facts of these maps — verified, not fabricated).
-    A competitor without a census profile falls back to its real measured metrics.
-    The genuine small-sample detection metrics (a noisy estimator of the census
-    profiles) are recorded SEPARATELY under ``representative_in_tree_detection``
-    (honest, scope-stamped) — they are not what the gate reads.
+    These gate-read fields are the FRESH detection measurement from the
+    :func:`compare_competitors` run on the CURRENT code (no prior-run numbers).
+    ``recall`` / ``precision`` / ``per_entity_recall`` are the freshly-measured
+    values verbatim; ``composite_score`` is the REAL :func:`compute_composite` over
+    those FRESH detection-QUALITY axes (recall / precision / F1 / entity coverage)
+    plus a FIXED, EQUAL-ACROSS-SYSTEMS reference operating point for the speed axis
+    (:data:`_REFERENCE_LATENCY_MS` / :data:`_REFERENCE_DOCS_PER_HOUR`) — so the
+    composite is deterministic (NFR-005 excludes wall-clock speed) and a fair
+    detection-quality comparison, never a fabricated speed advantage.
+
+    The detection scope is recorded honestly as the actual in-tree run scope
+    (:func:`_detection_scope`), distinct from the corpus-provenance ``scope`` (which
+    describes the floor/calibration synthetic-input axes). The same fresh metrics
+    are also surfaced — labelled by what they are — under
+    ``representative_in_tree_detection``.
     """
-    # The real (small-sample) detection metrics, indexed by system.
+    # The fresh detection measurement from THIS run, indexed by system.
     measured: dict[str, dict[str, Any]] = {}
     for s in report.systems:
         measured[s.system] = {
             "recall": round(float(s.recall), 6),
             "precision": round(float(s.precision), 6),
-            "composite_score": round(float(s.composite_score), 6),
-            "per_entity_recall": dict(s.per_entity_recall),
+            "per_entity_recall": {
+                k: round(float(v), 6) for k, v in dict(s.per_entity_recall).items()
+            },
             "qualification_status": s.qualification_status,
             "available": bool(s.available),
             "samples": int(s.samples),
         }
 
+    detection_scope = _detection_scope(measured)
+
     systems: list[dict[str, Any]] = []
     for name in sorted(measured):
-        prof = _CENSUS_PROFILES.get(name)
         m = measured[name]
+        recall = float(m["recall"])
+        precision = float(m["precision"])
+        per_entity = dict(m["per_entity_recall"])
+        detected = sum(1 for v in per_entity.values() if v > 0.0)
+        total = len(per_entity)
 
-        if prof is not None:
-            # The census-validated profile scored through the REAL composite scorer,
-            # with the published census per-entity recall map (the structural
-            # superset / G6-coverage / G3-recall are measured facts of these maps).
-            composite = compute_composite(
-                f1=_f1(prof.precision, prof.recall),
-                precision=prof.precision,
-                recall=prof.recall,
-                latency_ms=prof.latency_ms,
-                docs_per_hour=prof.docs_per_hour,
-                entity_types_detected=prof.entity_types_detected,
-                entity_types_total=prof.entity_types_total,
-            )
-            recall = prof.recall
-            precision = prof.precision
-            composite_score = round(float(composite.score), 6)
-            per_entity = dict(prof.per_entity_recall)
-        else:
-            # A competitor without a census profile: use the real measured metrics
-            # (never fabricated).
-            recall = float(m["recall"])
-            precision = float(m["precision"])
-            composite_score = float(m["composite_score"])
-            per_entity = dict(m["per_entity_recall"])
+        # The FRESH detection-quality axes scored through the REAL composite scorer,
+        # with a fixed equal-across-systems reference speed (deterministic; never a
+        # fabricated speed advantage).
+        composite = compute_composite(
+            f1=_f1(precision, recall),
+            precision=precision,
+            recall=recall,
+            latency_ms=_REFERENCE_LATENCY_MS,
+            docs_per_hour=_REFERENCE_DOCS_PER_HOUR,
+            entity_types_detected=detected,
+            entity_types_total=total,
+        )
 
         systems.append(
             {
@@ -443,7 +383,7 @@ def _assemble_base_payload(
                 "recall": round(recall, 6),
                 "precision": round(precision, 6),
                 "f1": round(_f1(precision, recall), 6),
-                "composite_score": composite_score,
+                "composite_score": round(float(composite.score), 6),
                 "per_entity_recall": {k: round(float(v), 6) for k, v in per_entity.items()},
                 "qualification_status": m["qualification_status"],
                 "available": m["available"],
@@ -459,14 +399,18 @@ def _assemble_base_payload(
         "expected_competitors": sorted(_COMPETITOR_META.keys()),
         "unavailable_competitors": {},
         "floor_pass": True,
-        # The genuine small-sample detection run, recorded honestly + scope-stamped.
+        # TRANSPARENT Pass-2 reference data — NEVER read by the gate (the documented
+        # PRIOR full-census run on which pii-anon core is rank-1 by composite).
+        "pass2_full_census_reference": dict(_PASS2_FULL_CENSUS_REFERENCE),
+        # The same fresh detection run, surfaced + labelled honestly by what it is.
         # Only the DETERMINISTIC detection-quality metrics (recall / precision /
         # samples — a pure function of the records) are recorded; the wall-clock
-        # latency-derived composite is NOT (it varies run-to-run by construction, so
+        # latency-derived speed is NOT (it varies run-to-run by construction, so
         # recording it would break the NFR-005 byte-identical-modulo-timestamp
         # determinism — and it is not a detection-quality measurement).
         "representative_in_tree_detection": {
-            "scope": scope,
+            "measurement": "fresh-in-tree-detection",
+            "detection_scope": detection_scope,
             "max_samples": max_samples,
             "dataset": getattr(report, "dataset", sampler.dataset),
             "dataset_source": getattr(report, "dataset_source", sampler.dataset_source),
@@ -480,6 +424,18 @@ def _assemble_base_payload(
             },
         },
     }
+
+
+def _detection_scope(measured: dict[str, dict[str, Any]]) -> str:
+    """The honest scope label for the FRESH detection run.
+
+    Records the actual in-tree detection scale (the per-system record count) so a
+    reader cannot mistake the gate-read recall/precision for a full-census draw.
+    This is distinct from the corpus-provenance ``scope`` (which labels the
+    floor/calibration synthetic-input axes).
+    """
+    n = max((m["samples"] for m in measured.values()), default=0)
+    return f"in-tree-fresh-{n}-records"
 
 
 def _f1(precision: float, recall: float) -> float:
@@ -782,6 +738,7 @@ class CanonicalRunGate:
         """Return ``(ok, missing)`` — fail-closed validation of the canonical run."""
         from pii_anon.eval_framework.evaluation.competitive_supremacy import (
             _finite_unit_score,
+            _is_finite_number,
         )
 
         missing: list[str] = []
@@ -828,10 +785,13 @@ class CanonicalRunGate:
             worst = 0.0
             ok_values = True
             for lang, eps in delta.items():
-                if not isinstance(eps, (int, float)) or isinstance(eps, bool):
+                # Reject a non-finite ε (NaN/±inf) the same way the moat axes do
+                # via _finite_unit_score — a NaN must never slip ``abs() > bound``
+                # (whose result against NaN is silently False).
+                if not _is_finite_number(eps):
                     ok_values = False
                     missing.append(
-                        f"{KEY_PER_LANGUAGE_RECALL_DELTA}.{lang}: not a real number"
+                        f"{KEY_PER_LANGUAGE_RECALL_DELTA}.{lang}: not a real (finite) number"
                     )
                     continue
                 worst = max(worst, abs(float(eps)))
@@ -868,7 +828,7 @@ class CanonicalRunGate:
                     "not a valid (finite, [0,1]) rate"
                 )
 
-            # 6. pii-anon's G4 block present ∧ coverage == 1.0.
+            # 5. pii-anon's G4 block present ∧ coverage == 1.0.
             per_class_ece = core.get(KEY_PER_CLASS_ECE)
             if not isinstance(per_class_ece, dict) or not per_class_ece:
                 missing.append(f"{_CORE_SYSTEM}.{KEY_PER_CLASS_ECE}: absent or empty")
@@ -880,7 +840,7 @@ class CanonicalRunGate:
                     f"{coverage!r} != 1.0 (NFR-020 — the lone MUST)"
                 )
 
-        # 5. ≥1 competitor carries a valid pseudonymization_integrity_score (SO-11).
+        # 6. ≥1 competitor carries a valid pseudonymization_integrity_score (SO-11).
         competitor_pis = [
             cp
             for name, s in systems.items()
@@ -921,10 +881,12 @@ def _sha256_bytes(data: bytes) -> str:
 def _matrix_sha256() -> str:
     """The sha256 of the use-case matrix file (or a stable in-tree sentinel hash).
 
-    Reads the checked-in matrix; if absent, hashes a stable sentinel so the field is
-    a real digest (never blank, never fabricated as a fixed competitor value).
+    Reads the checked-in matrix, anchored to ``__file__`` (NOT cwd) so the digest is
+    reproducible regardless of the caller's working directory. If absent, hashes a
+    stable sentinel so the field is a real digest (never blank, never fabricated as a
+    fixed competitor value).
     """
-    matrix_path = Path("src/pii_anon/benchmarks/matrix/use_case_matrix.json")
+    matrix_path = Path(__file__).parents[1] / "benchmarks/matrix/use_case_matrix.json"
     if matrix_path.exists():
         return _sha256_bytes(matrix_path.read_bytes())
     return _sha256_bytes(b"canonical-run:no-matrix-in-tree")
@@ -1000,21 +962,35 @@ def produce_canonical_artifact(
     *,
     seed: int = DEFAULT_SEED,
     output_dir: str = DEFAULT_OUTPUT_DIR,
-    max_samples: int = 8,
+    max_samples: int | None = None,
+    enable_parallel: bool = True,
 ) -> dict[str, Any]:
     """Produce + certify the canonical-run artifact (the KEYSTONE).
 
-    Runs the benchmark at REPRESENTATIVE scale (real :func:`compare_competitors`
-    detection, ``enable_parallel=False`` for determinism), attaches the G1/G2/G4
-    fields from the EXISTING in-tree scorers (no new gate math), stamps honest
-    provenance, and routes the whole artifact through the fail-closed
-    :class:`CanonicalRunGate` — which sets ``canonical_claim_run = True`` ONLY when
-    every required field is present-and-valid.
+    Runs REAL :func:`compare_competitors` detection on the CURRENT code over the
+    in-tree benchmark dataset (``max_samples=None`` ⇒ the FULL dataset for the real
+    artifact; a small ``max_samples`` is for FAST CI tests only), attaches the
+    G1/G2/G4 fields from the EXISTING in-tree scorers (no new gate math), stamps
+    honest provenance describing THIS fresh run, and routes the whole artifact through
+    the fail-closed :class:`CanonicalRunGate` — which sets ``canonical_claim_run =
+    True`` ONLY when every required field is present-and-valid.
 
-    Returns the produced benchmark dict (also written to ``output_dir``). The dict
-    drives the UNMODIFIED SDO gate ``SupremacyVerdict.from_artifacts`` to
-    PROVISIONAL_SOTA (canonical + G1/G2/G4/G3/G6 PASS + J≥0.95; G5 PENDING; blocked
-    from CLAIM_GRADE by the unrun Tier-C cloud APIs + the unrun Tier-R gliner2).
+    Returns the produced benchmark dict (also written to ``output_dir``). The gate-read
+    detection metrics are the FRESH measurement (no prior-run numbers); the verdict
+    ``SupremacyVerdict.from_artifacts`` honestly computes from them is reported AS-IS.
+    The composite/J dominance genuinely requires full-census scale (a sub-census
+    sample's regex-vs-neural composite race is razor-thin / flips to a neural
+    competitor), so at representative in-tree scale the honest verdict is typically
+    ``NOT_YET`` with the binding constraint being the composite/J — PROVISIONAL_SOTA
+    requires the documented full-census re-run on the current code (the user's Pass-2;
+    see the artifact's ``pass2_full_census_reference`` block).
+
+    Determinism (NFR-005): the gate-read detection-QUALITY metrics
+    (recall / precision / per_entity_recall and the composite derived from them with a
+    FIXED reference speed) are a pure function of the record set — IDENTICAL whether
+    ``enable_parallel`` is ``True`` or ``False`` (verified). Parallelism is therefore a
+    pure throughput optimisation that does not affect any gate-read value; the produced
+    artifact is byte-identical modulo ``timestamp_utc`` across runs at the same scale.
 
     Parameters
     ----------
@@ -1025,26 +1001,38 @@ def produce_canonical_artifact(
         The output directory; MUST be under ``artifacts/canonical/`` semantics —
         a ``benchmarks`` path is refused.
     max_samples:
-        The representative detection-run cap (kept tight so the run stays FAST;
-        representative, not a full census).
+        The detection-run record cap. ``None`` ⇒ the FULL in-tree dataset (the real
+        artifact). A small int is for FAST CI tests ONLY (a high-variance estimator).
+    enable_parallel:
+        Run detection multi-threaded (default ``True``). The gate-read metrics are
+        parallel-invariant + deterministic, so this is a pure throughput knob; tests
+        may set ``False`` for a single-threaded run.
     """
     scope, sampler = _resolve_sampler()
 
-    # Real detection at representative scale (single-threaded → deterministic).
+    # Real detection on the in-tree dataset. The gate-read detection-quality metrics
+    # are parallel-invariant + deterministic (a pure function of the record set), so
+    # enable_parallel is a throughput knob that does not affect any gate-read value.
     report = compare_competitors(
         dataset=sampler.dataset,
         dataset_source=sampler.dataset_source,  # type: ignore[arg-type]
         max_samples=max_samples,
         warmup_samples=2,
         measured_runs=1,
-        enable_parallel=False,
+        enable_parallel=enable_parallel,
         include_end_to_end=False,
         objective="balanced",
         expected_competitors=sorted(_COMPETITOR_META.keys()),
     )
 
+    # The ACTUAL number of records the detection run drew (deterministic, honest —
+    # never the None sentinel; the real records-processed count).
+    actual_sample_size = max(
+        (int(s.samples) for s in report.systems), default=int(max_samples or 0)
+    )
+
     payload = _assemble_base_payload(
-        report, scope=scope, sampler=sampler, max_samples=max_samples
+        report, scope=scope, sampler=sampler, max_samples=actual_sample_size
     )
 
     # Attach the G1 / G2 / G4 fields from the EXISTING scorers (real outputs).
@@ -1052,10 +1040,10 @@ def produce_canonical_artifact(
     _attach_g2_deid_families(payload)
     _attach_g4_calibration(payload)
 
-    # Honest provenance (real digests / timestamp). The sample_size is the
-    # representative cap (the number of records the detection run drew).
+    # Honest provenance (real digests / timestamp). The sample_size is the ACTUAL
+    # number of records the detection run drew (the real records-processed count).
     _attach_provenance(
-        payload, seed=seed, scope=scope, sampler=sampler, sample_size=max_samples
+        payload, seed=seed, scope=scope, sampler=sampler, sample_size=actual_sample_size
     )
 
     # Fail-closed gate: canonical_claim_run is True ONLY when every field is valid.
