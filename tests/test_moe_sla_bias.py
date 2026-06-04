@@ -285,11 +285,21 @@ def test_ax003_floored_output_byte_identical_under_aggressive_bias() -> None:
 
 
 def test_ax003_shared_membership_invariant_under_aggressive_bias() -> None:
-    """A5: the regex-oss shared input set + re-injected keys are bias-invariant.
+    """A5: the regex-oss shared input set + the floored Shared-membership are
+    bias-invariant.
 
-    Membership invariance (distinct from A4's output-value invariance): the shared
-    subset fed to the projector and the keys re-injected with the ``shared_floor``
-    provenance marker are identical bias-on vs bias-off.
+    Membership invariance (distinct from A4's output-value invariance). Two
+    membership sets must be identical bias-on vs bias-off:
+
+    1. the shared INPUT set the floor consumes (the regex-oss subset of findings);
+    2. the SHARED span membership in the floored output (the US_SSN regex-oss span
+       must be present either way — whether via the normal MoE merge or via the
+       floor re-injection — and the set of ``shared_floor`` re-injected keys must
+       match exactly).
+
+    This pins that the selection-only SLA bias cannot add/drop a Shared span from
+    the floor's input OR from the final membership: the bias re-orders *selection*
+    but the recall-floor (FR-016 / AX-003) keeps the shared set membership fixed.
     """
     shared_span = EngineFinding(
         entity_type="US_SSN",
@@ -302,22 +312,34 @@ def test_ax003_shared_membership_invariant_under_aggressive_bias() -> None:
         explanation="regex checksum-gated",
     )
     findings = [shared_span]
+    key = ("US_SSN", 0, 11)
 
-    # The shared INPUT set is the regex-oss subset of the same findings — it is
-    # derived independently of the router/bias, so it is trivially invariant; we
-    # still pin it as the membership contract the floor consumes.
-    shared_input = {(f.entity_type, f.span_start, f.span_end) for f in _shared_subset(findings, "regex-oss")}
+    # (1) The shared INPUT set the projector consumes is the regex-oss subset of
+    # the same findings — derived independently of the router/bias.
+    shared_input = {
+        (f.entity_type, f.span_start, f.span_end) for f in _shared_subset(findings, "regex-oss")
+    }
+    assert shared_input == {key}
 
-    def _reinjected_keys(sla_bias: SLABias | None) -> set[tuple[str, int | None, int | None]]:
+    def _membership(
+        sla_bias: SLABias | None,
+    ) -> tuple[set[tuple[str, int | None, int | None]], set[tuple[str, int | None, int | None]]]:
         inner = MoEFusionStrategy(registry=build_default_registry(), sla_bias=sla_bias)
         out = FloorProjectingFusion(inner).merge(findings)
-        return {
+        present = {(f.entity_type, f.span_start, f.span_end) for f in out}
+        reinjected = {
             (f.entity_type, f.span_start, f.span_end) for f in out if is_shared_floor(f)
         }
+        return present, reinjected
 
-    assert _reinjected_keys(None) == _reinjected_keys(_AGGRESSIVE) == shared_input, (
-        "Shared-layer membership shifted under the SLA bias (AX-003 violated)"
-    )
+    off_present, off_reinjected = _membership(None)
+    on_present, on_reinjected = _membership(_AGGRESSIVE)
+
+    # The shared span is present in the floored output BOTH ways (never dropped).
+    assert key in off_present and key in on_present, "a Shared span left the floored output"
+    # Final shared-membership + the re-injected-key set are byte-identical on/off.
+    assert off_present == on_present, "Shared-span membership shifted under the SLA bias (AX-003)"
+    assert off_reinjected == on_reinjected, "the floor re-injected a DIFFERENT key set under bias"
 
 
 # --------------------------------------------------------------------------- #

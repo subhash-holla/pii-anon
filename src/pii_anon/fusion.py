@@ -17,10 +17,16 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from pii_anon.errors import FusionError
 from pii_anon.types import EngineFinding, EnsembleFinding, FusionAuditRecord, FusionMode
+
+if TYPE_CHECKING:
+    # Annotation-only import (guarded to avoid the fusion<->moe import cycle —
+    # moe imports FROM fusion). `from __future__ import annotations` keeps the
+    # SLABias reference a string at runtime, so no cycle is created.
+    from pii_anon.moe import SLABias
 
 FindingKey = tuple[str, str | None, int | None, int | None, str]
 AuditKey = tuple[str, str | None, int | None, int | None]
@@ -479,6 +485,13 @@ class FusionBuildSpec:
         loosely to avoid an import cycle; a v2 factory narrows it as needed.
     top_k : int
         Number of experts to activate per entity type (MoE seam).
+    sla_bias : SLABias | None
+        Optional aux-loss-free SLA selection-bias (DC-03) for the inner MoE
+        router. Carried like ``gate_path`` — the spec transports it, but
+        :func:`build_fusion`'s PUBLIC signature is intentionally NOT changed to
+        source it (the v2 seam carries ``sla_bias=None``); a caller that
+        hand-builds a :class:`FusionBuildSpec` with a real ``SLABias`` gets the
+        wired latency-biased path. ``None`` (the default) is inert (NFR-026).
     """
 
     mode: str
@@ -489,6 +502,7 @@ class FusionBuildSpec:
     gate_path: str | Path | None
     key_ring: Any | None
     top_k: int
+    sla_bias: SLABias | None = None
 
 
 CustomFusionFactoryV2 = Callable[[FusionBuildSpec], FusionStrategy]
@@ -632,6 +646,7 @@ def build_fusion(
             gate_path=None,
             key_ring=None,
             top_k=3,
+            sla_bias=None,
         )
         return _CUSTOM_FACTORIES_V2[mode](spec)
     if mode in _CUSTOM_FACTORIES:
@@ -719,6 +734,7 @@ def _build_distilled_moe(spec: FusionBuildSpec) -> FusionStrategy:
         iou_threshold=spec.iou_threshold,
         performance_floor=True,
         min_expert_weight=0.15,
+        sla_bias=spec.sla_bias,
     )
     # Load the verified gate ONLY through the fail-closed verify-on-load seam.
     # gate_path is None ⇒ no gate ⇒ the inner router's static softmax (NFR-026).
@@ -732,12 +748,14 @@ def _build_distilled_moe(spec: FusionBuildSpec) -> FusionStrategy:
         gate = load_distilled_gate(spec.gate_path, key_ring=key_ring)
     # Replace the inner strategy's default (no-gate) router with a gate-equipped
     # one — the advisory-weighting layer. The floor wrap below keeps the gate from
-    # ever dropping a shared span (AX-003).
+    # ever dropping a shared span (AX-003). The optional SLA bias (DC-03) is
+    # threaded too so the latency-biased path is wired when a caller supplies it.
     inner.router = MoERouter(
         registry,
         top_k=spec.top_k,
         performance_floor=True,
         gate=gate,
+        sla_bias=spec.sla_bias,
     )
     return FloorProjectingFusion(inner)
 

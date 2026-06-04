@@ -271,6 +271,79 @@ class RouteContext:
     features: tuple[tuple[str, float], ...] = ()
 
 
+#: Metadata key on :class:`ExpertSpec` carrying a per-expert latency cost (ms).
+#: The DC-03 SLA selection-bias reads ONLY this key — never ``default_weight``
+#: (the NFR-004 power signal) and never ``entity_strengths``.
+LATENCY_COST_KEY = "latency_cost_ms"
+
+
+@dataclass(frozen=True)
+class SLABias:
+    """Aux-loss-free SLA selection-bias config (DeepSeek-V3 loss-free balancing).
+
+    The SLA bias adds a per-expert latency penalty to :meth:`MoERouter.route`'s
+    **selection logits only** — never :class:`~pii_anon.types.EnsembleFinding`
+    ``confidence`` and never ``Shared``-layer membership — so that under a latency
+    SLA the router biases *selection* toward cheaper experts, with **no auxiliary
+    loss term** (a bias on the routing logits, not on a gradient/objective).
+
+    The penalty for an expert carrying a latency cost ``cost_e`` (from
+    ``ExpertSpec.metadata[LATENCY_COST_KEY]``) is::
+
+        biased_logit(e) = strength_e − strength · (cost_e / reference_ms)
+
+    Frozen + hashable (AX-002 / NFR-005), mirroring :class:`RouteContext`. Kept
+    DISTINCT from ``RouteContext`` (the gate's per-call feature channel): the SLA
+    is router-construction state, not a per-call gate feature.
+
+    Default-off: ``strength == 0.0`` makes the bias term identically 0, so a bare
+    ``SLABias()`` (and ``sla_bias=None``) is fully inert — ``route()`` is then
+    byte-identical to the static-softmax baseline (NFR-026).
+
+    Attributes
+    ----------
+    strength : float
+        The bias magnitude β ≥ 0. ``0.0`` (the default) ⇒ the bias is inert.
+    reference_ms : float
+        A logit-scale latency normalizer (ms) so the penalty is unit-decoupled.
+        Defaults to ``1.0``.
+    """
+
+    strength: float = 0.0
+    reference_ms: float = 1.0
+
+
+def _is_finite_number(value: object) -> bool:
+    """True iff *value* is a real, finite, non-``bool`` number.
+
+    A Python ``bool`` is an ``int`` subclass, so it is rejected explicitly — a
+    ``latency_cost_ms`` of ``True``/``False`` is "no cost", not 1.0/0.0.
+    """
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value)
+
+
+def _latency_cost(spec: ExpertSpec) -> float | None:
+    """Return the expert's latency cost (ms), or ``None`` when it has no opinion.
+
+    Reads ``spec.metadata[LATENCY_COST_KEY]`` and returns it ONLY when it is a
+    real, finite, non-negative, non-``bool`` number. A missing / ``NaN`` / ``±inf``
+    / negative / ``bool`` / non-numeric cost is coerced to ``None`` ("no cost") so
+    the SLA bias never produces a NaN or negative logit and never raises — an
+    expert with no usable cost is simply not penalized.
+    """
+    raw = spec.metadata.get(LATENCY_COST_KEY)
+    if not _is_finite_number(raw):
+        return None
+    cost = float(raw)  # type: ignore[arg-type]  # _is_finite_number narrows to a real number
+    if cost < 0.0:
+        return None
+    return cost
+
+
 @runtime_checkable
 class RoutingGate(Protocol):
     """Advisory re-weighting hook for :class:`MoERouter` (the S2-02 plug point).
@@ -374,6 +447,16 @@ class MoERouter:
     key_ring : KeyRing | None
         Trust root for verifying ``gate_path``. Required when ``gate_path`` is
         provided. ``None`` (the default) preserves the no-gate path.
+    sla_bias : SLABias | None
+        Optional aux-loss-free SLA selection-bias (DC-03). When given with
+        ``strength != 0.0``, a per-expert latency penalty is added to the
+        selection logits in :meth:`route` so the router biases *selection* toward
+        cheaper experts (from ``ExpertSpec.metadata[LATENCY_COST_KEY]``). ``None``
+        (the default) or ``SLABias(strength=0.0)`` is fully inert — ``route()`` is
+        then byte-identical to the static softmax (NFR-026). The bias is advisory
+        and selection-only: it never mutates ``EnsembleFinding.confidence`` and the
+        recall-floor (``FloorProjectingFusion``) remains the no-drop authority
+        (AX-003).
     """
 
     def __init__(
@@ -385,10 +468,19 @@ class MoERouter:
         gate_path: str | Path | None = None,
         key_ring: KeyRing | None = None,
         gate: RoutingGate | None = None,
+        sla_bias: SLABias | None = None,
     ) -> None:
         self.registry = registry
         self.top_k = max(1, top_k)
         self.performance_floor = performance_floor
+        # Optional aux-loss-free SLA selection-bias (DC-03). Default None ⇒ the
+        # bias branch in route() is never taken (byte-identical static softmax,
+        # NFR-026). The per-expert latency cost is read lazily from
+        # metadata[LATENCY_COST_KEY] into _latency_cost_cache (invalidated by
+        # clear_cache()); it is NEVER default_weight (the POWER-TIER TRAP) and
+        # never entity_strengths.
+        self._sla_bias = sla_bias
+        self._latency_cost_cache: dict[str, float] | None = None
         # Optional advisory re-weighting hook (S2-02 DistilledTopKGate). Default
         # None ⇒ route() returns the static-softmax base unchanged (NFR-026). The
         # gate is advisory on weighting only; the recall-floor (FR-016/AX-003) is
@@ -474,8 +566,26 @@ class MoERouter:
             # No expert has explicit knowledge of this entity type
             return []
 
-        # Sort by strength descending
-        scores.sort(key=lambda x: x[1], reverse=True)
+        # Aux-loss-free SLA selection-bias (DC-03). Applied to the SELECTION
+        # LOGITS only, BEFORE the sort, ONLY when an SLA is active. Default-off
+        # (sla_bias=None or strength==0.0) ⇒ `_sla_active` is False, the bias is a
+        # no-op, AND the sort stays the pre-S2-04 stable single-key sort, so the
+        # result is byte-identical to the static softmax / the S2-01 oracle
+        # (NFR-026 — equal-strength experts keep insertion order). The bias
+        # reshapes `scores`, affecting both top-k membership AND the softmax
+        # weights, but never touches confidence or Shared-layer membership (AX-003).
+        sla_active = self._sla_bias is not None and self._sla_bias.strength != 0.0
+        if sla_active:
+            scores = self._apply_sla_bias(scores)
+            # Total-order (logit, expert_id) tie-break: equal BIASED logits resolve
+            # deterministically by expert_id, so the order is stable across
+            # registry-insertion permutation (AX-002 / NFR-005). Gated behind the
+            # SLA path so the default-off sort is unchanged (byte-identical, A7).
+            scores.sort(key=lambda x: (x[1], x[0]), reverse=True)
+        else:
+            # Pre-S2-04 stable single-key sort: preserves insertion order for
+            # equal-strength experts ⇒ byte-identical to the recorded S2-01 oracle.
+            scores.sort(key=lambda x: x[1], reverse=True)
 
         # Select top-K
         selected = scores[: self.top_k]
@@ -512,6 +622,51 @@ class MoERouter:
         self._route_cache[cache_key] = normalized
         return normalized
 
+    def _latency_cost_by_id(self) -> dict[str, float]:
+        """Return ``{expert_id: latency_cost_ms}`` over the available experts.
+
+        Built lazily on first use from ``metadata[LATENCY_COST_KEY]`` (only experts
+        carrying a real, finite, non-negative cost appear — see :func:`_latency_cost`)
+        and cached so a repeated ``route()`` adds no per-call recompute. The cache
+        is invalidated by :meth:`clear_cache`. It is read ONLY by the SLA-bias step
+        — never by the static-softmax path.
+        """
+        if self._latency_cost_cache is None:
+            self._latency_cost_cache = {
+                e.expert_id: cost
+                for e in self.registry.available_experts()
+                if (cost := _latency_cost(e)) is not None
+            }
+        return self._latency_cost_cache
+
+    def _apply_sla_bias(
+        self, scores: list[tuple[str, float]]
+    ) -> list[tuple[str, float]]:
+        """Add the per-expert SLA latency penalty to the selection logits.
+
+        Returns ``scores`` UNCHANGED when no SLA is active (``sla_bias is None`` or
+        ``strength == 0.0``) — the default-off fast path (NFR-026). Otherwise
+        subtracts ``strength · (cost_e / reference_ms)`` from each expert that
+        carries a latency cost (others keep their raw logit). Pure-stdlib scalar
+        ``math``; never produces a NaN/negative-via-bad-cost logit because
+        :func:`_latency_cost` already coerced any unusable cost to "no cost".
+        """
+        sla = self._sla_bias
+        if sla is None or sla.strength == 0.0:
+            return scores
+        costs = self._latency_cost_by_id()
+        if not costs:
+            return scores
+        beta = sla.strength
+        reference = sla.reference_ms
+        return [
+            (
+                eid,
+                logit - beta * (costs[eid] / reference) if eid in costs else logit,
+            )
+            for eid, logit in scores
+        ]
+
     def route_all(self) -> dict[str, list[tuple[str, float]]]:
         """Precompute routing for all known entity types.
 
@@ -534,9 +689,12 @@ class MoERouter:
     def clear_cache(self) -> None:
         """Clear the routing cache.
 
-        Useful if registry is updated and routes need to be recomputed.
+        Useful if registry is updated and routes need to be recomputed. Also
+        invalidates the lazily-built per-expert latency-cost cache (DC-03) so a
+        registry change re-reads ``metadata[LATENCY_COST_KEY]`` on the next route.
         """
         self._route_cache.clear()
+        self._latency_cost_cache = None
 
 
 class MoEFusionStrategy(FusionStrategy):
@@ -581,6 +739,7 @@ class MoEFusionStrategy(FusionStrategy):
         iou_threshold: float = 0.5,
         performance_floor: bool = True,
         min_expert_weight: float = 0.15,
+        sla_bias: SLABias | None = None,
     ) -> None:
         if registry is None:
             registry = build_default_registry()
@@ -589,10 +748,16 @@ class MoEFusionStrategy(FusionStrategy):
         self.iou_threshold = iou_threshold
         self.performance_floor = performance_floor
         self.min_expert_weight = min_expert_weight
+        # Optional aux-loss-free SLA selection-bias (DC-03), threaded into the
+        # inner router. Default None ⇒ inert (NFR-026). Selection-only: the bias
+        # cannot move merge()'s confidence math (single-expert clusters stay
+        # byte-identical) and the recall-floor wrap remains the no-drop authority.
+        self.sla_bias = sla_bias
         self.router = MoERouter(
             self.registry,
             top_k=top_k,
             performance_floor=performance_floor,
+            sla_bias=sla_bias,
         )
 
     def merge(self, findings: list[EngineFinding]) -> list[EnsembleFinding]:
