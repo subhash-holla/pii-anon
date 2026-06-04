@@ -1285,6 +1285,34 @@ def test_g2_pass_when_only_one_competitor_carries_lower_pi_guard_not_overbroad()
     assert g2.observed >= g2.bar
 
 
+def test_g2_s7_02_producer_contract_competitors_carry_honest_zero_pi() -> None:
+    """[CONTRACT-TEST] S7-02 / SO-11 (gate-side companion): the canonical-run
+    producer's contract — every Tier-R competitor carries an HONEST
+    ``pseudonymization_integrity_score = 0.0`` (irreversible incumbents) — gives
+    the gate a real comparator, so G2 computes a real dominance PASS (NOT a phantom
+    0.0 win, and NOT PENDING). This pins the exact producer↔gate field contract the
+    S7-02 ``_attach_g2_deid_families`` honours; if the producer ever stopped
+    emitting the competitor field, G2 would fall back to PENDING (the companion
+    SUT-only case below) and the headline verdict could never reach a claim."""
+    bench = _g2_systems(
+        0.97,  # pii-anon real pseudonymization-integrity
+        anon=1.0,
+        unauthorized=0.0,
+        # The producer emits an HONEST 0.0 on EVERY irreversible incumbent.
+        competitors={"gliner": 0.0, "presidio": 0.0, "scrubadub": 0.0},
+    )
+    g2 = _g2_pseudonymization_integrity(bench)
+    assert g2.passed is True, g2.binding_detail  # real comparator ⇒ provable
+    assert g2.observed == 0.97  # pii-anon's score
+    assert g2.bar == 0.0  # best (honest) competitor comparator
+
+    # Companion: strip the competitor field (a SUT-only artifact) ⇒ PENDING, no
+    # phantom 0.0 win. This is the regression the producer-side A16 also pins.
+    sut_only = _g2_systems(0.97, anon=1.0, unauthorized=0.0, competitors={})
+    g2_sut = _g2_pseudonymization_integrity(sut_only)
+    assert g2_sut.passed is None, g2_sut.binding_detail
+
+
 def test_g2_pending_when_core_pi_non_finite_or_out_of_range_not_a_win() -> None:
     """[CONTRACT-TEST] A5 anti-fabrication: a non-finite or out-of-[0,1] pii-anon
     pseudonymization_integrity_score is not a real measurement
