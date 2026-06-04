@@ -933,17 +933,41 @@ def _attach_provenance(
     run_metadata["canonical_provenance"] = provenance
 
 
+def _is_benchmarks_part(part: str) -> bool:
+    """Case-INSENSITIVE match for a ``benchmarks`` path component.
+
+    The S7-02 close MAJOR-4: a CASE-SENSITIVE ``"benchmarks" in out_dir.parts`` check
+    let ``artifacts/Benchmarks`` (capital B) through on a case-insensitive filesystem
+    (APFS), writing a real canonical-run.json into the protected
+    ``artifacts/benchmarks/`` (same inode). Every casing of ``benchmarks`` must match.
+    """
+    return part.lower() == "benchmarks"
+
+
 def _write_canonical(payload: dict[str, Any], output_dir: str) -> Path:
     """Write the canonical artifact to ``artifacts/canonical/`` (created on demand).
 
     Canonical ``json.dumps(sort_keys=True, indent=2)``. NEVER writes under
-    ``artifacts/benchmarks/*`` (the protected user-WIP path).
+    ``artifacts/benchmarks/*`` (the protected user-WIP path) — the guard is
+    case-INSENSITIVE and resolves the REAL path (the S7-02 close MAJOR-4), so neither a
+    capital-``Benchmarks`` casing on a case-insensitive FS nor a ``..``-laundered path
+    whose RESOLVED location lands under ``artifacts/benchmarks`` can ever be written.
     """
     out_dir = Path(output_dir)
-    if "benchmarks" in out_dir.parts:
+    # 1. Literal-parts guard (case-insensitive) — catches the obvious benchmarks paths
+    #    on the path AS REQUESTED (covers a path that does not yet exist on disk).
+    # 2. Resolved-real-path guard (case-insensitive) — `Path.resolve()` collapses
+    #    `..` hops and symlinks, so a laundered alias (e.g.
+    #    `artifacts/canonical/../benchmarks`) is compared by its REAL location, not its
+    #    surface string. APFS aliasing (Benchmarks ≡ benchmarks) is handled by the
+    #    case-insensitive component match on the resolved parts.
+    candidate_parts = set(out_dir.parts) | set(out_dir.resolve().parts)
+    if any(_is_benchmarks_part(part) for part in candidate_parts):
         raise ValueError(
             f"refusing to write the canonical artifact under a benchmarks path: "
-            f"{out_dir} (only artifacts/canonical/ is permitted)"
+            f"{out_dir} (resolved {out_dir.resolve()}) — only artifacts/canonical/ is "
+            f"permitted (the protected artifacts/benchmarks/* can never be written; "
+            f"the check is case-insensitive and resolves the real path)"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "canonical-run.json"

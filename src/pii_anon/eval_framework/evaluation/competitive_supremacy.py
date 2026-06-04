@@ -429,7 +429,18 @@ def _run_breaches_recall_floor(benchmark: dict[str, Any]) -> bool:
     """
     per_lang = benchmark.get("per_language_recall_delta")
     if isinstance(per_lang, dict) and per_lang:
-        worst = max((abs(float(v)) for v in per_lang.values()), default=0.0)
+        # Each ε is a DELTA (can be negative) — validated by `_is_finite_number`, NOT
+        # `_finite_unit_score`. A non-finite ε (NaN / ±inf) or a Python int wider than
+        # a C double (10**400) is NOT a real measurement: it must be treated as a
+        # breach (the run cannot be certified floor-compliant from a corrupt ε), never
+        # slip ``abs() > bound`` (silently False against NaN) and never raise
+        # OverflowError in ``float()`` (the S7-02 close MAJOR-3 — the shipped
+        # ``pii-anon supremacy`` CLI crashed). Fail CLOSED.
+        worst = 0.0
+        for v in per_lang.values():
+            if not _is_finite_number(v):
+                return True  # corrupt ε ⇒ uncertifiable ⇒ breach (never a crash)
+            worst = max(worst, abs(float(v)))
         if worst > EPS_RECALL_PER_LANG:
             return True
 
@@ -527,8 +538,19 @@ def _g1_recall_floor(
             + ("holds" if superset_ok else f"BREACHED on {sorted(missing)}")
             + "); per-language ε never fabricated",
         )
-    worst_lang_eps = max((abs(float(v)) for v in per_lang.values()), default=0.0)
-    eps_ok = worst_lang_eps <= EPS_RECALL_PER_LANG
+    # Each ε is a DELTA (can be negative) — validated by `_is_finite_number`, NOT
+    # `_finite_unit_score`. A non-finite ε (NaN / ±inf) or a Python int wider than a
+    # C double (10**400) is rejected and fails CLOSED: G1 FAIL (the run's recall floor
+    # cannot be certified from a corrupt ε), never an OverflowError crash in ``float()``
+    # (the S7-02 close MAJOR-3) and never a silent PASS (NaN would otherwise slip
+    # ``abs() ≤ bound``). The worst corrupt language is named.
+    per_lang_items = per_lang.items() if isinstance(per_lang, dict) else []
+    corrupt_langs = [lang for lang, v in per_lang_items if not _is_finite_number(v)]
+    worst_lang_eps = max(
+        (abs(float(v)) for _, v in per_lang_items if _is_finite_number(v)),
+        default=0.0,
+    )
+    eps_ok = not corrupt_langs and worst_lang_eps <= EPS_RECALL_PER_LANG
 
     passed = superset_ok and eps_ok
     if passed:
@@ -538,6 +560,12 @@ def _g1_recall_floor(
         )
     elif not superset_ok:
         detail = f"G1 FAIL: ensemble misses competitor-detected entities {sorted(missing)}"
+    elif corrupt_langs:
+        detail = (
+            f"G1 FAIL: per-language recall ε on {sorted(corrupt_langs)} is non-finite / "
+            f"out-of-float-range — a corrupt measurement that cannot certify the recall "
+            f"floor (never slips ≤ {EPS_RECALL_PER_LANG}, never crashes)"
+        )
     else:
         detail = (
             f"G1 FAIL: per-language recall ε={worst_lang_eps:.4g} > "
@@ -769,8 +797,32 @@ def _g3_recall_dominance(systems: dict[str, dict[str, Any]]) -> GuaranteeResult:
             "G3", None, float("nan"), float("nan"),
             "G3 PENDING: no pii-anon ladder system in benchmark",
         )
-    swarm_recall = float(swarm["recall"])
-    best_competitor = max(float(systems[c]["recall"]) for c in competitors)
+    # Recall is a fraction in [0, 1] — validated by `_finite_unit_score` so a corrupt
+    # recall (a bool, a NaN / ±inf, or a Python int wider than a C double like 10**400)
+    # is REJECTED rather than crashing ``float()`` (the S7-02 close also-scan) or
+    # fabricating a vacuous dominance (``+inf >= best`` would be a phantom win). An
+    # invalid CLAIMANT recall ⇒ PENDING (no usable measurement, never a fabricated
+    # PASS); an invalid COMPETITOR recall is EXCLUDED from the max bar.
+    swarm_recall = _finite_unit_score(swarm.get("recall"))
+    if swarm_recall is None:
+        return GuaranteeResult(
+            "G3", None, float("nan"), float("nan"),
+            "G3 PENDING: pii-anon ladder recall is not a valid (finite, in [0,1]) "
+            "measurement — dominance is unprovable from a corrupt value (never "
+            "fabricated, never crashed)",
+        )
+    competitor_recalls = [
+        cr
+        for c in competitors
+        if (cr := _finite_unit_score(systems[c].get("recall"))) is not None
+    ]
+    if not competitor_recalls:
+        return GuaranteeResult(
+            "G3", None, float("nan"), float("nan"),
+            "G3 PENDING: no competitor carries a valid (finite, in [0,1]) recall — "
+            "dominance is unprovable without a real comparator (never fabricated)",
+        )
+    best_competitor = max(competitor_recalls)
     passed = swarm_recall >= best_competitor
     detail = (
         f"G3 {'PASS' if passed else 'FAIL'}: pii-anon-swarm recall "
@@ -908,9 +960,18 @@ def _g4_calibration_selective_risk(
     #    coverage is a fraction: it must be FINITE and in [0, 1] (a value > 1.0 /
     #    +inf is corrupt, never a pass) AND exactly 1.0 (100% calibrated-confidence
     #    coverage; a tiny eps absorbs float round-trip noise but never admits >1.0).
-    coverage_val = float(coverage)
-    coverage_in_range = math.isfinite(coverage_val) and 0.0 <= coverage_val <= 1.0
-    coverage_ok = coverage_in_range and coverage_val >= G4_COVERAGE_REQUIRED - 1e-9
+    #    Routed through `_finite_unit_score` (the shared moat-axis validator) so a
+    #    BOOL coverage — `isinstance(True, int)` is True in Python and `float(True)`
+    #    is 1.0 — is REJECTED (a flag is not a measurement; it would otherwise
+    #    fabricate a perfect-coverage PASS, the S7-02 close MAJOR-1), exactly as the
+    #    G2 family fields reject a bool. A rejected (None) coverage is a corrupt /
+    #    out-of-range present value ⇒ a FAIL (not a pass), reported with its raw repr.
+    coverage_score = _finite_unit_score(coverage)
+    coverage_in_range = coverage_score is not None
+    coverage_ok = (
+        coverage_score is not None
+        and coverage_score >= G4_COVERAGE_REQUIRED - 1e-9
+    )
 
     passed = ece_ok and monotone_ok and points_ok and coverage_ok
     if passed:
@@ -918,18 +979,19 @@ def _g4_calibration_selective_risk(
             f"G4 PASS: every per-class ECE ≤ its bar (worst {max_ece:.4g}); "
             f"risk-coverage monotone non-increasing; {len(points)} abstention "
             f"operating points (≥{G4_MIN_ABSTENTION_POINTS}); "
-            f"calibrated-confidence-coverage={coverage_val:.4g} (NFR-020 / AX-005)"
+            f"calibrated-confidence-coverage={coverage_score:.4g} (NFR-020 / AX-005)"
         )
     elif not coverage_ok:
         if not coverage_in_range:
             detail = (
-                f"G4 FAIL: calibrated-confidence-coverage={coverage_val!r} is not a "
-                f"valid fraction (finite, in [0,1]) — a value >1.0 / non-finite is a "
-                f"corrupt artifact, never a pass (NFR-020 requires EXACTLY 1.0)"
+                f"G4 FAIL: calibrated-confidence-coverage={coverage!r} is not a "
+                f"valid fraction (finite, in [0,1], non-bool) — a bool / value >1.0 / "
+                f"non-finite is a corrupt artifact, never a pass (NFR-020 requires "
+                f"EXACTLY 1.0)"
             )
         else:
             detail = (
-                f"G4 FAIL: calibrated-confidence-coverage={coverage_val:.4g} < "
+                f"G4 FAIL: calibrated-confidence-coverage={coverage_score:.4g} < "
                 f"{G4_COVERAGE_REQUIRED} (NFR-020 — every finding MUST carry a "
                 "calibrated confidence + provenance; a bare-logit finding is a "
                 "breach)"
@@ -965,10 +1027,30 @@ def _risk_coverage_is_monotone(curve: Any) -> bool:
             ((float(p["coverage"]), float(p["risk"])) for p in curve),
             key=lambda cr: cr[0],
         )
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, OverflowError):
+        # OverflowError: a coverage/risk that is a Python int wider than a C double
+        # (10**400) — a malformed curve cannot certify NFR-019; fail loud, never crash.
         return False
     risks = [r for _, r in pts]
     return all(hi >= lo - 1e-9 for lo, hi in zip(risks, risks[1:]))
+
+
+def _finite_f2(system: dict[str, Any]) -> float | None:
+    """The F2 of a system from its ``precision`` + ``recall``, or ``None`` if either
+    is not a real (finite, in ``[0, 1]``, non-boolean) measurement.
+
+    Precision and recall are fractions in ``[0, 1]``; routing each through
+    :func:`_finite_unit_score` rejects a corrupt value (a bool, a ``NaN`` / ``±inf``,
+    or a Python int wider than a C double like ``10**400``) BEFORE it reaches
+    :func:`f_beta` — so G6 never crashes on ``float()`` (the S7-02 close also-scan) and
+    a corrupt ``+inf`` recall never produces a vacuous F2 that silently passes the
+    non-inferiority comparison (a ``NaN`` F2 makes ``core_f2 >= bar`` silently False).
+    """
+    precision = _finite_unit_score(system.get("precision"))
+    recall = _finite_unit_score(system.get("recall"))
+    if precision is None or recall is None:
+        return None
+    return f_beta(precision, recall, beta=2.0)
 
 
 def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResult:
@@ -983,12 +1065,26 @@ def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResul
             "G6", None, float("nan"), float("nan"),
             "G6 PENDING: pii-anon core absent from benchmark systems",
         )
-    core_f2 = f_beta(float(core["precision"]), float(core["recall"]), beta=2.0)
+    # The core F2 is computed only from VALIDATED precision/recall (finite, in [0,1],
+    # non-boolean); a corrupt core precision/recall ⇒ PENDING (no usable claimant F2,
+    # never a fabricated non-inferiority PASS, never an OverflowError crash — the
+    # S7-02 close also-scan).
+    core_f2 = _finite_f2(core)
+    if core_f2 is None:
+        return GuaranteeResult(
+            "G6", None, float("nan"), float("nan"),
+            "G6 PENDING: pii-anon core precision/recall is not a valid (finite, in "
+            "[0,1]) measurement — raw non-inferiority is unprovable from a corrupt "
+            "value (never fabricated, never crashed). " + _CARVE_OUT_NOTE,
+        )
 
+    # Only Tier-R competitors carrying VALIDATED precision/recall seed the F2 bar; a
+    # corrupt Tier-R precision/recall is EXCLUDED rather than crashing float() or
+    # standing in as a phantom +inf bar.
     tier_r_f2 = [
-        f_beta(float(systems[name]["precision"]), float(systems[name]["recall"]), beta=2.0)
+        f2
         for name in systems
-        if name in TIER_R_NAMES
+        if name in TIER_R_NAMES and (f2 := _finite_f2(systems[name])) is not None
     ]
     best_tier_r = max(tier_r_f2, default=0.0)
     f2_ok = core_f2 >= best_tier_r - EPS_F2
@@ -1064,13 +1160,20 @@ def _g7_certified_run(
 def _top_composite_system(systems: dict[str, dict[str, Any]]) -> str | None:
     """Name of the system with the highest ``composite_score`` (``None`` if none).
 
-    Ties broken by name for determinism. Only systems carrying a numeric
-    composite are considered.
+    Ties broken by name for determinism. Only systems carrying a REAL composite
+    (finite, in ``[0, 1]``, non-boolean — :func:`_finite_unit_score`) are considered.
+    A non-finite / out-of-range composite is EXCLUDED rather than crowned or crashed
+    on (the S7-02 close MAJOR-2): ``composite_score=+inf`` would fabricate a phantom
+    rank-1 over a genuinely-superior finite system; ``NaN`` would crash the old
+    ``s == best`` argmax (``NaN == best`` is always False ⇒ empty list ⇒ ``[0]``
+    IndexError); a Python int wider than a C double (``10**400``) would raise
+    OverflowError in ``float()`` — all three now fail CLOSED (the corrupt system is
+    simply not eligible for the top-composite crown).
     """
     scored = [
-        (name, float(s["composite_score"]))
+        (name, score)
         for name, s in systems.items()
-        if isinstance(s.get("composite_score"), (int, float))
+        if (score := _finite_unit_score(s.get("composite_score"))) is not None
     ]
     if not scored:
         return None
@@ -1172,14 +1275,22 @@ def _mle_bootstrap_draws(
 
     Returns ``(None, [])`` when there are fewer than two systems (no pairs).
     """
-    names = sorted(
-        name for name, s in systems.items()
-        if isinstance(s.get("composite_score"), (int, float))
-    )
+    # Only systems carrying a REAL composite (finite, in [0, 1], non-boolean) seed
+    # the bootstrap (the S7-02 close MAJOR-2): a +inf composite would saturate the
+    # logistic gap into a fabricated phantom rank-1, a NaN would poison the MM fit,
+    # and a 10**400 would raise OverflowError in float() — the corrupt system is
+    # EXCLUDED (it can never be crowned by the J-meter), consistent with
+    # `_top_composite_system`.
+    valid_composites: dict[str, float] = {
+        name: score
+        for name, s in systems.items()
+        if (score := _finite_unit_score(s.get("composite_score"))) is not None
+    }
+    names = sorted(valid_composites)
     if len(names) < 2:
         return None, []
 
-    composites = {name: float(systems[name]["composite_score"]) for name in names}
+    composites = valid_composites
     records: list[tuple[str, str]] = []
     for i in range(len(names)):
         for j in range(i + 1, len(names)):

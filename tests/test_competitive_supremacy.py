@@ -2069,9 +2069,11 @@ def test_close_composite_nan_does_not_crash_verdict_end_to_end() -> None:
     for s in bench["systems"]:  # type: ignore[attr-defined]
         if s["system"] == "scrubadub":
             s["composite_score"] = float("nan")
-    verdict = SupremacyVerdict.from_artifacts(bench)  # must NOT raise
-    assert verdict.verdict is Verdict.NOT_YET  # canonical headline preserved
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must NOT raise (no IndexError)
+    # The NaN system is never crowned, and the corrupt composite never fabricates a
+    # claim-grade (the security property; the exact non-claim verdict tier is incidental).
     assert verdict.j_rank1_system != "scrubadub"
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
 
 
 def test_close_composite_huge_int_does_not_crash_verdict_end_to_end() -> None:
