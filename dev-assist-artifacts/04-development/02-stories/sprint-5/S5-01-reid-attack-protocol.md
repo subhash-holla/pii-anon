@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E5 Attacks** (DC-09: `attacks/` real Tier-3 LLM-adversary + LiRA@128 MIA) |
-| State | **TODO** |
+| State | **IN_PROGRESS** (owner: dev-assist-development-executor; branch: `pdlc/sota-program` [main working tree, no worktree]) |
 | provisional_status | AGENT_SIMULATED (the ReidAttack protocol, the deterministic baseline body, the success-metrics scorer, the non-strippable caveat, the sandbox-run, and the import-boundary test all run for REAL in-tree against SYNTHETIC personas/targets; a real Tier-3 LLM adversary [S5-02] + a real offline DATA adversary with Wilson CIs are Pass-2 / cross-repo) |
 | Implements | **NFR-016** (non-strippable re-id caveat — 100% of exported privacy artifacts carry the anti-anonymity caveat — MUST, satisfied now via `ReidSuccessMetrics`'s non-strippable `caveat`); the **FR-011/FR-013 protocol foundation** (the `ReidAttack` + `MiaAttack` Protocols + a representative baseline ReidAttack body — the real Tier-3 LLM adversary is S5-02, the real LiRA@128 MIA is S5-03); upholds **AX-001** (synthetic), **AX-002** (deterministic total-order ranking), and the **attacks import-isolation invariant** (attacks ⊄ swarm/moe/fusion/policy — the standing CI guard this story adds). |
 | Traces | Design **DC-09** (`D-implementation-ready-design.md:19` — "`attacks/` package: real Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA"; `:58` — "Tier-3 de-circularization lives in `attacks/`"). UC-09. The S5-04 sandbox substrate (`run_attack_under_sandbox`) — consumed, not changed. |
