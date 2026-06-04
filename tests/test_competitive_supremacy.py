@@ -32,9 +32,14 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     SupremacyVerdict,
     Verdict,
     _finite_unit_score,
+    _g1_recall_floor,
     _g2_pseudonymization_integrity,
+    _g3_recall_dominance,
     _g4_calibration_selective_risk,
+    _g6_raw_noninferiority,
     _is_finite_number,
+    _run_breaches_recall_floor,
+    _top_composite_system,
     f_beta,
     recall_floor_breachers,
 )
@@ -1917,3 +1922,369 @@ def test_g4_is_deterministic_on_fabrication_vectors() -> None:
         s1 = _g4_core(**cal_over)
         s2 = copy.deepcopy(s1)
         assert _g4_calibration_selective_risk(s1) == _g4_calibration_selective_risk(s2)
+
+
+# ---------------------------------------------------------------------------
+# S7-02 adversarial-close hardening — the no-fabrication invariant's 3 gate
+# holes (the close's exact repros). The shared root-cause: an artifact-numeric
+# field that DRIVES a verdict was read with bare ``float()`` /
+# ``isinstance(..., (int, float))`` instead of routing through the gate's OWN
+# hardened validators (``_finite_unit_score`` / ``_is_finite_number``), so a
+# bool / NaN / ±inf / huge-int (10**400) either FABRICATED a PASS-or-crown or
+# CRASHED the shipped ``pii-anon supremacy`` CLI (a fail-loud denial-of-verdict).
+# Each must now fail CLOSED: the guarantee reads PENDING/FAIL, the system is
+# EXCLUDED from the rank-1 crown/bootstrap, or the breach-guard skips — NEVER a
+# fabricated PASS, NEVER a crash.
+# ---------------------------------------------------------------------------
+
+
+# -- MAJOR 1: G4 calibrated_confidence_coverage bool (isinstance+float bypass). --
+
+
+def test_close_g4_coverage_true_bool_is_not_a_pass() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-1: ``calibrated_confidence_coverage=True``
+    is a Python bool (``isinstance(True, int)`` is True; ``float(True) == 1.0``), so
+    the pre-hardening ``isinstance(coverage, (int, float))`` + ``float(coverage)``
+    coverage path read it as a perfect 1.0 ⇒ a DISHONEST G4 PASS. Routed through
+    ``_finite_unit_score`` (which rejects bool), a bool coverage is a corrupt/absent
+    coverage ⇒ G4 is NOT a pass (PENDING-or-FAIL), never a fabricated PASS."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(calibrated_confidence_coverage=True)
+    )
+    assert g4.passed is not True  # never a fabricated PASS over a bool flag
+
+
+def test_close_g4_coverage_false_bool_is_not_a_pass() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-1 (companion): ``False`` coverage is also a
+    bool flag, not a 0.0 measurement — it must be rejected (not a pass), never
+    coerced to a real fraction."""
+    g4 = _g4_calibration_selective_risk(
+        _g4_core(calibrated_confidence_coverage=False)
+    )
+    assert g4.passed is not True
+
+
+def test_close_g4_coverage_true_does_not_reach_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END (close MAJOR-1): with a canonical run, J≥0.95,
+    G2 fields + G5 override PASS, and the whole Tier-R∪Tier-C set waived — but
+    ``calibrated_confidence_coverage=True`` (a bool) in the calibration block — G4 is
+    NOT a pass and the headline verdict does NOT reach CLAIM_GRADE_SOTA. Pre-hardening
+    the bool coerced to 1.0 → a vacuous G4 PASS → ``_decide`` → CLAIM_GRADE_SOTA."""
+    cal = _conforming_calibration()
+    cal["calibrated_confidence_coverage"] = True
+    bench = _with_pseudo_fields(
+        _canonical_benchmark(), pii_anon_pi=0.95, competitor_pi=0.60
+    )
+    bench = _with_calibration(bench, cal)
+    theta, names = _strong_posterior()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G5": True},
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet wired; cited Tier-R"},
+    )
+    assert verdict.guarantee("G4").passed is not True
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# -- MAJOR 2: composite_score non-finite (the verdict-driving J/G3/G6-crown field). --
+
+
+def test_close_top_composite_excludes_positive_infinity_no_phantom_crown() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-2: a ``composite_score=+inf`` must NEVER win
+    the top-composite rank-1 crown (it would fabricate a phantom rank-1 over a
+    genuinely-superior finite competitor). The non-finite composite is EXCLUDED, so
+    the honest finite winner (``pii-anon`` at 0.8) is crowned."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "composite_score": 0.8},
+        "rogue": {"system": "rogue", "composite_score": float("inf")},
+    }
+    assert _top_composite_system(systems) == "pii-anon"  # +inf excluded, not crowned
+
+
+def test_close_top_composite_nan_does_not_crash_excluded() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-2: a ``composite_score=NaN`` must not crash
+    ``_top_composite_system`` (pre-hardening ``NaN == best`` is always False ⇒ empty
+    list ⇒ ``[0]`` IndexError). NaN is excluded; the finite system survives, and an
+    all-NaN field yields ``None`` (no crash, no phantom)."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "composite_score": 0.8},
+        "rogue": {"system": "rogue", "composite_score": float("nan")},
+    }
+    assert _top_composite_system(systems) == "pii-anon"  # NaN excluded, no IndexError
+    all_nan = {
+        "a": {"system": "a", "composite_score": float("nan")},
+        "b": {"system": "b", "composite_score": float("nan")},
+    }
+    assert _top_composite_system(all_nan) is None  # all excluded ⇒ None, not a crash
+
+
+def test_close_top_composite_huge_int_does_not_crash_excluded() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-2: a ``composite_score=10**400`` (wider than
+    a C double) must not raise OverflowError in ``_top_composite_system`` (the
+    pre-hardening ``float(s["composite_score"])`` crashed). The huge-int is excluded;
+    the finite winner survives."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "composite_score": 0.8},
+        "rogue": {"system": "rogue", "composite_score": 10**400},
+    }
+    assert _top_composite_system(systems) == "pii-anon"  # huge-int excluded, no crash
+
+
+def test_close_composite_positive_infinity_no_phantom_crown_end_to_end() -> None:
+    """[CONTRACT-TEST] §5 END-TO-END (close MAJOR-2): a competitor stamping
+    ``composite_score=+inf`` must NEVER be crowned the SDO rank-1 system (J argmax),
+    and the honest floor-compliant winner (pii-anon) stays crowned. Pre-hardening the
+    +inf seeded a phantom rank-1 (the MLE-bootstrap composite gap saturates), crowning
+    a rogue over a genuinely-superior competitor — a fabricated PROVISIONAL/J=1.0."""
+    bench = _canonical_benchmark()
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "scrubadub":
+            s["composite_score"] = float("inf")  # hostile +inf composite
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        pending_overrides=_ALL_PENDING_PASS,
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+    )
+    # The +inf competitor is never the crowned rank-1 system.
+    assert verdict.j_rank1_system != "scrubadub"
+    # The honest floor-compliant winner stays crowned.
+    assert verdict.j_rank1_system == "pii-anon"
+
+
+def test_close_composite_nan_does_not_crash_verdict_end_to_end() -> None:
+    """[SECURITY-TEST] §5 END-TO-END (close MAJOR-2): a ``composite_score=NaN`` on a
+    competitor must not crash the full ``from_artifacts`` path with an IndexError (via
+    ``_top_composite_system``) nor the MLE-bootstrap (via ``_mle_bootstrap_draws``).
+    The verdict computes; the NaN system is never crowned."""
+    bench = _canonical_benchmark()
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "scrubadub":
+            s["composite_score"] = float("nan")
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must NOT raise
+    assert verdict.verdict is Verdict.NOT_YET  # canonical headline preserved
+    assert verdict.j_rank1_system != "scrubadub"
+
+
+def test_close_composite_huge_int_does_not_crash_verdict_end_to_end() -> None:
+    """[SECURITY-TEST] §5 END-TO-END (close MAJOR-2): a ``composite_score=10**400`` on
+    a competitor must not raise OverflowError anywhere in the verdict path (the shipped
+    ``pii-anon supremacy --artifact`` CLI must not crash on an adversarial artifact).
+    The huge-int system is excluded from the crown/bootstrap; the verdict computes."""
+    bench = _canonical_benchmark()
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "scrubadub":
+            s["composite_score"] = 10**400
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must NOT raise
+    assert verdict.j_rank1_system != "scrubadub"
+
+
+def test_close_floor_breaching_inf_composite_still_excluded_from_crown() -> None:
+    """[CONTRACT-TEST] close MAJOR-2 × the RecallFloorVerdictGuard: a floor-BREACHING
+    system that ALSO stamps ``composite_score=+inf`` must be doubly ineligible for the
+    rank-1 crown — excluded both as a non-finite composite AND as a floor breacher.
+    The crowned system stays the floor-compliant pii-anon, and the verdict is never
+    CLAIM_GRADE on its account."""
+    bench = _canonical_benchmark()
+    rogue = _breaching_system("rogue-inf", composite=float("inf"))
+    bench["systems"].append(rogue)  # type: ignore[attr-defined]
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        pending_overrides=_ALL_PENDING_PASS,
+        tier_c_waivers={
+            n: "w"
+            for n in ("openai-privacy-filter", "azure-ai-language", "aws-comprehend")
+        },
+    )
+    assert "rogue-inf" in verdict.recall_floor_breachers
+    assert verdict.j_rank1_system == "pii-anon"
+    assert verdict.j_rank1_system != "rogue-inf"
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# -- MAJOR 3: per_language_recall_delta huge-int (G1 + the run-breach guard). --
+
+
+def test_close_g1_huge_int_per_language_delta_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-3: a ``per_language_recall_delta`` value of
+    ``10**400`` (wider than a C double) must not raise OverflowError in
+    ``_g1_recall_floor`` (the pre-hardening ``max(abs(float(v)) ...)`` crashed). A
+    non-finite/huge-int ε is rejected (fail-closed); G1 does not crash and does not
+    silently pass over the corrupt value (a real ε regression is a breach, never a
+    fabricated PASS)."""
+    bench = {"per_language_recall_delta": {"en": 0.001, "de": 10**400}}
+    systems = {"pii-anon": {"system": "pii-anon", "per_entity_recall": {}}}
+    g1 = _g1_recall_floor(bench, systems)  # must NOT raise
+    assert g1.passed is not True  # never a fabricated PASS over a rejected ε
+
+
+def test_close_run_breach_guard_huge_int_per_language_delta_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-3: ``_run_breaches_recall_floor`` must not
+    crash on a ``10**400`` per-language ε (the pre-hardening ``max(abs(float(v)) ...)``
+    raised OverflowError, breaking the shipped CLI). A non-finite/huge-int ε is treated
+    as a breach (fail-closed: it CANNOT be certified ≤ the 0.005 bound), never a
+    crash."""
+    bench = {"per_language_recall_delta": {"en": 0.001, "de": 10**400}}
+    assert _run_breaches_recall_floor(bench) is True  # fail-closed breach, no crash
+
+
+def test_close_run_breach_guard_non_finite_per_language_delta_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-3 (companion): a NaN / ±inf per-language ε is
+    not a real measurement — it must be treated as a breach (the run cannot be certified
+    floor-compliant from a corrupt ε), never slip ``abs() > bound`` (silently False
+    against NaN) or crash."""
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        bench = {"per_language_recall_delta": {"en": bad}}
+        assert _run_breaches_recall_floor(bench) is True
+
+
+def test_close_huge_int_per_language_delta_does_not_crash_verdict_end_to_end() -> None:
+    """[SECURITY-TEST] §5 END-TO-END (close MAJOR-3): a ``per_language_recall_delta``
+    huge-int in the benchmark must not crash the full ``from_artifacts`` path (the
+    shipped ``pii-anon supremacy --artifact`` CLI). The verdict computes; the corrupt ε
+    taints the run as a recall-floor breach (G7 guard), never a fabricated PASS."""
+    bench = _canonical_benchmark()
+    bench["per_language_recall_delta"] = {"en": 10**400}  # type: ignore[index]
+    verdict = SupremacyVerdict.from_artifacts(  # must NOT raise
+        bench, pending_overrides=_ALL_PENDING_PASS
+    )
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# -- ALSO-SCAN: recall / precision in G3 + G6 (same bare-float / isinstance class). --
+
+
+def test_close_g3_huge_int_competitor_recall_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close also-scan (G3 recall): a competitor
+    ``recall=10**400`` must not raise OverflowError in ``_g3_recall_dominance`` (the
+    pre-hardening ``max(float(systems[c]["recall"]) ...)`` crashed). A non-finite/huge
+    competitor recall is rejected (excluded as not a real measurement); G3 does not
+    crash and does not award the swarm a fabricated dominance over a corrupt +inf."""
+    systems = {
+        "pii-anon-swarm": {"system": "pii-anon-swarm", "recall": 0.85, "precision": 0.7},
+        "gliner": {"system": "gliner", "recall": 10**400, "precision": 0.9},
+    }
+    g3 = _g3_recall_dominance(systems)  # must NOT raise
+    # A corrupt competitor recall is excluded — never a fabricated dominance over +inf.
+    assert g3.passed is not True
+
+
+def test_close_g3_infinite_swarm_recall_is_not_a_fabricated_dominance() -> None:
+    """[SECURITY-TEST] S7-02 close also-scan (G3 recall): a pii-anon-swarm
+    ``recall=+inf`` must NEVER fabricate a recall-dominance PASS (``+inf >= best`` is a
+    vacuous win over a real competitor). A non-finite claimant recall is rejected ⇒ G3
+    is not a fabricated PASS, never a crash."""
+    systems = {
+        "pii-anon-swarm": {"system": "pii-anon-swarm", "recall": float("inf"), "precision": 0.7},
+        "gliner": {"system": "gliner", "recall": 0.66, "precision": 0.9},
+    }
+    g3 = _g3_recall_dominance(systems)  # must NOT raise
+    assert g3.passed is not True  # +inf never a fabricated recall-dominance win
+
+
+def test_close_g6_huge_int_recall_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close also-scan (G6 recall/precision): a ``10**400`` core
+    or Tier-R recall/precision must not raise OverflowError in ``_g6_raw_noninferiority``
+    (the ``f_beta(float(...), float(...))`` path). A non-finite/huge recall/precision is
+    rejected; G6 does not crash and is never a fabricated non-inferiority PASS."""
+    core_huge = {
+        "pii-anon": {
+            "system": "pii-anon",
+            "recall": 10**400,
+            "precision": 0.7,
+            "per_entity_recall": {"A": 0.9, "B": 0.8},
+        },
+    }
+    g6 = _g6_raw_noninferiority(core_huge)  # must NOT raise
+    assert g6.passed is not True
+    # A huge-int Tier-R competitor recall must also be excluded (not crash / not a bar).
+    tier_r_huge = {
+        "pii-anon": {
+            "system": "pii-anon",
+            "recall": 0.8,
+            "precision": 0.8,
+            "per_entity_recall": {"A": 0.9, "B": 0.8},
+        },
+        "presidio": {"system": "presidio", "recall": 10**400, "precision": 0.9},
+    }
+    g6b = _g6_raw_noninferiority(tier_r_huge)  # must NOT raise
+    assert g6b.observed == g6b.observed  # core F2 is finite (== self ⇒ not NaN)
+
+
+def test_close_g6_infinite_core_recall_is_not_a_fabricated_pass() -> None:
+    """[SECURITY-TEST] S7-02 close also-scan (G6): a core ``recall=+inf`` must NEVER
+    fabricate a non-inferiority PASS. Pre-hardening ``f_beta(0.7, +inf)`` yielded a
+    corrupt F2 that silently flowed into ``core_f2 >= best_tier_r - eps``; the hardened
+    path rejects a non-finite core recall ⇒ G6 is not a fabricated PASS, never a
+    crash."""
+    core_inf = {
+        "pii-anon": {
+            "system": "pii-anon",
+            "recall": float("inf"),
+            "precision": 0.7,
+            "per_entity_recall": {"A": 0.9, "B": 0.8},
+        },
+        "presidio": {"system": "presidio", "recall": 0.63, "precision": 0.4},
+    }
+    g6 = _g6_raw_noninferiority(core_inf)  # must NOT raise
+    assert g6.passed is not True
+
+
+def test_close_g3_g6_huge_int_does_not_crash_verdict_end_to_end() -> None:
+    """[SECURITY-TEST] §5 END-TO-END (close also-scan): a competitor recall/precision
+    of ``10**400`` in the benchmark must not crash the full ``from_artifacts`` path (the
+    shipped ``pii-anon supremacy --artifact`` CLI). The verdict computes; the corrupt
+    competitor is excluded from G3/G6, never a fabricated PASS."""
+    bench = _canonical_benchmark()
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "gliner":
+            s["recall"] = 10**400
+            s["precision"] = 10**400
+    verdict = SupremacyVerdict.from_artifacts(  # must NOT raise
+        bench, pending_overrides=_ALL_PENDING_PASS
+    )
+    assert verdict.verdict is not Verdict.CLAIM_GRADE_SOTA
+
+
+# -- Honest-input regressions: the hardening must NOT perturb the honest path. --
+
+
+def test_close_hardening_preserves_honest_g3_g4_g6_pass() -> None:
+    """[CONTRACT-TEST] S7-02 close CARDINAL RULE: the hostile-input hardening must
+    leave the HONEST-input verdicts byte-identical. The fully-conforming benchmark
+    (finite composites, real coverage 1.0, finite recall/precision) still yields G3
+    PASS, G4 PASS, G6 PASS, and the honest top-composite crown is pii-anon."""
+    bench = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    verdict = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    assert verdict.guarantee("G3").passed is True
+    assert verdict.guarantee("G4").passed is True
+    assert verdict.guarantee("G6").passed is True
+    assert _top_composite_system(
+        {s["system"]: s for s in bench["systems"]}  # type: ignore[index]
+    ) == "pii-anon"
+
+
+def test_close_hardening_is_deterministic_on_hostile_vectors() -> None:
+    """[PROPERTY-TEST] AX-002: each hostile composite/coverage/recall vector yields an
+    identical (fail-closed) outcome across two runs on deep-copied inputs — the
+    hardened reads stay pure functions."""
+    # composite +inf / NaN / huge-int → identical exclusion.
+    for bad in (float("inf"), float("nan"), 10**400):
+        s1 = {
+            "pii-anon": {"system": "pii-anon", "composite_score": 0.8},
+            "rogue": {"system": "rogue", "composite_score": bad},
+        }
+        s2 = copy.deepcopy(s1)
+        assert _top_composite_system(s1) == _top_composite_system(s2)
+    # coverage bool → identical non-pass.
+    cov1 = _g4_core(calibrated_confidence_coverage=True)
+    cov2 = copy.deepcopy(cov1)
+    assert _g4_calibration_selective_risk(cov1) == _g4_calibration_selective_risk(cov2)

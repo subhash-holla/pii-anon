@@ -764,6 +764,67 @@ def test_write_refuses_artifacts_benchmarks_path(tmp_path: Path) -> None:
         )
 
 
+def test_close_write_refuses_capitalized_benchmarks_path_case_insensitive(
+    tmp_path: Path,
+) -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-4: the pre-hardening ``"benchmarks" in
+    out_dir.parts`` check is CASE-SENSITIVE, so ``artifacts/Benchmarks`` (capital B) on
+    a case-insensitive filesystem (APFS) WROTE a real canonical-run.json INTO the
+    protected ``artifacts/benchmarks/`` (same inode). The check must be
+    case-INSENSITIVE — every casing of ``benchmarks`` is refused, and NOTHING is
+    written."""
+    from pii_anon.evaluation.canonical_run import _write_canonical
+
+    for variant in ("Benchmarks", "BENCHMARKS", "BenchMarks"):
+        target = tmp_path / "artifacts" / variant
+        with pytest.raises(ValueError, match="(?i)benchmarks"):
+            _write_canonical(_synthetic_produced_shape(), str(target))
+        # Fail-closed: nothing written under the refused path.
+        assert not (target / "canonical-run.json").exists()
+        assert not target.exists()
+
+
+def test_close_write_refuses_resolved_artifacts_benchmarks_alias(
+    tmp_path: Path,
+) -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-4: the guard must compare the RESOLVED real
+    path, not just the literal string parts — a relative / ``..``-laundered path whose
+    RESOLVED location lands under ``.../artifacts/benchmarks`` is refused. A real
+    ``artifacts/benchmarks`` directory (created here) aliased via a ``..`` hop must be
+    rejected and nothing written into it."""
+    from pii_anon.evaluation.canonical_run import _write_canonical
+
+    protected = tmp_path / "artifacts" / "benchmarks"
+    protected.mkdir(parents=True)
+    sentinel_before = sorted(p.name for p in protected.iterdir())
+    # A laundered path: <tmp>/artifacts/canonical/../benchmarks resolves UNDER
+    # artifacts/benchmarks — the resolved-real-path guard must refuse it.
+    laundered = tmp_path / "artifacts" / "canonical" / ".." / "benchmarks"
+    with pytest.raises(ValueError, match="(?i)benchmarks"):
+        _write_canonical(_synthetic_produced_shape(), str(laundered))
+    # Nothing written into the protected directory.
+    assert sorted(p.name for p in protected.iterdir()) == sentinel_before
+    assert not (protected / "canonical-run.json").exists()
+
+
+def test_close_produce_canonical_artifact_refuses_capitalized_benchmarks(
+    tmp_path: Path,
+) -> None:
+    """[SECURITY-TEST] S7-02 close MAJOR-4 (end-to-end producer): the PUBLIC
+    ``produce_canonical_artifact(output_dir='artifacts/Benchmarks')`` (capital B) is
+    REFUSED before any write — the full producer path enforces the case-insensitive
+    sandbox, so nothing is ever written under any ``benchmarks`` casing."""
+    target = tmp_path / "artifacts" / "Benchmarks"
+    with pytest.raises(ValueError, match="(?i)benchmarks"):
+        produce_canonical_artifact(
+            seed=_SEED,
+            output_dir=str(target),
+            max_samples=_REPRESENTATIVE_MAX_SAMPLES,
+            enable_parallel=False,
+        )
+    assert not (target / "canonical-run.json").exists()
+
+
 def test_write_emits_canonical_json_under_canonical_dir(tmp_path: Path) -> None:
     """[UNIT-TEST] The write-path emits canonical sorted JSON under the requested
     (non-benchmarks) directory, creating it on demand."""
