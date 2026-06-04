@@ -1,0 +1,187 @@
+# Story-gate traceability review — S6-02 (4-channel least-privilege interception, DC-13)
+schema: dev-assist/reviewer-output/v1
+review:
+  dimension: traceability
+  gate: story
+  story_id: S6-02
+  story_title: "4-channel least-privilege interception + no-raw-PII-persist (DC-13)"
+  iteration: 1
+  reviewer: dev-assist-development-traceability
+  head: 0bb61b4
+  story_path: dev-assist-artifacts/04-development/02-stories/sprint-6/S6-02-four-channel-interception.md
+  scope: "Forward FR/NFR -> Story -> Test -> DC chain; ID existence; test-name pinning; DC<->module 1:1; no scope creep; forward-link coherence; dependency-state; matrix backfill."
+verdict: APPROVE
+self_attestation: >
+  Independent review. I read requirements-document.md (FR/AX source of truth),
+  D-implementation-ready-design.md (DC-13 at lines 23 + 49), traceability-matrix.md,
+  the S6-02 story, src/pii_anon/agentic/interception.py, tests/test_agentic_interception.py,
+  and the S6-03 dependency story. I ran the S6-02 acceptance suite (22 passed) and
+  introspected test-name->ID embedding + test-body semantics. No findings were
+  copied from another reviewer; severities are my own calibration.
+
+summary:
+  chain_status: VERIFIED
+  ids_claimed: [FR-025, FR-026, AX-006, AX-002, AX-001, DC-13, UC-20]
+  ids_phantom: []        # zero non-existent IDs claimed
+  must_claimed: [FR-025, FR-026]
+  scope_creep: NONE
+  forward_link: COHERENT
+  dependency_state: STANDS_ALONE
+  acceptance_tests_pass: "22 passed (PYTHONPATH=src pytest tests/test_agentic_interception.py)"
+
+evidence:
+  id_existence:
+    - id: FR-025
+      exists: true
+      where: "requirements-document.md:38 — 'Intercept all four agent channels (prompt/memory/tool-I/O/trace) least-privilege | UC-20 | swarm | MUST'"
+      status: MUST
+    - id: FR-026
+      exists: true
+      where: "requirements-document.md:39 — 'Persist no raw PII to any channel after masking (AX-006) | UC-20 | swarm | MUST'"
+      status: MUST
+    - id: AX-006
+      exists: true
+      where: "design D0:6 (axiom register: 'AX-006 least-privilege interception') + requirements-document.md:39 (FR-026 cites it)"
+    - id: AX-002
+      exists: true
+      where: "design D0:6 (axiom register: 'AX-002 determinism')"
+    - id: AX-001
+      exists: true
+      where: "design D0:6 ('AX-001 no-real-PII') + requirements-document.md:87 (NFR-024 cites AX-001)"
+    - id: DC-13
+      exists: true
+      where: "D-implementation-ready-design.md:23 (D1 table: 'Agentic interception ... 4-channel least-privilege + no-raw-PII-persist | FR-023..030, AX-006') AND :49 (DECISION 3, verbatim story-quoted clause)"
+    - id: UC-20
+      exists: true
+      where: "requirements-document.md:38-39 (FR-025/026 -> UC-20); traceability-matrix.md:34 (UC-20/21 interception row)"
+  test_pinning:
+    rule: "every claimed FR/AX has >=1 test whose name embeds the ID AND whose body asserts the matching semantics (finding-pattern-9 guard)"
+    fr_025:
+      pinning_tests: [test_fr025_a1_exactly_four_channels, test_fr025_a2_mask_prompt_channel, test_fr025_a7_intercept_all_covers_every_channel]
+      body_matches_id: true
+      note: "A1 pins exactly-{PROMPT,MEMORY,TOOL_IO,TRACE} membership; A2 asserts surrogate-present/raw-absent on PROMPT; A7 asserts a ChannelResult per channel — all are the FR-025 'intercept all four channels' semantic."
+    fr_026:
+      pinning_tests: [test_fr026_a3_record_has_no_plaintext_field, test_fr026_a4_no_raw_persist_raises_on_masked_text_leak, test_fr026_a4_no_raw_persist_raises_via_intercept_all, test_fr026_a4_error_is_pii_anon_error_subclass, test_fr026_a6_memory_persists_only_surrogate, test_fr026_a8_ledger_surrogate_only_g5_shape, test_fr026_a8_ledger_copy_on_read_is_immutable]
+      body_matches_id: true
+      note: "A3/A4/A6/A8 all assert 'no raw PII persisted post-mask' (record field-introspection, leaky-masker RAISES, store row==surrogate, JSON ledger free of raw) — the FR-026 headline."
+    ax_006:
+      pinning_tests: [test_ax006_a5_trace_never_reverses_by_default, test_ax006_a5_trace_reversible_only_on_explicit_opt_in]
+      body_matches_id: true
+      note: "A5 asserts TRACE writes 0 store rows by default and only on explicit reversible_channels opt-in — the AX-006 least-privilege invariant."
+    ax_002:
+      pinning_tests: [test_ax002_a9_deterministic_replay, test_ax002_a9_no_nondeterministic_imports_on_path]
+      body_matches_id: true
+    ax_001:
+      pinning_tests: [test_ax001_a10_import_isolation, test_ax001_a10_no_raw_value_field_audit, test_ax001_a10_channel_masker_is_runtime_checkable]
+      body_matches_id: true
+      note: "synthetic-only fixtures (SYNTH_EMAIL/SYNTH_PHONE) + import-isolation AST scan."
+  dc_to_module:
+    dc: DC-13
+    module: src/pii_anon/agentic/interception.py
+    mapping: "1:1 for the FR-025/026 slice of DC-13"
+    dc_broader_scope: "DC-13 spans FR-023..030; S6-02 implements ONLY FR-025 + FR-026 (+ upholds AX-006/002/001)."
+    no_surface_dir: true   # agentic/ is a library package, not surface/ — dc_to_module_audit (surface stories) N/A
+  scope_creep_check:
+    out_of_scope_correctly_excluded:
+      - "FR-023 (query-aware masking, SHOULD, UC-19) -> S6-01 — listed as non-goal (story §5)"
+      - "FR-024 (bound over-redaction, SHOULD, UC-19, eval) -> not claimed"
+      - "FR-027 (session pseudonyms, SHOULD, UC-21) -> not claimed"
+      - "FR-028 (leakage-Sankey counts, MUST, UC-22) -> S6-05 — consumed FORWARD only, not implemented here"
+      - "FR-029 (prompt-injection resistance, MUST, UC-23) -> S6-05 — non-goal (story §5)"
+      - "FR-030 (byte-identical masking, SHOULD, UC-20/21) -> not claimed (AX-002 determinism is upheld but FR-030 not declared — see OBSERVATION-1)"
+    verdict: "no creep — the two MUSTs claimed are exactly the in-scope pair for this module"
+  forward_link:
+    InterceptionLedger:
+      feeds: [FR-028 (S6-05 leakage-Sankey), "SDO G5 audit half"]
+      recorded_in:
+        - "story Blocks: 'S6-05 (leakage-Sankey consumes the InterceptionLedger)'"
+        - "story Implements: 'Feeds FR-028 (the leakage-Sankey, S6-05) + the SDO G5 audit half'"
+        - "module docstring interception.py:16-17 ('the auditable G5 artifact (+ the S6-05 leakage-Sankey source)')"
+      coherent: true
+      note: "FR-028 is itself MUST/UC-22 (requirements-document.md:41) — the forward dependency targets a real downstream MUST. as_dict() emits a JSON-serializable surrogate-only shape (A8) that is a coherent G5/Sankey input."
+  dependency_state:
+    declared: "Depends on: None hard"
+    soft_consumes_read_only: [tokenization/reidentification.py, tokenization/encrypted_store.py, errors.py]
+    s6_03_state: "DONE (iter-2), done_at 2026-06-01 — the consumed EncryptedSQLiteTokenStore + StaticTestKeyProvider exist (encrypted_store.py:164,228) and are imported read-only"
+    blocking_dep_in_progress: false
+    verdict: "stands alone — no hard dep; the only soft consume-dep (S6-03) is DONE; byte-identical md5s attest read-only consumption"
+
+provisional_status_cascade:
+  story_value: AGENT_SIMULATED
+  source_dc: DC-13
+  source_dc_status: AGENT_SIMULATED   # design header: 'Stage 3, AGENT_SIMULATED'
+  diverged: false
+  cascade_ok: true
+  note: "Source DC-13 is AGENT_SIMULATED (not DIVERGED) — no DIVERGED cascade obligation; story's AGENT_SIMULATED + Pass-2 boundary (live agent runtime / real transcript-residual leakage) matches the source. The in-tree teeth (synthetic text + real S6-03 AEAD store) run for REAL."
+
+findings:
+  - id: TRACE-S6-02-MAJOR-1
+    severity: MAJOR
+    pattern: 4   # traceability.md missing the row for this story's FR/NFR IDs
+    status: BATCH_TO_SPRINT_GATE
+    title: "traceability-matrix.md carries no Story/Test backfill for FR-025/026 + UC-20 (standing deferral, not S6-02-specific)"
+    detail: >
+      The matrix's UC-20/21 row (traceability-matrix.md:34) records FR-025/026/027/030
+      against AX-006 but has NO Story column and NO Test column — the table header is
+      'UC | FRs | NFRs | external_refs'. The preamble (line 3) promises 'DC/Story/Test
+      columns fill in Stages 3-5', yet no sprint story (S2-01/S2-02/S2-04, nor S6-02) has
+      a forward Story/Test row. This is the SAME standing backfill gap already deferred for
+      S2-01/S2-02/S2-04, not a defect introduced by S6-02. S6-02 itself is correctly traced
+      INSIDE the story (Traces -> DC-13; Implements -> FR-025/026; test names embed the IDs).
+    evidence:
+      - "dev-assist-artifacts/02-requirements/traceability-matrix.md:3 (Story/Test columns promised)"
+      - "dev-assist-artifacts/02-requirements/traceability-matrix.md:34 (UC-20/21 row — no Story/Test cell)"
+      - "grep 'S6-02' traceability-matrix.md -> 0 hits; grep 'DC-13' -> 0 hits"
+    remediation: >
+      Batch with the standing S2-01/S2-02/S2-04 deferral: at the S6 SPRINT GATE, backfill the
+      forward Story+Test trace for UC-20 -> {FR-025: S6-02 / test_fr025_*, FR-026: S6-02 /
+      test_fr026_* + test_ax006_a5_*} and add a DC-13 -> S6-02 edge. No in-loop story-gate
+      action required of the S6-02 executor.
+    blocks_approve: false
+
+  - id: TRACE-S6-02-OBS-1
+    severity: OBSERVATION
+    pattern: 2   # adjacent FR/NFR that could have been claimed
+    title: "FR-030 (byte-identical agentic masking, SHOULD/UC-20) is materially satisfied by A9 but not declared"
+    detail: >
+      A9 (test_ax002_a9_deterministic_replay) proves byte-identical masked outputs + identical
+      ledger for same payloads+scope, and the AST test pins no random/uuid/time/secrets on the
+      path. That is exactly FR-030's 'byte-identical agentic masking decisions given seed/key/scope'
+      (requirements-document.md:43). FR-030 is a SHOULD scoped to UC-20/21 and the story
+      legitimately routes determinism through AX-002 instead. No action needed; noting the adjacent
+      SHOULD is effectively covered so the sprint-gate backfill MAY additionally credit FR-030 to A9.
+    blocks_approve: false
+
+  - id: TRACE-S6-02-OBS-2
+    severity: OBSERVATION
+    pattern: 15  # (adapted) provisional-status provenance clarity
+    title: "G5 forward consumer (SDO gate) is named but not a tracked Story/DC ID — confirm at sprint gate that 'G5' resolves to a real gate criterion"
+    detail: >
+      The InterceptionLedger is declared to feed 'the SDO G5 audit half'. G5 is an SDO
+      competitive-supremacy gate criterion (per the standing competitive_supremacy.py invariants),
+      not an FR/DC ID, so it correctly does not appear in requirements-document.md. The forward
+      link is coherent as worded, but the S7 canonical-run audit-evidence wiring (story Blocks:
+      'Feeds the SDO G5 + the S7 canonical-run audit evidence') is the actual consumer to confirm
+      at the sprint/release gate. Recorded here so the G5<-ledger edge is not lost.
+    blocks_approve: false
+
+counts:
+  showstopper: 0
+  catastrophic: 0
+  major: 1          # batched to sprint gate; does not block this story gate
+  minor: 0
+  observation: 2
+  total: 3
+  blocking_total: 0
+
+decision_rationale: >
+  APPROVE. Every claimed ID is real (FR-025/026 both MUST, AX-006/002/001, DC-13, UC-20 — zero
+  phantom IDs). Every claimed requirement has >=1 pinning test whose name embeds the ID AND whose
+  body asserts the matching semantics (no name-vs-body mismatch). DC-13 -> agentic/interception.py
+  maps 1:1 for the FR-025/026 slice with NO scope creep into FR-023/024/027/028/029/030. The
+  InterceptionLedger -> FR-028(S6-05)+G5 forward link is recorded coherently in story metadata AND
+  the module docstring. 'Depends on: None hard' holds — the only soft consume-dep (S6-03) is DONE.
+  provisional_status AGENT_SIMULATED matches source DC-13 (AGENT_SIMULATED, not DIVERGED) — no
+  cascade violation. The one MAJOR is the pre-existing matrix Story/Test-column backfill gap that is
+  already deferred for S2-01/S2-02/S2-04 and is correctly batched to the S6 sprint gate; it is not an
+  S6-02 regression and does not block the story gate.

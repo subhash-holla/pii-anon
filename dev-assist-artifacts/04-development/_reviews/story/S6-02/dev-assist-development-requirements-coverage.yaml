@@ -1,0 +1,144 @@
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S6-02
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: coverage-S6-02-01
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:34
+    description: |
+      Matrix-row backfill owed (batch with the standing program deferral, NOT an
+      S6-02 regression). The traceability matrix is UC->FR/NFR-grained; its
+      DC/Story/Test columns "fill in Stages 3-5" (header line 3). Row 34
+      ("UC-20/21 interception + session pseudonyms | FR-025, FR-026, FR-027,
+      FR-030 | NFR-020 | AX-006") therefore carries NO forward Story column —
+      the FR-025/026 -> S6-02 forward rows and the explicit UC-20 -> S6-02 ->
+      test-id link are not yet recorded. This is a standing convention, not a
+      gap unique to this story: the matrix carries ZERO per-story forward rows
+      for ANY closed/in-review story (verified — `grep -cE 'S[0-9]-[0-9]'` over
+      the matrix == 0; S2-01/S2-02/S6-03 etc. are all absent too). So the only
+      coverage debt S6-02 introduces is the same batch backfill every prior
+      story deferred. The in-tree verification itself is complete (see notes).
+    suggested_resolution: |
+      When the Stage-3..5 column backfill is performed for the matrix (the
+      standing batch that also owes S2-01/S2-02/S6-03/...), add the forward
+      edges: UC-20 -> FR-025 -> S6-02 -> {test_fr025_a1_exactly_four_channels,
+      test_fr025_a2_mask_prompt_channel,
+      test_fr025_a7_intercept_all_covers_every_channel}; and UC-20 -> FR-026
+      (AX-006) -> S6-02 -> {test_fr026_a3_record_has_no_plaintext_field,
+      test_fr026_a4_no_raw_persist_raises_on_masked_text_leak (+ _via_intercept_all,
+      + _error_is_pii_anon_error_subclass),
+      test_fr026_a6_memory_persists_only_surrogate,
+      test_fr026_a8_ledger_surrogate_only_g5_shape}, with
+      provisional_status: AGENT_SIMULATED (live-runtime Pass-2). No code change.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-025
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-026
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md#UC-20
+
+  - id: coverage-S6-02-02
+    severity: OBSERVATION
+    location: src/pii_anon/agentic/interception.py:391
+    description: |
+      Scope-honesty note on FR-026 (no finding against this story; documents the
+      exact in-tree-vs-Pass-2 seam so a later reader does not over-read the
+      MUST). `_assert_no_raw_pii` scans for raw survival ONLY over the set of raw
+      values the masker SELF-REPORTS (`_known_raw_values` walks `result.records`
+      and takes each reported source span). It therefore catches a masker that
+      LIES by reporting-a-record-but-leaving-the-raw-text (A4, the headline) and
+      a masker that lets raw bleed into a persisted record (A3/A8). It does NOT,
+      by construction, catch raw PII that the detector NEVER reported at all
+      (a recall miss). That residual — real-detector-recall against a live agent
+      runtime / real transcript residual — is EXACTLY the AGENT_SIMULATED Pass-2
+      boundary the story declares, so the mechanism-under-test is honestly
+      scoped, not over-claimed. Flagging only so the Pass-2 protocol explicitly
+      owns "detector-miss residual leakage", not just "transcript residual".
+    suggested_resolution: |
+      No change required for S6-02. When the AGENT_SIMULATED Pass-2 is scheduled
+      (live-runtime gate), ensure its sample-size protocol covers detector-recall
+      misses (raw PII present but un-reported), not only transcript-residual
+      leakage of already-detected entities — so the Pass-2 confirm/invalidate
+      genuinely closes FR-026's live half.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-026
+      - dev-assist-artifacts/04-development/02-stories/sprint-6/S6-02-four-channel-interception.md
+
+notes: |
+  Claimed-vs-verified delta for the two in-scope MUSTs — both FULLY VERIFIED
+  in-tree; only the live-agent runtime is deferred (honest Pass-2). No
+  silently-missing MUST; nothing partially-satisfied-without-deferral.
+
+  FR-025 (intercept all four channels prompt/memory/tool-I/O/trace under
+  least-privilege — MUST): VERIFIED in-tree.
+    - 4-channel membership: A1 (test_fr025_a1_exactly_four_channels) pins
+      set(AgentChannel) == {PROMPT, MEMORY, TOOL_IO, TRACE} AND len == 4 —
+      add/remove a channel fails. Genuine, not a smoke assertion.
+    - per-channel mask: A2 (test_fr025_a2_mask_prompt_channel) — surrogate
+      present, raw email absent, span points at the source occurrence.
+    - intercept_all covers EVERY channel: A7
+      (test_fr025_a7_intercept_all_covers_every_channel) — one ChannelResult per
+      channel, each masked (raw absent), per-channel records;
+      set(results) == set(AgentChannel).
+    - least-privilege: A5 (test_ax006_a5_trace_never_reverses_by_default +
+      _reversible_only_on_explicit_opt_in) — TRACE persists 0 rows by default;
+      `intercept` reaches `_persist` ONLY when channel in reversible_channels;
+      explicit opt-in required for TRACE. Mechanism genuinely exercised against
+      the real S6-03 AEAD store.
+
+  FR-026 (persist NO raw PII to any channel after masking, AX-006 — MUST):
+  VERIFIED in-tree.
+    - no-raw-persist invariant RAISES on leak (headline): A4
+      (test_fr026_a4_no_raw_persist_raises_on_masked_text_leak +
+      _via_intercept_all + _error_is_pii_anon_error_subclass) — a deliberately
+      lying `_LeakyMasker` (emits a record but leaves the raw value in
+      masked_text) is caught; `_assert_no_raw_pii` RAISES NoRawPIIPersistError
+      (loud, never a silent pass), through both `intercept` and `intercept_all`;
+      the error subclasses PiiAnonError. This is real teeth, not a tautology —
+      the raw set is derived from the masker's reported source span and the lie
+      is the still-present source text.
+    - no-plaintext record: A3 (test_fr026_a3_record_has_no_plaintext_field) —
+      frozen dataclass; fields == surrogate-only metadata set; no field VALUE
+      contains the raw PII; mutation raises FrozenInstanceError.
+    - surrogate-only persist: A6 (test_fr026_a6_memory_persists_only_surrogate)
+      against the REAL S6-03 EncryptedSQLiteTokenStore — stored token == the
+      surrogate (AEAD ciphertext at rest), read-back is never the raw value.
+    - surrogate-only ledger (G5 shape): A8
+      (test_fr026_a8_ledger_surrogate_only_g5_shape) — as_dict() JSON-serializes
+      with NO raw PII in the blob + per-channel counts.
+
+  Pass-2 boundary is HONEST (not an over-claim). provisional_status:
+  AGENT_SIMULATED. The MECHANISM — 4-channel guard, the no-raw-PII-persist
+  invariant, least-privilege reversibility (TRACE never reverses by default),
+  surrogate-only ledger, determinism — all run for REAL in-tree against
+  SYNTHETIC text (AX-001) + the real S6-03 AEAD store. The ONLY deferral is the
+  live-agent runtime + real transcript-residual leakage. A MUST whose core
+  mechanism is in-tree-verified with only the live runtime deferred is
+  acceptable as in-tree-verified; the framing in the story header, the module
+  docstring, and the test docstring all consistently scope the deferral to the
+  live runtime — no claim that the live runtime is already proven. The residual
+  detector-recall miss is the one sharpening noted in coverage-S6-02-02 (an
+  OBSERVATION on the Pass-2 protocol, not a gap in this story).
+
+  Evidence base independently re-run by this reviewer:
+  `PYTHONPATH=src pytest tests/test_agentic_interception.py` -> 22 passed
+  (17 RED-pinned A1-A10 + 5 REFACTOR edge). Each acceptance carries an explicit
+  FR-/AX- name-tag (test_fr025_*/test_fr026_*/test_ax00*), so the claimed
+  test->requirement mapping in the story Evidence table is genuine and
+  introspectable, not asserted. RED-precedes-GREEN is git-evidenced
+  (f47aa05 ancestor of HEAD 0bb61b4).
+
+  Orphan / cross-story coverage: FR-027 (session pseudonyms — SHOULD) and FR-030
+  (byte-identical agentic masking — SHOULD) share UC-20/21 with FR-025/026 but
+  are out of S6-02 scope (FR-027 is a later swarm story; FR-030 determinism is
+  partially exercised here by A9 but its own row is not claimed by S6-02 — no
+  over-claim against either). FR-028 (leakage-Sankey — MUST) is the downstream
+  S6-05 consumer of this ledger and is correctly NOT claimed here. No
+  in-scope MUST is left unaddressed; no out-of-scope MUST is falsely claimed.
+
+review_time_seconds: 1500
+
+context_bounds_respected: true

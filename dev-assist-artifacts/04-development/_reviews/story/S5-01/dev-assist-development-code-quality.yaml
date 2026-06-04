@@ -1,0 +1,149 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S5-01
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S5-01-01
+    severity: MINOR
+    location: src/pii_anon/eval_framework/attacks/__init__.py:68
+    description: |
+      `DEFAULT_ATTACK_REGISTRY` in `sandbox.py` is annotated `Final[Mapping[str, AttackCallable]]`.
+      The `__init__.py` additive merge mutates it with `DEFAULT_ATTACK_REGISTRY[_name] = _runner`
+      suppressed by `# type: ignore[index]`. The `Final[Mapping]` annotation is an intentional
+      immutability signal from the S5-04 author: `Mapping` does not expose `__setitem__`, so mypy
+      correctly rejects the mutation and the suppressor comment is load-bearing. The implementation
+      works (the runtime object is a plain `dict` and the merge is correct), but the approach
+      couples `__init__.py` to an internal implementation detail of `sandbox.py` (that the backing
+      object happens to be a mutable dict). A future change that makes `DEFAULT_ATTACK_REGISTRY`
+      actually immutable (e.g. `types.MappingProxyType`) would silently fail at runtime rather than
+      at type-check time.
+    suggested_resolution: |
+      Two clean alternatives (either resolves the smell without touching `sandbox.py`'s public contract):
+      (a) Have `sandbox.py` export an `extend_default_registry(entries: Mapping[str, AttackCallable]) -> None`
+          helper that encapsulates the mutation and removes the `type: ignore` from `__init__.py`.
+      (b) Document the suppressor comment more precisely — e.g., add a `# SAFETY: DEFAULT_ATTACK_REGISTRY
+          is a plain dict at runtime; the Final[Mapping] annotation is a type-level immutability hint
+          that does not prevent mutation via the underlying dict interface.` The current comment
+          (`# plain dict (Final[Mapping] is type-level)`) is in the right direction but terse.
+      Option (a) is preferred as it makes the extension contract explicit and removes the coupling.
+
+  - id: code-quality-S5-01-02
+    severity: MINOR
+    location: src/pii_anon/eval_framework/attacks/reid.py:440
+    description: |
+      `REID_ATTACK_REGISTRY` is typed `Final[Mapping[str, Any]]` but every value stored is a
+      `reid_attack_runner` callable. The sandbox's merge loop treats registry values as
+      `AttackCallable = Callable[..., Mapping[str, Any]]`. Using `Any` as the value type loses
+      the callable constraint that `sandbox.py` relies on, so mypy cannot catch a future
+      registration of a non-callable value in the registry.
+    suggested_resolution: |
+      Import `AttackCallable` (or re-declare `Callable[..., Mapping[str, Any]]`) from
+      `pii_anon.eval_framework.attacks.sandbox` and type the registry as
+      `Final[Mapping[str, AttackCallable]]` (or `Final[dict[str, Callable[..., Mapping[str, Any]]]]`).
+      This is a pure type-precision fix; no behaviour change.
+
+  - id: code-quality-S5-01-03
+    severity: MINOR
+    location: src/pii_anon/eval_framework/attacks/reid.py:426,432
+    description: |
+      `candidate_set_size` is declared `int` in the function signature of `reid_attack_runner`,
+      so the two `int(candidate_set_size)` casts on lines 426 and 432 are redundant. The casts
+      are harmless but indicate the parameter may have been intended to accept non-int scalars
+      (e.g. JSON-decoded `float`), which conflicts with the type annotation. If the runner is
+      ever called with a JSON-decoded numeric that is a `float` (e.g. `2.0`), the type annotation
+      is violated silently and the `int()` cast would be doing real work — but mypy's static
+      check would have caught the call site.
+    suggested_resolution: |
+      Either (a) remove both `int()` casts and rely on the `int` annotation (the sandbox passes
+      params from the spec which coerces types at load time), or (b) widen the annotation to
+      `int | float` and keep one `int()` cast at the top of the function body. Option (a) is
+      cleaner given that `AttackSpec` already enforces typed parameters.
+
+  - id: code-quality-S5-01-04
+    severity: OBSERVATION
+    location: tests/test_attack_reid_protocol.py:519-583
+    description: |
+      The eight REFACTOR-phase edge tests (`test_runner_rejects_non_array_targets_json`,
+      `test_runner_rejects_non_array_candidates_json`, `test_runner_rejects_non_object_target_element`,
+      `test_runner_rejects_non_array_observed_signals_field`, `test_runner_rejects_non_array_quasi_identifiers_field`,
+      `test_runner_empty_inputs_yield_zeroed_metrics_with_caveat`,
+      `test_baseline_normalises_token_case_and_whitespace`,
+      `test_baseline_custom_adversary_id_is_pinned`) do not embed an FR/NFR ID in their names
+      (pattern-6: test names should embed `fr_NNN` / `nfr_NNN` when pinning an FR/NFR). These
+      tests are coverage-hardening edge cases for the shared JSON decoder's defensive branches,
+      not acceptance criteria — they do not correspond to a new FR/NFR acceptance criterion. The
+      omission is therefore intentional and acceptable per the story's §12 description ("additive
+      edge tests only; coverage hardening to 100%"), but worth noting for consistency.
+    suggested_resolution: |
+      No immediate action required. When S5-02/S5-03 reuse the decoder (and a specific
+      FR/NFR acceptance criterion covers malformed-input robustness), pin those tests with the
+      appropriate NFR ID prefix (e.g. `nfr_xxx_`). Optionally prefix the existing eight tests
+      with a `decoder_` or `robustness_` tag to signal their character.
+
+  - id: code-quality-S5-01-05
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/reid.py:80
+    description: |
+      `ReidPersona.auxiliary_knowledge` is typed `Mapping[str, Any]` (read-only interface)
+      but defaults to `field(default_factory=dict)`, which returns a mutable `dict`. Because
+      `ReidPersona` is `frozen=True`, the reference to the dict cannot be replaced post-construction,
+      but the dict's contents can still be mutated by any caller who retained the original dict
+      before passing it in. This is the idiomatic Python pattern for frozen dataclasses with
+      complex defaults and is not a defect — but the interface (`Mapping`) suggests immutability
+      that the backing object does not enforce.
+    suggested_resolution: |
+      No change required for the S5-01 baseline (the baseline adversary reads only
+      `quasi_identifiers`; `auxiliary_knowledge` is a pass-through side-channel for S5-02). When
+      the real adversary (S5-02) actively reads `auxiliary_knowledge`, consider either
+      (a) storing a `types.MappingProxyType(aux)` in `__post_init__` via `object.__setattr__`,
+      or (b) accepting `Mapping[str, Any]` in `__init__` and documenting the copy policy. The
+      `# SWITCH-POINT(DATA)` comment already marks this as a S5-02 concern.
+
+notes: |
+  TDD discipline: strict. RED-before-GREEN confirmed by `git merge-base --is-ancestor` in both
+  directions (59b8404→68c5d67 and 68c5d67→9aa39bc). RED commit is tests-only (new
+  tests/test_attack_reid_protocol.py + tests/test_attacks_import_boundary.py); GREEN adds the
+  production module; REFACTOR consolidates two decoder paths behind `_decode_object_array` +
+  `_string_tuple` and adds eight coverage-hardening edge tests. The refactor is
+  behaviour-preserving: the error messages changed label format from `"candidates_json must
+  decode to ..."` to `"{label} must decode to ..."` — the REFACTOR edge tests pin the new
+  message substrings and cover all defensive branches. The GREEN→REFACTOR change is additive.
+
+  Scope discipline: the `git diff 0bb61b4..HEAD --name-only` output includes files from the
+  S6-02 remediation commit (`83b73bf`) which sits in the diff range but predates the S5-01
+  RED commit. The S5-01 commits (59b8404, 68c5d67, 9aa39bc, e6f884c) each touch only
+  owned paths (reid.py, attacks/__init__.py, the two test files, the story doc). No scope creep
+  by the executor.
+
+  All public symbols (`ReidPersona`, `ReidTarget`, `ReidGuess`, `ReidSuccessMetrics`,
+  `ReidAttack`, `MiaAttack`, `BaselineDeterministicReidAttack`, `score_reid_attack`,
+  `reid_attack_runner`, `REID_ATTACK_REGISTRY`, `ANTI_ANONYMITY_CAVEAT`) carry module-level
+  or per-class docstrings. Private helpers (`_weighted_jaccard`, `_target_tokens`,
+  `_persona_tokens`, `_decode_object_array`, `_string_tuple`, `_personas_from_json`,
+  `_targets_from_json`) also carry docstrings. No missing-doc finding.
+
+  The `Final[Mapping]` mutation smell (finding S5-01-01) is the single most architecturally
+  notable finding. It is MINOR rather than MAJOR because: (a) it works correctly at runtime,
+  (b) the `# type: ignore[index]` comment makes the suppression visible, (c) the commit
+  message explicitly documents the rationale ("extend it in place WITHOUT replacing it"), and
+  (d) mypy is clean under both invocations. However, the coupling to sandbox.py's internal
+  implementation detail (mutable dict backing a Final[Mapping]) is the cleaner concern to
+  address in a follow-up (e.g. an `extend_default_registry()` helper) rather than before
+  APPROVE at story gate.
+
+  The import-boundary test (`test_attacks_import_boundary.py`) is well-constructed: it is
+  AST-based (not substring), has a "≥1 file scanned including reid.py" guard against a
+  silent empty-glob pass, and explicitly asserts `__init__.py` and `reid.py` are in scope.
+  The `test_nfr016_a6_constructing_with_blank_caveat_is_refused` parametrize covers three
+  blank variants (`""`, `"   "`, `"\t\n"`), which is thorough. The `(ValueError, TypeError)`
+  catch is correct given that frozen dataclass raises `FrozenInstanceError` (subclass of
+  `AttributeError`) on post-init mutation; the `__post_init__` raises `ValueError` for blank
+  caveat — the test is precise.
+
+review_time_seconds: 790
+
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

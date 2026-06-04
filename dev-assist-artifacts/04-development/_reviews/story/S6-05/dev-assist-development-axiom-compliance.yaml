@@ -1,0 +1,112 @@
+reviewer: dev-assist-development-axiom-compliance
+
+scope_id: S6-05
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: axiom-S6-05-01
+    severity: OBSERVATION
+    location: src/pii_anon/agentic/leakage_sankey.py:367-412
+    description: |
+      AX-002 determinism on the LIVE data path is upheld but rests on an UNTESTED
+      structural assumption worth pinning. In this environment pii_anon_datasets IS
+      installed, so score_injection_resistance takes the DATA branch of
+      _load_payloads (build_payloads + INTENT_TAGS), NOT the in-tree fallback that
+      A6/A10 exercise under monkeypatch. I independently verified the DATA path is
+      deterministic: build_payloads is pure-stdlib (base64 + dataclasses), uses a
+      FIXED INTENT_TAGS=("base64","ocr","zero_width"), a fixed CARRIER_TEMPLATES,
+      and a fixed _OCR_MAP, with no clock/RNG (eval-data payloads.py:1-114) — two
+      score_injection_resistance calls produced a byte-identical report
+      (n_payloads=4, intent_tags=("base64","ocr","zero_width")). So determinism
+      holds on BOTH paths today. HOWEVER, no S6-05 test pins the determinism of the
+      DATA branch (A6 only covers whichever path is active, and the env that runs
+      A6 with the extra PRESENT silently tests DATA, while the env that runs it
+      ABSENT tests the fallback — neither test asserts which path it took). The
+      AX-002 contract for this module therefore depends on an out-of-tree library's
+      determinism that this story does not contract-test. This is an OBSERVATION,
+      not a finding-with-teeth, because (a) the in-tree fallback determinism IS
+      pinned (A6 under monkeypatch), and (b) the DATA library is itself AX-002/
+      NFR-004-stamped at its own gate (S7-02). Raised so a future change to
+      build_payloads (e.g. adding a randomized carrier) cannot silently break this
+      module's AX-002 with the extra installed without a test here catching it.
+    suggested_resolution: |
+      No change required for S6-05 APPROVE. Optional hardening: add one
+      [PROPERTY-TEST] that calls score_injection_resistance twice WITHOUT the
+      monkeypatch (i.e. against whatever path is active in the running env) and
+      asserts byte-identical reports — this pins the DATA branch's determinism
+      when the extra is present, complementing A6's fallback-path pin. Alternatively
+      assert that _load_payloads returns a tuple equal to itself across two calls
+      regardless of branch. Either makes the AX-002 contract path-independent and
+      catches an upstream build_payloads regression at THIS module's gate.
+
+notes: |
+  AX-002 (determinism) — HEADLINE, UPHELD with margin. Independently verified (not
+  by re-running the executor's tests): (1) build_leakage_sankey is a pure function
+  of (ledger, outbound, known_values) — 3 builds with identical inputs yield a
+  byte-identical as_dict(), and the raw synthetic span never appears in the
+  rendered dict. as_dict() emits nodes in fixed AgentChannel order + (blocked,
+  leaked); links in a fixed (source-order x sink-order) traversal; edges built in a
+  deterministic (source, blocked-then-leaked, sorted-entity-type) order. known
+  values are de-duplicated via dict.fromkeys (insertion-stable) and the empty
+  string is skipped (no vacuous universal "survivor"). (2) AST walk of the real
+  module confirms ZERO random/uuid/time/secrets imports (module + nested). (3) The
+  injection report is byte-identical across two guard instances on BOTH the LIVE
+  DATA path (env has the extra) and the in-tree fallback (forced absent via
+  __import__ monkeypatch) — both reports byte-identical. The DATA build_payloads
+  path the dispatch flagged is a FIXED payload set (not seeded RNG): pure-stdlib,
+  fixed INTENT_TAGS / CARRIER_TEMPLATES / _OCR_MAP, no clock. The only residual is
+  that the DATA-branch determinism is not contract-tested HERE (logged as
+  axiom-S6-05-01, OBSERVATION).
+
+  AX-001 (synthetic-only / INERT) — UPHELD. The in-tree payload span is
+  _SYNTH_PII_SPAN = "jane.roe@example.test" (reserved example.test TLD, never real
+  PII); test fixtures use jane.roe@/john.doe@example.test + 555-0100. The three
+  obfuscation transforms are faithful + recoverable encodings of that SYNTHETIC
+  value (base64 decodes back; zero_width is U+200B-joined and strips back;
+  homoglyph is a fixed literal map) — verified each obfuscated payload does NOT
+  carry the verbatim span (so they are genuine obfuscations, which is exactly why
+  the "direct" verbatim scaffold probe must exist to exercise the
+  verbatim-exfiltration boundary; that probe is correctly EXCLUDED from intent_tags
+  on both paths). The benign corpus is three PII-free sentences. The LIVE DATA
+  payloads additionally carry the non-strippable INERT_DISCLAIMER. No real-PII
+  literal on any path. as_dict() / the Sankey never echo a raw value (the
+  entity_type label is a coarse shape class — EMAIL/PHONE/PII — never the raw
+  survivor; verified SYNTH_EMAIL/SYNTH_PHONE absent from the label and from the
+  JSON blob).
+
+  IMPORT ISOLATION — UPHELD. Module-level imports are exactly {__future__, base64,
+  collections.abc, dataclasses, pii_anon.agentic.interception}. AST confirms NO
+  import matching eval_framework.rating / eval_framework.attacks / attacks /
+  competitive_supremacy / competitor_compare / orchestrator. pii_anon_datasets is
+  NOT a module-level import and IS imported lazily inside _load_payloads (PEP 562
+  fallback also additive in agentic/__init__.py) — the module loads and scores via
+  the in-tree fallback with the extra absent. The agentic/__init__ change is purely
+  additive (new lazy re-exports; no removal/mutation of the S6-02 names).
+
+  AX-003 (ensemble-recall-floor) — NOT TRIGGERED. This is an agentic audit/scoring
+  surface (leakage-Sankey + injection ASR over the S6-02 ledger); it does not touch
+  the detection-fusion / swarm / MoE-router / early-exit / shared-floor path. Full
+  S6-05 diff scope = exactly the 4 owned paths (story + agentic/__init__.py +
+  leakage_sankey.py + test file); grep over the diff for
+  orchestrator|swarm|fusion|expert|router|gate_v1|competitive_supremacy|recall|floor|moe
+  ⇒ NONE. No recall-floor property test or per-language gate is in scope.
+
+  AX-005 (calibrated-uncertainty) — NOT TRIGGERED. The module emits no
+  confidence/abstention/router_path/needs_review surface (none of those tokens
+  appear); it is an audit/scoring surface, not a detector, so the calibration/
+  abstention hook does not apply.
+
+  Protected/user-WIP byte-identical (verified, md5 vs MEMORY): orchestrator
+  0afc6dee…, competitor_compare 7cae16c8…, test_moe_enhancements 910e9cd6…,
+  interception 7c306f41… (consumed read-only). The SDO gate
+  competitive_supremacy.py is not in the S6-05 diff (confirmed by diff-scope grep).
+  artifacts/benchmarks/* not written by this story (the pre-existing M entries are
+  user-WIP from session start). Ran tests/test_agentic_leakage_sankey.py
+  -o addopts='' -q ⇒ 29 passed.
+
+review_time_seconds: 720
+
+context_bounds_respected: true

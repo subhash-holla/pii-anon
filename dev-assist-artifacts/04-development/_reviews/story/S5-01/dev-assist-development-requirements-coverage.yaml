@@ -1,0 +1,97 @@
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S5-01
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: coverage-S5-01-01
+    severity: OBSERVATION
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:25
+    description: |
+      NFR-016 ("100% of exported privacy artifacts carry the anti-anonymity
+      caveat") is a cross-cutting MUST the traceability matrix attributes to TWO
+      UC rows: UC-05/07/08 (FR-006/009/010, DATA-side pseudonymization artifacts)
+      AND UC-09 (FR-011/012, the Tier-3 re-id artifacts). S5-01 honestly satisfies
+      it for the CODE-side re-id privacy-artifact family it INTRODUCES
+      (ReidSuccessMetrics / as_outcome) — verified non-strippable end-to-end. It
+      does NOT, and correctly does not claim to, certify the DATA-side
+      pseudonymization-integrity artifacts (cross-repo, `DATA:` dep). This is the
+      correct partial-satisfaction reading for an invariant-style MUST, but the
+      matrix's NFR-016 verification cell is not yet split by producing surface, so
+      a later reader could mistake S5-01's claim for whole-invariant closure. No
+      action required of S5-01; flagged so the epic/sprint coverage snapshot tracks
+      NFR-016 as "code-side re-id surface VERIFIED (S5-01); DATA-side pseudonym
+      surface pending its own producing story" rather than globally DONE.
+    suggested_resolution: |
+      No change to S5-01. At the epic/sprint coverage gate, record NFR-016 as a
+      per-surface invariant: re-id-artifact surface verified by S5-01
+      (test_nfr016_a6_* + A7 end-to-end through the sandbox); DATA-side
+      pseudonymization-artifact surface verified by its own producing story. Avoid
+      marking NFR-016 globally DONE off S5-01 alone.
+    references:
+      - requirements-document.md#NFR-016
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md
+
+notes: |
+  Scope verdict: every MUST in S5-01's scope is either fully verified (NFR-016)
+  or explicitly deferred-with-successor (FR-011 -> S5-02, FR-013 -> S5-03). No
+  silent gap and no over-claim found. Diff reviewed: 0bb61b4..e6f884c restricted
+  to S5-01's three commits (59b8404 RED / 68c5d67 GREEN / 9aa39bc REFACTOR);
+  reid.py + additive attacks/__init__ + the two new test files. (The
+  tests/test_agentic_interception.py delta in the raw 0bb61b4..HEAD window is
+  commit 83b73bf = S6-02, which sits at the diff-range floor and is NOT part of
+  S5-01 — S5-01 touched exactly its 4 owned files. Not an S5-01 over-reach.)
+
+  NFR-016 (the one full MUST — GENUINELY VERIFIED):
+    - ReidSuccessMetrics.caveat defaults to the canonical ANTI_ANONYMITY_CAVEAT;
+      __post_init__ refuses a blank/whitespace caveat (ValueError). The object is
+      frozen so the field cannot be mutated away post-construction.
+    - as_outcome() ALWAYS carries the caveat and is the SOLE exported-privacy
+      -result producer in reid.py (grep confirms no other dict/Mapping result/
+      export surface); reid_attack_runner (the only registry runner) routes
+      through it.
+    - End-to-end honesty: the sandbox copies the outcome via dict(outcome)
+      WITHOUT stripping keys (sandbox.py:306), so the caveat survives the full
+      export path runner -> run_attack_under_sandbox -> AttackResult.outcome.
+      A7 asserts result.outcome["caveat"] == ANTI_ANONYMITY_CAVEAT, not just the
+      in-memory object. The caveat is genuinely non-strippable on the EXPORTED
+      artifact, which is exactly what NFR-016 demands.
+    - A6 coverage: test_nfr016_a6_metrics_carry_anti_anonymity_caveat_by_default,
+      _constructing_with_blank_caveat_is_refused[3 params],
+      _caveat_cannot_be_stripped_post_construction, _as_outcome_always_carries
+      _caveat. All 6 pass (ran in isolation: 6 passed / 26 deselected). Full file
+      34 passed (addopts cleared to bypass the unrelated full-suite cov gate).
+
+  FR-011 / FR-013 (MUSTs whose REAL fulfillment is the successor stories —
+  HONESTLY DEFERRED, NOT over-claimed):
+    - The story header, Implements row, Intent, and Non-goals all frame these as
+      the "FR-011/FR-013 protocol foundation" (the @runtime_checkable ReidAttack +
+      MiaAttack Protocols + a representative deterministic BaselineDeterministic
+      ReidAttack body), with explicit successors: real Tier-3 LLM adversary
+      (RRS/QIC/BSL) -> S5-02 (Pass-2); real LiRA@128 + Secret-Sharer MIA -> S5-03
+      (Pass-2, DATA canary splits absent). The baseline is a weighted-Jaccard
+      stand-in with # SWITCH-POINT(DATA) markers, never presented as the real
+      adversary. No sentence claims FR-011 or FR-013 "satisfied/complete/done."
+    - The MiaAttack Protocol is a declared seam only (the baseline is asserted NOT
+      to be a MiaAttack, A1) — correctly a foundation for S5-03, not a fulfilled
+      MIA.
+
+  NFR-012 / NFR-013 (power thresholds >=385 personas / >=128 shadow models —
+  HONESTLY ABSENT): not referenced anywhere in reid.py, its tests, or claimed by
+  the story. Correct — power belongs to the real-adversary successor stories with
+  their real paired sets and Wilson CIs.
+
+  Cross-checks: no provisional_status: DIVERGED MUST in this scope, so the
+  DIVERGED Pass-2 commitment rule does not apply. provisional_status here is
+  AGENT_SIMULATED with a documented Pass-2 real-CI follow-up, consistent with the
+  program discipline. The package-wide dangerous-signature guard
+  (test_attack_sandbox.py::...no_unsafe_execution_call_signatures) now also scans
+  reid.py and passes. A10 import-boundary guard requires reid.py be scanned and
+  passes.
+
+review_time_seconds: 1170
+
+context_bounds_respected: true

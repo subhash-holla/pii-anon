@@ -1,0 +1,156 @@
+# Reviewer output — STORY S6-05 (DC-13), iteration 1
+# Dimension: security-sast (PRIMARY)
+schema: dev-assist/reviewer-output/v1
+gate:
+  program: pdlc-sota-program
+  level: story
+  story_id: S6-05
+  story_title: "agentic leakage-Sankey + prompt-injection exfiltration resistance (DC-13)"
+  iteration: 1
+reviewer:
+  dimension: security-sast
+  role: PRIMARY
+  model: claude-opus-4-8[1m]
+  branch: pdlc/sota-program
+  head: 644c61e6db66801ec8f4c5921398f49b68e1efd7
+  diff_base: e569761
+verdict: APPROVE
+summary: >
+  S6-05 adds the FR-028 leakage-Sankey + FR-029 prompt-injection exfiltration-resistance
+  scorer as one new in-tree module (src/pii_anon/agentic/leakage_sankey.py) + additive
+  re-exports, with a new test module. The headline security invariant — non-circular leak
+  detection — holds under adversarial probing: a `leaked` edge is created ONLY by a pure
+  membership test (`known_value in outbound[channel]`) over caller-supplied ground-truth
+  values; detection is NEVER re-run on the masked output. No survivor => leaked_count()==0;
+  empty known_values => 0; PII-shaped-but-undeclared outbound => 0. An attacker who controls
+  only the outbound payload (never known_values, which the membership direction makes
+  un-addable from the untrusted side) cannot forge a phantom leak — verified across
+  case-changed / truncated / spaced / zero-width-injected payload variants. The Sankey
+  artifact never echoes the raw value (as_dict() + every edge.entity_type derive labels from
+  the survivor's SHAPE only; JSON blob raw-value-free). Injection ASR semantics are correct:
+  mask-all => 0.0, a silently-leaky guard => 0.25, and a guard raising NoRawPIIPersistError
+  counts as RESISTANCE (the value did not cross the boundary). The in-tree INERT payloads are
+  recoverable encodings (base64 encode-only / fixed homoglyph map / zero-width) of a SYNTHETIC
+  value (jane.roe@example.test, RFC 2606 reserved .test TLD) — no real PII, no live
+  exfiltration; A10 forces the in-tree fallback via monkeypatch and yields >=3 transform
+  intents. Import isolation: the module's own source imports only stdlib + pii_anon.agentic
+  .interception + a function-local lazy pii_anon_datasets; no unsafe deserialization (base64
+  is data-only encode), no subprocess/shell/eval/dynamic-import, no weak hash, no
+  random/uuid/time/secrets. All protected files byte-identical (interception.py
+  7c306f41205c7bab38d907a4f29cee82, competitor_compare.py 7cae16c89f4c97136e1a12394dae2025),
+  SDO gate untouched, diff confined to the 4 owned paths. No SHOWSTOPPER / CATASTROPHIC /
+  MAJOR security findings.
+findings:
+  - id: S6-05-SEC-OBS-1
+    severity: OBSERVATION
+    title: "Empty-string survivor filter (`if v`) admits whitespace-only known_values"
+    file: src/pii_anon/agentic/leakage_sankey.py
+    lines: "237"
+    category: input-validation
+    cwe: null
+    description: >
+      build_leakage_sankey de-duplicates and drops the empty string with
+      `known = [v for v in dict.fromkeys(known_values) if v]`. A single space (or any
+      whitespace-only / single-punctuation token) is truthy, so it survives the filter; since
+      such a token is `in` almost any non-empty outbound payload, passing
+      known_values=[' '] would register a spurious `leaked` edge. This is NOT an
+      attacker-reachable phantom-leak: known_values is trusted caller-supplied ground truth
+      (in score_injection_resistance it is the fixed synthetic _SYNTH_PII_SPAN, never a
+      space), and the membership direction (known_value in payload) means the untrusted
+      outbound payload can never inject into the known-value set. It would require the trusted
+      caller to declare a whitespace token as a PII-value-in-scope — a caller-contract misuse,
+      not a security boundary breach. No current breach; flagged only because the empty-string
+      guard demonstrates intent to reject degenerate survivors and a `.strip()`-based check (or
+      a documented minimum-survivor-length contract) would close the degenerate-token edge
+      symmetrically.
+    evidence: >
+      Probe: build_leakage_sankey(led, outbound={PROMPT:'has spaces here'},
+      known_values=[' ']) -> leaked_count()==1. Contrast: every attacker-controlled outbound
+      variant against a fixed benign known set (case-changed/truncated/spaced/zero-width)
+      -> leaked_count()==0; only a VERBATIM survivor of a declared known_value -> 1.
+    recommendation: >
+      Optional hardening (non-blocking): filter with `if v and v.strip()` or document a
+      minimum-survivor-length / non-whitespace caller contract on known_values so a degenerate
+      trusted-caller token cannot register a vacuous leak. No change required for APPROVE.
+    attacker_reachable: false
+    source_pack: null
+  - id: S6-05-SEC-OBS-2
+    severity: OBSERVATION
+    title: "Package-root pii_anon/__init__ eagerly imports orchestrator/eval_framework (pre-existing, not introduced by S6-05)"
+    file: src/pii_anon/__init__.py
+    lines: "1-25"
+    category: import-isolation
+    cwe: null
+    description: >
+      A runtime sys.modules probe shows that importing pii_anon.agentic.leakage_sankey results
+      in orchestrator + eval_framework + competitor_compare being present in sys.modules. This
+      is NOT a dependency of leakage_sankey.py's own source — it is a pre-existing property of
+      the top-level pii_anon/__init__.py, which eagerly does `from .benchmarks import ...`
+      (-> runner.py -> `from pii_anon.orchestrator import PIIOrchestrator` -> eval_framework).
+      ANY import of anything under pii_anon.* runs the package __init__ and drags these in. The
+      already-DONE/approved S6-02 interception.py exhibits the identical behavior (39 forbidden
+      modules pulled via the same root). The story's RISK-5 isolation contract is specifically
+      about leakage_sankey.py's OWN source imports, which are clean (stdlib +
+      pii_anon.agentic.interception + lazy pii_anon_datasets) and AST-pinned by
+      test_ax001_a10_import_isolation_ast. The eager package-root import graph is out of scope
+      for this story-gate's diff and is not attacker-relevant. Noted for visibility only.
+    evidence: >
+      Pristine `python -S` import traceback: pii_anon/__init__.py L1 `from .benchmarks import`
+      -> benchmarks/runner.py L7 `from pii_anon.orchestrator import PIIOrchestrator`.
+      interception.py (S6-02, DONE) pulls in 39 forbidden modules via the same root.
+      leakage_sankey.py source top-level pii_anon import is ONLY L76
+      `from pii_anon.agentic.interception import (...)`; pii_anon_datasets is NOT loaded at
+      module-import time.
+    recommendation: >
+      No action for S6-05. If lazy package-root re-exports are ever desired program-wide
+      (mirroring the agentic package's PEP 562 __getattr__), that is a separate cross-cutting
+      refactor, not a story finding.
+    attacker_reachable: false
+    source_pack: null
+checks:
+  diff_scope_confined_to_owned_paths: true
+  protected_files_byte_identical: true        # interception.py + competitor_compare.py md5 match; orchestrator + test_moe unchanged
+  sdo_gate_untouched: true
+  red_precedes_green: true                     # module absent at RED 9b6b3c3, added at GREEN 5b35a12
+  non_circular_leak_detection: true            # A3: membership-only; no re-detection of masked output; phantom-leak impossible from untrusted side
+  no_raw_value_echo_in_artifact: true          # as_dict() + edge.entity_type label from survivor shape; raw value never serialized
+  injection_asr_semantics_correct: true        # A7 mask-all=0.0; A8 leaky>0; NoRawPIIPersistError counts as resistance
+  inert_synthetic_payloads: true               # AX-001: synthetic .test value; base64 encode-only recoverable; no live exfiltration
+  datasets_absent_fallback_verified: true      # A10 monkeypatch forces in-tree fallback; >=3 transform intents; 'direct' excluded from intent_tags
+  import_isolation_module_source: true         # stdlib + pii_anon.agentic.interception + lazy pii_anon_datasets only (AST-pinned)
+  no_unsafe_deserialization: true              # base64 is data-only encode; no pickle/marshal/yaml.load
+  no_subprocess_shell_eval_dynamic_import: true
+  no_weak_hash_primitive: true                 # no md5/sha1 in module
+  no_nondeterministic_primitives: true         # no random/uuid/time/secrets/datetime
+  no_new_egress: true                          # no network/socket/requests/urllib
+  no_unsafe_blocks: n/a                         # Python; no unsafe construct
+  cve_scan_new_deps: n/a                        # no new third-party dependency added (pii_anon_datasets pre-existing optional extra)
+  module_tests_pass: true                       # 29/29 tests in tests/test_agentic_leakage_sankey.py
+  ruff_clean: true
+  mypy_canonical_clean: true                    # mypy src/pii_anon -> Success (135 files)
+  mypy_strict_clean: true                       # mypy src/pii_anon --strict -> Success (135 files)
+severity_counts:
+  SHOWSTOPPER: 0
+  CATASTROPHIC: 0
+  MAJOR: 0
+  MINOR: 0
+  OBSERVATION: 2
+independence:
+  context_bounds_respected: true
+  shared_state_used: false
+  bounded_context: "S6-05 diff (4 owned paths) + read-only S6-02 interception.py dependency + story spec; no cross-reviewer state."
+  self_attestation: >
+    Reviewed independently within a bounded context. Verdict derived solely from the S6-05 diff,
+    the consumed S6-02 interception surface (read-only), the story acceptance criteria, and
+    direct adversarial execution against the new module. No shared state with other reviewers.
+verification_rerun:
+  performed: true
+  mode: read-only
+  results:
+    module_tests: "29 passed (tests/test_agentic_leakage_sankey.py, addopts-coverage-gate disabled)"
+    ruff: "All checks passed (owned files)"
+    mypy_canonical: "Success: no issues found in 135 source files"
+    mypy_strict: "Success: no issues found in 135 source files"
+    adversarial_phantom_leak: "0 phantom leaks constructible from untrusted (outbound) side; verbatim survivor -> 1 (true positive)"
+    injection_asr: "mask-all=0.0 | leaky=0.25 | raise-as-resistance=0.0"
+    datasets_fallback: "A10 monkeypatch -> in-tree intents ('base64','homoglyph','zero_width'); 'direct' excluded"

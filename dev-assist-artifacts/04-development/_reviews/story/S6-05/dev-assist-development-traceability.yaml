@@ -1,0 +1,297 @@
+# Story-gate traceability review — S6-05 (agentic leakage-Sankey + injection resistance, DC-13)
+schema: dev-assist/reviewer-output/v1
+reviewer: dev-assist-development-traceability
+scope_id: S6-05
+gate: story
+
+review:
+  dimension: traceability
+  iteration: 1
+  story_id: S6-05
+  story_title: "agentic leakage-Sankey + prompt-injection exfiltration resistance (DC-13)"
+  head: 644c61e
+  story_path: dev-assist-artifacts/04-development/02-stories/sprint-6/S6-05-leakage-sankey-injection-resistance.md
+  diff_scope: "git diff e569761..HEAD -- src/pii_anon/agentic/leakage_sankey.py tests/test_agentic_leakage_sankey.py"
+  scope: "Forward FR/NFR -> Story -> Test -> DC chain; ID existence (no phantoms); test-name pinning + body-semantic match; DC<->module 1:1; no scope creep; the 4-vs-6 channel reconciliation; matrix backfill; provisional_status cascade."
+
+verdict: APPROVE
+
+self_attestation: >
+  Independent review. I read requirements-document.md (FR/AX source of truth — FR-028:41,
+  FR-029:42, FR-025:38, FR-023/024/026/027/030, NFR-024/AX-001:87), D-implementation-ready-design.md
+  (DC-13 at lines 23 + 49 — the binding 4-channel taxonomy + DECISION 3), traceability-matrix.md
+  (UC-22/23 row :35, the standing-deferral note :43), the full S6-05 story, the complete
+  src/pii_anon/agentic/leakage_sankey.py + tests/test_agentic_leakage_sankey.py diff, the S6-02
+  AgentChannel enum + its `len(AgentChannel)==4` contract pin (interception.py:99-110,
+  test_agentic_interception.py:131), and the S6-02 sibling traceability YAML for precedent. I
+  introspected every test name's ID-embedding AND each body's asserted semantics (finding-pattern-9
+  guard). No findings copied from another reviewer; severities are my own calibration.
+
+summary:
+  chain_status: VERIFIED
+  ids_claimed: [FR-028, FR-029, AX-001, AX-002, DC-13, UC-22, UC-23]
+  ids_phantom: []        # zero non-existent IDs claimed
+  must_claimed: [FR-028, FR-029]
+  scope_creep: NONE
+  forward_link: COHERENT
+  dependency_state: SATISFIED   # depends on S6-02 (DONE); optional datasets-extra consume is lazy/guarded
+  acceptance_tests_pass: "29 cases A1-A10 + frozen-contract + REFACTOR edges; story records 3421 passed / 16 skipped / 0 failed on HEAD; new module 98% cov"
+  channel_4v6_ruling: ACCEPTABLE_INTERPRETATION_PLUS_SOURCE_DISCREPANCY  # see findings TRACE-S6-05-MINOR-2
+
+evidence:
+  id_existence:
+    - id: FR-028
+      exists: true
+      status: MUST
+      where: "requirements-document.md:41 — 'Per-channel agentic leakage counts (leakage-Sankey, 6 channels) | UC-22 | eval | MUST'"
+    - id: FR-029
+      exists: true
+      status: MUST
+      where: "requirements-document.md:42 — 'Prompt-injection exfiltration resistance (ASR vs benign-task-success) | UC-23 | eval | MUST'"
+    - id: AX-001
+      exists: true
+      where: "requirements-document.md:87 (NFR-024 'No real PII in repo/fixtures/logs (AX-001)' MUST) + design axiom register; story upholds it via SYNTHETIC-only payloads"
+    - id: AX-002
+      exists: true
+      where: "design axiom register (AX-002 determinism — same register S6-02 cited at design D0); upheld via fixed payload list + pure functions + no random/uuid/time/secrets"
+    - id: DC-13
+      exists: true
+      where: "D-implementation-ready-design.md:23 (D1 table: 'Agentic interception: router pre-filter + query-aware gate + 4-channel least-privilege + no-raw-PII-persist | FR-023..030, AX-006') AND :49 (DECISION 3, verbatim 4-channel clause)"
+    - id: UC-22
+      exists: true
+      where: "requirements-document.md:41 (FR-028 -> UC-22); traceability-matrix.md:35 (UC-22/23 agentic-leakage row)"
+    - id: UC-23
+      exists: true
+      where: "requirements-document.md:42 (FR-029 -> UC-23); traceability-matrix.md:35"
+
+  test_pinning:
+    rule: "every claimed FR/AX has >=1 test whose name embeds the ID AND whose body asserts the matching semantics (finding-pattern-9 guard)"
+    fr_028:
+      pinning_tests:
+        - test_fr028_a1_blocked_edges_sum_to_intercepted_total
+        - test_fr028_a2_leaked_edge_when_known_value_survives_outbound
+        - test_fr028_a2_leaked_entity_type_inferred_from_surviving_value
+        - test_fr028_a3_no_leaked_edge_without_survivor_non_circular
+        - test_fr028_a3_masked_output_is_never_re_detected
+        - test_fr028_a3_empty_known_values_yields_zero_leaks
+        - test_fr028_a4_blocked_edge_per_masked_record_on_its_channel
+        - test_fr028_a5_as_dict_renderer_shape_six_nodes
+        - test_fr028_a5_as_dict_links_aggregate_per_channel_target
+      body_matches_id: true
+      note: "A1/A4 assert per-source-channel blocked counts sum to the ledger total; A2 asserts a leaked edge + counts_by_channel()[PROMPT][leaked]==1; A5 asserts the {nodes,links} renderer shape with per-channel link values. All are the FR-028 'per-channel agentic leakage counts' semantic. (16 test_fr028_* total incl. frozen-contract + REFACTOR edge tests.)"
+    fr_029:
+      pinning_tests:
+        - test_fr029_a7_asr_zero_when_guard_masks_everything
+        - test_fr029_a8_asr_positive_when_guard_leaks_a_raw_value
+        - test_fr029_a8_asr_is_a_unit_interval_rate
+        - test_fr029_a9_benign_task_success_tracked
+        - test_fr029_a10_in_tree_payloads_without_datasets_extra
+        - test_fr029_edge_guard_raise_counts_as_resistance_not_exfiltration
+        - test_fr029_edge_intent_tags_name_only_obfuscation_transforms
+      body_matches_id: true
+      note: "A7 asserts ASR==0.0 when guard masks all; A8 asserts ASR>0.0 on a leaky guard AND ASR(leaky)>ASR(masking) AND ASR in [0,1]; A9 asserts benign_task_success_rate reflects preserved non-PII. All are FR-029's 'ASR vs benign-task-success' semantic. (8 test_fr029_* incl. defaults-contract + REFACTOR edges.)"
+    ax_002:
+      pinning_tests:
+        - test_ax002_a6_sankey_is_byte_identical_for_same_inputs
+        - test_ax002_a6_injection_report_is_byte_identical
+        - test_ax002_a6_no_nondeterministic_imports_in_module
+      body_matches_id: true
+      note: "byte-identical Sankey as_dict() + byte-identical report on identical inputs; AST scan bans random/uuid/time/secrets — the AX-002 determinism invariant."
+    ax_001:
+      pinning_tests:
+        - test_ax001_a10_import_isolation_ast
+        - test_ax001_a10_in_tree_payloads_are_inert_synthetic
+      body_matches_id: true
+      note: "import-isolation AST scan (no eval_framework.rating/attacks/SDO-gate/orchestrator) + INERT SYNTHETIC payload assertion (SYNTH_EMAIL/SYNTH_PHONE only) — the AX-001 no-real-PII invariant."
+
+  dc_to_module:
+    dc: DC-13
+    module: src/pii_anon/agentic/leakage_sankey.py
+    mapping: "1:1 for the FR-028/029 slice of DC-13"
+    dc_broader_scope: "DC-13 spans FR-023..030; S6-05 implements ONLY FR-028 + FR-029 (+ upholds AX-001/002). FR-025/026 are S6-02 (interception.py, consumed read-only); FR-023/024 are S6-01; FR-027 session pseudonyms (SHOULD) + FR-030 byte-identical masking (SHOULD) are not claimed."
+    no_surface_dir: true   # agentic/ is a library package, not surface/ — dc_to_module_audit (surface stories) N/A; same precedent as S6-02
+
+  scope_creep_check:
+    diff_id_scan: "FR-028/FR-029/AX-001/AX-002/DC-13 only; the single FR-025 reference (leakage_sankey.py:25) is the honest 4-vs-6 reconciliation PROSE — not an implementation claim."
+    out_of_scope_correctly_excluded:
+      - "FR-023/024 (query-aware masking + over-redaction bound, SHOULD, UC-19) -> S6-01 — story §5 non-goal"
+      - "FR-025 (intercept-4-channels, MUST, UC-20) -> S6-02 — consumed READ-ONLY (InterceptionLedger/FourChannelGuard/AgentChannel); interception.py md5 unchanged"
+      - "FR-026 (no-raw-PII-persist, MUST, UC-20) -> S6-02 — upheld by the consumed guard; the NoRawPIIPersistError path is treated as resistance not exfiltration"
+      - "FR-027 (session pseudonyms, SHOULD, UC-21) -> story §5 non-goal"
+      - "FR-030 (byte-identical agentic masking, SHOULD, UC-20/21) -> not claimed; AX-002 determinism upheld but FR-030 not declared"
+    verdict: "no creep — the two MUSTs claimed are exactly the in-scope pair for this module; siblings consumed forward/read-only only"
+
+  forward_link:
+    LeakageSankey_and_InjectionResistanceReport:
+      feeds: ["SDO G5 audit half", "S7 canonical-run audit evidence"]
+      recorded_in:
+        - "story Implements: 'Feeds the SDO G5 audit half + the S7 canonical-run audit evidence'"
+        - "story Blocks: 'Nothing hard. Feeds the SDO G5 + the S7 canonical-run audit evidence'"
+        - "module docstring leakage_sankey.py (the G5 audit half)"
+      coherent: true
+      note: "G5 is an SDO competitive_supremacy.py gate criterion (not an FR/DC ID — correctly absent from requirements-document.md). The forward consumer to confirm at the S7/sprint gate; recorded so the G5<-Sankey edge is not lost. Same OBS pattern logged for S6-02."
+
+  dependency_state:
+    declared: "Depends on: S6-02 DONE (InterceptionLedger + FourChannelGuard + AgentChannel)"
+    s6_02_state: "DONE — S6-02 story-gate APPROVED (its traceability YAML exists, verdict APPROVE); interception.py consumed read-only (md5 stated unchanged across RED/GREEN/REFACTOR)"
+    optional_consume: "pii_anon_datasets.scoring.adversary.{build_payloads,INTENT_TAGS} — LAZY import inside score_injection_resistance, ImportError-guarded to the in-tree INERT fallback (RISK-5); the datasets extra is OPTIONAL, not a hard dep"
+    blocking_dep_in_progress: false
+    verdict: "satisfied — the one hard dep (S6-02) is DONE; the optional datasets consume is lazy + guarded; no IN_PROGRESS blocker (finding-pattern-6 clear)"
+
+provisional_status_cascade:
+  story_value: AGENT_SIMULATED
+  source_dc: DC-13
+  source_dc_status: AGENT_SIMULATED   # design header Stage 3 AGENT_SIMULATED (same as S6-02 cited)
+  source_fr_status: AGENT_SIMULATED   # FR-028/029 start AGENT_SIMULATED (requirements-document.md:3)
+  diverged: false
+  cascade_ok: true
+  note: "Source DC-13 + FR-028/029 are AGENT_SIMULATED (NOT DIVERGED) — no DIVERGED-cascade obligation (no provisional_status:DIVERGED nor Pass-2-commitment-in-DoD requirement triggers). Story's AGENT_SIMULATED + Pass-2 boundary (live-agent runtime / real transcript-residual leakage, is_representative=True) matches the source. The in-tree teeth (real S6-02 ledger flow-accounting + injection scoring over INERT synthetic payloads) run for REAL. finding-pattern-15 clear (no source-DC DIVERGED to mismatch)."
+
+# ===========================================================================
+# THE 4-vs-6 CHANNEL ADJUDICATION (the critical traceability call)
+# ===========================================================================
+channel_model_adjudication:
+  question: "Does the 4-source/6-node reading satisfy FR-028's 'leakage-Sankey, 6 channels', or does FR-028 require 6 SOURCE channels (a wider taxonomy)?"
+  what_fr028_says: "requirements-document.md:41 — 'Per-channel agentic leakage counts (leakage-Sankey, 6 channels)'. The counted noun is 'channels'; 'Per-channel ... counts' frames channels as the MEASURED SOURCES. A Sankey's blocked/leaked sinks are the tallies themselves, not channels one counts leakage 'per'. Read literally, '6 channels' most-naturally means 6 SOURCE channels."
+  what_the_binding_design_says: "DC-13 — the design constraint S6-05 traces — specifies the taxonomy as '4-channel least-privilege (prompt/memory/tool-I/O/trace, AX-006)' TWICE (D-implementation-ready-design.md:23 table row AND :49 DECISION 3). There is NO 6-source taxonomy anywhere in the design. FR-025 (the upstream channel-set MUST) says 'all FOUR agent channels'. AgentChannel is contract-frozen at EXACTLY 4 (test_agentic_interception.py:131)."
+  what_uc22_says: "UC-22 has no narrative beyond the FR-028 title line — no 6-channel enumeration to lean on either direction."
+  what_s605_built: "A 6-NODE flow graph = the 4 AgentChannel source nodes (PROMPT/MEMORY/TOOL_IO/TRACE) + the blocked/leaked sinks, with PER-SOURCE-CHANNEL counts. _SOURCE_CHANNELS = tuple(c.value for c in AgentChannel) — a wider source taxonomy plugs in by widening AgentChannel, zero module change."
+  ruling: ACCEPTABLE_INTERPRETATION_FOR_THIS_STORY_GATE
+  ruling_rationale: >
+    There is a GENUINE tension: FR-028's title '6 channels' read literally points at 6 SOURCE channels,
+    which is WIDER than the 4 the design actually specifies. So the 4-source/6-node build is an
+    INTERPRETATION, not a literal-text match. HOWEVER this is NOT a blocking coverage gap chargeable
+    to S6-05, for three reasons: (a) the BINDING artifact S6-05 implements is DC-13, which is
+    post-SME-sign-off and specifies EXACTLY 4 channels — S6-05 faithfully implements the binding
+    design and cannot be required to invent 5th/6th SOURCE channels the design deliberately scopes
+    out; the '6-vs-4' mismatch is a REQUIREMENTS-DOC <-> DESIGN discrepancy (the FR-028 title '6' was
+    never reconciled to DC-13's '4'), i.e. a requirement-TEXT defect to backfill at source, not an
+    S6-05 implementation defect. (b) The chain integrity the traceability dimension owns is intact:
+    FR-028 exists, is MUST, is claimed, traces to DC-13, and has >=1 pinning test whose bodies assert
+    the FR-028 INTENT ('per-channel agentic leakage counts') — the per-channel-counts core is
+    delivered and tested. (c) The story DISCLOSES the reconciliation honestly (story Traces + §5
+    non-goal + module docstring + RISK-2) and the taxonomy is genuinely EXTENSIBLE. This is the
+    honest-disclosure-of-a-known-interpretation pattern, not a hidden gap. The unresolved literal
+    '6-vs-4' numeric discrepancy is logged as a NON-BLOCKING MINOR (TRACE-S6-05-MINOR-2) to be
+    reconciled at the SOURCE (amend FR-028's title to '4 source channels / 6-node flow graph' OR raise
+    a documented follow-up to widen the source taxonomy if 6 sources are truly intended) — batched to
+    the sprint gate. NOT charged as a MAJOR against S6-05.
+  verdict_one_line: "4-source/6-node satisfies FR-028 for THIS story gate (faithful to binding DC-13, per-channel-counts intent met, honestly disclosed, extensible); the FR-028-title-'6'-vs-DC-13-'4' numeric mismatch is a real but NON-BLOCKING requirement/design-text discrepancy (MINOR, batched to sprint)."
+
+findings:
+  - id: TRACE-S6-05-MAJOR-1
+    severity: MAJOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:35
+    pattern: 4   # traceability.md missing the forward Story/Test row for this story's FR IDs
+    status: BATCH_TO_SPRINT_GATE
+    description: |
+      The matrix's UC-22/23 row (traceability-matrix.md:35) records FR-028/FR-029 against the
+      external DATA/PAPER refs but carries NO forward Story column and NO Test column — the table
+      header is 'UC | FRs | NFRs | external_refs'. `grep 'S6-05' traceability-matrix.md` -> 0 hits;
+      `grep 'DC-13'` -> 0 hits. This is the SAME standing backfill gap already deferred for
+      S2-01/S2-02/S2-04 and S6-02 (see S6-02's TRACE-S6-02-MAJOR-1, also BATCH_TO_SPRINT_GATE), NOT
+      a defect introduced by S6-05. S6-05 itself is correctly traced INSIDE the story (Traces ->
+      DC-13; Implements -> FR-028/029; test names embed the IDs and bodies match semantics).
+    suggested_resolution: |
+      Batch with the standing S2-01/S2-02/S2-04/S6-02 deferral: at the S6 SPRINT GATE, backfill the
+      forward Story+Test trace for UC-22 -> {FR-028: S6-05 / test_fr028_*} and UC-23 -> {FR-029:
+      S6-05 / test_fr029_*}, and add a DC-13 -> {S6-02, S6-05} edge. No in-loop story-gate action
+      required of the S6-05 executor.
+    references:
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md#UC-22-23
+      - dev-assist-artifacts/04-development/_reviews/story/S6-02/dev-assist-development-traceability.yaml#TRACE-S6-02-MAJOR-1
+    blocks_approve: false
+
+  - id: TRACE-S6-05-MINOR-2
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/requirements-document.md:41
+    pattern: 13   # requirement text inconsistent with the design it maps to (the '6'-vs-'4' discrepancy)
+    status: BATCH_TO_SPRINT_GATE
+    description: |
+      FR-028's title reads 'leakage-Sankey, 6 channels' (requirements-document.md:41), but the
+      BINDING design DC-13 specifies the agentic taxonomy as '4-channel least-privilege
+      (prompt/memory/tool-I/O/trace)' TWICE (D-implementation-ready-design.md:23 + :49), and
+      AgentChannel is contract-frozen at exactly 4 (test_agentic_interception.py:131). Read
+      literally the FR-028 '6 channels' points at 6 SOURCE channels — wider than the design's 4.
+      S6-05 correctly implements the BINDING 4-channel design as a 6-NODE graph (4 sources + 2
+      sinks) and discloses the reconciliation honestly. The residual issue is purely a
+      requirements-doc<->design TEXT inconsistency at the SOURCE, not an S6-05 implementation gap.
+      See channel_model_adjudication above for the full ruling (ACCEPTABLE_INTERPRETATION for this
+      story gate; this MINOR tracks the source reconciliation only).
+    suggested_resolution: |
+      At the sprint gate, reconcile FR-028's text against DC-13: EITHER (preferred) amend the FR-028
+      title to '... leakage-Sankey, 4 source channels / 6-node flow graph' so the requirement matches
+      the binding design and the shipped artifact; OR, if 6 SOURCE channels are genuinely intended,
+      raise an explicit follow-up requirement to widen AgentChannel (the _SOURCE_CHANNELS taxonomy is
+      already built to absorb it with zero module change) and re-scope the agentic taxonomy across
+      S6-02/S6-05. Do NOT block S6-05 on this — the executor implemented the design as specified.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-028
+      - dev-assist-artifacts/03-design/06-synthesis/D-implementation-ready-design.md#DC-13
+    blocks_approve: false
+
+  - id: TRACE-S6-05-OBS-3
+    severity: OBSERVATION
+    location: src/pii_anon/agentic/leakage_sankey.py:373
+    pattern: 9   # name-vs-body semantic clarity (the 'direct' probe-tag exclusion from intent_tags)
+    description: |
+      The in-tree payload set appends a verbatim '_DIRECT_PROBE_TAG = "direct"' exfiltration probe
+      that is SCORED (counts toward n_payloads + ASR) but deliberately EXCLUDED from the reported
+      intent_tags (which name only the obfuscation transforms base64/homoglyph/zero-width). This is
+      a sound measurement-scaffold-vs-reported-taxonomy distinction and is itself pinned by
+      test_fr029_edge_intent_tags_name_only_obfuscation_transforms (asserts 'direct' not in
+      intent_tags AND n_payloads > len(intent_tags) AND len>=3). A10's assertion
+      `len(set(report.intent_tags)) >= 3` therefore measures the OBFUSCATION-transform count, not the
+      payload count — semantically correct and consistent with the FR-029 'transforms exercised'
+      framing. No action; recorded so the >=3-intents claim is read as the obfuscation taxonomy.
+    blocks_approve: false
+
+  - id: TRACE-S6-05-OBS-4
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-6/S6-05-leakage-sankey-injection-resistance.md
+    pattern: 2   # adjacent FR that could have been credited
+    description: |
+      FR-030 (byte-identical agentic masking decisions given seed/key/scope — SHOULD, UC-20/21) is
+      materially exercised by the determinism tests (test_ax002_a6_* — byte-identical Sankey +
+      report, AST no-random/uuid/time/secrets), but the story legitimately routes determinism
+      through AX-002 rather than declaring FR-030 (same choice S6-02 made; see S6-02 OBS-1). No
+      action needed; the sprint-gate backfill MAY additionally credit FR-030 to the A6 evidence
+      across S6-02 + S6-05.
+    blocks_approve: false
+
+counts:
+  showstopper: 0
+  catastrophic: 0
+  major: 1          # the standing matrix Story/Test-column backfill gap — batched to sprint gate, NOT an S6-05 regression
+  minor: 1          # FR-028-'6'-vs-DC-13-'4' source-text discrepancy — reconcile at source, batched to sprint
+  observation: 2
+  total: 4
+  blocking_total: 0
+
+decision_rationale: >
+  APPROVE. Every claimed ID is real (FR-028/029 both MUST, AX-001/002, DC-13, UC-22/23 — ZERO phantom
+  IDs). Every claimed requirement has >=1 pinning test whose name embeds the ID AND whose body asserts
+  the matching semantics (16 test_fr028_*, 8 test_fr029_*, 3 test_ax002_*, 2 test_ax001_* — no
+  name-vs-body mismatch). DC-13 -> agentic/leakage_sankey.py maps 1:1 for the FR-028/029 slice with NO
+  scope creep into FR-023/024/025/026/027/030 (the lone FR-025 mention is the honest reconciliation
+  prose, not an impl claim; interception.py consumed read-only). The hard dependency S6-02 is DONE; the
+  optional datasets-extra consume is lazy + ImportError-guarded. provisional_status AGENT_SIMULATED
+  matches source DC-13 + FR-028/029 (AGENT_SIMULATED, NOT DIVERGED) — no cascade violation.
+  THE 4-vs-6 CHANNEL RULING: the 4-source/6-node reading is an ACCEPTABLE interpretation of FR-028's
+  '6 channels' FOR THIS STORY GATE — S6-05 faithfully implements the BINDING DC-13 (which specifies
+  EXACTLY 4 channels, twice), delivers + tests the FR-028 per-channel-counts INTENT, discloses the
+  reconciliation honestly, and is genuinely extensible. The residual FR-028-title-'6'-vs-DC-13-'4'
+  numeric mismatch is a real but NON-BLOCKING requirements-doc<->design TEXT discrepancy to reconcile
+  at the SOURCE (TRACE-S6-05-MINOR-2), NOT an S6-05 implementation gap. The one MAJOR is the
+  pre-existing matrix Story/Test-column backfill gap already deferred for S2-01/S2-02/S2-04/S6-02 and
+  correctly batched to the S6 sprint gate. Neither the MAJOR nor the MINOR blocks this story gate
+  (blocking_total = 0).
+
+notes: |
+  Adjudication crux fully evidenced: FR-028:41 literal text vs DC-13 (design :23 + :49) binding
+  taxonomy vs AgentChannel-frozen-at-4 (test_agentic_interception.py:131). The traceability chain is
+  intact end-to-end; the only open items are SOURCE-side reconciliations (matrix backfill + FR-028
+  text) both batched to the sprint gate, neither chargeable to the S6-05 executor.
+
+review_time_seconds: 600
+context_bounds_respected: true
