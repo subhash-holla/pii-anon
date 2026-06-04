@@ -39,6 +39,35 @@ from pii_anon.eval_framework.attacks.spec import (
     load_attack_spec,
 )
 
+# S5-01 — the re-identification attack protocol + the deterministic baseline body
+# (DC-09; FR-011/FR-013 foundation; NFR-016 non-strippable caveat). Importing it
+# here keeps the package surface in one place and lets the import-boundary +
+# dangerous-call-signature AST guards scan reid.py alongside the substrate.
+from pii_anon.eval_framework.attacks.reid import (
+    ANTI_ANONYMITY_CAVEAT,
+    REID_ATTACK_REGISTRY,
+    BaselineDeterministicReidAttack,
+    MiaAttack,
+    ReidAttack,
+    ReidGuess,
+    ReidPersona,
+    ReidSuccessMetrics,
+    ReidTarget,
+    reid_attack_runner,
+    score_reid_attack,
+)
+
+# Additively merge the re-identification runners into the sandbox default
+# allow-list registry. ``DEFAULT_ATTACK_REGISTRY`` (defined in ``sandbox``) is the
+# single plain-dict allow-list ``run_attack_under_sandbox`` resolves against; we
+# extend it in place WITHOUT replacing it, so the S5-04 reconstruction runner
+# stays registered and the merge is the ONLY way the new bodies join the
+# allow-list (no new dynamic-import path is introduced). The registry remains a
+# plain in-code dict — the only way a spec selects code.
+for _name, _runner in REID_ATTACK_REGISTRY.items():
+    DEFAULT_ATTACK_REGISTRY[_name] = _runner  # type: ignore[index]  # plain dict (Final[Mapping] is type-level)
+del _name, _runner
+
 __all__ = [
     # spec surface
     "AttackSpec",
@@ -57,4 +86,16 @@ __all__ = [
     "DEFAULT_CPU_SECONDS",
     "DEFAULT_AS_BYTES",
     "DEFAULT_WALL_SECONDS",
+    # reid surface (S5-01)
+    "ReidPersona",
+    "ReidTarget",
+    "ReidGuess",
+    "ReidSuccessMetrics",
+    "ReidAttack",
+    "MiaAttack",
+    "BaselineDeterministicReidAttack",
+    "score_reid_attack",
+    "reid_attack_runner",
+    "REID_ATTACK_REGISTRY",
+    "ANTI_ANONYMITY_CAVEAT",
 ]
