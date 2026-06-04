@@ -308,7 +308,18 @@ class SupremacyVerdict:
             WAIVED before ``CLAIM_GRADE``; an unrun-unwaived Tier-R member blocks
             a claim just as an unrun Tier-C API does. Reason mandatory.
         """
-        run_metadata = benchmark.get("run_metadata", {}) or {}
+        # Container-shape hardened (the S7-02 close-2 crash class): `benchmark` MUST
+        # be a dict, and `run_metadata` MUST be a dict — but a malformed artifact can
+        # ship `benchmark` as a list/scalar (`benchmark.get` → AttributeError) or
+        # `run_metadata` as a JSON array (`{} or []` kept the truthy list, then
+        # `.get` → AttributeError, crashing the shipped CLI). Normalise BOTH
+        # fail-CLOSED: a non-dict benchmark / run_metadata is treated as ABSENT (an
+        # empty dict) → canonical_claim_run=False → a clean NOT_YET, never a crash.
+        if not isinstance(benchmark, dict):
+            benchmark = {}
+        run_metadata = benchmark.get("run_metadata")
+        if not isinstance(run_metadata, dict):
+            run_metadata = {}
         canonical = bool(run_metadata.get("canonical_claim_run", False))
 
         systems = _systems_by_name(benchmark)
@@ -345,8 +356,17 @@ class SupremacyVerdict:
 
         # The Tier registry, with run-status derived from the benchmark + waivers.
         # Tier-R and Tier-C waivers share the same `waive` (reason-mandatory) path.
+        # `run_status_from_benchmark` lives in the OFF-LIMITS (byte-identical)
+        # competitor_tiers module and reads `systems` (iterating + `.get`) +
+        # `available_competitors` (in a `set(...)`) UNGUARDED — a malformed-container
+        # artifact would crash it (the S7-02 close-2 crash class) exactly as it crashed
+        # `_systems_by_name`. Since that module cannot be edited, it is fed a
+        # SHAPE-NORMALISED view: the already-validated `systems` map (dict-only
+        # elements) re-listed, and `available_competitors` coerced to a list (a
+        # non-list → empty). The gate shields the off-limits reader at the call site.
         registry = apply_run_status(
-            default_registry(), run_status_from_benchmark(benchmark)
+            default_registry(),
+            run_status_from_benchmark(_tier_status_input(benchmark, systems)),
         )
         for name, reason in {**(tier_c_waivers or {}), **(unrun_tier_r_waivers or {})}.items():
             registry = waive(registry, name, reason)
@@ -396,18 +416,73 @@ class SupremacyVerdict:
 
 
 def _systems_by_name(benchmark: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Index the benchmark's top-level ``systems`` list by ``system`` name."""
+    """Index the benchmark's top-level ``systems`` list by ``system`` name.
+
+    Container-shape hardened (the S7-02 close-2 crash class): the artifact-sourced
+    ``systems`` field must be a LIST of system DICTs, but a malformed artifact can
+    ship it as a JSON object (``{...}`` — iterating yields string keys → ``str.get``
+    → ``AttributeError``), a scalar (not iterable), or a list carrying a bare-string /
+    ``None`` / scalar element (``element.get`` → ``AttributeError``). Each of those
+    crashed the shipped ``pii-anon supremacy`` CLI with a raw traceback (a fail-loud
+    denial-of-verdict). This normalises fail-CLOSED: a non-list ``systems`` is treated
+    as EMPTY (no systems), and a non-dict element is IGNORED (skipped) — so the
+    returned map is ALWAYS ``dict[str, dict]`` and every downstream consumer
+    (``_g1``..``_g7`` / ``_compute_j`` / ``_top_composite_system`` / ``_competitor_names``)
+    can read ``.get`` / ``.items`` / iterate without a type check of its own.
+    """
     out: dict[str, dict[str, Any]] = {}
-    for system in benchmark.get("systems", []) or []:
+    raw = benchmark.get("systems", [])
+    if not isinstance(raw, list):
+        return out  # a non-list `systems` (dict / scalar) → no systems (fail-closed)
+    for system in raw:
+        if not isinstance(system, dict):
+            continue  # a bare-string / None / scalar element is ignored (never `.get`)
         name = system.get("system")
         if isinstance(name, str):
             out[name] = system
     return out
 
 
+def _tier_status_input(
+    benchmark: dict[str, Any], systems: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """A SHAPE-NORMALISED benchmark view for the OFF-LIMITS ``run_status_from_benchmark``.
+
+    ``competitor_tiers.run_status_from_benchmark`` (byte-identical, un-editable —
+    RISK-6) reads exactly two artifact-sourced containers UNGUARDED: ``systems``
+    (iterated + ``.get`` per element) and ``available_competitors`` (consumed by
+    ``set(...)``). A malformed-container artifact (``systems`` as a dict/scalar, a
+    bare-string element, or ``available_competitors`` as a non-list) would crash it
+    (the S7-02 close-2 crash class). The gate cannot edit that module, so it shields
+    it at the call site: pass the ALREADY-VALIDATED ``systems`` map (dict-only
+    elements, from :func:`_systems_by_name`) re-listed, and ``available_competitors``
+    coerced to a list (a non-list → empty). Pure: builds a new dict, never mutates
+    the input.
+    """
+    available = benchmark.get("available_competitors")
+    return {
+        "systems": list(systems.values()),
+        "available_competitors": available if isinstance(available, list) else [],
+    }
+
+
 def _competitor_names(systems: dict[str, dict[str, Any]]) -> list[str]:
     """The benchmarked competitor systems (everything outside the pii-anon ladder)."""
     return sorted(name for name in systems if name not in _LADDER_SYSTEMS)
+
+
+def _recall_map(system: dict[str, Any]) -> dict[str, Any]:
+    """A system's ``per_entity_recall`` as a dict — ``{}`` when absent OR malformed.
+
+    Container-shape hardened (the S7-02 close-2 crash class): a malformed artifact can
+    ship ``per_entity_recall`` as a JSON array — and the old ``(... or {}).items()`` /
+    ``.values()`` then raised ``AttributeError: 'list' object has no attribute 'items'``
+    (in G1) / ``...'values'`` (in G6). A non-dict ``per_entity_recall`` is treated as
+    EMPTY (no per-entity recall), fail-CLOSED, so the callers can read ``.items`` /
+    ``.values`` / ``len`` unconditionally.
+    """
+    per = system.get("per_entity_recall")
+    return per if isinstance(per, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -444,10 +519,22 @@ def _run_breaches_recall_floor(benchmark: dict[str, Any]) -> bool:
         if worst > EPS_RECALL_PER_LANG:
             return True
 
-    for profile in benchmark.get("profile_results", []) or []:
+    # `profile_results` / `floor_checks` must be LISTS — but a malformed artifact can
+    # ship either as a scalar (the S7-02 close-2 crash class): `42 or []` keeps the
+    # truthy `42`, then `for profile in 42` → `TypeError: 'int' object is not iterable`.
+    # A non-list is treated as EMPTY (no profiles / no floor-checks) — fail-CLOSED, no
+    # crash. (A dict is technically iterable but yields keys, caught by the per-element
+    # `isinstance(..., dict)` skips below; the list guard handles the scalar.)
+    profile_results = benchmark.get("profile_results")
+    if not isinstance(profile_results, list):
+        return False
+    for profile in profile_results:
         if not isinstance(profile, dict):
             continue
-        for check in profile.get("floor_checks", []) or []:
+        floor_checks = profile.get("floor_checks")
+        if not isinstance(floor_checks, list):
+            continue
+        for check in floor_checks:
             if not isinstance(check, dict):
                 continue
             metric = check.get("metric")
@@ -515,12 +602,12 @@ def _g1_recall_floor(
         sys = systems.get(ladder)
         if sys:
             ensemble_entities |= {
-                e for e, r in (sys.get("per_entity_recall") or {}).items()
+                e for e, r in _recall_map(sys).items()
                 if isinstance(r, (int, float))
             }
     shared_entities: set[str] = set()
     for name in _competitor_names(systems):
-        per = systems[name].get("per_entity_recall") or {}
+        per = _recall_map(systems[name])
         shared_entities |= {
             e for e, r in per.items()
             if isinstance(r, (int, float)) and r > 0.0
@@ -528,12 +615,16 @@ def _g1_recall_floor(
     missing = shared_entities - ensemble_entities
     superset_ok = not missing
 
-    # Per-language ε (PENDING if the artifact is absent).
+    # Per-language ε (PENDING if the artifact is absent OR MALFORMED). A non-dict
+    # per_language_recall_delta (a list / scalar — the S7-02 close-2 crash class) is
+    # absent-EQUIVALENT: it cannot certify the per-language ε bound, so it is PENDING,
+    # NEVER silently read as present-with-no-items (which fabricated a "worst ε=0" PASS
+    # on malformed input). PENDING never fabricates and never crashes.
     per_lang = benchmark.get("per_language_recall_delta")
-    if per_lang is None:
+    if not isinstance(per_lang, dict):
         return GuaranteeResult(
             "G1", None, float("nan"), EPS_RECALL_PER_LANG,
-            "G1 PENDING: per_language_recall_delta artifact absent "
+            "G1 PENDING: per_language_recall_delta artifact absent or malformed "
             "(structural superset "
             + ("holds" if superset_ok else f"BREACHED on {sorted(missing)}")
             + "); per-language ε never fabricated",
@@ -544,7 +635,7 @@ def _g1_recall_floor(
     # cannot be certified from a corrupt ε), never an OverflowError crash in ``float()``
     # (the S7-02 close MAJOR-3) and never a silent PASS (NaN would otherwise slip
     # ``abs() ≤ bound``). The worst corrupt language is named.
-    per_lang_items = per_lang.items() if isinstance(per_lang, dict) else []
+    per_lang_items = list(per_lang.items())
     corrupt_langs = [lang for lang, v in per_lang_items if not _is_finite_number(v)]
     worst_lang_eps = max(
         (abs(float(v)) for _, v in per_lang_items if _is_finite_number(v)),
@@ -952,9 +1043,17 @@ def _g4_calibration_selective_risk(
     curve = core.get("risk_coverage_curve") or []
     monotone_ok = _risk_coverage_is_monotone(curve)
 
-    # 3. ≥3 abstention operating points (NFR-021).
-    points = core.get("abstention_operating_points") or []
-    points_ok = isinstance(points, list) and len(points) >= G4_MIN_ABSTENTION_POINTS
+    # 3. ≥3 abstention operating points (NFR-021). The artifact-sourced field must be
+    #    a LIST — but a malformed artifact can ship it as a scalar (42 / 3.14 / True).
+    #    The count is computed ONCE, safely (0 for a non-list), and reused in BOTH the
+    #    PASS- and FAIL-detail branches below: the old FAIL-detail `else` called
+    #    `len(points)` UNCONDITIONALLY → `TypeError: object of type 'int' has no len()`
+    #    when the other three G4 checks passed and `points` was a non-list (the S7-02
+    #    close-2 crash-1). A non-list now reads 0 points ⇒ G4 FAIL (it cannot supply
+    #    ≥3 operating points), never a crash.
+    points = core.get("abstention_operating_points")
+    n_points = len(points) if isinstance(points, list) else 0
+    points_ok = n_points >= G4_MIN_ABSTENTION_POINTS
 
     # 4. Calibrated-confidence-coverage == 1.0 (NFR-020 — the lone MUST). The
     #    coverage is a fraction: it must be FINITE and in [0, 1] (a value > 1.0 /
@@ -977,7 +1076,7 @@ def _g4_calibration_selective_risk(
     if passed:
         detail = (
             f"G4 PASS: every per-class ECE ≤ its bar (worst {max_ece:.4g}); "
-            f"risk-coverage monotone non-increasing; {len(points)} abstention "
+            f"risk-coverage monotone non-increasing; {n_points} abstention "
             f"operating points (≥{G4_MIN_ABSTENTION_POINTS}); "
             f"calibrated-confidence-coverage={coverage_score:.4g} (NFR-020 / AX-005)"
         )
@@ -1005,7 +1104,7 @@ def _g4_calibration_selective_risk(
         )
     else:
         detail = (
-            f"G4 FAIL: only {len(points)} abstention operating point(s) "
+            f"G4 FAIL: only {n_points} abstention operating point(s) "
             f"(< {G4_MIN_ABSTENTION_POINTS} required; NFR-021)"
         )
     return GuaranteeResult("G4", passed, max_ece, G4_ECE_BAR_HIGH_RESOURCE, detail)
@@ -1089,8 +1188,11 @@ def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResul
     best_tier_r = max(tier_r_f2, default=0.0)
     f2_ok = core_f2 >= best_tier_r - EPS_F2
 
-    # Entity coverage: fraction of entity types the core actually detects.
-    per = core.get("per_entity_recall") or {}
+    # Entity coverage: fraction of entity types the core actually detects. A non-dict
+    # per_entity_recall (the S7-02 close-2 crash class) reads as EMPTY via `_recall_map`
+    # ⇒ 0 detected / 0 total ⇒ coverage 0.0 (fail-closed), never an AttributeError on
+    # `.values()` / `len`.
+    per = _recall_map(core)
     detected = sum(1 for r in per.values() if isinstance(r, (int, float)) and r > 0.0)
     total = len(per)
     coverage = (detected / total) if total else 0.0

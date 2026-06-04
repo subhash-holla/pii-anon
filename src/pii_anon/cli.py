@@ -794,8 +794,28 @@ def create_app() -> Any:
         path = Path(artifact)
         if not path.exists():
             raise typer.BadParameter(f"benchmark artifact not found: {artifact}")
-        benchmark = json.loads(path.read_text(encoding="utf-8"))
-        verdict = SupremacyVerdict.from_artifacts(benchmark)
+        # Defense-in-depth (S7-02 close-2): the gate itself is now hardened so NO
+        # malformed CONTAINER can crash `from_artifacts` (it fails CLOSED to a clean
+        # verdict). This CLI backstop catches the one thing UPSTREAM of the gate — a
+        # genuinely-UNPARSEABLE artifact (not valid JSON at all) — and emits a clean
+        # error + exit 1 instead of a raw Python traceback. (`from_artifacts` no longer
+        # raises on a parseable-but-malformed-shape artifact, but the catch stays as a
+        # belt-and-braces backstop so the shipped command can never traceback.)
+        try:
+            benchmark = json.loads(path.read_text(encoding="utf-8"))
+            verdict = SupremacyVerdict.from_artifacts(benchmark)
+        except json.JSONDecodeError as exc:
+            raise typer.BadParameter(
+                f"benchmark artifact is not valid JSON ({artifact}): {exc}"
+            )
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            # The gate is hardened not to reach here on a malformed container; this is
+            # the last-resort backstop so a never-anticipated artifact shape still
+            # exits cleanly (exit 1) rather than tracebacking out of the shipped CLI.
+            raise typer.BadParameter(
+                f"benchmark artifact could not be evaluated ({artifact}): "
+                f"{type(exc).__name__}: {exc}"
+            )
 
         _dump_output(
             {
