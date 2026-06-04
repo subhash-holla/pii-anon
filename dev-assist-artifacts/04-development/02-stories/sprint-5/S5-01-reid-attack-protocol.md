@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E5 Attacks** (DC-09: `attacks/` real Tier-3 LLM-adversary + LiRA@128 MIA) |
-| State | **IN_PROGRESS** (owner: dev-assist-development-executor; branch: `pdlc/sota-program` [main working tree, no worktree]) |
+| State | **REVIEW** (owner: dev-assist-development-executor; branch: `pdlc/sota-program` [main working tree, no worktree]) |
 | provisional_status | AGENT_SIMULATED (the ReidAttack protocol, the deterministic baseline body, the success-metrics scorer, the non-strippable caveat, the sandbox-run, and the import-boundary test all run for REAL in-tree against SYNTHETIC personas/targets; a real Tier-3 LLM adversary [S5-02] + a real offline DATA adversary with Wilson CIs are Pass-2 / cross-repo) |
 | Implements | **NFR-016** (non-strippable re-id caveat — 100% of exported privacy artifacts carry the anti-anonymity caveat — MUST, satisfied now via `ReidSuccessMetrics`'s non-strippable `caveat`); the **FR-011/FR-013 protocol foundation** (the `ReidAttack` + `MiaAttack` Protocols + a representative baseline ReidAttack body — the real Tier-3 LLM adversary is S5-02, the real LiRA@128 MIA is S5-03); upholds **AX-001** (synthetic), **AX-002** (deterministic total-order ranking), and the **attacks import-isolation invariant** (attacks ⊄ swarm/moe/fusion/policy — the standing CI guard this story adds). |
 | Traces | Design **DC-09** (`D-implementation-ready-design.md:19` — "`attacks/` package: real Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA"; `:58` — "Tier-3 de-circularization lives in `attacks/`"). UC-09. The S5-04 sandbox substrate (`run_attack_under_sandbox`) — consumed, not changed. |
@@ -68,3 +68,40 @@ Re-identification resistance is the audit half of G5 (and Paper 1's Tier-2/3 evi
 
 ## Evidence (filled on completion)
 *Provisional status: AGENT_SIMULATED. The ReidAttack/MiaAttack protocols, the deterministic baseline body, the success scorer, the non-strippable caveat, the sandbox-run, and the import-boundary + dangerous-signature guards run for REAL in-tree against SYNTHETIC personas/targets. A real Tier-3 LLM adversary (S5-02) + a real offline DATA adversary with Wilson CIs are Pass-2 / cross-repo.*
+
+### Execution (TDD; main working tree, branch `pdlc/sota-program`)
+- **RED** `59b8404` — `test: S5-01 RED — pin FR-011/FR-013 ReidAttack protocol + baseline + NFR-016 non-strippable caveat (A1–A11)`. Tests-only; both new files fail with `ModuleNotFoundError: No module named 'pii_anon.eval_framework.attacks.reid'` (and `test_attacks_import_boundary.py` independently asserts `reid.py` must be scanned). Files: `tests/test_attack_reid_protocol.py`, `tests/test_attacks_import_boundary.py`.
+- **GREEN** `68c5d67` — `feat: S5-01 GREEN — implement FR-011/FR-013 ReidAttack protocol + deterministic baseline body (DC-09)`. New `src/pii_anon/eval_framework/attacks/reid.py`; additive `src/pii_anon/eval_framework/attacks/__init__.py` (re-exports + in-place merge of `REID_ATTACK_REGISTRY` into the sandbox default allow-list — `sandbox.py`/`spec.py` untouched, byte-identical). A1–A11 green.
+- **REFACTOR** `9aa39bc` — `refactor: S5-01 — consolidate the runner's two JSON decoders behind a shared object-array helper`. Extracted `_decode_object_array` + `_string_tuple`; additive edge tests only. `reid.py` → 100% line+branch coverage.
+- **RED-before-GREEN proof:** `git merge-base --is-ancestor 59b8404 68c5d67` ⇒ exit 0; `… 68c5d67 9aa39bc` ⇒ exit 0 (strict RED→GREEN→REFACTOR ancestry).
+
+### Acceptance → tests (A1–A11; 34 new cases = 32 + 2)
+- **A1** (runtime-checkable `ReidAttack`/`MiaAttack`): `test_fr011_a1_reid_attack_protocol_is_runtime_checkable`, `test_fr011_a1_baseline_exposes_required_protocol_attributes`, `test_fr013_a1_mia_attack_protocol_seam_is_runtime_checkable`.
+- **A2** (exact-QI link): `test_fr011_a2_baseline_links_exact_quasi_identifier_match`, `test_fr011_a2_baseline_prefers_higher_overlap_persona`.
+- **A3** (abstain on no signal): `test_fr011_a3_baseline_abstains_on_no_surviving_signal`, `test_fr011_a3_baseline_abstains_when_signal_matches_no_candidate`.
+- **A4** (deterministic total-order ranking): `test_ax002_a4_ranking_is_deterministic_across_runs`, `test_ax002_a4_candidate_permutation_yields_identical_guesses`, `test_ax002_a4_ties_resolve_by_persona_id_ascending`.
+- **A5** (integer-count metrics): `test_nfr016_a5_score_reid_attack_uses_integer_counts`, `test_nfr016_a5_zero_guesses_does_not_divide_by_zero`.
+- **A6** (non-strippable caveat, NFR-016): `test_nfr016_a6_metrics_carry_anti_anonymity_caveat_by_default`, `test_nfr016_a6_constructing_with_blank_caveat_is_refused[…]` (3 params), `test_nfr016_a6_caveat_cannot_be_stripped_post_construction`, `test_nfr016_a6_as_outcome_always_carries_caveat`.
+- **A7** (runs under sandbox): `test_fr011_a7_runner_runs_under_sandbox_returns_mapping`, `test_fr011_a7_reid_runner_is_registered_in_sandbox_default_registry`.
+- **A8** (Mapping outcome): `test_nfr016_a8_runner_returns_mapping_outcome`.
+- **A9** (equal `AttackResult`, wall-clock excluded): `test_ax002_a9_two_sandboxed_runs_yield_equal_attack_result`.
+- **A10** (import-boundary AST guard): `tests/test_attacks_import_boundary.py::test_ax_isolation_attacks_layer_has_no_forbidden_imports`, `…::test_ax_isolation_at_least_one_attacks_module_scanned` (verbatim adaptation of `test_rating_import_boundary.py`).
+- **A11** (no dangerous signatures): `test_ax002_a11_reid_body_imports_no_nondeterminism_sources`, `test_ax002_a11_reid_body_has_no_unsafe_call_signatures` (reid-scoped) + the package-wide `tests/test_attack_sandbox.py::test_attacks_package_has_no_unsafe_execution_call_signatures` now also scans `reid.py` (`scanned >= 3` ⇒ 4 files, green).
+- REFACTOR additive edge tests (coverage→100%): `test_runner_rejects_non_array_targets_json`, `…_non_array_candidates_json`, `…_non_object_target_element`, `…_non_array_observed_signals_field`, `…_non_array_quasi_identifiers_field`, `test_runner_empty_inputs_yield_zeroed_metrics_with_caveat`, `test_baseline_normalises_token_case_and_whitespace`, `test_baseline_custom_adversary_id_is_pinned`.
+
+### Quality gate (all green)
+- `ruff check src tests` → **All checks passed**.
+- `mypy src/pii_anon` → **Success: no issues found in 134 source files**; `mypy src/pii_anon --strict` → **Success: no issues found in 134 source files** (both invocations clean — the numpy-typing gotcha is N/A here, pure-stdlib module).
+- `PYTHONPATH=src python -m pytest` (full suite, coverage gate) → exit 0; **Total coverage 87.48% ≥ 84%** ("Required test coverage of 84% reached"). Pass count **3401 passed / 16 skipped** (3367 pre-change baseline + 34 new; zero failures, zero regressions). `reid.py` own coverage **100%** (109 stmts / 20 branch, 0 miss).
+- AGENT-SIMULATED note: pytest/ruff/mypy run for real locally on this host; no real CI runner / benchmark hardware — a Pass-2 real-CI run is scheduled per the program's epistemic-honesty discipline.
+
+### Protected / user-WIP byte-identical (working-tree md5 re-verified post-REFACTOR)
+- `src/pii_anon/orchestrator.py` = `0afc6deed62bbd0653ae1051b723bace` ✓ (user WIP, untouched)
+- `tests/test_moe_enhancements.py` = `910e9cd66ad6e38c7bb64a9c51ecb1cb` ✓ (user WIP, untouched)
+- `src/pii_anon/evaluation/competitor_compare.py` = `7cae16c89f4c97136e1a12394dae2025` ✓ (RISK-6)
+- `src/pii_anon/eval_framework/attacks/sandbox.py` = `1c60b03ef1464f88112d9d814d59d6a1` ✓ (consumed read-only)
+- `src/pii_anon/eval_framework/attacks/spec.py` = `bd452e05236137109c650815a648c622` ✓ (consumed read-only)
+- SDO gate `src/pii_anon/eval_framework/evaluation/competitive_supremacy.py` — NOT touched (no diff). `artifacts/benchmarks/*` — never written. The 3 commits touch only owned paths: `reid.py`, `attacks/__init__.py`, `tests/test_attack_reid_protocol.py`, `tests/test_attacks_import_boundary.py`, this story file (narrow explicit `git add`; no `-A`/`-u`/`.`/`commit -a`).
+
+### History
+- IN_PROGRESS → REVIEW. Awaiting the canonical 5-gate story set (security-sast PRIMARY + axiom-compliance + code-quality + requirements-coverage + traceability). Adversarial close RECOMMENDED at the S5 work-stream close (bar = 0 upheld).
