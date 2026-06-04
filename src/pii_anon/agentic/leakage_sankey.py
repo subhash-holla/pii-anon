@@ -232,9 +232,11 @@ def build_leakage_sankey(
     LeakageSankey
         A pure, deterministic function of ``(ledger, outbound, known_values)``.
     """
-    # De-duplicate the known values once; skip the empty string (a vacuous
-    # "survivor" that is trivially `in` every payload).
-    known = [v for v in dict.fromkeys(known_values) if v]
+    # De-duplicate the known values once; skip the empty string AND
+    # whitespace-only strings (both are vacuous "survivors" — a `" "` is
+    # trivially `in` almost every payload). The value is trusted caller
+    # ground-truth, so the ``.strip()`` is defense-in-depth, not a vuln fix.
+    known = [v for v in dict.fromkeys(known_values) if v.strip()]
 
     # 1) A blocked edge per masked ledger record, aggregated per (channel, type).
     blocked_counts: dict[tuple[str, str], int] = {}
@@ -311,7 +313,9 @@ _HOMOGLYPH_MAP: dict[str, str] = {
     "s": "5",
     "t": "7",
 }
-_ZERO_WIDTH = "​"
+# U+200B ZERO WIDTH SPACE — written as an explicit escape (not the raw invisible
+# glyph) so the assignment does not read as a no-op ``= ""`` in editors/diffs.
+_ZERO_WIDTH = "\u200b"
 
 
 def _homoglyph(span: str) -> str:

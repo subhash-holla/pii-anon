@@ -330,6 +330,46 @@ def test_ax002_a6_injection_report_is_byte_identical() -> None:
     assert dataclasses.asdict(a) == dataclasses.asdict(b)
 
 
+def test_ax002_data_path_injection_scoring_is_deterministic() -> None:
+    """The ACTIVE DATA ``build_payloads`` path is byte-deterministic (AX-002).
+
+    The in-tree fallback's determinism is pinned by A6/A10 under a monkeypatched
+    absent ``pii_anon_datasets``. But when the ``datasets`` extra IS installed (as
+    in this env), ``score_injection_resistance`` takes the DATA ``build_payloads``
+    path by default — and that is the path the S7 keystone canonical run actually
+    exercises. This test runs the scorer twice WITHOUT the monkeypatch (so the
+    REAL DATA path executes) on two independently-constructed but EQUIVALENT
+    guards and asserts a byte-identical ``InjectionResistanceReport``, pinning the
+    active-path reproducibility the keystone depends on.
+
+    Skipped only if the optional ``datasets`` extra is absent (then there is no
+    DATA path to pin and the in-tree-fallback determinism is already covered).
+    """
+    pytest.importorskip(
+        "pii_anon_datasets.scoring.adversary",
+        reason="datasets extra absent — DATA path covered by the in-tree fallback",
+    )
+
+    def _report() -> InjectionResistanceReport:
+        # Two separate-but-equivalent guards (same fixed key) — the report must be
+        # a pure function of the guard, independent of object identity.
+        guard = FourChannelGuard(masker=None, surrogate_key=FIXED_KEY)
+        return score_injection_resistance(guard, scope=SCOPE)
+
+    a = _report()
+    b = _report()
+    assert a == b
+    assert dataclasses.asdict(a) == dataclasses.asdict(b)
+    # The report must reflect the DATA library's intent taxonomy (the active path),
+    # never silently the in-tree fallback's, and still exclude the direct probe.
+    from pii_anon_datasets.scoring.adversary import (  # noqa: PLC0415
+        INTENT_TAGS as _DATA_INTENT_TAGS,
+    )
+
+    assert a.intent_tags == tuple(_DATA_INTENT_TAGS)
+    assert "direct" not in a.intent_tags
+
+
 def test_ax002_a6_no_nondeterministic_imports_in_module() -> None:
     """The leakage_sankey module imports no random/uuid/time/secrets (AX-002)."""
     src = (
@@ -492,7 +532,9 @@ def test_ax001_a10_import_isolation_ast() -> None:
             )
 
 
-def test_ax001_a10_in_tree_payloads_are_inert_synthetic() -> None:
+def test_ax001_a10_in_tree_payloads_are_inert_synthetic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The in-tree fallback payloads encode SYNTHETIC values only (AX-001).
 
     With the datasets extra forced absent, the scorer runs the in-tree INERT set;
@@ -506,15 +548,13 @@ def test_ax001_a10_in_tree_payloads_are_inert_synthetic() -> None:
             raise ModuleNotFoundError("No module named 'pii_anon_datasets'")
         return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
 
-    import builtins as _b
+    # Use the module-level ``builtins`` via monkeypatch (auto-restored) — mirrors
+    # the sibling test's idiom; no redundant in-function ``import builtins``.
+    monkeypatch.setattr(builtins, "__import__", _no_datasets)
 
-    _b.__import__ = _no_datasets  # type: ignore[assignment]
-    try:
-        report = score_injection_resistance(
-            FourChannelGuard(masker=None, surrogate_key=FIXED_KEY), scope=SCOPE
-        )
-    finally:
-        _b.__import__ = real_import
+    report = score_injection_resistance(
+        FourChannelGuard(masker=None, surrogate_key=FIXED_KEY), scope=SCOPE
+    )
     assert report.n_payloads >= 3
     assert report.is_representative is True
 
