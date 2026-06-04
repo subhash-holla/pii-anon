@@ -823,6 +823,61 @@ def create_app() -> Any:
         if canonical_claim and verdict.verdict is not Verdict.CLAIM_GRADE_SOTA:
             raise typer.Exit(1)
 
+    @app.command("canonical-run")
+    def canonical_run(
+        seed: int = typer.Option(20240601, help="Deterministic seed (NFR-005)"),
+        output_dir: str = typer.Option(
+            "artifacts/canonical",
+            help="Output directory (artifacts/canonical/ only; never artifacts/benchmarks/*)",
+        ),
+        max_samples: int = typer.Option(
+            8, help="Representative detection-run cap (kept tight so the run stays fast)"
+        ),
+        output: str = typer.Option("json", help="Output format: json|text"),
+    ) -> None:
+        """Produce + certify the canonical-run artifact (the SDO completion-criterion).
+
+        Runs the benchmark at representative scale, attaches the G1/G2/G4 fields from
+        the existing in-tree scorers (no new gate math), stamps honest provenance, and
+        routes the artifact through the fail-closed CanonicalRunGate (sets
+        canonical_claim_run=True ONLY when every required field is present-and-valid).
+        Then reports the resulting SDO verdict on the produced artifact. The producer
+        LOGIC lives in ``produce_canonical_artifact``; this command stays thin.
+        """
+        from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+            SupremacyVerdict,
+        )
+        from pii_anon.evaluation import produce_canonical_artifact
+
+        try:
+            artifact = produce_canonical_artifact(
+                seed=seed, output_dir=output_dir, max_samples=max_samples
+            )
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc))
+
+        verdict = SupremacyVerdict.from_artifacts(artifact)
+        run_metadata = artifact["run_metadata"]
+        _dump_output(
+            {
+                "canonical_claim_run": run_metadata["canonical_claim_run"],
+                "canonical_gate_missing": run_metadata["canonical_gate_missing"],
+                "scope": run_metadata["canonical_provenance"]["scope"],
+                "output_path": str(Path(output_dir) / "canonical-run.json"),
+                "verdict": verdict.verdict.value,
+                "binding_constraint": verdict.binding_constraint,
+                "j_value": (
+                    round(verdict.j_value, 4) if verdict.j_value is not None else None
+                ),
+                "j_source": verdict.j_source,
+                "guarantees": {
+                    g.axis: {True: "PASS", False: "FAIL", None: "PENDING"}[g.passed]
+                    for g in verdict.guarantees
+                },
+            },
+            output,
+        )
+
     @app.command("version")
     def version() -> None:
         print(__version__)
