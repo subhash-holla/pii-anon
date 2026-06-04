@@ -25,8 +25,16 @@ if TYPE_CHECKING:
         InterceptionRecord,
         NoRawPIIPersistError,
     )
+    from pii_anon.agentic.leakage_sankey import (
+        InjectionResistanceReport,
+        LeakageSankey,
+        SankeyEdge,
+        build_leakage_sankey,
+        score_injection_resistance,
+    )
 
 __all__ = [
+    # interception (S6-02)
     "AgentChannel",
     "InterceptionRecord",
     "ChannelResult",
@@ -34,15 +42,48 @@ __all__ = [
     "FourChannelGuard",
     "InterceptionLedger",
     "NoRawPIIPersistError",
+    # leakage_sankey (S6-05) — additive
+    "SankeyEdge",
+    "LeakageSankey",
+    "build_leakage_sankey",
+    "InjectionResistanceReport",
+    "score_injection_resistance",
 ]
+
+# Names resolved lazily from ``interception`` (S6-02).
+_INTERCEPTION_NAMES = frozenset(
+    {
+        "AgentChannel",
+        "InterceptionRecord",
+        "ChannelResult",
+        "ChannelMasker",
+        "FourChannelGuard",
+        "InterceptionLedger",
+        "NoRawPIIPersistError",
+    }
+)
+# Names resolved lazily from ``leakage_sankey`` (S6-05) — additive.
+_LEAKAGE_SANKEY_NAMES = frozenset(
+    {
+        "SankeyEdge",
+        "LeakageSankey",
+        "build_leakage_sankey",
+        "InjectionResistanceReport",
+        "score_injection_resistance",
+    }
+)
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily resolve the public interception names on first access."""
-    if name in __all__:
+    """Lazily resolve the public agentic names on first access (PEP 562)."""
+    if name in _INTERCEPTION_NAMES:
         from pii_anon.agentic import interception
 
         return getattr(interception, name)
+    if name in _LEAKAGE_SANKEY_NAMES:
+        from pii_anon.agentic import leakage_sankey
+
+        return getattr(leakage_sankey, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
