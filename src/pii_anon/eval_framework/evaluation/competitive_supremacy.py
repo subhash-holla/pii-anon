@@ -934,9 +934,12 @@ def _g4_calibration_selective_risk(
     emits (the S7 canonical run stamps it):
 
     * ``per_class_ece`` — ``{entity_type: ece}`` (post-temperature-scaling); each
-      ECE must be FINITE — a non-finite ECE (``NaN`` / ``±inf``) is a corrupt
-      present-but-unusable measurement and a breach (a ``NaN`` must never slip the
-      ``ece > bar`` comparison, whose result against ``NaN`` is silently ``False``);
+      ECE must be FINITE **and NON-NEGATIVE** — a non-finite ECE (``NaN`` / ``±inf``)
+      OR a negative ECE (an Expected Calibration Error is ``≥ 0`` by construction) is
+      a corrupt present-but-unusable measurement and a breach (a ``NaN`` must never
+      slip the ``ece > bar`` comparison, whose result against ``NaN`` is silently
+      ``False``; a negative ECE like ``-1.0`` is ``< bar`` and would otherwise count
+      as "within bar" and forge a moat-axis PASS — the S7-02 close-3 fabrication);
     * ``per_class_ece_threshold`` (optional) — ``{entity_type: bar}``; the gate's
       OWN sanctioned bars (:data:`G4_ECE_BAR_HIGH_RESOURCE` 0.05 high-resource /
       :data:`G4_ECE_BAR_LONG_TAIL` 0.08 long-tail) are AUTHORITATIVE. An artifact-
@@ -954,9 +957,9 @@ def _g4_calibration_selective_risk(
 
     Three-valued outcome:
 
-    * **PASS** iff EVERY per-class ECE is finite AND ≤ its (clamped) bar AND the
-      risk-coverage curve is monotone non-increasing (risk never drops as coverage
-      grows) AND there are ≥ :data:`G4_MIN_ABSTENTION_POINTS` abstention points AND
+    * **PASS** iff EVERY per-class ECE is finite AND non-negative AND ≤ its (clamped)
+      bar AND the risk-coverage curve is monotone non-increasing (risk never drops as
+      coverage grows) AND there are ≥ :data:`G4_MIN_ABSTENTION_POINTS` points AND
       ``calibrated_confidence_coverage`` is finite, in ``[0, 1]``, and ``== 1.0``
       (NFR-020 — 0 bare-logit);
     * **FAIL** iff the fields are present but a check is breached (the binding
@@ -1002,12 +1005,15 @@ def _g4_calibration_selective_risk(
         thresholds = {}
 
     # 1. Per-class ECE ≤ its (clamped) bar (worst class drives the FAIL detail).
-    #    Each ECE must be FINITE — a non-finite ECE (NaN / ±inf) is a corrupt
-    #    present-but-unusable measurement and a breach (NaN would otherwise slip
-    #    `ece > bar`, which is silently False against NaN). The per-class bar is the
-    #    gate's sanctioned default (high-resource 0.05), TIGHTENED — never loosened —
-    #    by an artifact-supplied threshold via `_g4_class_bar` (so a benchmark cannot
-    #    mask a high ECE with a 0.99 / +inf threshold).
+    #    Each ECE must be FINITE and NON-NEGATIVE — a non-finite ECE (NaN / ±inf) OR a
+    #    negative ECE (ECE ≥ 0 by construction) is a corrupt present-but-unusable
+    #    measurement and a breach. NaN would otherwise slip `ece > bar` (silently
+    #    False against NaN); a negative ECE (-1.0) is `< bar` and would otherwise
+    #    count as "within bar" and forge a PASS ("worst -1.0") — the S7-02 close-3
+    #    fabrication. The per-class bar is the gate's sanctioned default (high-resource
+    #    0.05), TIGHTENED — never loosened — by an artifact-supplied threshold via
+    #    `_g4_class_bar` (so a benchmark cannot mask a high ECE with a 0.99 / +inf
+    #    threshold).
     worst_detail = ""
     worst_slack = -math.inf  # (ece - bar); a non-finite ECE is the worst breach
     ece_ok = True
@@ -1025,6 +1031,26 @@ def _g4_calibration_selective_risk(
                 )
             continue
         ece = float(raw)
+        # A NEGATIVE ECE is non-physical: an Expected Calibration Error is ≥ 0 by
+        # construction. A sub-zero value (e.g. -1.0) is a corrupt present-but-
+        # unusable measurement (symmetric with rejecting a coverage outside [0,1])
+        # — a BREACH, NOT "within bar" (the S7-02 close-3 fabrication: -1.0 < bar
+        # slipped 'every ECE ≤ bar' and forged a moat-axis PASS, "worst -1.0").
+        # It is EXCLUDED from `finite_eces` so garbage never stands in as the worst
+        # observed ECE, and ranked by its (negative) `ece - bar` slack so a co-located
+        # GENUINE over-bar class (positive slack) stays the headline breach while a
+        # lone negative is the reported breach.
+        if ece < 0.0:
+            ece_ok = False
+            slack = ece - bar
+            if slack > worst_slack:
+                worst_slack = slack
+                worst_detail = (
+                    f"per-class ECE on {et!r} is negative ({ece:.4g}) — non-physical "
+                    f"(ECE ≥ 0 by construction), a corrupt measurement, not ≤ bar "
+                    f"{bar:.4g} (NFR-017)"
+                )
+            continue
         finite_eces.append(ece)
         if ece > bar:
             ece_ok = False

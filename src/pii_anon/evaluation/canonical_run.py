@@ -832,6 +832,19 @@ class CanonicalRunGate:
             per_class_ece = core.get(KEY_PER_CLASS_ECE)
             if not isinstance(per_class_ece, dict) or not per_class_ece:
                 missing.append(f"{_CORE_SYSTEM}.{KEY_PER_CLASS_ECE}: absent or empty")
+            else:
+                # Every per-class ECE must be a valid non-negative finite number.
+                # The real selective_risk scorer always emits ECE ≥ 0, but the gate
+                # is fail-CLOSED — `_finite_unit_score` rejects a bool / NaN / ±inf /
+                # out-of-[0,1] value, and crucially a NEGATIVE ECE (non-physical;
+                # ECE ≥ 0 by construction), symmetric with the SDO gate's close-3 fix
+                # where a sub-zero ECE is a breach, never a vacuous 'within bar' PASS.
+                for et, ece in per_class_ece.items():
+                    if _finite_unit_score(ece) is None:
+                        missing.append(
+                            f"{_CORE_SYSTEM}.{KEY_PER_CLASS_ECE}[{et!r}]: {ece!r} is "
+                            "not a valid (finite, non-negative, [0,1], non-bool) ECE"
+                        )
             coverage = core.get(KEY_CALIBRATED_CONFIDENCE_COVERAGE)
             cov = _finite_unit_score(coverage)
             if cov is None or cov != 1.0:
