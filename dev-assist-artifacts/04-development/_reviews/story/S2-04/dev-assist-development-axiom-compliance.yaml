@@ -1,0 +1,147 @@
+reviewer: dev-assist-development-axiom-compliance
+scope_id: S2-04
+gate: story
+iteration: 2
+verdict: APPROVE
+
+findings:
+  - id: axiom-S2-04-01
+    severity: MINOR
+    status: CLOSED
+    location: tests/test_moe_sla_bias.py:394-432,449-461,625-739
+    closed_by_commit: 3e9fbe7
+    description: |
+      [ITERATION-1 MINOR — now CLOSED in remediation commit 3e9fbe7.] In iteration 1,
+      A4 (test_ax003_floored_output_byte_identical_under_aggressive_bias) and A5
+      (test_ax003_shared_membership_invariant_under_aggressive_bias) — the two
+      headline AX-pii-anon-003 (recall-floor) tests — both built their fusion from
+      build_default_registry(), whose experts carry NO metadata["latency_cost_ms"].
+      Therefore the _AGGRESSIVE = SLABias(strength=100.0) hit _apply_sla_bias's
+      `if not costs: return scores` fast path and was a COMPLETE NO-OP: route("US_SSN")
+      was byte-identical bias-on/off and regex-oss stayed routed both ways. The tests
+      proved floor-invariance under an INERT bias, not under a bias that genuinely
+      demotes regex-oss out of routing — a test-STRENGTH gap (never a correctness
+      defect; AX-003 was already proved to hold by construction).
+    resolution_verified: |
+      CLOSED — the remediation implements the iteration-1 suggested_resolution exactly.
+      A new synthetic _regex_oss_evicting_registry() (moe.py-free, AX-001) makes the
+      shared regex-oss expert authoritative on US_SSN (strength 0.99) but EXPENSIVE
+      (latency_cost_ms=5000.0), with two cheap competitors gliner-cheap (0.70) /
+      presidio-cheap (0.65) at cost 1.0. With top_k=2 + performance_floor=False the
+      aggressive SLABias(strength=100) GENUINELY EVICTS regex-oss from the routed set.
+      Re-verified at runtime by me (importing the test module by path):
+        bias-off routed = {gliner-cheap, regex-oss}
+        bias-on  routed = {gliner-cheap, presidio-cheap}   (regex-oss EVICTED; sets differ)
+      (1) ANTI-NO-OP GUARD HAS TEETH: A4/A5 add an explicit guard via _routed_ids():
+          assert _SHARED_ENGINE_ID in off_routed AND assert _SHARED_ENGINE_ID not in
+          on_routed. I confirmed it would FAIL LOUDLY on a revert: simulating the OLD
+          no-cost build_default_registry() fixture, regex-oss STAYS routed bias-on
+          ({regex-oss, scrubadub-compatible}), so `_SHARED_ENGINE_ID not in on_routed`
+          evaluates False and the test errors. The guard is not decorative.
+      (2) AX-003 HOLDS UNDER GENUINE EVICTION: despite regex-oss being evicted from
+          routing, the checksum-gated US_SSN shared span survives BYTE-IDENTICALLY in
+          the floored output through the REAL FloorProjectingFusion(MoEFusionStrategy(...))
+          pipeline — I confirmed FloorProjectingFusion(...).merge([us_ssn_span]) ⇒
+          [('US_SSN', 0, 11)] bias-on. The recall-floor (merge()'s min_expert_weight
+          floor + the projector backstop), NOT routing, is what yields the span — which
+          is the precise AX-003 invariant. A4 pins floored-output byte-identity; A5 pins
+          shared-input membership ∧ floored Shared-membership ∧ the shared_floor
+          re-injected-key set, all bias-invariant. `pytest -k ax003` ⇒ 2 passed.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-003
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-04-aux-loss-free-sla-bias.md#A4
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-04-aux-loss-free-sla-bias.md#A5
+
+notes: |
+  ITERATION 2 (re-review after remediation 3e9fbe7). Axiom-by-axiom re-assessment
+  (PRIMARY dimension for this story). My sole iteration-1 finding (axiom-S2-04-01,
+  MINOR) is CLOSED. All project axioms triggered by the diff remain UPHELD. No new
+  axiom finding introduced by the remediation. Verdict: APPROVE.
+
+  Scope of the remediation re-review: diff 7fea822..HEAD on src/pii_anon/moe.py +
+  tests/test_moe_sla_bias.py (the only owned files this iteration; fusion.py correctly
+  NOT re-touched — md5 f855ecf80f65871b0561010a7a7f96f6, the S2-04 GREEN value, no
+  production change was needed). The remediation adds: (a) SLABias.__post_init__
+  fail-fast validation (reject non-finite/negative strength; non-finite/<=0
+  reference_ms); (b) an OverflowError/ValueError guard around math.isfinite in the
+  local _is_finite_number (unbounded int ⇒ "not finite" ⇒ "no cost", never raises);
+  (c) the strengthened A4/A5 genuine-eviction fixtures + anti-no-op guard;
+  (d) a docstring line. All ADDITIVE; A1–A11 semantics unchanged; owned-file case
+  count 41 -> 53.
+
+  AX-pii-anon-003 (ensemble-recall-floor-guarantee — THE HEADLINE; my reviewer_hook,
+  severity_default CATASTROPHIC): UPHELD, now with teeth. floor_fusion.py
+  (md5 39f325bd61b152fd3e6b00b0995e524b) and shared_layer.py
+  (md5 929c18b12da5fab0ede98f0c577b9579) re-verified BYTE-IDENTICAL post-remediation —
+  the no-drop authority is untouched. The SLA bias is structurally upstream (route()'s
+  `scores`) and selection-only. The iteration-2 A4/A5 now exercise the DYNAMIC
+  eviction-and-recovery path (regex-oss genuinely evicted from the routed top-k under
+  SLABias(strength=100)), and the shared span still survives byte-identically via the
+  recall-floor. I re-confirmed the survival mechanism at runtime. The bias can never
+  push a Shared span out — and the tests now demonstrate this against a hostile,
+  eviction-forcing registry rather than an inert no-op.
+
+  DC-03 confidence-immutability (literal acceptance criterion): UPHELD (unchanged by
+  the remediation). The bias reshapes only `scores` (selection logits); it never writes
+  EnsembleFinding/EngineFinding.confidence. A3 (single-expert clusters) byte-identity
+  re-confirmed green. The OverflowError guard + __post_init__ touch only the bias
+  ingress, not the merge() confidence math.
+
+  AX-pii-anon-002 (determinism / replay): UPHELD — explicitly re-verified for the NEW
+  code. (1) grep confirms ZERO random/uuid/secrets/time/datetime/monotonic/perf_counter/
+  os.urandom in moe.py; imports remain pure-stdlib (json, math, dataclasses, pathlib,
+  typing) + internal. (2) The two NEW guards are PURE/deterministic: __post_init__ is
+  validation-only (raises ValueError on hostile config; same input ⇒ same outcome twice)
+  and the OverflowError-wrapped _is_finite_number returns False deterministically for
+  10**400 and -(10**400) with no raise — they add no nondeterminism. (3) Unbounded-int
+  cost reaches route() WITHOUT raising and stays inert (clean==bad, Σ=1.0), so the
+  NFR-026 totality fix preserves replay-equality. A6 replay-equality + the crafted-equal
+  -logit (-0.50 both) permutation-stable (logit, expert_id) total-order tie-break both
+  re-confirmed green. The tie-break remains correctly gated behind `sla_active` so the
+  default-off path keeps the pre-S2-04 single-key sort byte-identical to the S2-01 oracle
+  (A7 green for all 10 representative entities).
+
+  AX-pii-anon-001 (synthetic-only): UPHELD. The new _regex_oss_evicting_registry() +
+  _us_ssn_shared_span() fixtures are fully synthetic — expert ids / strengths / latency
+  costs only; the US_SSN finding is offset-only (span_start=0/span_end=11, no value
+  literal). grep for real-PII-shaped SSN/email literals in test_moe_sla_bias.py ⇒ none.
+
+  THE POWER-TIER TRAP (RISK-1 / A9 — the S2-04 trap from MEMORY moe-router-gate-seam):
+  UPHELD, AST-confirmed. I parsed moe.py's AST: ZERO functions read spec.default_weight
+  as an attribute access (the 6 grep hits are the ExpertSpec dataclass field decl +
+  docstrings + a comment + build_default_registry registration-data kwargs). The bias
+  path {route, _apply_sla_bias, _latency_cost_by_id, _latency_cost} reads ONLY
+  metadata[LATENCY_COST_KEY] — never default_weight (NFR-004 power) nor entity_strengths
+  (the legitimate pre-existing base-logit source). A9 both directions re-confirmed green
+  (mutating default_weight ⇒ no change; mutating latency_cost_ms ⇒ routing shifts). The
+  latency signal is the orthogonal third signal, exactly as DC-03 traces NFR-009/010
+  (NOT NFR-004). The power-tier-vs-latency trap is correctly avoided.
+
+  Default-off / no-new-public-surface: build_fusion public signature UNCHANGED (sla_bias
+  carried via FusionBuildSpec exactly as gate_path is; fusion.py NOT re-touched this
+  iteration). sla_bias remains KEYWORD_ONLY default None on MoERouter + MoEFusionStrategy.
+  Protected/user-WIP md5s ALL re-verified byte-identical post-remediation:
+  orchestrator.py=0afc6deed62bbd0653ae1051b723bace;
+  tests/test_moe_enhancements.py=910e9cd66ad6e38c7bb64a9c51ecb1cb;
+  evaluation/competitor_compare.py=7cae16c89f4c97136e1a12394dae2025 (RISK-6);
+  routing/floor_fusion.py=39f325bd61b152fd3e6b00b0995e524b;
+  routing/shared_layer.py=929c18b12da5fab0ede98f0c577b9579. The SDO gate
+  (eval_framework/evaluation/competitive_supremacy.py) NOT touched; artifacts/benchmarks/*
+  not written. S2-04 writes no control-path artifact and flips no guarantee, so the
+  adversarial catch-net is not in scope (consistent with the story's reviewer note and
+  the MEMORY SDO-gate catch-net rule).
+
+  Re-ran read-only post-remediation: `pytest tests/test_moe_sla_bias.py -o addopts=""`
+  ⇒ 53 passed; `-k ax003` ⇒ 2 passed (the strengthened A4/A5); `-k ax002` ⇒ 4 passed;
+  `-k "default_weight or responds_only_to_latency"` ⇒ A9 green. The 84% coverage
+  threshold is a FULL-SUITE gate; single-file isolation under-reports by design and is
+  not a real failure.
+
+  No domain packs active (developer-assistant.yaml domain_packs: []), so no pack
+  reviewer-extensions merged. project-axioms.yaml reviewer_hook for AX-pii-anon-003
+  (mine) is satisfied; AX-pii-anon-005 (calibrated-uncertainty/abstention, also mine)
+  is not triggered by this selection-bias diff.
+
+review_time_seconds: 600
+
+context_bounds_respected: true

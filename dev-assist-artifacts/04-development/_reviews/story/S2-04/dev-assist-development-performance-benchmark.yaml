@@ -1,0 +1,95 @@
+reviewer: dev-assist-development-performance-benchmark
+
+scope_id: S2-04
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: performance-S2-04-01
+    severity: OBSERVATION
+    location: src/pii_anon/moe.py:625-668
+    description: |
+      The SLA-bias hot-path cost is correctly amortized to a cold-miss-only cost,
+      but no micro-benchmark exists in-tree to make that empirically reproducible
+      ahead of the S7-04 numeric ceilings. The mechanism is benchmark-reproducible
+      IN PRINCIPLE — it is pure-stdlib scalar `math`, with no RNG, no `time`, no
+      `secrets`, no I/O and no network (AX-002 determinism) — so a deterministic,
+      fixture-driven micro-benchmark would be trivially reproducible (no seeding
+      caveats). Such a benchmark would strengthen the S7-04 handoff by recording a
+      route()-call delta (bias-on vs bias-off, inert vs active) against synthetic
+      registries of varying expert cardinality. This is explicitly NOT a blocker:
+      the story commits no p50/p95/p99 ceiling (§5/§12 defer them to S7-04/NFR-009),
+      and the dispatch brief instructs this be logged as an OBSERVATION, not a gate.
+    suggested_resolution: |
+      OPTIONAL (S7-04 / Pass-2). When the numeric ceilings land, add a seeded,
+      fixture-driven micro-benchmark over `MoERouter.route()` that records the
+      inert-path delta (sla_bias=None vs SLABias(strength=0)) and the active-path
+      delta (cold first route vs steady-state cached route) across N-expert
+      synthetic registries, so the O(experts) list-comp + the tuple-key sort
+      overhead are reproducibly bounded against the LOCKED 1522/753/200 budgets.
+      Nothing to change for S2-04 itself.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-04-aux-loss-free-sla-bias.md#5
+      - non-functional-requirements.md#NFR-009
+
+notes: |
+  PERFORMANCE-BENCHMARK STORY GATE — S2-04 (aux-loss-free SLA selection-bias, DC-03),
+  iteration 1. Verdict APPROVE. Scope per dispatch: assess that the MECHANISM adds no
+  regression and is benchmark-reproducible in principle; NOT to demand a committed
+  numeric latency ceiling (that is S7-04/NFR-009). All four focus checks pass.
+
+  (1) NO per-route()-call recompute of latency costs — CONFIRMED.
+      `_latency_cost_by_id()` (moe.py:625-640) builds `self._latency_cost_cache`
+      lazily ONCE on first use (`if self._latency_cost_cache is None`) by iterating
+      `registry.available_experts()` and calling `_latency_cost()` per expert, then
+      reuses it on every subsequent route. It is invalidated ONLY by `clear_cache()`
+      (moe.py:697, `self._latency_cost_cache = None`), which the REFACTOR test
+      `test_latency_cost_cache_invalidated_by_clear_cache` pins. The one-time build
+      is an amortized O(experts) cost, not a per-call cost. Additionally, the
+      route-level `_route_cache` (keyed on `(entity_type, context)`, moe.py:547-550 /
+      622) memoizes the FULL biased+sorted+softmaxed result, so the entire bias step
+      runs at most once per `(entity_type, context)` key — steady-state hot-path
+      overhead of the bias is effectively zero (cold-miss-only).
+
+  (2) Default-off path keeps the cheaper single-key stable sort — CONFIRMED.
+      `sla_active = self._sla_bias is not None and self._sla_bias.strength != 0.0`
+      (moe.py:577) gates the tuple-key sort. When inert, the `else` branch
+      (moe.py:586-588) keeps the pre-S2-04 `scores.sort(key=lambda x: x[1],
+      reverse=True)` stable single-key sort — byte-identical to the S2-01 oracle.
+      The only steady-state per-route delta vs S2-01 on the inert path is the single
+      extra boolean `sla_active` evaluation (one attribute load + one float compare)
+      on a cold miss — negligible, and absorbed by `_route_cache` thereafter. NO
+      perf regression when the SLA is inert. The tuple-key `(logit, expert_id)`
+      compares its 2nd element only on logit ties, so its added overhead on the
+      ACTIVE path is negligible (the active path runs at most once per cache key).
+      A7's static-softmax oracle guardians independently pin the inert byte-identity.
+
+  (3) No I/O, no detection re-run, no allocation beyond an O(experts) transient list —
+      CONFIRMED. `_apply_sla_bias` (moe.py:642-668): a cached dict lookup
+      (`_latency_cost_by_id()`), a `if not costs: return scores` early-out fast path
+      (covered by `test_apply_sla_bias_inert_when_no_costs_in_registry`), then a
+      single O(experts) list-comprehension emitting ONE transient list; per element a
+      scalar subtraction + an O(1) `eid in costs` dict-membership test. No
+      `math.exp`/numpy, no network, no filesystem, no re-detection. Pure scalar
+      `math` per RISK-5.
+
+  (4) Benchmark-reproducible in principle — CONFIRMED. No RNG/time/secrets in the
+      bias path; deterministic by construction (AX-002), so a fixture-driven
+      micro-benchmark would be reproducible with no seeding caveat. Logged as
+      OBSERVATION performance-S2-04-01 (optional S7-04 handoff aid), not a finding.
+
+  No committed numeric ceiling exists to re-run, and none is required at this gate
+  (story §5/§12; benchmark artifacts carry no S2-04/SLA reference — `artifacts/
+  benchmarks/*` correctly NOT written). No regression baseline comparison applies
+  because no numeric latency metric is committed for this mechanism. The 9
+  `performance`-marked deselected tests are pre-existing and unrelated to S2-04.
+  Out-of-scope-for-this-dimension (covered by other reviewers): confidence/floor
+  invariance (axiom), public-signature/keyword-only (code-quality), DC-03→NFR-009/010
+  tracing (traceability). No SHOWSTOPPER (a benchmark harness is not required for a
+  mechanism-only story that commits no ceiling), no CATASTROPHIC, no MAJOR, no MINOR.
+
+review_time_seconds: 480
+
+context_bounds_respected: true

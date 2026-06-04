@@ -1,0 +1,108 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S2-04
+gate: story
+iteration: 2
+verdict: APPROVE
+
+findings: []
+
+notes: |
+  ITERATION-2 RE-REVIEW — both prior findings confirmed CLOSED.
+
+  ── FINDING CLOSURE STATUS ─────────────────────────────────────────────────
+
+  MAJOR code-quality-S2-04-01 (reference_ms=0.0 → ZeroDivisionError): CLOSED.
+    SLABias.__post_init__ (moe.py lines 320–339) now validates both fields at
+    construction. Confirmed conditions:
+    (a) strength non-finite or < 0.0 → ValueError (pinned by 7-param
+        pytest.mark.parametrize in test_nfr026_slabias_rejects_hostile_config_at_construction).
+    (b) reference_ms non-finite or <= 0.0 → ValueError (same parametrize table
+        covers reference_ms ∈ {0.0, -1.0, nan, inf}).
+    (c) SLABias() [strength=0.0, reference_ms=1.0] and SLABias(strength=0.0)
+        still construct (test_nfr026_slabias_valid_configs_construct_fine).
+    (d) Frozen-dataclass invariant (A11) preserved: __post_init__ does NOT
+        mutate any field — it is validation-only. The dataclass remains frozen=True
+        (FrozenInstanceError confirmed by test_ax002_slabias_is_frozen_and_hashable).
+    The __post_init__ guard closes BOTH the ZeroDivisionError (reference_ms=0.0)
+    AND the NaN distribution-poison hole (strength=nan / reference_ms=nan), which
+    the bare no-gate static-softmax path does NOT route through _normalize_weights.
+
+  MINOR code-quality-S2-04-02 (MoEFusionStrategy.__init__ docstring missing sla_bias):
+    CLOSED. The Parameters block in MoEFusionStrategy (moe.py lines 768–772) now
+    documents sla_bias with the DC-03 reference, NFR-026 inert note, and the
+    AX-003 recall-floor advisory statement. Style matches the MoERouter entry.
+
+  ── SECURITY-ADJACENT CLOSURE (noted, not a code-quality primary) ──────────
+
+  MAJOR security-S2-04-01 (_is_finite_number OverflowError on unbounded int):
+    CLOSED. _is_finite_number (moe.py lines 342–364) now wraps math.isfinite
+    in try/except (OverflowError, ValueError), returning False for an int wider
+    than the C-double range (e.g. 10**400). Confirmed by parametrized A8 table
+    entries [10**400, -(10**400)] in test_nfr026_invalid_latency_cost_treated_as_no_cost
+    and test_latency_cost_helper_coercion.
+
+  ── NEW CODE QUALITY SCAN (remediation commit 3e9fbe7) ─────────────────────
+
+  SCOPE DISCIPLINE — clean. Remediation commit 3e9fbe7 touches exactly three
+  paths: src/pii_anon/moe.py, tests/test_moe_sla_bias.py, and the story file
+  (dev-assist-artifacts/.../S2-04-aux-loss-free-sla-bias.md). fusion.py correctly
+  NOT modified (no production change needed there). The full S2-04 diff from
+  7fea822 touches src/pii_anon/moe.py + src/pii_anon/fusion.py +
+  tests/test_moe_sla_bias.py — all three in story §8 "Files owned". No scope creep.
+
+  LINT — ruff check src tests → "All checks passed!" (re-run confirmed, iteration 2).
+
+  TYPE — mypy src/pii_anon → "Success: no issues found in 131 source files".
+  mypy src/pii_anon --strict → "Success: no issues found in 131 source files".
+  Both canonical CI and the explicit strict flag are clean (the numpy-generics
+  gotcha does not arise — pure scalar math, no npt.NDArray).
+
+  TDD DISCIPLINE — RED-before-GREEN confirmed unaltered. The remediation commit
+  3e9fbe7 is a REFACTOR-layer addition (new tests + production hardening) sitting
+  after the established RED (250312b) → GREEN (1f76bca) → REFACTOR (ff0c689) chain.
+  git merge-base --is-ancestor 250312b 1f76bca ⇒ TRUE (unchanged from iteration 1).
+  Remediation did not break the TDD chain.
+
+  TEST COVERAGE — 53 cases pass in tests/test_moe_sla_bias.py (re-verified via
+  direct pytest run, 1.53s). Test count grew 41 → 53 (+12 additive: 7-param
+  SLABias-rejection table + 1 valid-config positive test + 2 unbounded-int rows
+  in each of the two coercion tables). Executor reports full suite 3343 passed /
+  0 failed; coverage 87.28% ≥ 84%. The new __post_init__-raise branch and the
+  OverflowError guard branch are both hit by the added tests.
+
+  A4/A5 GENUINE EVICTION — the axiom-compliance SUBSTANTIVE finding (A4/A5 were
+  previously a no-op because build_default_registry experts carry no latency_cost_ms)
+  is closed in this remediation. _regex_oss_evicting_registry() makes regex-oss
+  expensive (5000.0 ms) and two cheap competitors outrank it under the aggressive
+  SLABias(strength=100). Anti-no-op assertions (_routed_ids) confirm genuine eviction
+  (regex-oss IS in off_routed, NOT in on_routed). Both A4 and A5 now exercise
+  eviction-and-recovery, not an inert-bias no-op.
+
+  PUBLIC SIGNATURE — unchanged. build_fusion's public signature not modified.
+  sla_bias travels FusionBuildSpec (TYPE_CHECKING-guarded import, cycle-safe).
+
+  FROZEN-DATACLASS INTEGRITY — __post_init__ is validation-only; no field mutation.
+  The dataclass decorator frozen=True remains unchanged; the invariant A11 pins are
+  unaltered and pass.
+
+  UNWRAP / PANIC PATTERNS — none on production paths. _latency_cost returns None
+  for unusable values; _apply_sla_bias exits early when no costs; __post_init__
+  raises ValueError (not an assert or bare exception) with a concrete message.
+
+  PROTECTED FILES — all md5 hashes verified post-remediation, all match claimed:
+    orchestrator.py           0afc6deed62bbd0653ae1051b723bace  OK
+    test_moe_enhancements.py  910e9cd66ad6e38c7bb64a9c51ecb1cb  OK
+    competitor_compare.py     7cae16c89f4c97136e1a12394dae2025  OK
+    floor_fusion.py           39f325bd61b152fd3e6b00b0995e524b  OK
+    shared_layer.py           929c18b12da5fab0ede98f0c577b9579  OK
+
+  DEFERRED ITEMS (not code-quality; unchanged from iteration 1) — the two MINOR
+  deferred findings (traceability-S2-04-01 matrix backfill and coverage-S2-04-01
+  NFR-026 matrix citation) remain batched to the S2 sprint gate per the S2-01/S2-02
+  precedent. These are not code-quality findings and do not affect this verdict.
+
+review_time_seconds: 600
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

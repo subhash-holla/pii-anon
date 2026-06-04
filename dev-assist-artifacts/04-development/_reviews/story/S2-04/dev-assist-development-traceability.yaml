@@ -1,0 +1,136 @@
+reviewer: dev-assist-development-traceability
+
+scope_id: S2-04
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: traceability-S2-04-01
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:31
+    description: |
+      No S2-04 Story/Test backfill row exists in traceability-matrix.md, AND the
+      claimed NFR-026 is not yet associated with the swarm/MoE-router UC on the
+      matrix. The matrix is keyed UC -> FR/NFR and its header explicitly states
+      "DC/Story/Test columns fill in Stages 3-5", so the forward Story column is
+      expected-but-absent. Concretely:
+        - row `UC-15 MoE-router` (line 31) maps `FR-018 | NFR-007, NFR-008,
+          NFR-009, NFR-010` with NO Story-ID/Test column, so S2-04's claim on
+          NFR-009/010 has no matrix row tying it back to this story;
+        - NFR-026 (line 89 in requirements-document.md, a swarm SHOULD) appears
+          on the matrix ONLY against `UC-24 multimodal readers` (line 36), never
+          against the swarm/MoE-router UC that S2-04 advances — so the
+          story->NFR-026 edge for the routing path is unrepresented.
+      This is the SAME deferred-backfill situation already logged for S2-01
+      (S2-01 traceability YAML: identical MINOR at traceability-matrix.md:31,
+      DEFERRED to the Sprint-2 gate) and S2-02 (S2-02 traceability YAML: same
+      MINOR, "Batch with the deferred S2-01/S2-05/S4-01 backfill rows"), per the
+      established S2-05 / S4-01 convention that the matrix populates DC/Story/Test
+      at Stages 3-5. Non-blocking: the story's `Traces`/`Implements` fields and
+      the test names already carry the full DC-03 -> NFR-009/010/026 + AX-002/003
+      chain; only the matrix's forward row is pending.
+    suggested_resolution: |
+      At the S2 sprint gate, add the S2-04 row to traceability-matrix.md mapping
+      Story S2-04 -> {NFR-009 (mechanism; numeric ceilings deferred to S7-04),
+      NFR-010, NFR-026, AX-002, AX-003} -> Test tests/test_moe_sla_bias.py
+      (A1-A11). Either widen the `UC-15 MoE-router` row to carry NFR-026 for the
+      swarm path, or add an explicit Story/Test column. Batch this with the
+      already-deferred S2-01 / S2-02 / S2-05 / S4-01 backfill rows so the
+      sprint-gate matrix refresh is a single coherent edit.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-009
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-010
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-026
+      - dev-assist-artifacts/04-development/_reviews/story/S2-01/dev-assist-development-traceability.yaml
+      - dev-assist-artifacts/04-development/_reviews/story/S2-02/dev-assist-development-traceability.yaml
+
+notes: |
+  FORWARD-TRACE VERDICT: the FR/NFR -> Story -> Test -> DC chain is sound. One
+  non-blocking MINOR (matrix forward-row backfill), identical to the standing
+  S2-01/S2-02 deferral. No SHOWSTOPPER / CATASTROPHIC / MAJOR.
+
+  THE POWER-TIER TRAP (critical check) -- PASS. The story traces NFR-009/010
+  (latency mechanism / throughput) and explicitly NOT NFR-004. Confirmed:
+    - requirements-document.md:63 NFR-004 = "Statistical-power consumption
+      (risk-tiered) | positives/slice >= 1,522 / 753 / 200" (MUST) -- this is the
+      power-tier requirement, and it is NOT in the story's `Implements` field.
+    - requirements-document.md:69 NFR-009 = "Full-swarm latency per profile"
+      (SHOULD); :70 NFR-010 = "Throughput floor (lightweight path)" (SHOULD) --
+      these ARE the claimed IDs.
+    - NFR-004 surfaces ONLY in defensive/orthogonality context in the story
+      (RISK-1, A9, DoD) and in moe.py:276 / test:472 as "the bias must NEVER read
+      default_weight (the NFR-004 power signal)". A9's two tests
+      (test_nfr009_bias_ignores_default_weight_power_signal +
+      test_nfr009_bias_responds_only_to_latency_cost) PIN the orthogonality: a
+      default_weight mutation changes nothing under the bias; a latency_cost_ms
+      mutation shifts routing. The trap is correctly avoided.
+
+  SCOPE-HONESTY (mechanism now, ceilings later) -- PASS. NFR-009's own
+  requirements-document.md:69 wording bundles the "committed numeric ceiling +
+  p99" into the requirement. The story honestly ships only the selection-bias
+  MECHANISM and records the committed numeric p50/p95/p99 ceilings as a
+  non-goal deferred to S7-04 (story line 9 provisional_status, line 10
+  Implements, line 51 Non-goal, Evidence block line 74). NOT silently claimed
+  complete: no test asserts a numeric latency ceiling, and the story's
+  provisional_status (AGENT_SIMULATED) flags the per-hardware 1522/753/200
+  budget tuning + numeric ceilings as S7-04 + Pass-2. The LOCKED 1522/753/200
+  figures are referenced as the *latency budgets the bias is later tuned toward*,
+  kept distinct from NFR-004's identical-looking power-positive counts -- the
+  story does not conflate them.
+
+  REQUIREMENT-EXISTENCE -- PASS. Every declared ID exists in
+  requirements-document.md: FR-016 (:28), NFR-004 (:63, referenced-only),
+  NFR-005 (:64), NFR-009 (:69), NFR-010 (:70), NFR-026 (:89). AX-002/AX-003 are
+  the program axioms (design D0). Zero phantom IDs.
+
+  TEST-NAME EMBEDDING / >=1 PINNING TEST PER CLAIM -- PASS. Test-name tally in
+  tests/test_moe_sla_bias.py: nfr009 x3, nfr010 x2, nfr026 x5, ax002 x4,
+  ax003 x2, dc03 x1. Each claimed requirement has >=1 test whose NAME embeds the
+  ID, and (spot-checked) each test BODY asserts the matching semantic (A1 lifts
+  the cheaper expert's mass; A9 pins default_weight orthogonality; A3/A4/A5 pin
+  confidence + floor + shared-membership invariance; A6 pins the total-order
+  tie-break; A7 pins default-off byte-identity). No name/body mismatch observed.
+  The A3 confidence-immutability test is named test_dc03_* (the literal DC-03
+  acceptance criterion) -- appropriate, since DC-03's design text
+  (D-implementation-ready-design.md:36) states the criterion at the DC level.
+
+  DC<->MODULE 1:1 MAPPING -- PASS, no scope creep. DC-03 (Aux-loss-free SLA
+  selection-bias, selection-logits only | NFR-009/010 | swarm) maps to moe.py
+  route()'s bias step. The diff adds ONLY: SLABias, LATENCY_COST_KEY,
+  _is_finite_number, _latency_cost, _latency_cost_by_id, _apply_sla_bias, the
+  keyword-only sla_bias param + the gated route() bias/tie-break + the
+  MoEFusionStrategy thread (moe.py), plus the additive FusionBuildSpec.sla_bias
+  field carried as None (fusion.py public build_fusion signature UNCHANGED, per
+  the explicit S2-02 gate_path precedent). The two load_distilled_gate /
+  DistilledTopKGate occurrences in the diff are unchanged CONTEXT lines / a
+  comment naming the adjacent S2-02 hook -- NOT additions. No DC-01
+  SharedLayerProjector, DC-02 gate, or DC-04 pseudonymization code is introduced.
+  The fusion.py thread is the story's documented "OPTIONAL additive" wiring, not
+  creep.
+
+  DEPENDENCY-STATE -- PASS. Story declares "Depends on: S2-01 DONE"; S2-01 is on
+  HEAD's history (commit 7fea822 references SO-12 S2 CORE live; S2-01 route()
+  widen + v2 seam landed). The consumed widened route() selection logits + v2
+  seam are present and not modified. No declared dependency on an IN_PROGRESS
+  story.
+
+  DIVERGED-CASCADE -- NOT APPLICABLE. The source design
+  (D-implementation-ready-design.md:3) is "Stage 3, AGENT_SIMULATED", not
+  DIVERGED. The story's provisional_status (AGENT_SIMULATED) matches the source
+  DC posture; the real-hardware calibration is honestly carried as Pass-2 /
+  S7-04, so no §10 Pass-2 DIVERGED-commitment is mandated and none is missing.
+
+  OUT OF SCOPE for this dimension (deferred to the named reviewers, no opinion
+  rendered): test well-formedness / idiomatic code (code-quality); AX-003
+  advisory-floor semantic depth + AX-002 determinism semantics (axiom-compliance,
+  PRIMARY); NFR-009/010/026 semantic scope-honesty beyond the trace
+  (requirements-coverage); whether route() hot-path cost is acceptable
+  (performance). This review asserts only that the declared IDs exist, the test
+  names embed them, the DC<->module mapping is 1:1, and the matrix backfill is
+  the standing deferred MINOR.
+
+review_time_seconds: 540
+
+context_bounds_respected: true

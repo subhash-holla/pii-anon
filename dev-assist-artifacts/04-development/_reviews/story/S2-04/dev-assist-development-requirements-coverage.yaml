@@ -1,0 +1,165 @@
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S2-04
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: coverage-S2-04-01
+    severity: MINOR
+    location: dev-assist-artifacts/05-testing/03-nfr-verification/nfr-verification-matrix.md:10
+    description: |
+      Documentation-coherence gap on NFR-026's status row. The NFR-verification
+      matrix still records NFR-026 as `**PARTIAL** | projector empty-shared
+      no-op; gate-absent fallback designed -> S2-02`. S2-04 now lands a SECOND,
+      independent, fully-VERIFIED slice of NFR-026 in the swarm-routing path: the
+      default-off byte-identity of `MoERouter.route()` under `sla_bias=None` /
+      `SLABias(strength=0.0)`, with 0 unhandled exceptions and no silent recall
+      loss (the recall-floor stays the no-drop authority). This slice is pinned
+      by named-and-passing tests A7 (`test_nfr026_sla_bias_none_..._oracle`,
+      `test_nfr026_sla_bias_strength_zero_..._oracle`), A8
+      (`test_nfr026_invalid_latency_cost_treated_as_no_cost` over
+      NaN/inf/-inf/neg/bool/str/None/list -> never raises), and A10
+      (`test_nfr026_sla_bias_none_matches_s2_01_reference_on_bare_call_sites`)
+      — all GREEN in this review's run (41/41 cases pass). The matrix row neither
+      cites S2-04 nor reflects this newly-verified coverage. This is a
+      bookkeeping lag, NOT an over-claim by the story (the story file itself does
+      NOT claim NFR-026 is repo-wide DONE — it correctly scopes its slice to the
+      router default-off path). Non-blocking: it understates rather than
+      overstates verified coverage.
+    suggested_resolution: |
+      At the S2 sprint gate (or whenever the matrix is next touched), append an
+      S2-04 citation to the NFR-026 row so the verified swarm-routing default-off
+      slice is traceable, e.g. extend to:
+      `... gate-absent fallback -> S2-02; router SLA-bias default-off byte-id +
+      invalid-cost-never-raises -> S2-04 (A7/A8/A10)`. No story-scope change is
+      required; this is a successor-tracking note.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-026
+      - dev-assist-artifacts/05-testing/03-nfr-verification/nfr-verification-matrix.md
+
+  - id: coverage-S2-04-02
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-04-aux-loss-free-sla-bias.md:69
+    description: |
+      NFR-010 (throughput floor >=5,000 rec/sec on 8-core; per-class
+      transparency, SHOULD) — the in-tree teeth verify the MECHANISM/lever, not
+      the numeric floor, and the story is honest about that. A2
+      (`test_nfr010_bias_promotes_cheap_expert_into_truncated_topk`) and A10
+      (`test_nfr010_route_all_and_merge_produce_valid_outputs_under_bias`) prove
+      the bias is a coherent throughput lever (it can demote a costly expert out
+      of the truncated top-k toward the lightweight path while preserving valid
+      Sigma=1.0 distributions and 0<=confidence<=1 findings). The real-hardware
+      >=5,000 rec/sec number is correctly deferred to S7-04 + Pass-2 (the
+      LOCKED 1522/753/200 budgets / committed ceilings), and the NFR-verification
+      matrix row 16 records NFR-007/008/009/010 as `DEFERRED | S2/S7; commit
+      p50/p95/p99 per class (S7-04)`. Scope-split is coherent: lever now,
+      throughput-floor number later. One transparency nuance worth noting (not a
+      gap): the "per-class transparency" half of NFR-010 is neither claimed nor
+      shipped here and likewise rides to S7-04 — which is consistent with the
+      story's "mechanism only" framing.
+    suggested_resolution: |
+      No action for this story. Confirm at the S7-04 successor that BOTH halves
+      of NFR-010 (the >=5,000 rec/sec floor AND the per-class transparency
+      breakdown) are discharged with real-hardware evidence; the S2-04 lever is
+      the upstream enabler, not the verification.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-010
+      - dev-assist-artifacts/04-development/development-log.md
+
+  - id: coverage-S2-04-03
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-04-aux-loss-free-sla-bias.md:9
+    description: |
+      Pass-2 / DIVERGED cross-check (informational). S2-04's
+      `provisional_status: AGENT_SIMULATED` correctly distinguishes what runs
+      for REAL in-tree against SYNTHETIC registries (the bias mechanism, the
+      `metadata["latency_cost_ms"]` ingress, the total-order tie-break, the
+      advisory-floor/confidence invariance, the default-off byte-identity) from
+      what is Pass-2 (beta-tuning toward the REAL per-hardware 1522/753/200
+      latency budgets + the committed numeric p50/p95/p99 ceilings). This is the
+      correct AGENT_SIMULATED posture, not a DIVERGED NFR (no provisional
+      threshold has been measured-and-missed here — the numeric thresholds are
+      simply DEFERRED, not diverged), so no Pass-2-confirm/invalidate logging is
+      owed by this story. The successor S7-04 is real and tracked: it is named in
+      the development-log S7 row, the NFR-verification matrix (`commit
+      p50/p95/p99 per class (S7-04)`), and even an upstream S2-01 traceability
+      review — so the deferral target is a genuine, scheduled successor, not a
+      dangling forward-reference. (S7-04 is pre-creation: no `sprint-7/` story
+      file exists yet, which is expected for a sprint-2 story whose successor
+      lives three sprints out.)
+    suggested_resolution: |
+      No action. When S7-04 is authored, ensure it back-references S2-04 as the
+      mechanism it calibrates, and that the eventual p50/p95/p99 commitment lands
+      with a sample-size protocol + real-hardware run so NFR-009/010 graduate
+      from DEFERRED to VERIFIED in the matrix.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-009
+
+notes: |
+  REQUIREMENTS-COVERAGE VERDICT: APPROVE. No silent gap; no over-claim.
+
+  Every MUST/SHOULD in this story's declared scope is EITHER fully verified
+  (named test + passing run) OR explicitly deferred-with-tracked-successor.
+  Verified live in this review (tests/test_moe_sla_bias.py, 41/41 cases GREEN,
+  run with --no-cov to bypass the repo-wide 84% single-file artifact;
+  the 84%-not-reached line when running one file is a coverage-config artifact,
+  NOT an S2-04 failure):
+
+    * NFR-009 (SHOULD, full-swarm latency per profile): MECHANISM verified
+      (A1 `test_nfr009_bias_shifts_selection_mass_toward_cheaper_expert`;
+      A9 power-tier-trap pair). The COMMITTED NUMERIC p50/p95/p99 ceilings are
+      explicitly DEFERRED to S7-04 + Pass-2 — stated identically in
+      provisional_status, the Implements row, the Blocks row, S5 Non-goals,
+      and the Evidence block. This is the correct "partial-with-tracked-
+      successor" posture for a SHOULD whose numeric threshold is deferred — it
+      is NOT claimed "fully verified". HONEST.
+
+    * NFR-010 (SHOULD, throughput floor >=5,000 rec/sec): LEVER verified
+      (A2 top-k promotion toward the lightweight path; A10 valid-output-under-
+      bias). The real-hardware throughput number + per-class transparency are
+      DEFERRED to S7-04 + Pass-2 (matrix row 16). The bias is a coherent
+      throughput lever (demoting costly experts out of the truncated top-k).
+      HONEST (see coverage-S2-04-02).
+
+    * NFR-026 (SHOULD, graceful degradation): default-off byte-identity FULLY
+      VERIFIED in the swarm-routing path. A7 pins route() == an INDEPENDENT
+      static-softmax oracle (re-derived from spec, not importing production
+      route) for both `sla_bias=None` and `SLABias(strength=0.0)` over a
+      10-entity representative set; A8 pins invalid-cost (NaN/inf/-inf/neg/bool/
+      str/None/list) -> "no cost" never raising (0 unhandled exceptions); A10
+      pins the bare route_all() call site against the same oracle. I verified
+      the oracle is a faithful apples-to-apples comparator: `min_expert_weight`
+      pruning lives on MoEFusionStrategy, NOT on MoERouter.route() (moe.py:750,
+      795), and route() has no min-weight pruning — so the oracle's
+      scores->sort->top_k->floor-swap->softmax mirrors route() exactly. The
+      byte-identity claim has real teeth. The only NFR-026 note is the matrix-row
+      bookkeeping lag (coverage-S2-04-01, MINOR).
+
+  EVIDENCE / DoD HONESTY: the Evidence block faithfully separates in-tree-real
+  (mechanism, ingress, tie-break, advisory-floor/confidence invariance, default-
+  off byte-identity vs SYNTHETIC registries) from Pass-2 (beta toward the real
+  1522/753/200 budgets + numeric ceilings). The DoD's single open box is the
+  story-gate APPROVE (this review) — every substantive box is checked with
+  matching evidence. I spot-confirmed: all 23 named tests exist (grep) and the
+  A1-A11 set runs GREEN; the claimed-untouched md5s are byte-identical
+  (orchestrator.py 0afc6dee..., competitor_compare.py 7cae16c8... [RISK-6],
+  floor_fusion.py 39f325bd..., shared_layer.py 929c18b1..., test_moe_enhancements
+  910e9cd6...); S7-04 is a real, tracked successor (development-log S7 row +
+  NFR matrix). The diff is additive only (a frozen SLABias + a keyword-only
+  param + a gated bias step; build_fusion's PUBLIC signature is UNCHANGED, per
+  the S2-02 gate_path precedent — confirmed in the diff).
+
+  SCOPE BOUNDARY (out of this dimension, deferred to peers): whether the bias
+  mechanism is correctly *implemented* / well-tested (code-quality,
+  axiom-compliance); whether DC-03 -> NFR-009/010 (not NFR-004) is the right
+  trace and the power-tier trap holds semantically (traceability,
+  axiom-compliance); the route()-hot-path per-call cost of the cached
+  `_latency_cost_by_id` (performance). I assessed ONLY claimed-vs-verified
+  coverage and deferral honesty.
+
+review_time_seconds: 690
+
+context_bounds_respected: true

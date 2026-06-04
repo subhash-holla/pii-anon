@@ -1,0 +1,88 @@
+sign_off_id: SO-13-s2-04-sla-bias
+date: 2026-06-03
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S2-04 (aux-loss-free SLA selection-bias, DC-03, a SHOULD) is LIVE in code, closing the S2 MoE-router
+  actionable work-stream (S2-01/02/04/05 DONE; S2-03 remains DEFERRED-blocked on the user's protected
+  orchestrator.py WIP). S2-04 adds a DeepSeek-V3 loss-free load-balancing bias on MoERouter.route()'s
+  SELECTION LOGITS ONLY: a per-expert latency penalty (biased_logit = strength − β·(cost/reference_ms))
+  read from ExpertSpec.metadata["latency_cost_ms"] (optional; missing ⇒ no bias), applied before the sort
+  with a total-order (logit, expert_id) tie-break gated behind sla_active. It targets the LATENCY NFRs
+  (NFR-009/010) and is structurally orthogonal to the NFR-004 power signal (default_weight, which route()
+  never reads — the "power-tier trap", pinned by A9). Default-off (sla_bias=None / strength=0.0) ⇒
+  byte-identical static softmax (NFR-026). The bias is advisory and selection-only: it never mutates
+  EnsembleFinding.confidence, never alters Shared-layer membership, and can never drop a floored span
+  (AX-003 — FloorProjectingFusion/SharedLayerProjector byte-identical, the no-drop authority). The SDO
+  verdict is UNCHANGED — NOT_YET, binding canonical_claim_run=False — a swarm-routing feature writes no
+  benchmark artifact and flips no guarantee.
+
+stories_closed:
+  - id: S2-04
+    title: aux-loss-free SLA selection-bias (DeepSeek-V3 style, selection-logits only)
+    gate: _reviews/story/S2-04/synthesis.md   # 6/6 APPROVE (iter-2); iter-1 REQUEST_CHANGES (2 MAJOR) remediated; 2 MINOR deferred-to-sprint-gate
+    commits: { red: 250312b, green: 1f76bca, refactor: ff0c689, remediation: 3e9fbe7 }
+    implements: [NFR-009, NFR-010, NFR-026, AX-002, AX-003]
+    effect: "moe.py additive: frozen SLABias(strength,reference_ms) with a validating __post_init__ (rejects non-finite/negative strength + non-finite/<=0 reference_ms) + LATENCY_COST_KEY + _latency_cost/_is_finite_number (total over hostile input incl. unbounded int via try/except OverflowError) + keyword-only sla_bias param + cached _latency_cost_by_id() + the route() bias step + the sla_active-gated total-order tie-break + _apply_sla_bias() + thread into MoEFusionStrategy. fusion.py additive: sla_bias field on FusionBuildSpec (build_fusion public signature UNCHANGED, per the S2-02 gate_path precedent). 53 owned-file test cases (A1–A11)."
+
+story_gate:
+  reviewers: 6   # code-quality, security-sast, requirements-coverage, traceability, axiom-compliance (PRIMARY), performance-benchmark
+  iter1_verdict: REQUEST_CHANGES
+  iter2_verdict: APPROVE
+  blocking_findings_remediated:
+    - "MAJOR (code-quality) — SLABias(reference_ms=0.0) → ZeroDivisionError on route(): CLOSED by the validating __post_init__."
+    - "MAJOR (security-sast) — metadata['latency_cost_ms']=10**400 → OverflowError in math.isfinite (int wider than a C double) propagating through route(): CLOSED by wrapping math.isfinite in try/except (OverflowError, ValueError): return False; A8 extended with ±10**400."
+  substantive_minor_remediated:
+    - "MINOR (axiom-compliance) — A4/A5 used a registry with no latency cost, so the 'aggressive' bias was a no-op: STRENGTHENED to a _regex_oss_evicting_registry() (regex-oss latency_cost_ms=5000, top_k=2, performance_floor=False) that GENUINELY evicts regex-oss from the routed top-k, with a _routed_ids anti-no-op guard, then asserts the floored US_SSN output byte-identical bias-on/off through the real FloorProjectingFusion pipeline (eviction-and-recovery, AX-003). Verified by reviewer live re-run."
+    - "MINOR (code-quality) — MoEFusionStrategy.__init__ docstring missing sla_bias: documented."
+  cross_reviewer_joint_signal: "Both MAJORs are the same defect class (the SLA-bias numeric ingress was not total over hostile input — NFR-026 '0 unhandled exceptions'), found independently on two ingress paths (construction-state reference_ms; operator-metadata unbounded int). One hardening pass closed both. Exactly the robustness hole a multi-dimension gate is meant to surface."
+
+decisions_acknowledged:
+  - "DC-03's SLA-bias MECHANISM is LIVE; the committed numeric latency ceilings (p50/p95/p99 per power class, NFR-009) are honestly DEFERRED to S7-04 + a Pass-2 real-hardware β-calibration toward the LOCKED 1522/753/200 budgets — scope honesty (mechanism now, ceilings later), not over-claimed."
+  - "The power-tier trap is structurally avoided: the bias reads ONLY metadata['latency_cost_ms'] and never default_weight (NFR-004 power) nor entity_strengths (AST-confirmed by axiom-compliance; pinned by A9). DC-03 traces NFR-009/010, NOT NFR-004."
+  - "Advisory + selection-only + recall-floor-safe (AX-003): the bias re-orders/re-weights selection beneath the floor; an aggressive β that evicts regex-oss from routing still yields the floored span byte-identically (the floor is the no-drop authority). EnsembleFinding.confidence byte-identical (DC-03 literal criterion)."
+  - "Default-off byte-identity (NFR-026): the total-order tie-break is gated behind sla_active so the inert path keeps the pre-S2-04 stable single-key sort — A7/A10 caught (and the executor fixed) a would-be regression where an unconditional tie-break reordered equal-strength experts."
+  - "RISK-6 honoured: evaluation/competitor_compare.py byte-identical (md5 7cae16c89f4c97136e1a12394dae2025); the SDO gate competitive_supremacy.py NOT touched."
+
+findings_waived_or_deferred:
+  - id: TRACE-matrix-backfill (S2-04 + standing S2-01/S2-02)
+    disposition: deferred-to-sprint-gate
+    detail: "traceability-matrix.md S2-04 forward Story/Test row + nfr-verification-matrix.md NFR-026 S2-04 (A7/A8/A10) citation, batched with the standing S2-01/S2-02/S2-05/S4-01/S5-04/S4-CS-01 backfills for a traceability sweep at the S2 sprint gate / before the release gate."
+  - id: gate-is_finite_number-overflow-hardening
+    disposition: deferred-to-S7-keystone-adversarial-close
+    detail: "The SDO gate's own _is_finite_number in competitive_supremacy.py (off-limits control-path file) shares the same math.isfinite-on-unbounded-int gap S2-04's security review found in moe.py. It is a fail-loud crash (denial-of-verdict), not a fabrication-pass. Harden it identically as fabrication-vector #11 during the S7 canonical-run producer's MANDATORY adversarial close (any change to competitive_supremacy.py requires the close)."
+  - id: real-hardware-latency-calibration (S2-04)
+    disposition: pass2
+    detail: "Tuning β toward the REAL per-hardware 1522/753/200 latency budgets + committing the numeric p50/p95/p99 ceilings are S7-04 + a Pass-2 real-hardware calibration — never agent-simulated as real. The bias mechanism + the metadata ingress + the advisory-floor/confidence invariance + the default-off byte-identity run for real in-tree against synthetic registries."
+
+sdo_verdict:
+  verdict: NOT_YET   # recomputed fresh via `pii-anon supremacy`; UNCHANGED by S2-04
+  binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+  j_value: 1.0
+  j_source: mle-bootstrap
+  guarantees: { G1: PENDING, G2: PENDING, G3: PASS, G4: PENDING, G5: "PENDING<-S5/S6", G6: PASS, G7: FAIL }
+  note: >
+    S2-04 hardens the swarm routing path (latency-aware selection bias) but writes no benchmark artifact and
+    flips no guarantee. The #1 binding constraint is unchanged: the S7 canonical run (canonical_claim_run=True).
+
+quality:
+  suite: "3343 passed / 16 skipped / 0 failed (exit 0). S2-04 +53 owned-file cases (A1–A11 + the iter-2 remediation edges); 16 env-gated skips stable (numpyro/jax/dataset/pyarrow)."
+  coverage: "87.28% (>= 84 gate); the new __post_init__-raise + OverflowError-guard branches hit."
+  lint_type: "ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` / 131 files (pure scalar math, no numpy)."
+  env: "AGENT_SIMULATED on the local .venv. The bias mechanism + metadata ingress + total-order tie-break + advisory-floor/confidence invariance + default-off byte-identity run for real against synthetic registries; real-hardware latency calibration + numeric ceilings are S7-04 + Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md 8a0f1000…, benchmark-diagnostics.json 47f9b116…, artifacts/benchmarks/*, docs/* all match session-start baseline
+  competitor_compare_byte_identical: true   # md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6)
+  byte_identical_preserved: "routing/floor_fusion.py 39f325bd…, routing/shared_layer.py 929c18b1… (the recall-floor, consumed read-only); the SDO gate competitive_supremacy.py NOT touched"
+  recall_floor_intact: true   # AX-003 — the advisory bias can never drop a floored span; proven under genuine regex-oss eviction (strengthened A4/A5)
+  narrow_git_add_only: true
+  no_new_hard_dependency: true   # pure scalar math; no numpy introduced
+
+next:
+  binding_objective: "S7 canonical run (canonical_claim_run=True) — THE #1 binding constraint toward CLAIM_GRADE; emits the G1 per-language ε + G2 family fields + G4 calibration fields."
+  s2_remaining: "S2-03 (rules-first early-exit) when the user's orchestrator.py WIP clears (re-check md5 each session). S2 work-stream otherwise CLOSED."
+  feature_work: "Phase B — dispatch S5 (attacks: S5-01 ReidAttack + S5-02 Tier-3 + S5-03 MIA, all via run_attack_under_sandbox) + S6 (agentic: S6-02 4-channel interception G5#1, S6-05 leakage-Sankey, S6-01 query-aware, S6-04 BYO-SDK) IN PARALLEL (worktree-isolated new modules). Then Phase C — S7-01/03/04 + the ★ S7-02 canonical-run keystone. RC target this run (CODE-only; DATA/PAPER siblings flagged follow-on)."
+  milestone: "M4 (CODE v2) advances — the S2 MoE-router work-stream (DC-02 learned routing + DC-03 SLA bias) is CODE-COMPLETE + secured; S2-03 the lone deferred (blocked)."

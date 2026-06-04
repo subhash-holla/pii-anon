@@ -1,0 +1,148 @@
+reviewer: dev-assist-development-security-sast
+
+scope_id: S2-04
+
+gate: story
+
+iteration: 2
+
+verdict: APPROVE
+
+findings: []
+
+closed_findings:
+  - id: security-S2-04-01
+    severity: MAJOR
+    status: CLOSED
+    location: src/pii_anon/moe.py (_is_finite_number) via _latency_cost -> _latency_cost_by_id -> MoERouter.route()
+    closed_by: 3e9fbe7
+    verification: |
+      CLOSED — re-ran the exact iteration-1 break-probe live in-tree. The local
+      `_is_finite_number` now wraps the `math.isfinite(value)` call in
+      `try/except (OverflowError, ValueError): return False`, so an unbounded
+      Python `int` (the one numeric type that passes `isinstance(value,(int,float))`
+      yet exceeds the C-double range) is treated as "not a usable finite number"
+      -> `_latency_cost` returns `None` -> "no cost", never raising.
+
+      Live probe (cost = 10**400 AND -(10**400)):
+        _is_finite_number(10**400)              -> False  (was: OverflowError)
+        _latency_cost(spec w/ 10**400)          -> None
+        MoERouter(reg_with(10**400),
+                  sla_bias=SLABias(strength=100.0)).route("PERSON_NAME")
+          -> NO RAISE; distribution finite ∧ all w>=0 ∧ Σ=1.0;
+             the bad-cost expert coerced to "no cost" (its weight == the clean
+             equal-strength expert's, abs_tol 1e-12).
+        Same for -(10**400).
+
+      A8 now parametrizes both `10**400` and `-(10**400)`
+      (`test_nfr026_invalid_latency_cost_treated_as_no_cost`, moe.py test lines
+      553-554) AND the `_latency_cost` helper table
+      (`test_latency_cost_helper_coercion`, lines 789-790) asserts each coerces
+      to `None`. Both green. The `_latency_cost` docstring contract ("never
+      raises"), story A8, and the gate's untrusted-input criterion now hold over
+      the full int range. Verified the fix touched ONLY moe.py's local copy — no
+      other module's `_is_finite_number` was altered.
+
+  - id: security-S2-04-02
+    severity: MINOR
+    status: CLOSED
+    location: src/pii_anon/moe.py (SLABias.__post_init__) guarding _apply_sla_bias
+    closed_by: 3e9fbe7
+    verification: |
+      CLOSED — `SLABias` gained a `__post_init__` (validation-only; the dataclass
+      stays `frozen=True`, no field mutation) that raises `ValueError` when
+      `strength` is non-finite or `< 0`, OR `reference_ms` is non-finite or
+      `<= 0`. The degenerate/poisoning configs can no longer be constructed, so
+      neither a `ZeroDivisionError` (reference_ms == 0.0) nor a NaN-poisoned
+      distribution (NaN strength/reference_ms escaping the no-gate static-softmax
+      path, which does not route through `_normalize_weights`) can reach `route()`.
+
+      Live probe (7 hostile kwargs, each fail-fast at construction):
+        SLABias(reference_ms=0.0)        -> ValueError   (was: ZeroDivisionError downstream)
+        SLABias(reference_ms=-1.0)       -> ValueError
+        SLABias(reference_ms=nan)        -> ValueError   (was: [nan,nan] distribution)
+        SLABias(reference_ms=inf)        -> ValueError
+        SLABias(strength=-1.0)           -> ValueError   (no silent bias-inversion)
+        SLABias(strength=nan)            -> ValueError   (was: [nan,nan] distribution)
+        SLABias(strength=inf)            -> ValueError
+      Legitimate surface NOT over-rejected:
+        SLABias() / SLABias(strength=0.0) / SLABias(strength=2.0, reference_ms=3.0)
+        all construct fine (β>=0 inert boundary preserved).
+
+      Pinned by `test_nfr026_slabias_rejects_hostile_config_at_construction`
+      (7 params) + `test_nfr026_slabias_valid_configs_construct_fine`. Both green.
+
+notes: |
+  VERDICT: APPROVE. Both iteration-1 findings (MAJOR security-S2-04-01,
+  MINOR security-S2-04-02) are CLOSED, independently re-verified by live in-tree
+  break-probes (not by reading the diff alone). No new finding. Remediation commit
+  `3e9fbe7` is correctly scoped: `git show 3e9fbe7 --name-only` lists ONLY
+  `src/pii_anon/moe.py`, `tests/test_moe_sla_bias.py`, and the story md — the SDO
+  gate (`eval_framework/.../competitive_supremacy.py`) is NOT touched, and
+  `fusion.py` correctly needed no further change this iteration.
+
+  RE-CONFIRMED (read-only, the iteration-1 PASSes that must still hold):
+  - METADATA INGRESS NOW TOTAL over ALL hostile types. Live-probed the full
+    hostile set {nan, +inf, -inf, -1.0, True, False, "slow", None, [1.0], {dict},
+    complex, 10**400, -(10**400), 0, -0.0} through
+    MoERouter(..., SLABias(strength=100.0)).route(): EVERY case returns without
+    raising, with a finite, non-negative, Σ=1.0 distribution. The unbounded-int
+    hole (the ONLY iteration-1 gap) is now closed; bool-is-int still handled
+    (True/False -> "no cost", not 1.0/0.0); negative finite costs still rejected
+    (no sign-flip into a positive bias). No NaN/negative selection logit escapes.
+  - NO NEW OVERFLOW VECTOR introduced by the remediation. Probed finite-but-extreme
+    products where `beta * (cost/reference)` overflows to +inf while each field is
+    individually finite (e.g. strength=1e308·cost=10; cost=1e305/reference=1e-300):
+    the penalty is SUBTRACTED, so a biased logit is `finite - (>=0, possibly +inf)`
+    = finite or -inf, NEVER +inf and NEVER `inf - inf` -> NaN. `math.exp(-inf)`
+    underflows to 0.0; the all-underflow case hits the existing `total <= 0`
+    uniform-fallback guard -> {0.5, 0.5}. All such cases stay finite ∧ >=0 ∧ Σ=1.0.
+  - NO VALIDATION-BYPASS VECTOR. `dataclasses.replace(bias, reference_ms=0.0)`
+    re-runs `__post_init__` -> ValueError (re-validated). Public attribute set is
+    blocked (FrozenInstanceError). The only escape (`object.__setattr__`) is an
+    explicit caller-side frozen-bypass abuse, not an ingress (same posture as every
+    frozen dataclass in-tree) — out of scope. The `_is_finite_number` forward
+    reference from `__post_init__` resolves at call-time (no NameError; True-branch
+    exercised by SLABias(strength=0.0)).
+  - NO PRIVILEGE / FLOOR ESCALATION. The bias lives entirely in `route()`'s
+    `scores` (selection logits), structurally upstream of and decoupled from
+    `MoEFusionStrategy.merge`'s confidence math, the `SharedLayerProjector`, and the
+    recall-floor re-injection. The remediation's A4/A5 STRENGTHENING (new
+    `_regex_oss_evicting_registry` where the aggressive SLABias GENUINELY evicts
+    `regex-oss` from the routed top-k, with an explicit anti-no-op guard) makes the
+    AX-003 floored-output / Shared-membership byte-identity claim strictly more
+    adversarial than iteration-1's inert-bias no-op — and it still holds bias-on vs
+    bias-off. Metadata can never defeat the recall-floor, alter confidence, or
+    change Shared membership.
+  - IMPORT ISOLATION intact. `grep` confirms `moe.py`/`fusion.py` import NOTHING
+    from `eval_framework`/`rating`/`attacks`/`competitive_supremacy`. The
+    fusion<->moe `SLABias` annotation import remains `TYPE_CHECKING`-guarded with
+    `from __future__ import annotations` (no runtime import edge / no cycle).
+  - NO DANGEROUS PRIMITIVES in the diff. `grep` over the added (`^+`) lines: no
+    pickle/marshal/yaml.load, no subprocess/os.system/os.popen/shell=True, no
+    eval/exec/__import__, no md5/sha1, no hard-coded credential/key shape. Pure
+    scalar `math`; no new dependency (RISK-5); determinism preserved (no
+    random/uuid/time/secrets; the total-order `(logit, expert_id)` tie-break is
+    gated behind `sla_active` so the default-off sort stays byte-identical to the
+    S2-01 oracle — AX-002).
+  - OFF-LIMITS BYTE-IDENTITY re-verified (md5 == story-recorded):
+    orchestrator.py = 0afc6deed62bbd0653ae1051b723bace;
+    routing/floor_fusion.py = 39f325bd61b152fd3e6b00b0995e524b;
+    routing/shared_layer.py = 929c18b12da5fab0ede98f0c577b9579;
+    tests/test_moe_enhancements.py = 910e9cd66ad6e38c7bb64a9c51ecb1cb;
+    evaluation/competitor_compare.py = 7cae16c89f4c97136e1a12394dae2025 (RISK-6).
+  - SUITE GREEN: `tests/test_moe_sla_bias.py` (53 cases) + the S2-01 oracle
+    guardian `tests/test_moe_router_seam.py` (23 cases) = 76 passed / 0 failed
+    (run with --no-cov; the "84% coverage not reached" line on a single-file run is
+    the GLOBAL coverage gate firing on a partial run, not a test failure).
+
+  SCOPE POSTURE (unchanged from iteration-1): S2-04 is a non-control-path advisory
+  swarm-routing feature — no signed artifact, no capability-registry grant, no trust
+  boundary, no composition-root edge, no new egress, no `unsafe`. Neither closed
+  finding was ever a trust-boundary / capability / signing breach; both were
+  untrusted-input-robustness / DoS-on-crafted-input issues on the scoped
+  `metadata["latency_cost_ms"]` ingress + the SLABias construction state, now total.
+
+review_time_seconds: 420
+
+context_bounds_respected: true
