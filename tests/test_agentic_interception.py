@@ -441,3 +441,102 @@ def test_ax001_a10_channel_masker_is_runtime_checkable() -> None:
     assert isinstance(guard.masker, ChannelMasker)
     # The leaky test double also structurally satisfies the protocol.
     assert isinstance(_LeakyMasker(SYNTH_EMAIL), ChannelMasker)
+
+
+# ==============================================================================
+# REFACTOR-phase additive edge tests (no production change — close edge paths)
+# ==============================================================================
+def test_edge_lazy_reexport_resolves_public_names() -> None:
+    """The package's PEP 562 lazy ``__getattr__`` re-exports resolve correctly."""
+    import pii_anon.agentic as agentic
+
+    # Each public name resolves lazily to the same object as the submodule's.
+    from pii_anon.agentic import interception as impl
+
+    for name in (
+        "AgentChannel",
+        "InterceptionRecord",
+        "ChannelResult",
+        "ChannelMasker",
+        "FourChannelGuard",
+        "InterceptionLedger",
+        "NoRawPIIPersistError",
+    ):
+        assert getattr(agentic, name) is getattr(impl, name)
+    # __dir__ advertises exactly the public surface.
+    assert set(dir(agentic)) >= {"FourChannelGuard", "AgentChannel"}
+    # An unknown attribute still raises AttributeError (no silent None).
+    with pytest.raises(AttributeError):
+        _ = agentic.does_not_exist  # type: ignore[attr-defined]
+
+
+def test_edge_default_masker_dedupes_overlapping_detectors() -> None:
+    """Overlapping detector matches are claimed once (no double-mask)."""
+    guard = FourChannelGuard(masker=None)
+    # An email whose local-part visually contains a phone-like run: the email
+    # detector claims the span first; the looser phone detector must skip it.
+    text = "ping 555-0100-user@example.test please"
+    result = guard.intercept(text, channel=AgentChannel.PROMPT, scope=SCOPE)
+    # Exactly one record (the email), not an email + an overlapping phone.
+    assert len(result.records) == 1
+    assert result.records[0].entity_type == "EMAIL"
+
+
+def test_edge_known_values_skips_out_of_bounds_span() -> None:
+    """A record with an out-of-bounds span is ignored by the raw-value scan.
+
+    Defensive: a misbehaving masker that reports ``span_start=-1`` (no real
+    source span) must not crash ``_known_raw_values`` — the guard simply derives
+    no raw value from that record and the masked text (no raw survival) passes.
+    """
+
+    class _BadSpanMasker:
+        def mask(
+            self, text: str, *, channel: AgentChannel, scope: str
+        ) -> ChannelResult:
+            rec = InterceptionRecord(
+                channel=channel,
+                entity_type="EMAIL",
+                surrogate="<EMAIL:v1:tok_badspan0>",
+                span_start=-1,  # out of bounds
+                span_end=9999,
+                scope=scope,
+            )
+            # Masked text carries NO raw value, so the invariant must pass.
+            return ChannelResult(
+                channel=channel,
+                masked_text="<EMAIL:v1:tok_badspan0>",
+                records=(rec,),
+            )
+
+    guard = FourChannelGuard(masker=_BadSpanMasker())
+    result = guard.intercept("anything", channel=AgentChannel.PROMPT, scope=SCOPE)
+    assert result.masked_text == "<EMAIL:v1:tok_badspan0>"
+
+
+def test_edge_reversible_channel_with_no_store_is_noop() -> None:
+    """A reversible channel with no injected store persists nothing (no crash)."""
+    guard = FourChannelGuard(
+        masker=None,
+        token_store=None,
+        reversible_channels=frozenset({AgentChannel.MEMORY}),
+    )
+    # MEMORY is reversible but there is no store — the persist step is a no-op.
+    result = guard.intercept(
+        f"remember {SYNTH_EMAIL}", channel=AgentChannel.MEMORY, scope=SCOPE
+    )
+    assert SYNTH_EMAIL not in result.masked_text
+    assert len(result.records) == 1
+
+
+def test_edge_empty_text_yields_no_records() -> None:
+    """Empty / PII-free text produces a clean pass-through with no records."""
+    guard = FourChannelGuard(masker=None)
+    result = guard.intercept("", channel=AgentChannel.TRACE, scope=SCOPE)
+    assert result.masked_text == ""
+    assert result.records == ()
+    clean = guard.intercept(
+        "no pii here at all", channel=AgentChannel.TOOL_IO, scope=SCOPE
+    )
+    assert clean.records == ()
+    assert clean.masked_text == "no pii here at all"
