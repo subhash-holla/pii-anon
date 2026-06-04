@@ -5,7 +5,8 @@
 | Field | Value |
 |---|---|
 | Epic | **E6 Agentic interception** (DC-13: router pre-filter + query-aware gate + 4-channel least-privilege + no-raw-PII-persist) |
-| State | **TODO** |
+| State | **IN_PROGRESS** |
+| Owner | `dev-assist-development-executor` (worktree `agent-a9a00540b7d40ba30`, branch `worktree-agent-a9a00540b7d40ba30`, base `2464641`) |
 | provisional_status | AGENT_SIMULATED (the 4-channel interception, the no-raw-PII-persist invariant, the least-privilege per-channel reversibility policy, the surrogate-only ledger, and determinism all run for REAL in-tree against SYNTHETIC text + the real S6-03 AEAD store; a live agent runtime + real transcript-residual leakage are Pass-2) |
 | Implements | **FR-025** (intercept all four agent channels prompt/memory/tool-I/O/trace under least-privilege — MUST); **FR-026** (persist NO raw PII to any channel after masking — MUST, **AX-006**); upholds **AX-006** (least-privilege — the TRACE channel can never reverse; only explicitly-reversible channels touch the token store), **AX-002** (determinism), **AX-001** (synthetic fixtures). Feeds **FR-028** (the leakage-Sankey, S6-05) + the SDO **G5** audit half. |
 | Traces | Design **DC-13** (`D-implementation-ready-design.md:23,49` — "4-channel least-privilege interception (prompt/memory/tool-I/O/trace, AX-006); **no raw PII persisted post-masking** (FR-026)"). UC-20. |
