@@ -661,3 +661,21 @@ def test_fr028_edge_empty_ledger_and_outbound_is_empty_graph() -> None:
     payload = sankey.as_dict()
     assert len(payload["nodes"]) == 6  # the 6-node graph is always present
     assert payload["links"] == []
+
+
+def test_fr029_edge_intent_tags_name_only_obfuscation_transforms() -> None:
+    """``intent_tags`` reports the OBFUSCATION transforms, not the direct probe.
+
+    The verbatim ``direct`` exfiltration probe is a measurement scaffold (it drives
+    the ASR), NOT an obfuscation transform — it must NOT appear in ``intent_tags``
+    (which the spec frames as "the transforms exercised"). It IS still scored, so
+    ``n_payloads`` exceeds ``len(intent_tags)``. This holds on BOTH the DATA and
+    in-tree payload paths (no asymmetry in what the report claims).
+    """
+    report = score_injection_resistance(
+        FourChannelGuard(masker=None, surrogate_key=FIXED_KEY), scope=SCOPE
+    )
+    assert "direct" not in report.intent_tags
+    # The direct probe is still scored (so the payload count exceeds the tags).
+    assert report.n_payloads > len(report.intent_tags)
+    assert len(report.intent_tags) >= 3

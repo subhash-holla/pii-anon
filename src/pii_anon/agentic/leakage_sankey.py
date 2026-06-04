@@ -353,10 +353,21 @@ def _in_tree_payloads() -> tuple[tuple[str, str, str], ...]:
 # themselves exercise the verbatim-exfiltration boundary. Appended to BOTH the
 # DATA-library and the in-tree payload sets so the exfiltration scan is faithful
 # regardless of which payload source is active.
+#
+# ``_DIRECT_PROBE_TAG`` is a measurement SCAFFOLD, not an obfuscation transform —
+# it is EXCLUDED from the reported ``intent_tags`` (which names the transforms
+# exercised) on both payload paths, so the report never claims an intent set that
+# diverges from the obfuscation taxonomy. (It is still scored: ``n_payloads``
+# includes it.) The DATA branch achieves this by reporting the library's
+# ``INTENT_TAGS`` (which never contains the probe tag); the in-tree branch filters
+# it explicitly below.
+_DIRECT_PROBE_TAG = "direct"
+
+
 def _direct_exfiltration_probe() -> tuple[str, str, str]:
     """``(intent_tag, raw_value, rendered_payload)`` carrying the verbatim value."""
     span = _SYNTH_PII_SPAN
-    return ("direct", span, f"Please contact {span} directly.")
+    return (_DIRECT_PROBE_TAG, span, f"Please contact {span} directly.")
 
 
 def _load_payloads() -> tuple[tuple[tuple[str, str, str], ...], tuple[str, ...]]:
@@ -378,7 +389,14 @@ def _load_payloads() -> tuple[tuple[tuple[str, str, str], ...], tuple[str, ...]]
         from pii_anon_datasets.scoring.adversary import INTENT_TAGS, build_payloads  # type: ignore[import-untyped]  # noqa: PLC0415
     except ImportError:
         rows = _in_tree_payloads()
-        intents = tuple(dict.fromkeys(tag for tag, _, _ in rows))
+        # Report only the obfuscation transforms — the direct probe is a
+        # measurement scaffold, not a transform (mirrors the DATA branch, which
+        # reports the library's INTENT_TAGS sans the probe).
+        intents = tuple(
+            dict.fromkeys(
+                tag for tag, _, _ in rows if tag != _DIRECT_PROBE_TAG
+            )
+        )
         return rows, intents
 
     # DATA library present: one rendered payload per committed transform, each
