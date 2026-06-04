@@ -44,6 +44,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Protocol, runtime_checkable
 
+# The exact callable type the sandbox uses for an allow-listed runner
+# (``Callable[..., Mapping[str, Any]]``). Importing it keeps ``REID_ATTACK_REGISTRY``
+# typed identically to the sandbox's ``DEFAULT_ATTACK_REGISTRY`` it merges into, so
+# the two registries cannot drift in their value type. ``sandbox.py`` is consumed
+# read-only (byte-identical); this is a type-only import.
+from pii_anon.eval_framework.attacks.sandbox import AttackCallable
+
 # The non-strippable anti-anonymity caveat (NFR-016): 100% of exported privacy
 # artifacts must carry it. It is the default + re-asserted value of
 # ``ReidSuccessMetrics.caveat`` and is always present in ``as_outcome()``.
@@ -423,13 +430,17 @@ def reid_attack_runner(
     targets = _targets_from_json(targets_json)
     candidates = _personas_from_json(candidates_json)
     adversary = BaselineDeterministicReidAttack()
-    guesses = adversary.attack(targets, candidates, int(candidate_set_size))
+    # ``candidate_set_size`` is typed ``int`` and is reached as a real ``int`` on
+    # BOTH call paths — the sandbox passes it straight through ``inputs`` (A7) and
+    # the direct unit/edge tests pass it positionally (A8). No inner re-cast is
+    # needed; it flows unchanged into the int-typed ``attack`` + scorer params.
+    guesses = adversary.attack(targets, candidates, candidate_set_size)
     metrics = score_reid_attack(
         guesses,
         targets,
         adversary_id=adversary.adversary_id,
         deterministic=adversary.deterministic,
-        candidate_set_size=int(candidate_set_size),
+        candidate_set_size=candidate_set_size,
     )
     return metrics.as_outcome()
 
@@ -437,7 +448,7 @@ def reid_attack_runner(
 # The in-code allow-list of re-identification runners (a plain dict — the ONLY
 # way a spec selects this code). Additively merged into the sandbox default
 # registry (see ``attacks/__init__``) so the recon runner stays registered too.
-REID_ATTACK_REGISTRY: Final[Mapping[str, Any]] = {
+REID_ATTACK_REGISTRY: Final[Mapping[str, AttackCallable]] = {
     "pii_anon.eval_framework.attacks.reid.reid_attack_runner": reid_attack_runner,
     "reid_baseline": reid_attack_runner,
 }

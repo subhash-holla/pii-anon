@@ -65,7 +65,23 @@ from pii_anon.eval_framework.attacks.reid import (
 # allow-list (no new dynamic-import path is introduced). The registry remains a
 # plain in-code dict — the only way a spec selects code.
 for _name, _runner in REID_ATTACK_REGISTRY.items():
-    DEFAULT_ATTACK_REGISTRY[_name] = _runner  # type: ignore[index]  # plain dict (Final[Mapping] is type-level)
+    # SAFETY: ``DEFAULT_ATTACK_REGISTRY`` is annotated ``Final[Mapping[...]]`` in
+    # ``sandbox.py`` so a static checker treats it as read-only, but the object
+    # bound to that name IS a plain mutable ``dict`` — it is the SAME dict the
+    # sandbox exposes (``attacks.DEFAULT_ATTACK_REGISTRY is
+    # sandbox.DEFAULT_ATTACK_REGISTRY``), so this in-place item-set mutates the
+    # live allow-list the sandbox resolves against. The merge is ADDITIVE +
+    # IDEMPOTENT: ``REID_ATTACK_REGISTRY``'s keys are disjoint from the sandbox's
+    # (the recon runner ``pii_anon.harness.attack.reconstruction_attack_score``
+    # stays registered — never overridden), and re-running this module rebinds the
+    # same runners to the same keys (no growth, no clobber). The ``index`` ignore
+    # only suppresses the Final-Mapping read-only complaint; it is sound ONLY while
+    # the underlying object stays a mutable dict. IF ``sandbox.py`` ever makes the
+    # registry truly immutable (e.g. wrapping it in ``MappingProxyType``), this
+    # item-set would raise ``TypeError`` at import; the fix THEN is to add an
+    # ``extend_default_registry(mapping)`` helper to ``sandbox.py`` and call it
+    # here (NOT in scope now — the S5-04 substrate stays byte-identical).
+    DEFAULT_ATTACK_REGISTRY[_name] = _runner  # type: ignore[index]
 del _name, _runner
 
 __all__ = [
