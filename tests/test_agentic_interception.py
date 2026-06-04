@@ -32,7 +32,9 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import hashlib
 import json
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -46,6 +48,7 @@ from pii_anon.agentic.interception import (
     InterceptionLedger,
     InterceptionRecord,
     NoRawPIIPersistError,
+    _keyed_token_id,
 )
 from pii_anon.errors import PiiAnonError
 from pii_anon.tokenization.encrypted_store import (
@@ -60,6 +63,13 @@ if TYPE_CHECKING:
 SYNTH_EMAIL = "jane.roe@example.test"
 SYNTH_PHONE = "555-0100"
 SCOPE = "case_s6_02"
+
+# A FIXED surrogate key so keyed-HMAC surrogates are reproducible in tests
+# (the surrogate id is a keyed HMAC — security-S6-02-01 remediation — so
+# determinism is per-key; an injected fixed key pins byte-identical output).
+# A second key proves keyed surrogates DIFFER across keys (dictionary resistance).
+FIXED_KEY = b"\x11" * 32
+FIXED_KEY_2 = b"\x22" * 32
 
 # A surrogate using the canonical token format reused from
 # tokenization/reidentification.py: ``<ENTITY:vN:tok_XXX>``.
@@ -136,8 +146,6 @@ def test_fr025_a2_mask_prompt_channel() -> None:
     assert isinstance(result, ChannelResult)
     assert result.channel is AgentChannel.PROMPT
     assert SYNTH_EMAIL not in result.masked_text  # raw email gone
-    import re
-
     assert re.search(EMAIL_SURROGATE_RE, result.masked_text)  # surrogate present
     assert len(result.records) == 1
     rec = result.records[0]
@@ -349,21 +357,29 @@ def test_fr026_a8_ledger_copy_on_read_is_immutable() -> None:
 # A9 — deterministic [PROPERTY] (AX-002)
 # ==============================================================================
 def test_ax002_a9_deterministic_replay() -> None:
-    """Same payloads + scope ⟹ byte-identical masked outputs + identical ledger."""
+    """Same payloads + scope + KEY ⟹ byte-identical masked outputs + ledger.
+
+    The surrogate is a KEYED HMAC (security-S6-02-01 remediation): determinism
+    is *per fixed key*. We INJECT a fixed ``surrogate_key`` into both guards so
+    the per-mask path is byte-identical and reproducible (the FR-030 path the
+    canonical run uses). Key generation is the only non-deterministic step and it
+    is skipped entirely when a key is supplied — so no RNG runs on the per-mask
+    path here.
+    """
     payloads = {
         AgentChannel.PROMPT: f"prompt {SYNTH_EMAIL} and {SYNTH_PHONE}",
         AgentChannel.TOOL_IO: f"tool {SYNTH_EMAIL}",
     }
 
     ledger_a = InterceptionLedger()
-    out_a = FourChannelGuard(masker=None, ledger=ledger_a).intercept_all(
-        payloads, scope=SCOPE
-    )
+    out_a = FourChannelGuard(
+        masker=None, surrogate_key=FIXED_KEY, ledger=ledger_a
+    ).intercept_all(payloads, scope=SCOPE)
 
     ledger_b = InterceptionLedger()
-    out_b = FourChannelGuard(masker=None, ledger=ledger_b).intercept_all(
-        payloads, scope=SCOPE
-    )
+    out_b = FourChannelGuard(
+        masker=None, surrogate_key=FIXED_KEY, ledger=ledger_b
+    ).intercept_all(payloads, scope=SCOPE)
 
     for channel in payloads:
         assert out_a[channel].masked_text == out_b[channel].masked_text
@@ -375,11 +391,26 @@ def test_ax002_a9_deterministic_replay() -> None:
 
 
 def test_ax002_a9_no_nondeterministic_imports_on_path() -> None:
-    """The interception module imports no ``random``/``uuid``/``time``/``secrets``."""
+    """The PER-MASK path is deterministic: no ``random``/``uuid``/``time`` import.
+
+    Reconciliation with the keyed-surrogate remediation (security-S6-02-01):
+    ``secrets`` / ``os`` are now ALLOWED because the masker mints a random
+    per-instance ``surrogate_key`` at CONSTRUCTION (secure-by-default — the
+    persisted G5 ledger is then non-dictionary-reversible). That key generation
+    is a one-time construction step, never invoked on the per-mask path, so the
+    per-mask path stays deterministic *given a fixed key*. ``random`` / ``uuid``
+    / ``time`` remain banned outright — none of them appears in the module, and
+    the keyed surrogate must never depend on wall-clock / RNG per call.
+
+    The companion :func:`test_ax002_a9_deterministic_replay` (and the dedicated
+    fixed-key determinism assertion below) prove the per-mask path is
+    byte-identical when a fixed ``surrogate_key`` is injected.
+    """
     src = Path(__file__).resolve().parents[1] / "src" / "pii_anon" / "agentic"
     module_src = (src / "interception.py").read_text(encoding="utf-8")
     tree = ast.parse(module_src)
-    banned = {"random", "uuid", "time", "secrets"}
+    # ``secrets``/``os`` deliberately EXCLUDED — construction-time key gen only.
+    banned = {"random", "uuid", "time"}
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -387,6 +418,132 @@ def test_ax002_a9_no_nondeterministic_imports_on_path() -> None:
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported.add(node.module.split(".")[0])
     assert not (imported & banned), f"non-deterministic import(s): {imported & banned}"
+
+    # ``secrets`` IS imported (for the construction-time key) but must NOT be
+    # referenced anywhere inside ``_DefaultMasker.mask`` / ``_keyed_token_id`` /
+    # ``_make_surrogate`` (the per-mask path). Assert the only ``secrets`` use is
+    # in ``FourChannelGuard.__post_init__`` (construction).
+    per_mask_funcs = {"mask", "_keyed_token_id", "_make_surrogate"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name in per_mask_funcs:
+            names = {
+                n.id for n in ast.walk(node) if isinstance(n, ast.Name)
+            }
+            assert "secrets" not in names, (
+                f"{node.name} (per-mask path) must not call secrets — "
+                "RNG belongs only in construction-time key generation"
+            )
+
+    # Determinism is per fixed key: inject one and assert byte-identical replay.
+    text = f"reach {SYNTH_EMAIL}"
+    out1 = FourChannelGuard(masker=None, surrogate_key=FIXED_KEY).intercept(
+        text, channel=AgentChannel.PROMPT, scope=SCOPE
+    )
+    out2 = FourChannelGuard(masker=None, surrogate_key=FIXED_KEY).intercept(
+        text, channel=AgentChannel.PROMPT, scope=SCOPE
+    )
+    assert out1.masked_text == out2.masked_text
+    assert out1.records == out2.records
+
+
+# ==============================================================================
+# A11 — KEYED surrogate resists offline dictionary re-identification
+#       [SECURITY] (FR-026 / AX-006 — security-S6-02-01 remediation)
+# ==============================================================================
+def test_fr026_a11_keyed_surrogate_resists_dictionary_reidentification() -> None:
+    """A surrogate is NOT recoverable to its raw value without the key.
+
+    The inverse of the reviewer's break-probe (which recovered the raw email
+    from a KEYLESS hash + a candidate dictionary with NO key). With the surrogate
+    now a KEYED HMAC:
+
+    1. Masking the SAME value under two DIFFERENT keys yields DIFFERENT
+       surrogates (the surrogate is key-dependent, not a public hash of the raw).
+    2. An attacker holding the persisted (surrogate-only) G5 ledger + a candidate
+       dictionary that CONTAINS the true raw value, but WITHOUT the key, cannot
+       reconstruct the surrogate for any candidate — so no candidate matches the
+       real surrogate. (We reproduce the attacker's offline keyless guess exactly
+       and assert it never lands.)
+    """
+    text = f"email {SYNTH_EMAIL} now"
+
+    # (1) Same raw value, two different keys -> different surrogates.
+    ledger_a = InterceptionLedger()
+    rec_a = (
+        FourChannelGuard(masker=None, surrogate_key=FIXED_KEY, ledger=ledger_a)
+        .intercept(text, channel=AgentChannel.MEMORY, scope=SCOPE)
+        .records[0]
+    )
+    rec_b = (
+        FourChannelGuard(masker=None, surrogate_key=FIXED_KEY_2)
+        .intercept(text, channel=AgentChannel.MEMORY, scope=SCOPE)
+        .records[0]
+    )
+    assert rec_a.surrogate != rec_b.surrogate, (
+        "two different keys must produce different surrogates for the same raw "
+        "value — otherwise the surrogate is a keyless (guessable) hash"
+    )
+
+    # (2) Offline dictionary attack WITHOUT the key fails. The attacker has the
+    #     published G5 ledger (surrogate-only) + a candidate dictionary that even
+    #     CONTAINS the true synthetic value + knows the (low-cardinality)
+    #     scope/entity + the open-source surrogate construction — but NOT the key.
+    target_surrogate = ledger_a.as_dict()["records"][0]["surrogate"]  # type: ignore[index]
+    candidate_dictionary = [
+        SYNTH_EMAIL,  # the true value is IN the dictionary
+        "john.doe@example.test",
+        "alice@example.test",
+        "555-0100",
+    ]
+
+    # The attacker's best offline move: recompute the surrogate for each
+    # candidate using a KEYLESS digest (they have no key). Reproduce the OLD
+    # keyless construction exactly — it must NOT reproduce the keyed surrogate.
+    def _keyless_guess(entity: str, raw: str) -> str:
+        keyless_id = hashlib.blake2b(
+            f"{SCOPE}\x1f{entity}\x1f{raw}".encode(), digest_size=8
+        ).hexdigest()[:12]
+        return f"<{entity}:v1:tok_{keyless_id}>"
+
+    keyless_matches = [
+        c for c in candidate_dictionary if _keyless_guess("EMAIL", c) == target_surrogate
+    ]
+    assert keyless_matches == [], (
+        "a keyless dictionary guess must NOT recover the keyed surrogate — "
+        "the surrogate is no longer offline-reversible without the key"
+    )
+
+    # Even brute-forcing with a WRONG key (the attacker guesses a key) misses;
+    # only the exact key reproduces the surrogate.
+    wrong_key_id = _keyed_token_id(FIXED_KEY_2, SCOPE, "EMAIL", SYNTH_EMAIL)
+    assert f"<EMAIL:v1:tok_{wrong_key_id}>" != target_surrogate
+    right_key_id = _keyed_token_id(FIXED_KEY, SCOPE, "EMAIL", SYNTH_EMAIL)
+    assert f"<EMAIL:v1:tok_{right_key_id}>" == target_surrogate  # only WITH the key
+
+
+def test_fr026_a11_default_key_is_random_per_instance_secure_by_default() -> None:
+    """No injected key ⟹ a fresh random per-instance key (secure-by-default).
+
+    Two default-constructed guards (no ``surrogate_key``) mask the same value but
+    produce DIFFERENT surrogates, because each mints its own random key at
+    construction — so the persisted G5 ledger from the keyless-default era is
+    replaced by a non-dictionary-reversible one even when the operator injects
+    nothing. (Determinism-when-needed is opt-in via a fixed key, proven by A9.)
+    """
+    text = f"reach {SYNTH_EMAIL}"
+    s1 = FourChannelGuard(masker=None).intercept(
+        text, channel=AgentChannel.PROMPT, scope=SCOPE
+    ).records[0].surrogate
+    s2 = FourChannelGuard(masker=None).intercept(
+        text, channel=AgentChannel.PROMPT, scope=SCOPE
+    ).records[0].surrogate
+    assert s1 != s2, (
+        "default (no-key) guards must each use a fresh random key — identical "
+        "surrogates across instances would mean a fixed/keyless construction"
+    )
+    # Both are still well-formed canonical surrogates (and never the raw value).
+    assert SYNTH_EMAIL not in s1 and SYNTH_EMAIL not in s2
+    assert re.match(EMAIL_SURROGATE_RE, s1) and re.match(EMAIL_SURROGATE_RE, s2)
 
 
 # ==============================================================================
@@ -446,7 +603,7 @@ def test_ax001_a10_channel_masker_is_runtime_checkable() -> None:
 # ==============================================================================
 # REFACTOR-phase additive edge tests (no production change — close edge paths)
 # ==============================================================================
-def test_edge_lazy_reexport_resolves_public_names() -> None:
+def test_ax001_edge_lazy_reexport_resolves_public_names() -> None:
     """The package's PEP 562 lazy ``__getattr__`` re-exports resolve correctly."""
     import pii_anon.agentic as agentic
 
@@ -470,7 +627,7 @@ def test_edge_lazy_reexport_resolves_public_names() -> None:
         _ = agentic.does_not_exist  # type: ignore[attr-defined]
 
 
-def test_edge_default_masker_dedupes_overlapping_detectors() -> None:
+def test_fr025_edge_default_masker_dedupes_overlapping_detectors() -> None:
     """Overlapping detector matches are claimed once (no double-mask)."""
     guard = FourChannelGuard(masker=None)
     # An email whose local-part visually contains a phone-like run: the email
@@ -482,7 +639,7 @@ def test_edge_default_masker_dedupes_overlapping_detectors() -> None:
     assert result.records[0].entity_type == "EMAIL"
 
 
-def test_edge_known_values_skips_out_of_bounds_span() -> None:
+def test_fr026_edge_known_values_skips_out_of_bounds_span() -> None:
     """A record with an out-of-bounds span is ignored by the raw-value scan.
 
     Defensive: a misbehaving masker that reports ``span_start=-1`` (no real
@@ -514,7 +671,7 @@ def test_edge_known_values_skips_out_of_bounds_span() -> None:
     assert result.masked_text == "<EMAIL:v1:tok_badspan0>"
 
 
-def test_edge_reversible_channel_with_no_store_is_noop() -> None:
+def test_fr026_edge_persist_noop_without_store() -> None:
     """A reversible channel with no injected store persists nothing (no crash)."""
     guard = FourChannelGuard(
         masker=None,
@@ -529,7 +686,7 @@ def test_edge_reversible_channel_with_no_store_is_noop() -> None:
     assert len(result.records) == 1
 
 
-def test_edge_empty_text_yields_no_records() -> None:
+def test_fr025_edge_empty_text_yields_no_records() -> None:
     """Empty / PII-free text produces a clean pass-through with no records."""
     guard = FourChannelGuard(masker=None)
     result = guard.intercept("", channel=AgentChannel.TRACE, scope=SCOPE)

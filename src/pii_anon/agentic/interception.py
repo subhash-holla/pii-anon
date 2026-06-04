@@ -16,12 +16,31 @@ value survives. The per-channel :class:`InterceptionLedger` records only
 surrogates (never plaintext) and is the auditable **G5** artifact (+ the S6-05
 leakage-Sankey source).
 
-Determinism (AX-002)
---------------------
-There is no ``random`` / ``uuid`` / ``time`` / ``secrets`` on the interception
-path. The default in-tree masker derives each surrogate token deterministically
-from a keyless ``BLAKE2b`` digest of ``(scope, entity_type, raw_value)`` — the
-same input always yields the same masked output and the same ledger.
+Determinism (AX-002) + keyed-surrogate de-identification
+--------------------------------------------------------
+The per-mask path is **deterministic** — there is no ``random`` / ``uuid`` /
+``time`` on it: the default in-tree masker derives each surrogate token via a
+**keyed** ``HMAC-SHA256`` of ``(scope, entity_type, raw_value)`` under a
+per-instance ``surrogate_key`` (mirroring the canonical keyed
+:class:`~pii_anon.tokenization.providers.DeterministicHMACTokenizer` /
+``encrypted_store.py``'s blind-index HMAC — no new crypto is rolled). Given a
+**fixed** key, the same input always yields the same masked output and the same
+ledger (the FR-030 "byte-identical given seed/key/scope" reproducible path).
+
+The key is **keyed, not keyless**, on purpose: a keyless hash of low-entropy PII
+(email / phone / name) is offline dictionary/rainbow-reversible — an attacker
+holding the persisted surrogate-only :class:`InterceptionLedger` (a G5 audit
+artifact + the S6-05 Sankey source) plus a candidate dictionary and the
+low-cardinality scope/entity could brute-force-match a surrogate back to its raw
+value with NO secret. Keying the HMAC removes that offline guessability while
+preserving within-key determinism (closes the keyless-hash re-identification
+finding).
+
+``secrets`` is imported and used **only at CONSTRUCTION** to mint a random
+per-instance key when none is injected (secure-by-default: the ledger is then
+NON-dictionary-reversible). It is never called on the per-mask path, so
+determinism-under-a-fixed-key is unaffected. ``random`` / ``uuid`` / ``time`` do
+not appear anywhere in this module.
 
 Isolation (AX-001 / RISK-5)
 ---------------------------
@@ -41,7 +60,9 @@ AEAD store. A live agent runtime + real transcript-residual leakage are Pass-2.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import re
+import secrets
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
@@ -151,7 +172,8 @@ class ChannelMasker(Protocol):
 # masker EMITS tokens in exactly this shape so the ledger/store stay
 # interoperable with the re-identification service.
 _SURROGATE_VERSION = 1
-_TOKEN_ID_LEN = 12  # hex chars of the deterministic digest used as the token id
+_TOKEN_ID_LEN = 12  # hex chars of the keyed digest used as the token id
+_SURROGATE_KEY_BYTES = 32  # 256-bit per-instance surrogate HMAC key
 
 
 # Synthetic-PII detection patterns for the dependency-free default masker. These
@@ -170,34 +192,63 @@ _DETECTORS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
-def _deterministic_token_id(scope: str, entity_type: str, raw_value: str) -> str:
-    """Derive a stable token id from ``(scope, entity_type, raw_value)``.
+def _keyed_token_id(
+    surrogate_key: bytes, scope: str, entity_type: str, raw_value: str
+) -> str:
+    """Derive a stable, **keyed** token id from ``(scope, entity_type, raw)``.
 
-    Keyless :func:`hashlib.blake2b` — pure-stdlib and deterministic (no
-    ``random`` / ``uuid`` / ``time`` / ``secrets``), so the same raw value in the
-    same scope always produces the same surrogate (AX-002). The digest is over
-    the *raw* value but only its hex *image* is ever emitted — the raw value is
-    not recoverable from the surrogate.
+    A keyed :func:`hmac.new` over SHA-256 — the same keyed-pseudonym primitive
+    the canonical :class:`~pii_anon.tokenization.providers.DeterministicHMACTokenizer`
+    and ``encrypted_store.py``'s blind index use (no new crypto). Two properties
+    matter here:
+
+    * **Within a fixed key it is deterministic** (no ``random`` / ``uuid`` /
+      ``time`` on this path), so the same raw value in the same scope always
+      produces the same surrogate — the FR-030 / AX-002 reproducible path.
+    * **Without the key it is NOT offline-reversible.** A keyless hash of
+      low-entropy PII is dictionary/rainbow-reversible from the surrogate alone;
+      keying the HMAC defeats that — an attacker holding the surrogate-only
+      ledger plus a candidate dictionary but WITHOUT ``surrogate_key`` cannot
+      brute-force a surrogate back to its raw value (closes the keyless-hash
+      re-identification finding). Only the hex *image* of the keyed digest is
+      ever emitted.
     """
     msg = f"{scope}\x1f{entity_type}\x1f{raw_value}".encode("utf-8")
-    return hashlib.blake2b(msg, digest_size=8).hexdigest()[:_TOKEN_ID_LEN]
+    return hmac.new(surrogate_key, msg, hashlib.sha256).hexdigest()[:_TOKEN_ID_LEN]
 
 
-def _make_surrogate(scope: str, entity_type: str, raw_value: str) -> str:
+def _make_surrogate(
+    surrogate_key: bytes, scope: str, entity_type: str, raw_value: str
+) -> str:
     """Build a canonical ``<ENTITY:vN:tok_XXX>`` surrogate for a raw value."""
-    token_id = _deterministic_token_id(scope, entity_type, raw_value)
+    token_id = _keyed_token_id(surrogate_key, scope, entity_type, raw_value)
     return f"<{entity_type}:v{_SURROGATE_VERSION}:tok_{token_id}>"
 
 
 class _DefaultMasker:
-    """Dependency-free, deterministic default :class:`ChannelMasker`.
+    """Dependency-free, **keyed**-surrogate default :class:`ChannelMasker`.
 
     Detects synthetic email / phone PII via small regexes and replaces each
-    match with a canonical surrogate token. Has no detection-engine dependency,
-    so it stays CI-fast and deterministic. A production deployment injects a
-    richer engine-backed masker implementing the same :class:`ChannelMasker`
-    protocol.
+    match with a canonical surrogate token whose id is a KEYED HMAC of the raw
+    value under this masker's ``surrogate_key`` (see :func:`_keyed_token_id`).
+    Keying makes the emitted surrogates — which flow into the persisted G5
+    :class:`InterceptionLedger` — non-dictionary-reversible without the key,
+    while staying deterministic given a fixed key. Has no detection-engine
+    dependency, so it stays CI-fast and deterministic. A production deployment
+    injects a richer engine-backed masker implementing the same
+    :class:`ChannelMasker` protocol.
+
+    Parameters
+    ----------
+    surrogate_key:
+        The secret key for the surrogate HMAC. Determinism is per-key: the same
+        ``(key, scope, entity, raw)`` always yields the same surrogate.
     """
+
+    __slots__ = ("_surrogate_key",)
+
+    def __init__(self, surrogate_key: bytes) -> None:
+        self._surrogate_key = surrogate_key
 
     def mask(
         self, text: str, *, channel: AgentChannel, scope: str
@@ -220,7 +271,9 @@ class _DefaultMasker:
         out_parts: list[str] = []
         cursor = 0
         for start, end, entity_type, raw in spans:
-            surrogate = _make_surrogate(scope, entity_type, raw)
+            surrogate = _make_surrogate(
+                self._surrogate_key, scope, entity_type, raw
+            )
             out_parts.append(text[cursor:start])
             out_parts.append(surrogate)
             cursor = end
@@ -240,9 +293,6 @@ class _DefaultMasker:
             masked_text="".join(out_parts),
             records=tuple(records),
         )
-
-
-_DEFAULT_MASKER = _DefaultMasker()
 
 
 class InterceptionLedger:
@@ -298,7 +348,19 @@ class FourChannelGuard:
     ----------
     masker:
         The :class:`ChannelMasker` used to detect + replace PII. ``None`` selects
-        the dependency-free deterministic default (:class:`_DefaultMasker`).
+        the dependency-free deterministic default (:class:`_DefaultMasker`),
+        keyed by ``surrogate_key``. (When a custom ``masker`` is supplied it owns
+        its own keying and ``surrogate_key`` is ignored.)
+    surrogate_key:
+        The secret key the default masker uses to derive surrogate token ids
+        (a KEYED HMAC — see :func:`_keyed_token_id`). ``None`` (the default)
+        mints a fresh random per-instance key (:func:`secrets.token_bytes`) at
+        CONSTRUCTION — **secure-by-default**: the emitted surrogates (and the
+        persisted G5 ledger) are then NOT offline-dictionary-reversible without
+        this process's key. Supply a fixed key for the FR-030 reproducible path
+        (byte-identical masked output + ledger given the same key/seed/scope).
+        Key generation is the ONLY non-deterministic step and it happens once at
+        construction, never on the per-mask path.
     token_store:
         Optional injected store for reversible channels — prefer the S6-03
         :class:`~pii_anon.tokenization.encrypted_store.EncryptedSQLiteTokenStore`
@@ -306,14 +368,18 @@ class FourChannelGuard:
         touches the store.
     reversible_channels:
         The channels (a :class:`frozenset`) permitted to persist a
-        surrogate -> raw mapping. **TRACE is reversible only if explicitly opted
-        in** (default: never — least-privilege, AX-006).
+        surrogate -> surrogate linkage record (the ``plaintext`` column receives
+        the SURROGATE, never raw PII — see :meth:`_persist`). **TRACE is
+        reversible only if explicitly opted in** (default: never —
+        least-privilege, AX-006). True authorized reversal-to-raw is FR-027
+        (session pseudonyms) and is OUT OF S6-02's scope.
     ledger:
         Optional :class:`InterceptionLedger` to record every substitution into
         (the G5 audit source). One is created if omitted.
     """
 
     masker: ChannelMasker | None = None
+    surrogate_key: bytes | None = None
     token_store: TokenStore | None = None
     reversible_channels: frozenset[AgentChannel] = frozenset()
     ledger: InterceptionLedger = field(default_factory=InterceptionLedger)
@@ -322,10 +388,22 @@ class FourChannelGuard:
 
     def __post_init__(self) -> None:
         # ``masker=None`` is the ergonomic "use the default" sentinel; resolve it
-        # to the dependency-free deterministic in-tree masker. Both the public
-        # ``masker`` attribute (for introspection) and the private ``_masker``
-        # (the never-None one the hot path reads) end up concrete.
-        resolved = self.masker if self.masker is not None else _DEFAULT_MASKER
+        # to the dependency-free deterministic in-tree KEYED masker. The default
+        # masker is keyed by ``surrogate_key`` (or a fresh random per-instance
+        # key when ``surrogate_key is None`` — secure-by-default; this is the
+        # ONLY construction-time use of ``secrets`` and it never touches the
+        # per-mask path, so per-mask determinism-under-a-fixed-key holds). Both
+        # the public ``masker`` attribute (for introspection) and the private
+        # ``_masker`` (the never-None one the hot path reads) end up concrete.
+        if self.masker is not None:
+            resolved: ChannelMasker = self.masker
+        else:
+            key = (
+                self.surrogate_key
+                if self.surrogate_key is not None
+                else secrets.token_bytes(_SURROGATE_KEY_BYTES)
+            )
+            resolved = _DefaultMasker(key)
         self.masker = resolved
         self._masker = resolved
 
@@ -406,7 +484,19 @@ class FourChannelGuard:
 
     # -- persistence (reversible channels only) ----------------------------
     def _persist(self, result: ChannelResult, *, scope: str) -> None:
-        """Persist surrogate -> raw mappings for a reversible channel.
+        """Persist a surrogate -> surrogate linkage record for a reversible channel.
+
+        The ``plaintext`` column of each :class:`TokenMapping` receives the
+        **surrogate** value (``plaintext=rec.surrogate``), not the raw PII — no
+        raw value is ever written to the store (FR-026: the strongest reading of
+        no-raw-PII-persist; the on-disk payload is additionally AEAD-encrypted
+        ciphertext at rest, defense-in-depth). This persists a least-privilege
+        linkage record gated by ``reversible_channels``; it does NOT enable
+        authorized reversal-to-raw. **True surrogate -> raw reversal is FR-027
+        (session pseudonyms) and is out of S6-02's scope** — a future story that
+        needs it would thread the raw value through a reversible masker, at which
+        point the EncryptedSQLiteTokenStore AEAD-at-rest property becomes
+        load-bearing.
 
         Imports :class:`TokenMapping` lazily so importing this module never
         forces the tokenization store import (keeps the agentic surface light +
