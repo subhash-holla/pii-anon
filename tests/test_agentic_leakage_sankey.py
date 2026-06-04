@@ -554,3 +554,110 @@ def test_fr029_injection_report_defaults_is_representative_true() -> None:
     assert report.is_representative is True
     with pytest.raises(dataclasses.FrozenInstanceError):
         report.attack_success_rate = 1.0  # type: ignore[misc]
+
+
+# ==============================================================================
+# REFACTOR-phase additive edge tests (no production change — close edge paths)
+# ==============================================================================
+class _RaisingMasker:
+    """A masker that reports a record for the email span but LEAVES the raw text.
+
+    The S6-02 ``_assert_no_raw_pii`` invariant derives the raw value from the
+    reported span, sees it survive in ``masked_text``, and RAISES
+    ``NoRawPIIPersistError`` — the guard refuses to emit a leak. The injection
+    scorer must treat that refusal as RESISTANCE (the value did not cross the
+    boundary), not as an exfiltration. Models a guard that detects but fails to
+    substitute, where the upstream invariant is the backstop.
+    """
+
+    def mask(
+        self, text: str, *, channel: AgentChannel, scope: str
+    ) -> ChannelResult:
+        idx = text.find(SYNTH_EMAIL)
+        if idx < 0:
+            return ChannelResult(channel=channel, masked_text=text, records=())
+        rec = InterceptionRecord(
+            channel=channel,
+            entity_type="EMAIL",
+            surrogate="<EMAIL:v1:tok_raising0000>",
+            span_start=idx,
+            span_end=idx + len(SYNTH_EMAIL),
+            scope=scope,
+        )
+        # Reports a record but returns the raw text unchanged ⟹ invariant RAISES.
+        return ChannelResult(channel=channel, masked_text=text, records=(rec,))
+
+
+def test_fr029_edge_guard_raise_counts_as_resistance_not_exfiltration() -> None:
+    """A guard that RAISES NoRawPIIPersistError ⟹ that payload is resistance.
+
+    The raw value never crossed the boundary (the guard refused to emit it), so
+    the attack_success_rate is NOT incremented for it: ASR stays 0.0.
+    """
+    guard = FourChannelGuard(masker=_RaisingMasker())
+    report = score_injection_resistance(guard, scope=SCOPE)
+    # Every direct/verbatim probe RAISES (resistance), nothing exfiltrates.
+    assert report.attack_success_rate == 0.0
+    assert report.n_payloads > 0
+
+
+def test_fr028_edge_classify_survivor_phone_shape() -> None:
+    """A surviving phone-shaped synthetic value is labelled PHONE (not the raw)."""
+    ledger = _ledger_with(_rec(AgentChannel.TOOL_IO, entity_type="PHONE"))
+    # A synthetic phone-shaped value survives the outbound payload.
+    outbound = {AgentChannel.TOOL_IO: f"dialed {SYNTH_PHONE} just now"}
+    sankey = build_leakage_sankey(
+        ledger, outbound=outbound, known_values=[SYNTH_PHONE]
+    )
+    leak = next(e for e in sankey.edges if e.target == LEAKED)
+    assert leak.entity_type == "PHONE"
+    assert SYNTH_PHONE not in leak.entity_type  # never echoes the raw value
+
+
+def test_fr028_edge_classify_survivor_generic_pii_shape() -> None:
+    """A surviving value with no email/phone shape is labelled the generic PII."""
+    ledger = _ledger_with(_rec(AgentChannel.MEMORY, entity_type="NAME"))
+    survivor = "Jane Roe"  # synthetic name — neither '@' nor a phone shape
+    outbound = {AgentChannel.MEMORY: f"remember the client {survivor} please"}
+    sankey = build_leakage_sankey(
+        ledger, outbound=outbound, known_values=[survivor]
+    )
+    leak = next(e for e in sankey.edges if e.target == LEAKED)
+    assert leak.entity_type == "PII"
+
+
+def test_fr028_edge_as_dict_blocked_only_has_no_leaked_link() -> None:
+    """A blocked-only Sankey renders a leaked node but no link into it."""
+    ledger = _ledger_with(_rec(AgentChannel.PROMPT))
+    payload = build_leakage_sankey(
+        ledger, outbound={}, known_values=[]
+    ).as_dict()
+    # The leaked sink node still exists (stable 6-node graph) ...
+    assert {n["id"] for n in payload["nodes"]} >= {BLOCKED, LEAKED}
+    # ... but no link targets it (no survivor).
+    assert all(link["target"] != LEAKED for link in payload["links"])
+
+
+def test_fr028_edge_empty_known_value_string_is_not_a_survivor() -> None:
+    """An empty-string known_value is skipped (it would match every payload)."""
+    ledger = _ledger_with(_rec(AgentChannel.PROMPT))
+    outbound = {AgentChannel.PROMPT: "any non-empty outbound payload"}
+    sankey = build_leakage_sankey(
+        ledger, outbound=outbound, known_values=["", SYNTH_EMAIL]
+    )
+    # The empty string is not treated as a (vacuous) survivor.
+    assert sankey.leaked_count() == 0
+
+
+def test_fr028_edge_empty_ledger_and_outbound_is_empty_graph() -> None:
+    """No records + no outbound ⟹ zero edges, all-zero counts, stable 6 nodes."""
+    sankey = build_leakage_sankey(
+        InterceptionLedger(), outbound={}, known_values=[SYNTH_EMAIL]
+    )
+    assert sankey.edges == ()
+    assert sankey.blocked_count() == 0
+    assert sankey.leaked_count() == 0
+    assert sankey.counts_by_channel() == {}
+    payload = sankey.as_dict()
+    assert len(payload["nodes"]) == 6  # the 6-node graph is always present
+    assert payload["links"] == []
