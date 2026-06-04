@@ -88,6 +88,82 @@ def _two_experts_inverted() -> ExpertRegistry:
     return reg
 
 
+#: The engine_id of the always-on shared layer (the recall-floor source). The
+#: hostile registry below makes THIS expert expensive so the aggressive bias
+#: genuinely EVICTS it from the routed top-k (eviction-and-recovery for A4/A5).
+_SHARED_ENGINE_ID = "regex-oss"
+
+
+def _regex_oss_evicting_registry() -> ExpertRegistry:
+    """Synthetic registry where the shared ``regex-oss`` expert is EXPENSIVE.
+
+    Unlike ``build_default_registry()`` (whose ``regex-oss`` carries NO
+    ``latency_cost_ms``, so the aggressive bias is an inert no-op — the original
+    A4/A5 fixture gap the axiom reviewer flagged), here ``regex-oss`` is
+    authoritative on US_SSN (strength 0.99) but carries a LARGE ``latency_cost_ms``
+    (5000.0). Two cheap competitors (strengths 0.70 / 0.65, cost 1.0) outrank it
+    once the aggressive ``SLABias(strength=100)`` demotes it. With ``top_k=2`` +
+    ``performance_floor=False`` the bias GENUINELY EVICTS ``regex-oss`` from the
+    routed set — so A4/A5 exercise the dynamic eviction-and-recovery path (the
+    recall-floor still yields the shared span), not an inert-bias no-op.
+    """
+    reg = ExpertRegistry()
+    reg.register_expert(
+        ExpertSpec(
+            expert_id=_SHARED_ENGINE_ID,  # the shared / recall-floor expert
+            display_name="Regex (expensive)",
+            entity_strengths={"US_SSN": 0.99},
+            metadata={"latency_cost_ms": 5000.0},  # so the bias can evict it
+        )
+    )
+    reg.register_expert(
+        ExpertSpec(
+            expert_id="gliner-cheap",
+            display_name="GLiNER (cheap)",
+            entity_strengths={"US_SSN": 0.70},
+            metadata={"latency_cost_ms": 1.0},
+        )
+    )
+    reg.register_expert(
+        ExpertSpec(
+            expert_id="presidio-cheap",
+            display_name="Presidio (cheap)",
+            entity_strengths={"US_SSN": 0.65},
+            metadata={"latency_cost_ms": 1.0},
+        )
+    )
+    return reg
+
+
+def _us_ssn_shared_span() -> EngineFinding:
+    """A checksum-gated US_SSN shared span emitted by the ``regex-oss`` engine."""
+    return EngineFinding(
+        entity_type="US_SSN",
+        confidence=0.99,
+        field_path="ssn",
+        span_start=0,
+        span_end=11,
+        engine_id=_SHARED_ENGINE_ID,
+        language="en",
+        explanation="regex checksum-gated",
+    )
+
+
+def _routed_ids(sla_bias: SLABias | None) -> set[str]:
+    """The routed (selected) expert-id set for US_SSN on the evicting registry.
+
+    ``top_k=2`` + ``performance_floor=False`` so the floor-swap does NOT re-add
+    ``regex-oss`` to *routing* — letting the aggressive bias genuinely evict it.
+    """
+    router = MoERouter(
+        _regex_oss_evicting_registry(),
+        top_k=2,
+        performance_floor=False,
+        sla_bias=sla_bias,
+    )
+    return {eid for eid, _ in router.route("US_SSN")}
+
+
 def _independent_static_softmax(
     registry: ExpertRegistry,
     entity_type: str,
@@ -250,26 +326,40 @@ def test_dc03_confidence_byte_identical_with_and_without_bias() -> None:
 
 
 def test_ax003_floored_output_byte_identical_under_aggressive_bias() -> None:
-    """A4: the REAL FloorProjectingFusion output is byte-identical bias-on/off.
+    """A4: floored output byte-identical even when the bias EVICTS regex-oss.
 
-    An aggressive SLABias that would deprioritize regex-oss in routing cannot
-    change the floored span set: ``FloorProjectingFusion(MoEFusionStrategy(...))``
-    re-injects the checksum-gated shared (regex-oss) span post-fusion (FR-016 /
-    AX-003) regardless of the selection bias.
+    Eviction-and-recovery (NOT an inert-bias no-op): on the
+    ``_regex_oss_evicting_registry`` the aggressive ``SLABias(strength=100)``
+    GENUINELY demotes the expensive ``regex-oss`` out of the routed top-k (with
+    ``top_k=2`` + ``performance_floor=False`` so the floor-swap doesn't re-add it
+    to *routing*) — yet the REAL ``FloorProjectingFusion(MoEFusionStrategy(...))``
+    output is BYTE-IDENTICAL bias-on vs bias-off, because the recall-floor still
+    yields the checksum-gated shared span (via ``min_expert_weight`` in
+    ``merge()`` and the projector backstop, FR-016 / AX-003). The bias changed the
+    routed SET but not the floored OUTPUT.
     """
-    shared_span = EngineFinding(
-        entity_type="US_SSN",
-        confidence=0.99,
-        field_path="ssn",
-        span_start=0,
-        span_end=11,
-        engine_id="regex-oss",
-        language="en",
-        explanation="regex checksum-gated",
+    # Anti-no-op guard: assert the bias actually perturbed the routed set, so this
+    # test fails LOUDLY if the fixture ever silently reverts to an inert bias.
+    off_routed = _routed_ids(None)
+    on_routed = _routed_ids(_AGGRESSIVE)
+    assert _SHARED_ENGINE_ID in off_routed, "fixture broken: regex-oss not routed bias-off"
+    assert _SHARED_ENGINE_ID not in on_routed, (
+        "fixture broken: the aggressive bias did NOT evict regex-oss from routing "
+        "(A4 would be an inert-bias no-op, not eviction-and-recovery)"
     )
+    assert off_routed != on_routed, "the aggressive bias did not change the routed set"
 
-    def _floored(sla_bias: SLABias | None) -> list[tuple[str, str | None, int | None, int | None, float]]:
-        inner = MoEFusionStrategy(registry=build_default_registry(), sla_bias=sla_bias)
+    shared_span = _us_ssn_shared_span()
+
+    def _floored(
+        sla_bias: SLABias | None,
+    ) -> list[tuple[str, str | None, int | None, int | None, float]]:
+        inner = MoEFusionStrategy(
+            registry=_regex_oss_evicting_registry(),
+            top_k=2,
+            performance_floor=False,
+            sla_bias=sla_bias,
+        )
         out = FloorProjectingFusion(inner).merge([shared_span])
         # type-carrying key + confidence + the floor provenance, sorted for stability
         return sorted(
@@ -277,7 +367,8 @@ def test_ax003_floored_output_byte_identical_under_aggressive_bias() -> None:
         )
 
     assert _floored(None) == _floored(_AGGRESSIVE), (
-        "an aggressive SLA bias changed the recall-floored output set (AX-003 violated)"
+        "an aggressive SLA bias that EVICTED regex-oss from routing changed the "
+        "recall-floored output set (AX-003 violated)"
     )
 
 
@@ -300,33 +391,39 @@ def test_ax003_shared_membership_invariant_under_aggressive_bias() -> None:
        match exactly).
 
     This pins that the selection-only SLA bias cannot add/drop a Shared span from
-    the floor's input OR from the final membership: the bias re-orders *selection*
-    but the recall-floor (FR-016 / AX-003) keeps the shared set membership fixed.
+    the floor's input OR from the final membership EVEN WHEN the bias genuinely
+    evicts ``regex-oss`` from the routed set: the bias re-orders *selection* but
+    the recall-floor (FR-016 / AX-003) keeps the shared set membership fixed.
     """
-    shared_span = EngineFinding(
-        entity_type="US_SSN",
-        confidence=0.99,
-        field_path="ssn",
-        span_start=0,
-        span_end=11,
-        engine_id="regex-oss",
-        language="en",
-        explanation="regex checksum-gated",
+    # Anti-no-op guard (shared with A4): the aggressive bias must actually evict
+    # regex-oss from routing, so A5 exercises eviction-and-recovery membership
+    # invariance — not an inert-bias no-op. Fails LOUDLY on a reverted fixture.
+    assert _SHARED_ENGINE_ID in _routed_ids(None), "fixture broken: regex-oss not routed bias-off"
+    assert _SHARED_ENGINE_ID not in _routed_ids(_AGGRESSIVE), (
+        "fixture broken: the aggressive bias did NOT evict regex-oss from routing"
     )
+
+    shared_span = _us_ssn_shared_span()
     findings = [shared_span]
     key = ("US_SSN", 0, 11)
 
     # (1) The shared INPUT set the projector consumes is the regex-oss subset of
     # the same findings — derived independently of the router/bias.
     shared_input = {
-        (f.entity_type, f.span_start, f.span_end) for f in _shared_subset(findings, "regex-oss")
+        (f.entity_type, f.span_start, f.span_end)
+        for f in _shared_subset(findings, _SHARED_ENGINE_ID)
     }
     assert shared_input == {key}
 
     def _membership(
         sla_bias: SLABias | None,
     ) -> tuple[set[tuple[str, int | None, int | None]], set[tuple[str, int | None, int | None]]]:
-        inner = MoEFusionStrategy(registry=build_default_registry(), sla_bias=sla_bias)
+        inner = MoEFusionStrategy(
+            registry=_regex_oss_evicting_registry(),
+            top_k=2,
+            performance_floor=False,
+            sla_bias=sla_bias,
+        )
         out = FloorProjectingFusion(inner).merge(findings)
         present = {(f.entity_type, f.span_start, f.span_end) for f in out}
         reinjected = {
@@ -337,7 +434,8 @@ def test_ax003_shared_membership_invariant_under_aggressive_bias() -> None:
     off_present, off_reinjected = _membership(None)
     on_present, on_reinjected = _membership(_AGGRESSIVE)
 
-    # The shared span is present in the floored output BOTH ways (never dropped).
+    # The shared span is present in the floored output BOTH ways (never dropped),
+    # even though the bias evicted regex-oss from the routed set bias-on.
     assert key in off_present and key in on_present, "a Shared span left the floored output"
     # Final shared-membership + the re-injected-key set are byte-identical on/off.
     assert off_present == on_present, "Shared-span membership shifted under the SLA bias (AX-003)"
@@ -439,14 +537,32 @@ def test_nfr026_missing_latency_metadata_expert_not_penalized() -> None:
 
 @pytest.mark.parametrize(
     "bad_cost",
-    [float("nan"), float("inf"), float("-inf"), -1.0, True, "slow", None, [1.0]],
+    [
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        -1.0,
+        True,
+        "slow",
+        None,
+        [1.0],
+        # An UNBOUNDED Python int wider than the C-double range: math.isfinite
+        # raises OverflowError on it, which (pre-remediation) propagated unhandled
+        # through _latency_cost -> route(). The one numeric type that can exceed
+        # the double range while staying isinstance(int). (security-S2-04-01)
+        10**400,
+        -(10**400),
+    ],
 )
 def test_nfr026_invalid_latency_cost_treated_as_no_cost(bad_cost: object) -> None:
-    """A8: a NaN/inf/negative/bool/non-numeric cost ⇒ "no cost" (never penalized).
+    """A8: a NaN/inf/negative/bool/non-numeric/unbounded-int cost ⇒ "no cost".
 
     The expert carrying an INVALID cost is treated identically to one carrying no
-    cost: its biased logit equals its raw strength, and routing never raises. Pin
-    against a clean equal-strength expert with NO metadata as the unbiased oracle.
+    cost: its biased logit equals its raw strength, and routing never raises (the
+    unbounded-int rows pin that the ``math.isfinite`` ``OverflowError`` is caught
+    so ``route()`` is TOTAL over hostile numeric metadata). Pin against a clean
+    equal-strength expert with NO metadata as the unbiased oracle, and assert the
+    distribution stays finite, non-negative, and sums to 1.0.
     """
     reg = ExpertRegistry()
     reg.register_expert(ExpertSpec("e-clean", "Clean", {"PERSON_NAME": 0.50}))  # no metadata
@@ -458,6 +574,9 @@ def test_nfr026_invalid_latency_cost_treated_as_no_cost(bad_cost: object) -> Non
         f"invalid latency_cost_ms {bad_cost!r} was not coerced to 'no cost'"
     )
     assert all(math.isfinite(w) and w >= 0.0 for w in out.values())
+    assert math.isclose(sum(out.values()), 1.0, abs_tol=1e-9), (
+        f"distribution did not sum to 1.0 under invalid cost {bad_cost!r}"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -592,6 +711,58 @@ def test_ax002_slabias_defaults_are_inert() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# A11+ — SLABias rejects a hostile/degenerate config at construction           #
+# (review remediation: code-quality-S2-04-01 + security-S2-04-02, MAJOR).      #
+# The SLA-bias ingress must be TOTAL — a reference_ms<=0 ZeroDivisionError or a #
+# NaN strength/reference_ms distribution-poison must fail-fast, never reach     #
+# route() (NFR-026 "0 unhandled exceptions"; _apply_sla_bias "never raises").   #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"reference_ms": 0.0},  # ZeroDivisionError at cost/reference (code-quality-01)
+        {"reference_ms": -1.0},  # negative normalizer
+        {"reference_ms": float("nan")},  # NaN normalizer ⇒ poisoned distribution
+        {"reference_ms": float("inf")},  # non-finite normalizer
+        {"strength": -1.0},  # β must be >= 0 (silent bias-inversion otherwise)
+        {"strength": float("nan")},  # NaN strength ⇒ poisoned distribution
+        {"strength": float("inf")},  # non-finite strength
+    ],
+)
+def test_nfr026_slabias_rejects_hostile_config_at_construction(
+    kwargs: dict[str, float],
+) -> None:
+    """A11+: a non-finite/degenerate SLABias raises ValueError at construction.
+
+    Fail-fast closes the production-path holes the story-gate flagged: a
+    ``reference_ms=0.0`` would ``ZeroDivisionError`` at the ``cost / reference``
+    division in ``_apply_sla_bias``; a ``NaN`` strength/reference_ms would poison
+    the static-softmax distribution (which the bare no-gate path does NOT route
+    through ``_normalize_weights``). Validating at the boundary makes the bias
+    ingress TOTAL over its construction state — it can never raise downstream.
+    """
+    with pytest.raises(ValueError):
+        SLABias(**kwargs)
+
+
+def test_nfr026_slabias_valid_configs_construct_fine() -> None:
+    """A11+: the default + a normal positive config still construct (no over-strict).
+
+    The validator must NOT reject the legitimate surface: ``SLABias()`` (the
+    inert default, strength=0.0 / reference_ms=1.0) and a normal active config
+    must both build. ``strength=0.0`` is explicitly allowed (β >= 0, the inert
+    boundary); only ``strength < 0`` / non-finite is rejected.
+    """
+    assert SLABias() == SLABias(strength=0.0, reference_ms=1.0)  # default inert
+    assert SLABias(strength=0.0).reference_ms == 1.0  # strength==0 boundary allowed
+    bias = SLABias(strength=2.0, reference_ms=3.0)  # normal active config
+    assert bias.strength == 2.0
+    assert bias.reference_ms == 3.0
+
+
+# --------------------------------------------------------------------------- #
 # REFACTOR — additive edge tests (no behaviour change). Harden the helper       #
 # contracts + the cache-invalidation seam + full branch coverage.              #
 # --------------------------------------------------------------------------- #
@@ -612,6 +783,11 @@ def test_ax002_slabias_defaults_are_inert() -> None:
         (False, None),
         ("3.0", None),  # non-numeric
         ([1.0], None),
+        # Unbounded ints wider than the C-double range: math.isfinite raises
+        # OverflowError on coercion; the guarded _is_finite_number returns False
+        # ⇒ "no cost", never raising (security-S2-04-01 remediation).
+        (10**400, None),
+        (-(10**400), None),
     ],
 )
 def test_latency_cost_helper_coercion(raw: object, expected: float | None) -> None:

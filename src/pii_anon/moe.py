@@ -304,13 +304,39 @@ class SLABias:
     ----------
     strength : float
         The bias magnitude β ≥ 0. ``0.0`` (the default) ⇒ the bias is inert.
+        Must be finite and non-negative (a negative or NaN strength is rejected
+        at construction — see :meth:`__post_init__`).
     reference_ms : float
         A logit-scale latency normalizer (ms) so the penalty is unit-decoupled.
-        Defaults to ``1.0``.
+        Defaults to ``1.0``. Must be finite and ``> 0`` (a ``0``/negative/NaN
+        normalizer is rejected at construction so the ``cost / reference_ms``
+        division in :meth:`MoERouter._apply_sla_bias` can never raise or poison
+        the distribution — NFR-026 "0 unhandled exceptions").
     """
 
     strength: float = 0.0
     reference_ms: float = 1.0
+
+    def __post_init__(self) -> None:
+        """Fail-fast: reject a hostile/degenerate SLA config at construction.
+
+        Validation only (no field mutation — the dataclass stays frozen). Closes
+        the ``reference_ms=0.0`` ``ZeroDivisionError`` and the
+        ``strength``/``reference_ms`` ``NaN`` distribution-poisoning holes on the
+        production ``route()`` path: the SLA-bias ingress must be TOTAL over its
+        construction state (NFR-026 — ``_apply_sla_bias`` "never raises"). Mirrors
+        the existing fail-fast style (``gate_path requires a key_ring``).
+        """
+        if not _is_finite_number(self.strength) or self.strength < 0.0:
+            raise ValueError(
+                "SLABias.strength must be a finite number >= 0; "
+                f"got {self.strength!r}"
+            )
+        if not _is_finite_number(self.reference_ms) or self.reference_ms <= 0.0:
+            raise ValueError(
+                "SLABias.reference_ms must be a finite number > 0; "
+                f"got {self.reference_ms!r}"
+            )
 
 
 def _is_finite_number(value: object) -> bool:
@@ -318,12 +344,24 @@ def _is_finite_number(value: object) -> bool:
 
     A Python ``bool`` is an ``int`` subclass, so it is rejected explicitly — a
     ``latency_cost_ms`` of ``True``/``False`` is "no cost", not 1.0/0.0.
+
+    TOTAL over all ``int``/``float`` inputs: ``math.isfinite`` first coerces its
+    argument to a C double, which raises ``OverflowError`` for a Python ``int``
+    wider than the double range (e.g. ``10**400``). That coercion is wrapped so an
+    out-of-range int is treated as "not a usable finite number" (→ "no cost" in
+    :func:`_latency_cost`) rather than crashing ``route()`` — NFR-026 ("0 unhandled
+    exceptions"); the ingress must never raise on hostile numeric metadata.
     """
     if isinstance(value, bool):
         return False
     if not isinstance(value, (int, float)):
         return False
-    return math.isfinite(value)
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        # An int wider than the C-double range is unusable as a latency cost /
+        # SLA field — treat as "not finite", never raise.
+        return False
 
 
 def _latency_cost(spec: ExpertSpec) -> float | None:
@@ -727,6 +765,11 @@ class MoEFusionStrategy(FusionStrategy):
         Always include best expert for each entity type (default True).
     min_expert_weight : float
         Minimum weight for the performance floor expert (default 0.15).
+    sla_bias : SLABias | None
+        Optional aux-loss-free SLA selection-bias (DC-03). ``None`` (the
+        default) or ``SLABias(strength=0.0)`` is fully inert (NFR-026). Threaded
+        into the inner :class:`MoERouter`; selection-only — it can never move
+        ``merge()``'s confidence math nor weaken the recall-floor (AX-003).
     """
 
     strategy_id = "mixture_of_experts"
