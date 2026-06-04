@@ -1,0 +1,210 @@
+reviewer: dev-assist-development-traceability
+
+scope_id: S7-02
+
+gate: story
+
+iteration: 2
+
+verdict: APPROVE
+
+findings:
+  - id: traceability-S7-02-01
+    severity: MAJOR
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py:312
+    description: |
+      [CLOSED in remediation commit 5496d3c] The iter-1 MAJOR was a forward-traceability
+      break: the gate-READ headline detection metrics (per-ladder recall / precision /
+      composite_score / per_entity_recall — the fields the UNMODIFIED gate's J, G3 and G6
+      read) were sourced from `_CENSUS_PROFILES`, byte-identical to the 148,994-record
+      census in benchmark-results.json @ git_sha=2761a27 (canonical_claim_run=False),
+      while `_attach_provenance` stamped a DIFFERENT, FRESH run (scope=data-v2.0.0,
+      git_sha=4ddcae6, sample_size=8). The headline metrics did not trace to the run the
+      provenance described, and no trace edge linked them to their true 2761a27 source.
+
+      VERIFICATION THAT IT IS NOW CLOSED (read the remediated code + ran the suite):
+
+      1. The gate-read metrics now trace to the SAME fresh run the provenance describes.
+         `_assemble_base_payload` (canonical_run.py:312) reads recall / precision /
+         per_entity_recall from `report.systems` VERBATIM (lines 344-354, 361-363) — the
+         output of the ONE `compare_competitors` run produced in
+         `produce_canonical_artifact` (canonical_run.py:1016). `composite_score` is the
+         REAL `compute_composite` (line 370) over those FRESH detection-quality axes with
+         a FIXED, equal-across-systems reference speed (_REFERENCE_LATENCY_MS /
+         _REFERENCE_DOCS_PER_HOUR) — NOT a census literal. The SAME `report` then yields
+         `actual_sample_size = max(s.samples ...)` (canonical_run.py:1030), which
+         `_attach_provenance` stamps as `sample_size` (canonical_run.py:1045-1047). So the
+         provenance `sample_size` and the headline metrics are now BOTH derived from the
+         identical fresh `report` — the iter-1 "provenance sample_size:8 vs headline
+         recall from the 2761a27 census" mismatch is now STRUCTURALLY IMPOSSIBLE.
+
+      2. The scope-laundering machinery is REMOVED, not relabelled. `_CENSUS_PROFILES`,
+         `_DetectionProfile`, and the `_*_PER_ENTITY` literals no longer exist as module
+         attributes (confirmed by grep AND by `test_no_census_literals_module_attribute`,
+         canonical_run.py tests:581, which asserts `not hasattr(cr, "_CENSUS_PROFILES")`).
+
+      3. The documented census is now a TRANSPARENT `pass2_full_census_reference` block
+         (canonical_run.py:185, attached at :404) carrying `source_git_sha=2761a27...`,
+         `source_record_count=148994`, `source_canonical_claim_run=False`,
+         pii_anon_composite=0.784583 vs gliner_composite=0.680213, and a Pass-2 note. This
+         is EXACTLY the first-class auditable trace edge to the Pass-2 source I requested
+         in iter-1 (the suggested_resolution `detection_metrics_provenance` block,
+         implemented under the dispatch's `pass2_full_census_reference` name). It lives
+         OUTSIDE `systems` and is NEVER gate-read: a grep of competitive_supremacy.py +
+         competitor_compare.py for `2761a27` / `148994` / `0.784583` / `0.680213` /
+         `pass2_full_census_reference` returns NOTHING, so the gate structurally cannot
+         read it. Pinned by `test_pass2_full_census_reference_present_and_not_gate_read`
+         (tests:561), which asserts the block's fields AND that
+         "pass2_full_census_reference" is not in the gate-read system-names set.
+
+      4. The two-run relationship is now an explicit, tested trace edge:
+         `test_gate_read_systems_are_fresh_not_census_literals` (tests:541) asserts the
+         gate-read `systems[*].recall/precision` == the separately-surfaced fresh
+         `representative_in_tree_detection` block VERBATIM, AND that the pii-anon gate-read
+         recall != 0.7958 (the census literal). The fresh-detection sub-block is honestly
+         relabelled `measurement="fresh-in-tree-detection"` /
+         `detection_scope="in-tree-fresh-<n>-records"` (canonical_run.py:412-413), pinned
+         by `test_detection_scope_labels_fresh_run_honestly` (tests:592).
+
+      The honest consequence (correctly NOT a fabrication): on the fresh in-tree metrics
+      the verdict is NOT_YET, binding on G6 FAIL (a raw-detection axis) + J=0.0 — the
+      integrity-over-outcome result. PROVISIONAL_SOTA now legitimately requires the
+      documented full-census re-run on the current code (Pass-2), cited via the reference
+      block. The trace edge from headline metrics to their source run is now first-class
+      and auditable; the iter-1 MAJOR is CLOSED.
+    suggested_resolution: |
+      None — resolved. The fix exceeds the iter-1 suggested_resolution: rather than
+      annotate a census-sourced headline with a provenance pointer, the remediation makes
+      the headline metrics genuinely fresh-measured on the run the provenance describes,
+      and demotes the census to a transparent, never-gate-read Pass-2 reference block. The
+      trace is now coherent by construction.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-006
+      - dev-assist-artifacts/03-design/06-synthesis/D-implementation-ready-design.md#DC-11
+
+  - id: traceability-S7-02-02
+    severity: MINOR
+    status: OPEN_DEFERRED
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:18
+    description: |
+      [UNCHANGED — standing batch deferral] The traceability-matrix UC->FR/NFR table has
+      the UC-06 row (FR-007/FR-008, NFR-006/NFR-004) but no forward Story/Test column
+      populated for S7-02, and no Status Change Log entry recording the
+      FR-008/NFR-005/NFR-006 -> DC-11 -> S7-02 -> {A1..A21} edge or its
+      `provisional_status: AGENT_SIMULATED`. The matrix header notes the DC/Story/Test
+      columns fill in Stages 3-5, so this is the program's known standing deferral
+      (batched to the sprint gate), not a per-story blocker. Given S7-02 is the KEYSTONE
+      completion-criterion story, its forward row should ride the next backfill batch.
+    suggested_resolution: |
+      In the next traceability-matrix backfill batch, add the S7-02 forward row:
+      FR-008/NFR-005/NFR-006 -> DC-11 -> S7-02 -> tests A1-A21 (test_canonical_run.py) +
+      the gate-side SO-11 contract test
+      (test_competitive_supremacy.py::test_g2_s7_02_producer_contract_*) + the gate-side
+      vector-#11 [SECURITY-TEST]s, with provisional_status AGENT_SIMULATED and the Pass-2
+      boundary note (real Tier-C cloud + real bayes-NUTS J + full-census re-run, cited via
+      the artifact's pass2_full_census_reference block). No action required this iteration
+      beyond acknowledging the deferral.
+    references:
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md
+
+  - id: traceability-S7-02-03
+    severity: OBSERVATION
+    status: CONFIRMED
+    location: dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md:10
+    description: |
+      `provisional_status` cascade remains consistent post-remediation. The story declares
+      `provisional_status: AGENT_SIMULATED`; its source DC-11 is NOT a DIVERGED DC (no
+      DIVERGED cascade obligation applies — no §10 Pass-2-DIVERGED commitment is owed). The
+      §10 DoD / Evidence honestly scope the AGENT_SIMULATED boundary (real scorers at
+      representative scale; real MLE-bootstrap J; real Tier-C cloud + real bayes-NUTS J +
+      full-census re-run = Pass-2, now CITED via the pass2_full_census_reference trace
+      edge). The remediation's TRUE-verdict honesty (NOT_YET, G6-FAIL-binding) strengthens
+      rather than weakens the AGENT_SIMULATED labelling. Adjacent FR-007 (the CI
+      ship/no-ship half of DC-11) is correctly NOT claimed by this story (gate-CI
+      follow-up), so no ambiguous-ownership (pattern #12) issue.
+    suggested_resolution: |
+      None — informational. Confirms the provisional_status and DC->story cascade are
+      internally consistent and the Pass-2 boundary is now an explicit trace edge.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md
+
+notes: |
+  ITERATION-2 RE-REVIEW SUMMARY — the iter-1 MAJOR (traceability-S7-02-01) is CLOSED;
+  verdict flips REQUEST_CHANGES -> APPROVE. The only remaining item is the standing matrix
+  backfill MINOR (batched to the sprint gate).
+
+  WHAT I RE-VERIFIED THIS ITERATION (read remediated code + ran the suites):
+
+  - HEADLINE-METRIC TRACE EDGE (the iter-1 MAJOR) — CLOSED. `_assemble_base_payload`
+    (canonical_run.py:312) + `_attach_provenance` (:895) + `produce_canonical_artifact`
+    (:961) now describe ONE fresh `compare_competitors` run: the gate-read recall /
+    precision / per_entity_recall come from `report.systems` verbatim, composite_score is
+    the real compute_composite over those fresh axes, and the provenance `sample_size` is
+    `max(s.samples)` from the SAME report. No prior-run census numbers in the gate-read
+    path. The census is a transparent, never-gate-read `pass2_full_census_reference` block
+    (source_git_sha=2761a27, source_record_count=148994). Confirmed by grep (zero census
+    identifiers in the gate/comparator) + 3 new pinning tests (tests:541/561/592) GREEN.
+
+  - GATE FIELD CONTRACT — STILL AN EXACT MATCH (re-confirmed against the readers). The
+    producer emits exactly what the gate reads:
+      systems[*].recall                 -> _g3_recall_dominance (systems[c]["recall"]) [match]
+      systems[*].recall/f1/precision/per_entity_recall -> _g6_raw_noninferiority + J     [match]
+      pseudonymization_integrity_score + anonymization_score + unauthorized_reversal_rate
+                                        -> _g2_pseudonymization_integrity (core.get each) [match]
+      per_class_ece + calibrated_confidence_coverage -> _g4 (core.get; coverage == 1.0)   [match]
+      per_language_recall_delta         -> _g1_recall_floor (EPS_RECALL_PER_LANG shared)   [match]
+      run_metadata.{git_sha,dataset_sha256,matrix_sha256,timestamp_utc} + canonical_claim_run
+                                        -> _g7_certified_run                               [match]
+    No field-name added / removed / renamed in the remediation — only the SOURCE of the
+    recall/precision/per_entity_recall/composite_score VALUES changed (fresh report,
+    not census literals). The producer's CanonicalRunGate still REUSES the gate's own
+    `_finite_unit_score` validator, so the no-fabrication contract is identical on both
+    sides.
+
+  - THE ONE SANCTIONED GATE CHANGE (vector #11) — VALIDATOR-INTERNAL, NOT a field-contract
+    change. The diff to competitive_supremacy.py is solely `_is_finite_number` wrapping
+    `math.isfinite` in `try/except (OverflowError, ValueError): return False` (8 ins / 1
+    del). Signature is unchanged (`TypeGuard[int | float]`); it hardens the validator to
+    REJECT (fail-CLOSED) an out-of-float-range huge-int (10**400) instead of crashing — a
+    no-fabrication / fail-closed hardening, NOT a change to which fields the gate reads.
+    Gate md5 = 2e59e1377d48e9acb6f874368b4538e6 (matches the story's claimed hash;
+    fa575f4f -> 2e59e137). 4 gate-side vector-#11 [SECURITY-TEST]s added as TEST FUNCTIONS
+    (tests:469/497/508/525). All 97 test_competitive_supremacy tests pass — ZERO gate
+    regression.
+
+  - SO-11 CONTRACT (A16/A17 + gate-side companion) — still both-sides pinned: SUT-only
+    artifact => G2 PENDING (no phantom-0.0 win); producer's full artifact => G2 PASS
+    (real comparator at 0.0). The gate-side companion remains a TEST FUNCTION only
+    (gate md5 byte-identical modulo the sanctioned vector-#11 wrap).
+
+  - OFF-LIMITS / RISK-6 — all byte-identical to their anchors (re-hashed this iteration):
+    competitor_compare 7cae16c89f4c97136e1a12394dae2025; competitor_tiers
+    d9202479d84c519d5866b7d9d515c903; orchestrator 0afc6deed62bbd0653ae1051b723bace;
+    test_moe_enhancements 910e9cd66ad6e38c7bb64a9c51ecb1cb. DC-11 -> canonical_run.py
+    stays 1:1. Nothing written/committed under artifacts/benchmarks/* or
+    artifacts/canonical/.
+
+  - ID EXISTENCE / DC TRACE (unchanged, still clean): FR-008 (requirements-document.md:18,
+    MUST), NFR-005 (:64, MUST), NFR-006 (:65, MUST) all exist; DC-11 exists
+    (D-implementation-ready-design.md:21/:45) and traces FR-007/008 + NFR-006/011 — the
+    story's "Traces DC-11 -> FR-008/NFR-006" claim is exact. No SHOWSTOPPER (no
+    nonexistent declared ID).
+
+  - TEST EVIDENCE GREEN: `PYTHONPATH=src pytest tests/test_canonical_run.py
+    tests/test_competitive_supremacy.py` => 145 passed, 0 failed (48 producer + 97
+    gate-side; addopts-overridden run for the clean banner). The earlier "84% coverage not
+    reached" banner is the global suite-wide threshold on a 2-file targeted subset, exit
+    code 0 — expected, not a S7-02 test failure; the new module's own coverage is 95% per
+    the story Evidence.
+
+  CROSS-REVIEWER NOTE (non-blocking): the iter-1 finding bordered security-sast's
+  no-fabrication scope (vector #11) and axiom-compliance's AX-001 honesty scope; the
+  specific defect I filed was the TRACEABILITY break (missing trace edge from headline
+  metrics to their source run). The remediation resolves it as a traceability fix (fresh
+  metrics + a transparent Pass-2 reference edge) AND lands the sanctioned vector-#11 gate
+  hardening — both confirmed closed from the traceability angle.
+
+review_time_seconds: 660
+
+context_bounds_respected: true

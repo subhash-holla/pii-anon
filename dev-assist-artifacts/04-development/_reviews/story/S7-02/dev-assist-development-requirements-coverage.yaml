@@ -1,0 +1,231 @@
+# Canonical Reviewer Output — requirements-coverage — S7-02 (the KEYSTONE)
+# ★ The load-bearing honesty audit. requirements-coverage carries the HONESTY load.
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S7-02
+gate: story
+iteration: 2
+verdict: APPROVE
+
+findings:
+  - id: coverage-S7-02-01
+    severity: OBSERVATION
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py:153-245 (census machinery deleted) + 318-426 (_assemble_base_payload)
+    description: |
+      RESOLVED — the iter-1 MAJOR (NFR-006 provenance-integrity / scope-laundering on
+      the G3/G6/J detection axes) is CLOSED. Verified independently against the
+      remediation commit 5496d3c AND by running the producer + the UNMODIFIED SDO gate
+      end-to-end myself.
+
+      WHAT THE LAUNDERING WAS (iter-1): the gate-read `systems` block's
+      recall/precision/per_entity_recall/composite_score were the transcribed MEASURED
+      OUTPUT numbers of a PRIOR, differently-provenanced run (`_CENSUS_PROFILES`,
+      byte-identical to benchmark-results.json @ git_sha=2761a27, dataset_source=auto,
+      canonical_claim_run=False), re-stamped under FRESH provenance
+      (git_sha=HEAD, scope=data-v2.0.0, fresh dataset_sha256, fresh timestamp). The
+      provenance affirmatively misrepresented that the verdict-driving detection numbers
+      were measured at the stamped scope. On the artifact's OWN fresh numbers the
+      composite crown flipped to gliner — so the manufactured PROVISIONAL_SOTA was true
+      ONLY at the undisclosed 148,994-record census, never at the stamped scope.
+
+      WHAT THE REMEDIATION DID (iter-2), independently verified:
+      * `_CENSUS_PROFILES`, `_DetectionProfile`, and ALL five `_*_PER_ENTITY` literal
+        maps are DELETED from the module (grep-confirmed gone; the only residual
+        reference to benchmark-results.json is the `source` string of the new
+        transparent reference block).
+      * `_assemble_base_payload` now takes the gate-read recall/precision/
+        per_entity_recall from the FRESH `compare_competitors` run VERBATIM
+        (`report.systems`), and `composite_score` from the REAL `compute_composite`
+        over those fresh detection-QUALITY axes (recall/precision/F1/entity-coverage)
+        plus a FIXED, EQUAL-ACROSS-SYSTEMS reference speed (`_REFERENCE_LATENCY_MS`/
+        `_REFERENCE_DOCS_PER_HOUR`). Equal speed across systems is a fair
+        detection-quality comparison and is deterministic (NFR-005 excludes wall-clock
+        speed) — it never fabricates a per-system speed advantage.
+      * ANTI-LAUNDERING PROOF (my own run, max_samples=300, enable_parallel=True): every
+        gate-read recall DIFFERS from the deleted iter-1 census literal — gliner
+        0.7272 vs 0.6581 (Δ0.069), pii-anon 0.6695 vs 0.7958 (Δ0.126), pii-anon-swarm
+        0.7545 vs 0.8180 (Δ0.064), presidio 0.5846 vs 0.6308 (Δ0.046), scrubadub
+        0.1995 vs 0.2064 (Δ0.007). The gate-read systems[].recall is byte-equal to the
+        `representative_in_tree_detection` fresh side-block (zero mismatch) — the
+        gate-read path IS the fresh measurement, not a transcribed prior run.
+      * The documented census is now a TRANSPARENT top-level
+        `pass2_full_census_reference` block (source_git_sha=2761a27,
+        source_record_count=148994, source_canonical_claim_run=False,
+        pii_anon_composite=0.784583, gliner_composite=0.680213, Pass-2 note) — it lives
+        OUTSIDE the gate-read `systems` array and is NEVER read by the CanonicalRunGate
+        or the SDO gate (confirmed: no census/pass2 entry in `systems`).
+      * Provenance honestly describes the SAME fresh run as the metrics: the corpus
+        `scope=data-v2.0.0` labels ONLY the floor/calibration synthetic-input axes,
+        while the gate-read detection axis carries a DISTINCT `detection_scope`
+        (`in-tree-fresh-<n>-records`) and `representative_in_tree_detection.measurement
+        = "fresh-in-tree-detection"` — no data-v2.0.0 mislabel on the detection numbers
+        (my iter-1 finding 02 compound concern is also resolved by this separation).
+        `canonical_provenance.sample_size` equals the ACTUAL records the run drew
+        (300 == 300 in my run) — not the None sentinel, not a representative cap.
+    suggested_resolution: |
+      None — closed. The detection-metric provenance is now honest: the gate-read
+      G3/G6/J numbers are a fresh measurement on the current code, the provenance
+      describes that run, and the census is disclosed as transparent reference-only
+      data. This is exactly path (a)+(b) of my iter-1 suggested resolution (the
+      detection_scope separation AND a genuine fresh measurement), done cleanly.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-006
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-008
+
+  - id: coverage-S7-02-02
+    severity: OBSERVATION
+    status: CONFIRMED_HONEST
+    location: src/pii_anon/evaluation/canonical_run.py:961-1050 (produce_canonical_artifact) + S7-02 §Evidence
+    description: |
+      THE VERDICT IS HONESTLY COMPUTED, NOT ENGINEERED — the headline integrity check.
+      I ran produce_canonical_artifact + SupremacyVerdict.from_artifacts end-to-end
+      myself (max_samples=300, unmodified gate, no pending_overrides) and the verdict is
+      the HONEST scale-dependent outcome the §Evidence reports, NOT a manufactured
+      PROVISIONAL_SOTA:
+        * verdict = NOT_YET
+        * canonical_claim_run = True  (the run IS certified — fail-closed
+          CanonicalRunGate validated every field; canonical_gate_missing = [])
+        * binding_constraint = G6 FAIL (core F2=0.6573 < best Tier-R gliner F2=0.7569,
+          ε_F=0.01) — an HONEST RAW-DETECTION axis, never a fabrication
+        * J = 0.0 (j_source=mle-bootstrap; j_rank1_system=gliner — at in-tree scale
+          gliner is the rank-1 composite, so pii-anon's rank-1 probability is honestly 0)
+        * per-guarantee: G1 PASS (worst per-language ε=0 ≤ 0.005) · G2 PASS (pii-anon
+          pseudonymization-integrity 1.0 strictly dominates the honest competitor 0.0;
+          anon+pseudo distinct — AX-004 / SO-11) · G3 PASS (pii-anon-swarm fresh recall
+          0.7545 ≥ best competitor gliner 0.7272 — recall dominance robust at fresh
+          scale) · G4 PASS (every per-class ECE ≤ bar; ≥3 abstention points; coverage
+          ==1.0) · G5 PENDING (honest — S7-04 successor) · G6 FAIL · G7 PASS.
+      This is the INTEGRITY-OVER-OUTCOME result. A NOT_YET bound on a raw-detection axis
+      (G6/J) is the HONEST, ACCEPTABLE endpoint: PROVISIONAL_SOTA genuinely requires the
+      full-census re-run (the regex-vs-neural composite race resolves only at census
+      scale), and that boundary is now DISCLOSED on the artifact
+      (`pass2_full_census_reference` + the producer docstring). The verdict was NOT
+      reverse-engineered to a target — A10/A11 now assert verdict ∈ {PROVISIONAL_SOTA,
+      NOT_YET}, not a hardcoded PROVISIONAL_SOTA.
+
+      NOTE on binding axis: my n=300 run binds on G6 FAIL (the executor's n=5000 run
+      also reports G6 FAIL; both also fail to crown pii-anon by composite/J at sub-census
+      scale). Either way the binding constraint is a raw-detection axis the gate
+      honestly measures — not a fabrication, exactly as the §Evidence states.
+    suggested_resolution: |
+      None. FR-008 (the run IS certified — producer + fail-closed gate exist and
+      validate) is genuinely met; the verdict is honestly computed from the fresh
+      metrics; the Pass-2 boundary (full-census re-run flips the composite/J crown) is
+      honestly disclosed. APPROVE.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-008
+
+  - id: coverage-S7-02-03
+    severity: OBSERVATION
+    status: CONFIRMED_HONEST
+    location: src/pii_anon/evaluation/canonical_run.py:738-848 (CanonicalRunGate.validate) + competitive_supremacy.py::_is_finite_number
+    description: |
+      FAIL-CLOSED GATE + NFR-005 DETERMINISM + VECTOR-#11 HARDENING all confirmed by my
+      own probes:
+      * FAIL-CLOSED (FR-008 teeth): the produced artifact passes; four hostile mutations
+        each correctly REJECT with canonical_claim_run staying False — blank git_sha
+        ("blank or absent provenance"), calibrated_confidence_coverage=0.97 ("!= 1.0
+        (NFR-020)"), NaN per-language ε ("not a real (finite) number" — the MINOR fix
+        via the gate's own _is_finite_number), and the gate reuses the SDO gate's own
+        _finite_unit_score / _is_finite_number validators (no fabrication slips).
+      * NFR-005 DETERMINISM: two serial produces (same seed/scale) are byte-identical
+        modulo timestamp_utc; the gate-read values (recall/precision/composite) are
+        parallel-invariant (enable_parallel True vs False identical) — so the real
+        artifact runs multi-threaded while staying byte-deterministic. A18 holds.
+      * VECTOR-#11 (the ONE sanctioned gate change): _is_finite_number(10**400) returns
+        False (fail-CLOSED) instead of crashing on the OverflowError — the wrap is
+        exactly try/except (OverflowError, ValueError): return False. Gate md5 is the
+        sanctioned 2e59e137 (diff = only that wrap). 97 SDO-gate tests pass (zero
+        regression).
+      * OFF-LIMITS byte-identical: competitor_compare.py 7cae16c8, orchestrator.py
+        0afc6dee (both unchanged); nothing committed under artifacts/canonical/ or
+        written under artifacts/benchmarks/* (the producer refuses a benchmarks path).
+    suggested_resolution: |
+      None. The fail-closed gate, determinism, and the sanctioned vector-#11 hardening
+      are all honestly in place.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-005
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-008
+
+  - id: coverage-S7-02-04
+    severity: OBSERVATION
+    status: CONFIRMED_HONEST
+    location: S7-02 §Definition of Done + competitive_supremacy.py G5/Tier gating
+    description: |
+      THE PASS-2 BOUNDARY + G5-PENDING + G1/G2/G4 HONESTY remain correctly drawn
+      (carried forward from iter-1, re-confirmed):
+      * G5 PENDING is HONEST (no G5 field emitted; gate's _g5_* returns None) — deferred
+        to the named successor S7-04 (valid deferral-with-successor-story).
+      * The CLAIM_GRADE blocker is correctly the unrun TIER (unrun_tier_c =
+        {aws-comprehend, azure-ai-language, openai-privacy-filter}, unrun_tier_r =
+        {gliner2}) — confirmed on the produced verdict — not a failed guarantee. The
+        real Tier-C cloud runs + real bayes-NUTS J + the full-census re-run are all
+        legitimately Pass-2.
+      * G1/G2/G4 remain honest: real scorers over SYNTHETIC representative INPUTS
+        (floored-fusion findings → G1 ε=0-by-construction; anonymize/pseudonymize
+        fixtures → G2 with every Tier-R competitor carrying an honest
+        pseudonymization_integrity_score=0.0, SO-11 closed; a well-calibrated finding
+        set → G4 coverage 1.0). These are squarely inside the AX-001 keystone-teeth
+        sanction (a synthetic INPUT a real scorer processes), categorically distinct
+        from the iter-1 detection-axis defect (which substituted a prior run's OUTPUTS)
+        — and that defect is now CLOSED, so the whole artifact is honest.
+      * NFR-005/NFR-006 honest provenance now met across ALL axes: the corpus-scope
+        fields describe only the floor/calibration synthetic-input axes; the detection
+        axis carries its own fresh detection_scope; the census is reference-only.
+    suggested_resolution: |
+      None. With finding 01 closed, this story's coverage of FR-008/NFR-005/NFR-006 is
+      complete-and-honest.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-008
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md
+
+notes: |
+  EXPLICIT RULING ON THE iter-1 MAJOR (the load): CLOSED. The census-profile
+  scope-laundering on the G3/G6/J detection axes is fully remediated. The gate-read
+  detection metrics are now a FRESH compare_competitors measurement on the current code
+  (independently verified: every gate-read recall DIFFERS from the deleted iter-1 census
+  literal by Δ0.007–0.126, and is byte-equal to the fresh side-block), the composite is
+  the REAL compute_composite over those fresh axes with a fair equal-across-systems
+  reference speed, and the documented census is demoted to a transparent
+  `pass2_full_census_reference` block that the gate NEVER reads. The provenance honestly
+  describes the SAME fresh run as the metrics (distinct detection_scope vs corpus scope;
+  sample_size == actual records drawn). My iter-1 finding 02 (the compound concern that
+  the fresh dataset_sha256 certified the wrong corpus for the detection axis) is resolved
+  by the same scope separation.
+
+  INTEGRITY OVER OUTCOME — the headline. I ran the producer + the UNMODIFIED SDO gate
+  end-to-end myself and the verdict is the HONEST scale-dependent result, NOT a
+  manufactured PROVISIONAL_SOTA: verdict=NOT_YET, canonical_claim_run=True (the run IS
+  certified), binding=G6 FAIL (core F2 0.6573 < gliner 0.7569 — a raw-detection axis),
+  J=0.0 (gliner rank-1 composite at in-tree scale). G1/G2/G3/G4/G7 PASS, G5 PENDING. A
+  NOT_YET bound on a raw-detection axis is the honest, acceptable endpoint — the point is
+  integrity, not a particular verdict, and the producer is now honest. The Pass-2 boundary
+  (the full-census re-run flips the composite/J crown — pii-anon core IS rank-1 by composite
+  at the documented 148,994-record census) is honestly disclosed on the artifact, not
+  silently relied upon.
+
+  FR-008 (certified canonical run — the producer + fail-closed gate) is genuinely met:
+  canonical_claim_run=True, canonical_gate_missing=[], and the gate is genuinely
+  fail-closed (four hostile probes each rejected; reuses the SDO gate's own
+  _finite_unit_score/_is_finite_number). NFR-005 (determinism: byte-identical modulo
+  timestamp + parallel-invariant gate-read) and NFR-006 (honest provenance across all
+  axes) are met. The vector-#11 _is_finite_number hardening is the one sanctioned gate
+  change (fail-closed on 10**400, md5 2e59e137, zero gate regression across 97 tests).
+
+  Severity aggregation: the iter-1 MAJOR is CLOSED; all four findings are now OBSERVATION
+  / CONFIRMED_HONEST. No MAJOR or above remains. Per aggregation ⇒ APPROVE.
+
+  Independence self-attestation: I reached this verdict independently — by reading the
+  5496d3c diff directly, grep-confirming the census machinery is deleted, running
+  produce_canonical_artifact + SupremacyVerdict.from_artifacts end-to-end myself
+  (max_samples=300, unmodified gate, no overrides), numerically diffing every gate-read
+  recall against the deleted iter-1 census literals to PROVE freshness, probing the
+  fail-closed gate with four hostile mutations, verifying NFR-005 determinism +
+  parallel-invariance + the vector-#11 hardening, and confirming the off-limits md5s and
+  the 145-passing (48 canonical + 97 gate) regression. I did not defer to the story's
+  self-assessment; I tested every claim.
+
+review_time_seconds: 2640
+
+context_bounds_respected: true

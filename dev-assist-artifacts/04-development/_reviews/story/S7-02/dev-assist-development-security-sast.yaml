@@ -1,0 +1,177 @@
+reviewer: dev-assist-development-security-sast
+
+scope_id: S7-02
+
+gate: story
+
+iteration: 2
+
+verdict: APPROVE
+
+findings:
+  - id: security-S7-02-01
+    severity: MAJOR
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py (remediation commit 5496d3c)
+    description: |
+      [CLOSED in iter-2] Fabrication-vector #7 (census-profile scope-laundering) is
+      RESOLVED. RE-PROBED on a freshly-produced artifact (produce_canonical_artifact,
+      seed=20240601, in-tree, enable_parallel=False):
+        - `_CENSUS_PROFILES`, `_DetectionProfile`, and ALL `_*_PER_ENTITY` literals are
+          GONE from the module (grep over canonical_run.py → 0 matches; confirmed in the
+          5496d3c diff as outright deletions).
+        - The gate-read `systems` block is now FRESH-measured: pii-anon gate-read
+          recall=0.5875 (the census literal was 0.7958) and composite_score=0.569509
+          (census literal was 0.784583) at this scale — the numbers track the live
+          `compare_competitors` run, NOT transcribed prior-run figures. `recall`/
+          `precision`/`per_entity_recall` are taken verbatim from the fresh report;
+          `composite_score` is the REAL `compute_composite` over fresh detection-quality
+          axes (recall/precision/F1/entity-coverage) plus a FIXED, equal-across-systems
+          reference speed (`_REFERENCE_LATENCY_MS`/`_REFERENCE_DOCS_PER_HOUR`) — so no
+          fabricated speed advantage, and the gate-read composite is deterministic.
+        - The census is demoted to a TRANSPARENT `pass2_full_census_reference` block that
+          lives OUTSIDE `systems` (never gate-read), carrying `source_git_sha=2761a27…`,
+          `source_record_count=148994`, and crucially `source_canonical_claim_run=False`
+          — it self-discloses that it predates the certified run. A reader can no longer
+          mistake a census figure for a fresh certified measurement.
+      The no-fabrication hole the iter-1 finding named (a prior canonical_claim_run=False
+      run's detection numbers re-stamped under fresh `data-v2.0.0`/HEAD provenance) is
+      closed: the gate-read detection metrics and their provenance now describe the SAME
+      fresh run. The detection scope is recorded honestly and SEPARATELY from the
+      corpus-provenance scope (see finding 04). INTEGRITY-OVER-OUTCOME confirmed: the
+      honest verdict on the fresh artifact is NOT_YET (binding G6 FAIL at in-tree scale),
+      not a manufactured PROVISIONAL_SOTA — the remediation chose the truthful result.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#2a-RISK-1
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#9-vector-7
+
+  - id: security-S7-02-02
+    severity: MAJOR
+    status: CLOSED
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:559-569 (_is_finite_number)
+    description: |
+      [CLOSED in iter-2] Fabrication-vector #11 (the SDO gate's `_is_finite_number`
+      math.isfinite-on-unbounded-int crash) is RESOLVED, and the fix is EXACTLY the
+      sanctioned wrap — nothing more. The diff (and the live file) wrap `math.isfinite`
+      in `try: return math.isfinite(value)  except (OverflowError, ValueError): return
+      False` (8 insertions, 1 deletion); the rest of `competitive_supremacy.py` is
+      untouched and the gate md5 is now `2e59e1377d48e9acb6f874368b4538e6` (matches the
+      story's claimed hash; was `fa575f4f67adecca42c9e05aa7cf4f51`).
+      RE-RAN the iter-1 probes against the LIVE gate:
+        - `_is_finite_number(10**400)` → False (no crash); also -(10**400), 10**4000,
+          2**5000 → False. Bool/NaN/±inf still rejected; ordinary finite (0.5, 10**300)
+          still accepted; `_finite_unit_score(10**400)` → None (no crash).
+        - `CanonicalRunGate.validate({…pseudonymization_integrity_score: 10**400…})`
+          → ok=False with a PIS finding (was an OverflowError CRASH in iter-1). Same for
+          a huge-int per_language_recall_delta ε → ok=False (no crash).
+        - `SupremacyVerdict.from_artifacts` on an artifact with a huge-int G2 PIS field →
+          Verdict.NOT_YET (no crash); with a huge-int G4 per_class_ece → Verdict.NOT_YET
+          (no crash). The fail-loud denial-of-verdict is gone — the gate now fails CLOSED
+          on the out-of-float-range field in both the G2 and G4 read paths.
+      Zero regression: the three suites (test_competitive_supremacy + test_canonical_run
+      + test_rating_import_boundary) run 149 tests, all pass, exit 0. The gate-side
+      `[SECURITY-TEST]`s are present and well-targeted: `test_vector11_is_finite_number_
+      rejects_unbounded_int_fail_closed`, `test_vector11_g2_pending_on_huge_int_field_
+      no_crash`, `test_vector11_g4_fail_on_huge_int_per_class_ece_no_crash` (the latter
+      two probe BOTH the SUT and the competitor slot).
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#9-vector-11
+
+  - id: security-S7-02-03
+    severity: MINOR
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py (CanonicalRunGate.validate, G1 loop)
+    description: |
+      [CLOSED in iter-2] The asymmetric-NaN G1 hole is closed. The `per_language_recall_
+      delta` loop now guards each ε with `_is_finite_number(eps)` (imported alongside
+      `_finite_unit_score`) instead of the old `isinstance(eps,(int,float)) and not
+      bool` check. RE-PROBED at the CORRECT path (the delta lives at the artifact TOP
+      level, keys ar/de/en/es/zh): a NaN ε → `validate` returns ok=False with finding
+      `per_language_recall_delta.ar: not a real (finite) number`; +inf ε → ok=False;
+      huge-int ε → ok=False (no crash). Regression check: a real `eps=0.01 > 0.005` is
+      still rejected (ok=False), so the bound enforcement is intact — only the
+      non-finite-slip is now also caught. A NaN ε can no longer slip the `abs() > bound`
+      comparison (whose result against NaN is silently False).
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#2a-RISK-3
+
+  - id: security-S7-02-04
+    severity: MINOR
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py (representative_in_tree_detection block)
+    description: |
+      [CLOSED in iter-2] The honest-scope mislabel is fixed. The
+      `representative_in_tree_detection` sub-block no longer carries the stale
+      `scope` key (which resolved to `data-v2.0.0`); it is relabelled
+      `measurement="fresh-in-tree-detection"` + `detection_scope="in-tree-fresh-<n>-
+      records"` (verified live: `measurement=fresh-in-tree-detection`,
+      `detection_scope=in-tree-fresh-40-records`, and the old `scope` key is absent).
+      A reader cannot read a `data-v2.0.0` label as a claim that these in-tree numbers
+      are a census draw. The corpus-provenance `scope` (`data-v2.0.0`) remains on the
+      provenance stamp where it honestly labels the floor/calibration synthetic-input
+      axes (the DATA v2.0.0 corpus resolves in this env for those axes) — distinct from,
+      and no longer conflated with, the fresh-detection scope.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#2a-RISK-5
+
+notes: |
+  ITER-2 RE-REVIEW — all 4 iter-1 findings (2 MAJOR + 2 MINOR) CLOSED, re-probed live
+  against the post-remediation code (commit 5496d3c). Verdict flips REQUEST_CHANGES →
+  APPROVE.
+
+  OFF-LIMITS BYTE-IDENTITY (re-verified, load-bearing):
+  - The SDO gate `competitive_supremacy.py` changed ONLY in `_is_finite_number` (the one
+    sanctioned vector-#11 wrap; md5 fa575f4f… → 2e59e1377d48e9acb6f874368b4538e6, matches
+    the story's claimed hash; diff = the try/except, 8 ins / 1 del, nothing else).
+  - competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025 — BYTE-IDENTICAL (RISK-6).
+  - competitor_tiers.py d9202479d84c519d5866b7d9d515c903 — byte-identical.
+  - orchestrator.py 0afc6deed62bbd0653ae1051b723bace — byte-identical.
+  - tests/test_moe_enhancements.py 910e9cd66ad6e38c7bb64a9c51ecb1cb — byte-identical.
+
+  ARTIFACTS:
+  - `artifacts/benchmarks/*` working-tree edits are PRE-EXISTING WIP, NOT in the S7-02
+    commit range (`git diff --name-only 8096c53..HEAD -- artifacts/benchmarks/` is empty).
+    The producer writes ONLY `artifacts/canonical/`.
+  - Nothing committed under `artifacts/canonical/` (`git ls-files artifacts/canonical/`
+    empty). (Note: `artifacts/canonical/` is not gitignored; my own probe runs left an
+    untracked file there which I removed — OBSERVATION only, not a finding: the sanctioned
+    output dir could carry a `.gitignore` to keep run artifacts out of `git status`.)
+
+  FAIL-CLOSED SURFACE (re-probed live against CanonicalRunGate.validate — 14 vectors, all
+  correct, no crash, no false-PASS): clean→ok=True; V2 bool-as-PIS→False; V4 NaN PIS /
+  +inf anon→False; V5 coverage=1.5 / 0.999≠1.0→False; V8 blank git_sha / missing
+  dataset_sha256→False; G2 PIS-missing→False; G4 per_class_ece-missing→False; G1 ε=0.5 /
+  ε=0.01>0.005→False; SO-11 no-competitor-carries-PIS→False; V11 huge-int PIS→False;
+  V11 huge-int ε→False. The producer's fresh artifact certifies cleanly
+  (canonical_claim_run=True, canonical_gate_missing=[]) on real finite measurements the
+  gate's no-fabrication validators ACCEPT.
+
+  ISOLATION + QUALITY:
+  - Import boundary HOLDS: tests/test_rating_import_boundary.py green inside the 149-test
+    run; the gate-side change is the `_is_finite_number` wrap (legitimate gate-code change,
+    sanctioned by the story under the mandatory close) + new TEST-only additions in
+    test_competitive_supremacy.py — no forbidden import edge into the producer.
+  - ruff check src tests → clean. mypy src/pii_anon/evaluation/canonical_run.py --strict →
+    Success (no issues). Suites: test_competitive_supremacy + test_canonical_run +
+    test_rating_import_boundary = 149 passed, exit 0 (the _is_finite_number wrap regressed
+    no existing gate test; story claims 97 in test_competitive_supremacy, run is green).
+
+  VERDICT RATIONALE: APPROVE. Both iter-1 MAJORs are genuinely closed at the LIVE gate, not
+  merely on paper. MAJOR-01: the gate-read detection axes are demonstrably fresh-measured
+  (pii-anon recall 0.5875 / composite 0.569509 ≠ the census literals 0.7958 / 0.784583), the
+  census machinery is deleted, and what remains is a self-disclosing
+  `pass2_full_census_reference` (source_canonical_claim_run=False) that the gate never reads
+  — the scope-laundering tension is eliminated and the honest verdict (NOT_YET) is reported.
+  MAJOR-02: the vector-#11 wrap is EXACTLY the sanctioned change (md5 matches), turns the
+  fail-loud crash into a fail-CLOSED rejection in both the G2 and G4 read paths, and breaks
+  no test. The two MINORs (NaN-ε guard, scope relabel) are confirmed fixed by live probe.
+  This is the no-fabrication-critical keystone artifact; from the security-sast bounded
+  context it is clean. The MANDATORY adversarial close (the 11 fabrication vectors, bar = 0
+  upheld) is the orchestrator-dispatched next step and remains REQUIRED before the artifact
+  is trusted to flip the SDO verdict — findings 01 and 02 are exactly the class that close
+  exists to re-confirm under live attack, and my sweep above is a story-gate pre-check, not
+  a substitute for it.
+
+review_time_seconds: 1620
+
+context_bounds_respected: true

@@ -1,0 +1,128 @@
+reviewer: dev-assist-development-performance-benchmark
+
+scope_id: S7-02
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: performance-S7-02-01
+    severity: MINOR
+    location: src/pii_anon/evaluation/canonical_run.py:248-259
+    description: |
+      The speed (operational) component of `_CENSUS_PROFILES` is only PARTIALLY
+      traceable to the published 148,994-record census, and the in-code provenance
+      claim overstates the traceability of the LATENCY axis specifically.
+
+      Verified against artifacts/benchmarks/benchmark-results.json (the real
+      148,994-record run; every system carries samples=148994):
+        * recall / precision  — BYTE-EXACT to the census for all 5 systems
+          (e.g. pii-anon 0.7958/0.7197, pii-anon-swarm 0.8180/0.4864,
+          gliner 0.6581/0.9096). Honestly sourced.
+        * per_entity_recall   — matches the published census maps. Honestly sourced.
+        * docs_per_hour       — DIVERGES from the measured throughput:
+          pii-anon 4,000,000 (hardcoded) vs 3,844,236 (census);
+          pii-anon-swarm 42,000 vs 31,380; gliner 42,000 vs 35,236;
+          presidio 90,000 vs 119,189; scrubadub 720,000 vs 8,179,166.
+        * latency_ms          — NOT byte-traceable. The census measured per-system
+          detect_only p50 latency (evaluation_tracks/detect_only) as
+          pii-anon 0.458, pii-anon-swarm 91.526, gliner 81.928, presidio 14.988,
+          scrubadub 0.237 ms; the profiles hardcode 0.9 / 85 / 85 / 40 / 5 ms.
+          These are plausible rounded deployment figures, not the measured p50s.
+
+      The module docstring (canonical_run.py:150-160, 188-191) asserts these are
+      "the per-system detection profiles MEASURED on the published ... 148,994-record
+      canonical run." That is accurate for recall/precision/per_entity_recall but
+      OVERSTATED for latency_ms (and approximate for docs_per_hour).
+
+      IMPACT ON THE VERDICT IS NIL (the reason this is MINOR, not MAJOR): I fed the
+      REAL measured latency AND throughput back through the live `compute_composite`
+      scorer. pii-anon remains rank-1 (the J crown) with an essentially identical
+      lead over the best competitor (gliner): +0.10616 (hardcoded) vs +0.10437
+      (real measured inputs). The real-input recompute of pii-anon's composite
+      (0.784599) reproduces the published census composite (0.784583) to 4 decimals.
+      The only rank movement under real inputs is presidio<->scrubadub at 4th/5th
+      place — far below pii-anon and irrelevant to J (rank-1) and G6 (best Tier-R =
+      gliner, unaffected). So the composite that drives J/G6 is honestly
+      representative of the census; the speed numbers do NOT fabricate the verdict.
+      This is flagged so the provenance CLAIM matches the provenance FACT.
+    suggested_resolution: |
+      Either (a) replace the hardcoded latency_ms with the measured detect_only p50
+      latencies from artifacts/benchmarks/benchmark-results.json
+      (evaluation_tracks/detect_only: pii-anon 0.458, pii-anon-swarm 91.526,
+      gliner 81.928, presidio 14.988, scrubadub 0.237) and the measured
+      docs_per_hour, so the constants are byte-traceable; OR (b) soften the
+      docstring at canonical_run.py:150-160/188-191 to state honestly that
+      recall/precision/per_entity_recall are census-measured while the
+      latency_ms / docs_per_hour are representative deployment figures (rounded /
+      approximate), not the raw census p50s. Option (b) is sufficient — the
+      composite ranking is robust to the real inputs either way.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md
+      - artifacts/benchmarks/benchmark-results.json
+
+notes: |
+  Scope: latency/throughput honesty of the composite-driving profiles, determinism
+  of the gate-read fields, latency-exclusion for NFR-005 byte-identity, and whether
+  8 samples is honestly stamped as a smoke. This story commits NO new latency NFR
+  ceiling (that is S7-04) — I did not assess against any latency budget, per the
+  dispatch.
+
+  ALL FOUR FOCUS ITEMS — independently verified:
+
+  1. SPEED-COMPONENT SOURCING — see finding -01. Recall/precision/per_entity are
+     byte-exact to the 148,994-record census; latency_ms is not census-traceable and
+     docs_per_hour is approximate, but the composite they drive keeps pii-anon rank-1
+     with an unchanged lead under the REAL measured inputs. Honestly sourced w.r.t.
+     the VERDICT; provenance-claim wording is the only gap (MINOR).
+
+  2. DETERMINISM OF THE GATE-READ COMPOSITE — CLEAN. The gate-read
+     systems[].composite_score is computed purely from the hardcoded
+     `_CENSUS_PROFILES` via `compute_composite` (canonical_run.py:415-431) — a pure
+     function of constants, fully deterministic. It is NOT the noisy 8-sample fresh
+     run: confirmed gate-read pii-anon recall = 0.7958 (profile) while the fresh
+     8-sample recall = 0.763158 lives only in the separate
+     `representative_in_tree_detection` block. I ran produce_canonical_artifact twice
+     (same seed) and confirmed BYTE-IDENTICAL modulo timestamp_utc. The A18
+     [PROPERTY-TEST] asserts the same. RNG is seeded (DEFAULT_SEED=20240601;
+     random.Random(seed) in _attach_g1_per_language_delta). enable_parallel=False.
+     NFR-005 byte-identity holds.
+
+  3. LATENCY EXCLUSION — CLEAN. I scanned the entire produced payload for any
+     latency key: NONE present anywhere. The fresh run's wall-clock latency is
+     deliberately excluded (canonical_run.py:462-481 records only the DETERMINISTIC
+     recall/precision/samples in representative_in_tree_detection). The hardcoded
+     profile latency_ms feeds compute_composite deterministically; no wall-clock
+     latency leaks into any gate-read field. This is exactly what preserves the
+     byte-identity in (2).
+
+  4. SCALE HONESTY OF THE FRESH RUN — CLEAN. max_samples=8 (DEFAULT in
+     produce_canonical_artifact; _REPRESENTATIVE_MAX_SAMPLES=8 in tests). The
+     representative_in_tree_detection block records max_samples: 8 verbatim, so a
+     reader sees it is a smoke (8 records), NOT a census. The noisy 8-sample metrics
+     are kept STRICTLY SEPARATE from the gate-read profile metrics (recall 0.763 vs
+     0.7958). 8 samples is NOT a meaningful "representative" detection scale on its
+     own — but the design does not rely on it being one: the small sample is an
+     explicitly-labelled noisy estimator, and the gate reads the census-validated
+     profiles instead. The story's epistemic note (S7-02 Evidence) candidly states
+     the regex-vs-neural composite race resolves only at census scale and a fast
+     sample is too noisy — consistent with what I observed. Honest.
+
+  REPRODUCIBILITY OF THE HARNESS: the producer is fixture/constant-driven and
+  seeded; no real network; runs single-threaded. tests/test_canonical_run.py — 37
+  passed (matches story claim), incl. A18 determinism [PROPERTY-TEST] and A6-A11
+  keystone-teeth (verdict PROVISIONAL_SOTA on the produced artifact). The lone
+  coverage FAIL observed when running the file in isolation is the whole-repo 84%
+  denominator artifact (35.5% total when only one file runs), NOT a new-module gap;
+  the story attests 95% new-module coverage. No regression-vs-main concern for this
+  dimension (no prior canonical-run baseline; this is the producer's first cut).
+
+  Per severity calibration: no benchmark harness absence (SHOWSTOPPER n/a); no NFR
+  P95/P99 ceiling committed this story (CATASTROPHIC/MAJOR threshold-breach n/a); the
+  one finding is a provenance-claim/traceability gap on the speed constants with NIL
+  verdict impact -> MINOR. APPROVE.
+
+review_time_seconds: 760
+
+context_bounds_respected: true
