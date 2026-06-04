@@ -424,6 +424,182 @@ def test_competitive_supremacy_unchanged() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Additive edge tests (REFACTOR) — FAST gate/helper isolation (no detection run).
+# These harden the adversarial-close fabrication vectors without re-running the
+# slow detection: a synthetic produced-SHAPED artifact exercises the gate +
+# write-path guard directly.
+# ---------------------------------------------------------------------------
+
+
+def _synthetic_produced_shape() -> dict[str, Any]:
+    """A minimal produced-SHAPED artifact (no detection run) for fast gate tests.
+
+    Mirrors the real producer's emitted shape closely enough to exercise the
+    ``CanonicalRunGate`` validators in isolation — a valid one passes the gate.
+    """
+    core_g4 = {
+        "per_class_ece": {"EMAIL_ADDRESS": 0.0, "US_SSN": 0.0},
+        "per_class_ece_threshold": {"EMAIL_ADDRESS": 0.05, "US_SSN": 0.05},
+        "risk_coverage_curve": [
+            {"coverage": 0.5, "risk": 0.01},
+            {"coverage": 1.0, "risk": 0.02},
+        ],
+        "abstention_operating_points": [
+            {"target_risk": 0.01, "achieved_coverage": 0.5, "achieved_risk": 0.01},
+            {"target_risk": 0.02, "achieved_coverage": 0.75, "achieved_risk": 0.02},
+            {"target_risk": 0.05, "achieved_coverage": 1.0, "achieved_risk": 0.02},
+        ],
+        "calibrated_confidence_coverage": 1.0,
+    }
+    return {
+        "run_metadata": {
+            "git_sha": "deadbeefcafe",
+            "dataset_sha256": "a" * 64,
+            "matrix_sha256": "b" * 64,
+            "timestamp_utc": "2026-06-04T00:00:00Z",
+            "canonical_provenance": {
+                "seed": 20240601,
+                "gate_id": "CanonicalRunGate.v1",
+                "scope": "representative-in-tree",
+                "sample_size": 8,
+                "dataset_sha256": "a" * 64,
+                "matrix_sha256": "b" * 64,
+                "git_sha": "deadbeefcafe",
+                "timestamp_utc": "2026-06-04T00:00:00Z",
+                "dataset_version": "in-tree-benchmark-1.0",
+                "power_cells": {"verdict": "n/a-in-tree", "sample_size": 8},
+            },
+        },
+        "per_language_recall_delta": {"en": 0.0, "de": 0.0},
+        "systems": [
+            {
+                "system": "pii-anon",
+                "pseudonymization_integrity_score": 1.0,
+                "anonymization_score": 1.0,
+                "unauthorized_reversal_rate": 0.0,
+                **core_g4,
+            },
+            {"system": "gliner", "pseudonymization_integrity_score": 0.0},
+        ],
+    }
+
+
+def test_gate_accepts_a_valid_synthetic_produced_shape() -> None:
+    """[UNIT-TEST] The gate ACCEPTS a fully-valid synthetic produced-shaped
+    artifact (the positive control for the fail-closed gate tests)."""
+    ok, missing = CanonicalRunGate().validate(_synthetic_produced_shape())
+    assert ok is True, missing
+    assert missing == []
+
+
+def test_gate_rejects_bool_masquerading_as_pseudonymization_integrity_score() -> None:
+    """[SECURITY-TEST] Adversarial vector #2 (bool-as-score): a ``True`` in the
+    pseudonymization_integrity_score slot (which would coerce to 1.0) is REJECTED by
+    the gate's reuse of ``_finite_unit_score`` — never a fabricated perfect score."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["pseudonymization_integrity_score"] = True
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("pseudonymization_integrity_score" in m for m in missing), missing
+
+
+def test_gate_rejects_non_finite_g4_coverage() -> None:
+    """[SECURITY-TEST] Adversarial vector #4/#5 (NaN/inf coverage): a non-finite
+    calibrated_confidence_coverage is REJECTED (never slips the ``== 1.0`` MUST)."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["calibrated_confidence_coverage"] = float("inf")
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("calibrated_confidence_coverage" in m for m in missing), missing
+
+
+def test_gate_rejects_laundered_scope() -> None:
+    """[SECURITY-TEST] Adversarial vector #7 (scope laundering): a provenance scope
+    outside the two honest values is REJECTED (no laundered ``full-census`` /
+    arbitrary scope can earn canonical=True)."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["canonical_provenance"]["scope"] = "full-census-PASS2"
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("scope" in m for m in missing), missing
+
+
+def test_gate_rejects_blank_provenance_fail_closed() -> None:
+    """[SECURITY-TEST] Adversarial vector #8 (blank-provenance fail-open): a blank
+    run_metadata provenance field is REJECTED — the gate is fail-CLOSED, never
+    fail-open on incomplete provenance."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["dataset_sha256"] = "   "  # whitespace-only
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("dataset_sha256" in m for m in missing), missing
+
+
+def test_write_refuses_artifacts_benchmarks_path(tmp_path: Path) -> None:
+    """[SECURITY-TEST] Adversarial vector #10 (output-path sandbox): the producer's
+    write-path REFUSES any directory under ``benchmarks`` — the protected user-WIP
+    ``artifacts/benchmarks/*`` can never be written by the canonical-run producer."""
+    from pii_anon.evaluation.canonical_run import _write_canonical
+
+    with pytest.raises(ValueError, match="benchmarks"):
+        _write_canonical(
+            _synthetic_produced_shape(), str(tmp_path / "artifacts" / "benchmarks")
+        )
+
+
+def test_write_emits_canonical_json_under_canonical_dir(tmp_path: Path) -> None:
+    """[UNIT-TEST] The write-path emits canonical sorted JSON under the requested
+    (non-benchmarks) directory, creating it on demand."""
+    from pii_anon.evaluation.canonical_run import _write_canonical
+
+    out = _write_canonical(_synthetic_produced_shape(), str(tmp_path / "canonical"))
+    assert out.exists() and out.name == "canonical-run.json"
+    # Round-trips as valid JSON, sorted-keys canonical form.
+    loaded = json.loads(out.read_text(encoding="utf-8"))
+    assert loaded["run_metadata"]["canonical_provenance"]["gate_id"] == "CanonicalRunGate.v1"
+
+
+def test_g4_block_emitted_via_real_selective_risk_scorer_passes_gate() -> None:
+    """[UNIT-TEST] The G4 block attach helper produces a gate-passing calibration
+    block from the REAL SelectiveRiskReporter (no detection run needed) — pins the
+    AX-001 synthetic-but-real-shaped calibration path independently of detection."""
+    from pii_anon.evaluation.canonical_run import _attach_g4_calibration
+
+    payload = {"systems": [{"system": "pii-anon"}]}
+    _attach_g4_calibration(payload)
+    core = payload["systems"][0]
+    assert core["calibrated_confidence_coverage"] == 1.0
+    assert len(core["abstention_operating_points"]) >= 3
+    # Every per-class ECE finite and within the high-resource bar.
+    for et, ece in core["per_class_ece"].items():
+        assert isinstance(ece, float) and not isinstance(ece, bool), et
+        assert ece <= 0.05, (et, ece)
+
+
+def test_g2_attach_keeps_anon_and_pseudo_separate_keys() -> None:
+    """[UNIT-TEST] AX-004: the G2 attach helper emits anon + pseudo as SEPARATE
+    keys on the ladder and an honest 0.0 pseudo on competitors (no detection run)."""
+    from pii_anon.evaluation.canonical_run import _attach_g2_deid_families
+
+    payload = {
+        "systems": [
+            {"system": "pii-anon"},
+            {"system": "pii-anon-swarm"},
+            {"system": "gliner"},
+            {"system": "presidio"},
+        ]
+    }
+    _attach_g2_deid_families(payload)
+    for s in payload["systems"]:
+        assert "pseudonymization_integrity_score" in s
+        assert "anonymization_score" in s
+        # AX-004 — never a merged number.
+        assert "deid_score" not in s and "privacy_score" not in s
+        if s["system"] in ("gliner", "presidio"):
+            assert s["pseudonymization_integrity_score"] == 0.0  # honest incumbent 0.0
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
