@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Epic | **E6 Agentic interception** (DC-13: router pre-filter + query-aware gate + 4-channel least-privilege + no-raw-PII-persist) |
-| State | **IN_PROGRESS** |
+| State | **REVIEW** |
 | Owner | `dev-assist-development-executor` (worktree `agent-a9a00540b7d40ba30`, branch `worktree-agent-a9a00540b7d40ba30`, base `2464641`) |
 | provisional_status | AGENT_SIMULATED (the 4-channel interception, the no-raw-PII-persist invariant, the least-privilege per-channel reversibility policy, the surrogate-only ledger, and determinism all run for REAL in-tree against SYNTHETIC text + the real S6-03 AEAD store; a live agent runtime + real transcript-residual leakage are Pass-2) |
 | Implements | **FR-025** (intercept all four agent channels prompt/memory/tool-I/O/trace under least-privilege — MUST); **FR-026** (persist NO raw PII to any channel after masking — MUST, **AX-006**); upholds **AX-006** (least-privilege — the TRACE channel can never reverse; only explicitly-reversible channels touch the token store), **AX-002** (determinism), **AX-001** (synthetic fixtures). Feeds **FR-028** (the leakage-Sankey, S6-05) + the SDO **G5** audit half. |
@@ -58,14 +58,58 @@ An agent pipeline leaks PII through four distinct channels — the **prompt** it
 > **Adversarial close:** RECOMMENDED at the S6 work-stream close (a security/least-privilege surface) — independent attempts to leak a raw value past `_assert_no_raw_pii`, reverse a non-reversible channel, or get plaintext into the ledger. Bar = 0 upheld.
 
 ## 12. Definition of Done
-- [ ] **RED**: `tests/test_agentic_interception.py` (A1–A10) written first & failing (`ModuleNotFoundError` on `pii_anon.agentic.interception`). RED precedes GREEN (git-evidenced).
-- [ ] **GREEN**: `agentic/__init__.py` + `agentic/interception.py` — all A1–A10 green.
-- [ ] **REFACTOR**: tidy; additive edge tests only.
-- [ ] **Quality gate**: full suite green (no regression vs the post-S2-04 baseline); ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` (parametrize any numpy → `npt.NDArray[np.float64]` — likely none, pure-stdlib); coverage ≥84% (new module ≥90% by own tests).
-- [ ] **Security (headline FR-026/AX-006)**: A4 (no-raw-persist raises) + A5 (TRACE never reverses) + A3 (no-plaintext record).
-- [ ] **Determinism (AX-002)**: A9 byte-identical replay; no random/uuid/time/secrets.
-- [ ] **Untouched / user-WIP**: `orchestrator.py` + `tests/test_moe_enhancements.py` byte-identical; `competitor_compare.py` (md5 `7cae16c89f4c97136e1a12394dae2025`) + `tokenization/*` byte-identical; `artifacts/benchmarks/*` never written; narrow `git add` of owned files only.
-- [ ] **Story-gate APPROVE** — `_reviews/story/S6-02/`, all 5 reviewers APPROVE; substantive MINOR + ALL MAJOR remediated in-loop.
+- [x] **RED**: `tests/test_agentic_interception.py` (A1–A10) written first & failing (`ModuleNotFoundError` on `pii_anon.agentic.interception`). RED precedes GREEN (git-evidenced — RED `f47aa05` is an ancestor of HEAD).
+- [x] **GREEN**: `agentic/__init__.py` + `agentic/interception.py` — all A1–A10 green.
+- [x] **REFACTOR**: tidy; additive edge tests only (production unchanged since GREEN; +5 edge tests → 100% module coverage).
+- [x] **Quality gate**: full suite green (3353 passed / 17 skipped / 9 deselected; no regression — +22 over the 3331 base); ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` (pure-stdlib — no numpy); coverage 87.37% repo-wide, `interception.py` + `__init__.py` both 100% by own tests.
+- [x] **Security (headline FR-026/AX-006)**: A4 (no-raw-persist raises) + A5 (TRACE never reverses) + A3 (no-plaintext record).
+- [x] **Determinism (AX-002)**: A9 byte-identical replay; no random/uuid/time/secrets (AST-pinned).
+- [x] **Untouched / user-WIP**: `orchestrator.py` + `tests/test_moe_enhancements.py` byte-identical; `competitor_compare.py` (md5 `7cae16c89f4c97136e1a12394dae2025`) + `tokenization/*` + `errors.py` byte-identical; `artifacts/benchmarks/*` never written; narrow explicit `git add` of owned files only.
+- [ ] **Story-gate APPROVE** — `_reviews/story/S6-02/`, all 5 reviewers APPROVE; substantive MINOR + ALL MAJOR remediated in-loop. *(orchestrator-dispatched; pending)*
 
 ## Evidence (filled on completion)
 *Provisional status: AGENT_SIMULATED. The 4-channel interception, the no-raw-PII-persist invariant, the least-privilege reversibility policy, the surrogate-only ledger, and determinism run for REAL in-tree against SYNTHETIC text + the real S6-03 AEAD store. A live agent runtime + real transcript-residual leakage are Pass-2.*
+
+### Execution (worktree `agent-a9a00540b7d40ba30`, branch `worktree-agent-a9a00540b7d40ba30`)
+- **Base commit:** `2464641` (branch `pdlc/sota-program` HEAD — the commit that authored this story). The worktree was initially checked out at an ancestor (`2761a27`); fast-forwarded to `2464641` (the dispatched base) before claim. RED-precedes-GREEN is git-evidenced (`git merge-base --is-ancestor f47aa05 HEAD` ⇒ TRUE).
+- **Commits (`git log --oneline 2464641..HEAD`):**
+  - `f47aa05` — `test: S6-02 RED — pin FR-025/026 + AX-006 four-channel interception (A1–A10)` (tests-only; failed with `ModuleNotFoundError: No module named 'pii_anon.agentic'`).
+  - `88319bd` — `feat: S6-02 GREEN — implement FR-025/026 + AX-006 four-channel interception (DC-13)`.
+  - `fab9b1e` — `refactor: S6-02 — additive edge tests close agentic coverage to 100%` (test-only; production byte-identical to GREEN).
+
+### Files owned (new)
+- `src/pii_anon/agentic/__init__.py` — PEP 562 lazy re-exports (100% cov).
+- `src/pii_anon/agentic/interception.py` — `AgentChannel`, `InterceptionRecord`, `ChannelResult`, `ChannelMasker` Protocol + default in-tree masker, `FourChannelGuard`, `InterceptionLedger`, `NoRawPIIPersistError` (100% line+branch cov).
+- `tests/test_agentic_interception.py` — 22 tests (17 RED-pinned A1–A10 + 5 REFACTOR edge).
+
+### Acceptance (A1–A10) — all green
+| ID | Test(s) | Result |
+|---|---|---|
+| A1 exactly four channels | `test_fr025_a1_exactly_four_channels` | PASS — `set(AgentChannel) == {PROMPT, MEMORY, TOOL_IO, TRACE}`, `len == 4` |
+| A2 mask prompt channel | `test_fr025_a2_mask_prompt_channel` | PASS — surrogate present, raw email absent, span points at source |
+| A3 record no plaintext | `test_fr026_a3_record_has_no_plaintext_field` | PASS — fields == surrogate-only set; frozen; no value contains raw |
+| A4 no-raw-persist raises | `test_fr026_a4_no_raw_persist_raises_on_masked_text_leak`, `…_via_intercept_all`, `…_error_is_pii_anon_error_subclass` | PASS — `_assert_no_raw_pii` RAISES `NoRawPIIPersistError` on a leaky masker |
+| A5 TRACE never reverses | `test_ax006_a5_trace_never_reverses_by_default`, `…_reversible_only_on_explicit_opt_in` | PASS — TRACE writes 0 rows; only `reversible_channels` persist |
+| A6 memory only-surrogate | `test_fr026_a6_memory_persists_only_surrogate` | PASS — store row token == surrogate (AEAD ciphertext at rest) |
+| A7 intercept_all all channels | `test_fr025_a7_intercept_all_covers_every_channel` | PASS — one `ChannelResult` per channel, per-channel records |
+| A8 ledger surrogate-only G5 | `test_fr026_a8_ledger_surrogate_only_g5_shape`, `…_copy_on_read_is_immutable` | PASS — `as_dict()` JSON-serializable, no raw PII, per-channel counts |
+| A9 deterministic | `test_ax002_a9_deterministic_replay`, `…_no_nondeterministic_imports_on_path` | PASS — byte-identical replay; AST: no `random`/`uuid`/`time`/`secrets` |
+| A10 import isolation | `test_ax001_a10_import_isolation`, `…_no_raw_value_field_audit`, `…_channel_masker_is_runtime_checkable` | PASS — AST: no `eval_framework.rating`/`attacks`/SDO/`orchestrator` imports |
+
+### Quality gate (verified in-worktree)
+- `ruff check src tests` — **All checks passed.**
+- `mypy src/pii_anon` (config `strict=true`) — **Success: no issues (133 files).**
+- `mypy src/pii_anon --strict` (explicit flag) — **Success: no issues (133 files).**
+- `PYTHONPATH=src pytest` (full) — **3353 passed, 17 skipped, 9 deselected**; coverage **87.37%** (gate ≥84). New module own-coverage **100%** (line + branch).
+
+### Protected / user-WIP byte-identical (md5, base==final)
+- `src/pii_anon/orchestrator.py` = `4a837c52ccdb27925d1f7885e71667d0`
+- `tests/test_moe_enhancements.py` = `a96d86248989e2bb5bb7fff9d65602b0`
+- `src/pii_anon/evaluation/competitor_compare.py` = `7cae16c89f4c97136e1a12394dae2025`
+- `src/pii_anon/errors.py` = `1d3ed9f784d425b25e76ed776a215a95` (NOT edited — `NoRawPIIPersistError` kept in `interception.py`)
+- `src/pii_anon/tokenization/encrypted_store.py` = `132fa3c1b6ee14a98a7d3c6c8eb0b94f`
+- `src/pii_anon/tokenization/reidentification.py` = `c2367ed62cb3e2a123ba88b8a3697751`
+- `artifacts/benchmarks/*` — never written (no diff).
+
+## History Log
+- **2026-06-03 — `dev-assist-development-executor` (worktree `agent-a9a00540b7d40ba30`):** TODO → CLAIMED → IN_PROGRESS → REVIEW. Pre-claim validation passed (12 sections present; FR-025/026 + AX-001/002/006 confirmed in `requirements-document.md` / `D-implementation-ready-design.md`; consumed `reidentification.py` regex + `encrypted_store.py` store verified read-only). Strict TDD: RED `f47aa05` (tests-only, `ModuleNotFoundError`) → GREEN `88319bd` → REFACTOR `fab9b1e` (test-only). All gates green; all 6 protected md5s unchanged. Awaiting orchestrator-dispatched 5-gate story review (axiom-compliance PRIMARY + security-sast + code-quality + requirements-coverage + traceability). Merge-back is the orchestrator's responsibility.
