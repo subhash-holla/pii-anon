@@ -1,0 +1,70 @@
+# S5-01 — `ReidAttack` protocol + baseline re-identification body + the attacks import-boundary test (DC-09)
+
+> **Cold-pickup invariant**: executable cold. The S5-04 sandbox substrate is DONE (`eval_framework/attacks/` has `sandbox.py` `run_attack_under_sandbox()` + the `DEFAULT_ATTACK_REGISTRY` allow-list, `spec.py` `AttackSpec`). This story adds the **re-identification attack protocol** + a deterministic **baseline body** that runs via `run_attack_under_sandbox`, plus the standing **attacks import-boundary CI test** (the `__init__.py` docstring already promises it). It shape-mirrors the DATA sibling's `Adversary`/`Persona`/`Target`/`Guess` contract (`../pii-anon-eval-data/.../scoring/adversary/base.py`) so the Pass-2 swap to the real offline adversary is structural. Satisfies the **NFR-016 non-strippable-caveat MUST** now; lays the FR-011/FR-013 protocol foundation (the real Tier-3 LLM adversary = S5-02; MIA = S5-03). Fully in-tree, deterministic, synthetic.
+
+| Field | Value |
+|---|---|
+| Epic | **E5 Attacks** (DC-09: `attacks/` real Tier-3 LLM-adversary + LiRA@128 MIA) |
+| State | **TODO** |
+| provisional_status | AGENT_SIMULATED (the ReidAttack protocol, the deterministic baseline body, the success-metrics scorer, the non-strippable caveat, the sandbox-run, and the import-boundary test all run for REAL in-tree against SYNTHETIC personas/targets; a real Tier-3 LLM adversary [S5-02] + a real offline DATA adversary with Wilson CIs are Pass-2 / cross-repo) |
+| Implements | **NFR-016** (non-strippable re-id caveat — 100% of exported privacy artifacts carry the anti-anonymity caveat — MUST, satisfied now via `ReidSuccessMetrics`'s non-strippable `caveat`); the **FR-011/FR-013 protocol foundation** (the `ReidAttack` + `MiaAttack` Protocols + a representative baseline ReidAttack body — the real Tier-3 LLM adversary is S5-02, the real LiRA@128 MIA is S5-03); upholds **AX-001** (synthetic), **AX-002** (deterministic total-order ranking), and the **attacks import-isolation invariant** (attacks ⊄ swarm/moe/fusion/policy — the standing CI guard this story adds). |
+| Traces | Design **DC-09** (`D-implementation-ready-design.md:19` — "`attacks/` package: real Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA"; `:58` — "Tier-3 de-circularization lives in `attacks/`"). UC-09. The S5-04 sandbox substrate (`run_attack_under_sandbox`) — consumed, not changed. |
+| Test-type tags | `[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` `[SECURITY-TEST]` `[AUDIT]` |
+| Files owned | `src/pii_anon/eval_framework/attacks/reid.py` (**new** — `ReidPersona`/`ReidTarget`/`ReidGuess` value objects, `ReidSuccessMetrics`, `@runtime_checkable ReidAttack` + `MiaAttack` Protocols, `BaselineDeterministicReidAttack`, `score_reid_attack`, `reid_attack_runner` + `REID_ATTACK_REGISTRY`). **Additive** to `src/pii_anon/eval_framework/attacks/__init__.py` (re-exports + merge `REID_ATTACK_REGISTRY` into the sandbox default registry). `tests/test_attack_reid_protocol.py` (**new**). `tests/test_attacks_import_boundary.py` (**new** — the standing CI guard the `__init__` docstring promises). |
+| Depends on | **S5-04 DONE** (the sandbox substrate: `run_attack_under_sandbox`, `AttackSpec`, `DEFAULT_ATTACK_REGISTRY`). The DATA sibling `Adversary`/`Persona`/`Target`/`Guess` shape is mirrored (read-only reference). |
+| Blocks | **S5-02** (Tier-3 LLM adversary — reuses the `ReidAttack` Protocol + ranking + scorer) + **S5-03** (MIA — reuses the `MiaAttack` Protocol seam + the package boundary test). Feeds the SDO **G5** audit half + Paper 1 Tier-2/3. |
+| Size | **M** (one new module + the boundary test; ~11 acceptance tests). |
+
+## 1. Intent
+Re-identification resistance is the audit half of G5 (and Paper 1's Tier-2/3 evidence). S5-01 lays the foundation: a `ReidAttack` Protocol (input: anonymized/pseudonymized targets + auxiliary persona knowledge; output: re-identification guesses + success metrics) + a deterministic **baseline** adversary (weighted-Jaccard over surviving quasi-identifier tokens, ranked by `(similarity desc, persona_id asc)` — a total order, AX-002) that runs ONLY inside the S5-04 sandbox (the attack body is allow-listed + invoked via `run_attack_under_sandbox`). The success metrics carry a **non-strippable anti-anonymity caveat** (NFR-016 — `__post_init__` re-asserts it; it cannot be cleared). The protocol mirrors the DATA sibling's `Adversary` contract so swapping the baseline for the real offline adversary (Wilson CIs on integer counts) is a one-line Pass-2/cross-repo change. This story also lands the standing **attacks import-boundary CI test** (the package imports nothing from swarm/moe/fusion/policy — the `__init__` docstring already promises it).
+
+## 2. Approach / scope
+- **Value objects (frozen):** `ReidPersona(persona_id, quasi_identifiers: tuple[str,...], auxiliary_knowledge: Mapping, source_text)`, `ReidTarget(target_id, anonymized_text, observed_signals: tuple[str,...])`, `ReidGuess(target_id, guessed_persona_id: str|None, score: float)`.
+- **`ReidSuccessMetrics`** (frozen) — `reid_recall`, `reid_precision`, `reid_success_rate`, `correct: int`, `n_targets: int`, `n_guesses: int`, `candidate_set_size: int`, `adversary_id: str`, `deterministic: bool`, `caveat: str = ANTI_ANONYMITY_CAVEAT`. `__post_init__` RE-ASSERTS the caveat (a non-strippable-caveat guard — clearing it raises; NFR-016) + `as_outcome() -> dict` (the sandbox runner's return Mapping).
+- **`@runtime_checkable ReidAttack(Protocol)`** — `adversary_id: str`, `deterministic: bool`, `attack(targets, candidates, candidate_set_size) -> list[ReidGuess]`. Plus a **`MiaAttack(Protocol)`** seam (`adversary_id`, `deterministic`, `membership_scores(records) -> list[float]`) consumed by S5-03 (declared here so the package boundary + the protocol family land together).
+- **`BaselineDeterministicReidAttack`** — weighted-Jaccard over the surviving quasi-identifier tokens + observed signals (faithful to the DATA sibling's `_weighted_jaccard`), ranked `(similarity desc, persona_id asc)` → a TOTAL order (AX-002). Abstains (`guessed_persona_id=None`) when no signal survives.
+- **`score_reid_attack(guesses, targets, *, adversary_id, deterministic, candidate_set_size) -> ReidSuccessMetrics`** — integer counts: `correct = #(guessed_persona_id == true target persona)`, `reid_recall = correct/n_targets`, `reid_precision = correct/n_guesses`, `reid_success_rate = recall·precision`.
+- **`reid_attack_runner(*, targets_json: str, candidates_json: str, candidate_set_size: int) -> dict`** — the **allow-listed** runner (scalar JSON-string args per the `AttackSpec` scalar-param rule): JSON-decode → frozen objects → `BaselineDeterministicReidAttack().attack(...)` → `score_reid_attack(...).as_outcome()` (a Mapping, per the sandbox contract). `REID_ATTACK_REGISTRY = {"reid_baseline": reid_attack_runner}`, merged into the sandbox default registry (additive to `attacks/__init__`).
+
+## 2a. Pre-claim de-risk (verify against live code on claim)
+- **RISK-1 (every body runs under the sandbox):** the baseline is invoked via `run_attack_under_sandbox(spec, inputs=...)` with `attack_kind="reid"` (already a `Literal` in `spec.py`); the runner returns a Mapping (else `SandboxViolation`). A `[SECURITY-TEST]` runs it under the sandbox + asserts the outcome is a Mapping.
+- **RISK-2 (import isolation — the standing CI guard):** `tests/test_attacks_import_boundary.py` AST-walks `pii_anon.eval_framework.attacks` and asserts it imports NOTHING from `{swarm, moe, fusion, policy}` (+ a "≥1 file scanned" guard) — a verbatim adaptation of `tests/test_rating_import_boundary.py`.
+- **RISK-3 (no dangerous primitives in attack bodies):** an `[AUDIT]` AST source-guard over `attacks/` asserts zero unsafe-deserialization / subprocess / shell-out / dynamic-eval call signatures (mirrors the S5-04 guard) — attack bodies are pure-stdlib over scalar inputs.
+- **RISK-4 (determinism, AX-002):** the ranking is a total order `(similarity desc, persona_id asc)`; no `random`/`uuid`/`time`/`secrets`; the sandbox `AttackResult` equality already excludes wall-clock. A `[PROPERTY-TEST]` pins replay-equality.
+- **RISK-5 (NFR-016 non-strippable caveat):** `ReidSuccessMetrics.caveat` defaults to `ANTI_ANONYMITY_CAVEAT` and `__post_init__` re-asserts it — a test that constructs with `caveat=""` (or strips it) must raise/restore.
+- **RISK-6 (off-limits + AX-001):** `orchestrator.py` + `tests/test_moe_enhancements.py` byte-identical; `evaluation/competitor_compare.py` byte-identical (RISK-6); `sandbox.py`/`spec.py` consumed read-only. All personas/targets SYNTHETIC.
+
+## 3. Given / When / Then (acceptance)
+- **A1 — `ReidAttack` Protocol is runtime-checkable `[CONTRACT-TEST]`.** `isinstance(BaselineDeterministicReidAttack(), ReidAttack)` is True; the Protocol is `@runtime_checkable`.
+- **A2 — baseline links an exact quasi-identifier match `[UNIT-TEST]`.** Given a target whose surviving QI tokens uniquely match one persona, the baseline guesses that persona (highest weighted-Jaccard).
+- **A3 — baseline abstains on no signal `[UNIT-TEST]`.** Given a fully-anonymized target (no surviving QI/signal), the baseline returns `guessed_persona_id=None`.
+- **A4 — deterministic total-order ranking `[PROPERTY-TEST]`.** Two runs (and a candidate-order permutation) yield identical guesses; ties resolve by `persona_id asc`.
+- **A5 — success metrics are integer-count-based `[UNIT-TEST]`.** `score_reid_attack` returns `reid_recall=correct/n_targets`, `reid_precision=correct/n_guesses`, `reid_success_rate=recall·precision` with `correct`/`n_targets`/`n_guesses` integers.
+- **A6 — non-strippable caveat (NFR-016) `[SECURITY-TEST]` `[CONTRACT-TEST]`.** `ReidSuccessMetrics(...).caveat == ANTI_ANONYMITY_CAVEAT`; constructing with `caveat=""`/stripping it raises (or restores) — the caveat cannot be removed; `as_outcome()` always carries it.
+- **A7 — runner runs under the sandbox `[SECURITY-TEST]` `[INTEGRATION-TEST]`.** `run_attack_under_sandbox` over the `reid_baseline` runner (scalar JSON args) returns an `AttackResult` whose outcome is a Mapping with the metric fields.
+- **A8 — runner outcome is a Mapping `[CONTRACT-TEST]`.** `reid_attack_runner(...)` returns a `Mapping[str, Any]` (the sandbox contract; a non-Mapping return would be a `SandboxViolation`).
+- **A9 — deterministic AttackResult equality `[PROPERTY-TEST]`.** Two sandboxed runs produce equal `AttackResult` (wall-clock excluded).
+- **A10 — attacks package imports nothing forbidden `[AUDIT]`.** `tests/test_attacks_import_boundary.py`: AST-walk `eval_framework.attacks` → 0 imports from `{swarm, moe, fusion, policy}`; ≥1 file scanned.
+- **A11 — no dangerous call signatures in attacks `[AUDIT]` `[SECURITY-TEST]`.** AST source-guard over `attacks/`: 0 unsafe-deserialization / subprocess / shell-out / dynamic-eval signatures.
+
+## 5. Notes / non-goals
+- **Non-goal:** the real Tier-3 LLM adversary (RRS/QIC/BSL) — **S5-02** (reuses this protocol + scorer; the LLM path is lazy/optional, the real run Pass-2). The real LiRA@128 MIA — **S5-03** (reuses the `MiaAttack` seam; real run Pass-2, canary splits absent in DATA).
+- **Non-goal:** the real offline DATA adversary + Wilson CIs — Pass-2/cross-repo (the baseline mirrors the shape; `# SWITCH-POINT(DATA)` marks the swap).
+- **Non-goal:** changing the S5-04 sandbox substrate (`sandbox.py`/`spec.py` byte-identical; bodies plug the allow-list).
+
+## 9. Test-type tags + reviewer set
+`[UNIT-TEST]` `[CONTRACT-TEST]` `[PROPERTY-TEST]` `[SECURITY-TEST]` `[AUDIT]`. **Reviewers (canonical 5-gate story set):** **security-sast** (**PRIMARY** — every body runs under the sandbox; the import-boundary + dangerous-call-signature guards; no egress) + **axiom-compliance** (AX-001 synthetic + AX-002 determinism + the import-isolation invariant + NFR-016 non-strippable caveat) + **code-quality** + **requirements-coverage** (NFR-016 MUST + honest FR-011/013-foundation scope) + **traceability** (DC-09 → NFR-016 + the FR-011/013 foundation). All five APPROVE.
+> **Adversarial close:** RECOMMENDED at the S5 work-stream close (a security/attack surface) — independent attempts to run an attack body outside the sandbox, strip the caveat, or import a forbidden module. Bar = 0 upheld.
+
+## 12. Definition of Done
+- [ ] **RED**: `tests/test_attack_reid_protocol.py` + `tests/test_attacks_import_boundary.py` (A1–A11) written first & failing (`ModuleNotFoundError` on `eval_framework.attacks.reid`). RED precedes GREEN (git-evidenced).
+- [ ] **GREEN**: `attacks/reid.py` + additive `attacks/__init__` re-exports/registry-merge — all A1–A11 green.
+- [ ] **REFACTOR**: tidy (share weighted-Jaccard with a small helper); additive edge tests only.
+- [ ] **Quality gate**: full suite green (no regression); ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict`; coverage ≥84% (new module ≥90% by own tests).
+- [ ] **Security (headline)**: A7 (runs under sandbox) + A10 (import-boundary) + A11 (no dangerous signatures) + A6 (non-strippable caveat).
+- [ ] **Determinism (AX-002)**: A4 + A9 byte-identical replay; no random/uuid/time/secrets.
+- [ ] **Untouched / user-WIP**: `orchestrator.py` + `tests/test_moe_enhancements.py` byte-identical; `competitor_compare.py` (md5 `7cae16c89f4c97136e1a12394dae2025`) + `sandbox.py`/`spec.py` byte-identical; `artifacts/benchmarks/*` never written; narrow `git add` of owned files only.
+- [ ] **Story-gate APPROVE** — `_reviews/story/S5-01/`, all 5 reviewers APPROVE; substantive MINOR + ALL MAJOR remediated in-loop.
+
+## Evidence (filled on completion)
+*Provisional status: AGENT_SIMULATED. The ReidAttack/MiaAttack protocols, the deterministic baseline body, the success scorer, the non-strippable caveat, the sandbox-run, and the import-boundary + dangerous-signature guards run for REAL in-tree against SYNTHETIC personas/targets. A real Tier-3 LLM adversary (S5-02) + a real offline DATA adversary with Wilson CIs are Pass-2 / cross-repo.*
