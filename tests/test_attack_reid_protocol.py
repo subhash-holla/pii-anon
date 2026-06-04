@@ -510,3 +510,74 @@ def test_ax002_a11_reid_body_has_no_unsafe_call_signatures() -> None:
         if isinstance(func, ast.Attribute) and func.attr in _FORBIDDEN_OS_ATTR_NAMES:
             violations.append(f"calls forbidden attr .{func.attr}")
     assert not violations, "reid.py has unsafe call signatures: " + "; ".join(violations)
+
+
+# --------------------------------------------------------------------------- #
+# REFACTOR — additive edge tests (the shared JSON decoder's defensive branches #
+# + helper behaviour). No production behaviour changes; coverage hardening.    #
+# --------------------------------------------------------------------------- #
+def test_runner_rejects_non_array_targets_json() -> None:
+    """A malformed targets_json whose top level is not a JSON array is refused
+    loudly (the shared object-array decoder; no unsafe-deserialization)."""
+    with pytest.raises(ValueError, match="target must decode to a JSON array"):
+        reid_attack_runner(targets_json=json.dumps({"not": "an array"}), candidates_json="[]", candidate_set_size=1)
+
+
+def test_runner_rejects_non_array_candidates_json() -> None:
+    with pytest.raises(ValueError, match="candidate must decode to a JSON array"):
+        reid_attack_runner(
+            targets_json="[]", candidates_json=json.dumps("scalar-not-array"), candidate_set_size=1
+        )
+
+
+def test_runner_rejects_non_object_target_element() -> None:
+    """Every array element must be a JSON object; a scalar element is refused."""
+    with pytest.raises(ValueError, match="target element must be a JSON object"):
+        reid_attack_runner(targets_json=json.dumps(["scalar"]), candidates_json="[]", candidate_set_size=1)
+
+
+def test_runner_rejects_non_array_observed_signals_field() -> None:
+    """A target.observed_signals that is not a JSON array (e.g. a scalar) is
+    refused — the field is a token list, never a scalar/object."""
+    bad = [{"target_id": "t1", "observed_signals": "oncology"}]
+    with pytest.raises(ValueError, match="target.observed_signals must be a JSON array"):
+        reid_attack_runner(targets_json=json.dumps(bad), candidates_json="[]", candidate_set_size=1)
+
+
+def test_runner_rejects_non_array_quasi_identifiers_field() -> None:
+    bad = [{"persona_id": "p1", "quasi_identifiers": {"k": "v"}}]
+    with pytest.raises(ValueError, match="candidate.quasi_identifiers must be a JSON array"):
+        reid_attack_runner(targets_json="[]", candidates_json=json.dumps(bad), candidate_set_size=1)
+
+
+def test_runner_empty_inputs_yield_zeroed_metrics_with_caveat() -> None:
+    """Empty targets+candidates: zero-target metrics, no division-by-zero, and the
+    non-strippable caveat still present (NFR-016 holds on the empty outcome)."""
+    outcome = reid_attack_runner(targets_json="[]", candidates_json="[]", candidate_set_size=0)
+    assert outcome["n_targets"] == 0
+    assert outcome["n_guesses"] == 0
+    assert outcome["reid_recall"] == 0.0
+    assert outcome["reid_success_rate"] == 0.0
+    assert outcome["caveat"] == ANTI_ANONYMITY_CAVEAT
+
+
+def test_baseline_normalises_token_case_and_whitespace() -> None:
+    """The weighted-Jaccard tokenisation is case/whitespace-insensitive, so a
+    surviving signal matches a quasi-identifier regardless of case/padding."""
+    personas = [_persona("p_alpha", ("Cardiology", " Boston "))]
+    target = _target("t1", "...", ("  CARDIOLOGY ", "boston"))
+    [g] = BaselineDeterministicReidAttack().attack([target], personas, candidate_set_size=1)
+    assert g.guessed_persona_id == "p_alpha"
+    assert g.score == pytest.approx(1.0)  # identical normalised token sets
+
+
+def test_baseline_custom_adversary_id_is_pinned() -> None:
+    """The adversary_id is version-pinnable (so results cite vs adversary@version)
+    and flows through score_reid_attack into the outcome."""
+    adv = BaselineDeterministicReidAttack(adversary_id="reid-custom@v9")
+    assert adv.adversary_id == "reid-custom@v9"
+    metrics = score_reid_attack(
+        [], [], adversary_id=adv.adversary_id, deterministic=adv.deterministic, candidate_set_size=0
+    )
+    assert metrics.adversary_id == "reid-custom@v9"
+    assert metrics.as_outcome()["adversary_id"] == "reid-custom@v9"

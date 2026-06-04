@@ -344,53 +344,65 @@ def score_reid_attack(
 # --------------------------------------------------------------------------- #
 # The allow-listed sandbox runner (scalar JSON-string args) + the registry.   #
 # --------------------------------------------------------------------------- #
+def _decode_object_array(source_json: str, *, label: str) -> list[Mapping[str, Any]]:
+    """Decode ``source_json`` into a list of plain JSON objects (stdlib only).
+
+    Shared decode path for the runner's two inputs: parse via the stdlib
+    structured parser (no unsafe-deserialization), require a JSON array top level,
+    and require every element to be a JSON object. It NEVER constructs objects
+    named in the data; a malformed document / non-array / non-object element is
+    refused loudly, naming ``label``.
+    """
+    decoded = json.loads(source_json)
+    if not isinstance(decoded, list):
+        raise ValueError(f"{label} must decode to a JSON array (got {type(decoded).__name__})")
+    items: list[Mapping[str, Any]] = []
+    for element in decoded:
+        if not isinstance(element, Mapping):
+            raise ValueError(f"each {label} element must be a JSON object (got {type(element).__name__})")
+        items.append(element)
+    return items
+
+
+def _string_tuple(item: Mapping[str, Any], key: str, *, label: str) -> tuple[str, ...]:
+    """Read ``item[key]`` as a JSON array of strings -> a normalised str tuple.
+
+    A missing key defaults to the empty tuple; a non-array value is refused
+    loudly (the field is a token list, never a scalar/object).
+    """
+    raw = item.get(key, [])
+    if not isinstance(raw, list):
+        raise ValueError(f"{label}.{key} must be a JSON array of strings (got {type(raw).__name__})")
+    return tuple(str(v) for v in raw)
+
+
 def _personas_from_json(candidates_json: str) -> list[ReidPersona]:
     """Decode candidate personas from a JSON array of plain mappings.
 
-    Uses ONLY the stdlib structured parser (no unsafe-deserialization) and reads
-    scalar fields out of plain mappings — it NEVER constructs objects named in
-    the data. A malformed document or a non-array top level is refused loudly.
+    Reads scalar fields out of plain mappings via the shared object-array
+    decoder — it NEVER constructs objects named in the data (no
+    unsafe-deserialization).
     """
-    decoded = json.loads(candidates_json)
-    if not isinstance(decoded, list):
-        raise ValueError(f"candidates_json must decode to a JSON array (got {type(decoded).__name__})")
-    personas: list[ReidPersona] = []
-    for item in decoded:
-        if not isinstance(item, Mapping):
-            raise ValueError("each candidate must be a JSON object")
-        qis = item.get("quasi_identifiers", [])
-        if not isinstance(qis, list):
-            raise ValueError("candidate.quasi_identifiers must be a JSON array of strings")
-        personas.append(
-            ReidPersona(
-                persona_id=str(item["persona_id"]),
-                quasi_identifiers=tuple(str(q) for q in qis),
-                source_text=str(item.get("source_text", "")),
-            )
+    return [
+        ReidPersona(
+            persona_id=str(item["persona_id"]),
+            quasi_identifiers=_string_tuple(item, "quasi_identifiers", label="candidate"),
+            source_text=str(item.get("source_text", "")),
         )
-    return personas
+        for item in _decode_object_array(candidates_json, label="candidate")
+    ]
 
 
 def _targets_from_json(targets_json: str) -> list[ReidTarget]:
-    """Decode targets from a JSON array of plain mappings (stdlib parser only)."""
-    decoded = json.loads(targets_json)
-    if not isinstance(decoded, list):
-        raise ValueError(f"targets_json must decode to a JSON array (got {type(decoded).__name__})")
-    targets: list[ReidTarget] = []
-    for item in decoded:
-        if not isinstance(item, Mapping):
-            raise ValueError("each target must be a JSON object")
-        signals = item.get("observed_signals", [])
-        if not isinstance(signals, list):
-            raise ValueError("target.observed_signals must be a JSON array of strings")
-        targets.append(
-            ReidTarget(
-                target_id=str(item["target_id"]),
-                anonymized_text=str(item.get("anonymized_text", "")),
-                observed_signals=tuple(str(s) for s in signals),
-            )
+    """Decode targets from a JSON array of plain mappings (shared decoder)."""
+    return [
+        ReidTarget(
+            target_id=str(item["target_id"]),
+            anonymized_text=str(item.get("anonymized_text", "")),
+            observed_signals=_string_tuple(item, "observed_signals", label="target"),
         )
-    return targets
+        for item in _decode_object_array(targets_json, label="target")
+    ]
 
 
 def reid_attack_runner(
