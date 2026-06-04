@@ -40,11 +40,13 @@ import math
 import pytest
 
 from pii_anon.moe import (
+    LATENCY_COST_KEY,
     ExpertRegistry,
     ExpertSpec,
     MoEFusionStrategy,
     MoERouter,
     SLABias,
+    _latency_cost,
     build_default_registry,
 )
 from pii_anon.routing.floor_fusion import FloorProjectingFusion, _shared_subset
@@ -587,3 +589,103 @@ def test_ax002_slabias_defaults_are_inert() -> None:
     """A11: a bare SLABias() defaults to strength=0.0 / reference_ms=1.0 (inert)."""
     assert SLABias() == SLABias(strength=0.0, reference_ms=1.0)
     assert SLABias().strength == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# REFACTOR — additive edge tests (no behaviour change). Harden the helper       #
+# contracts + the cache-invalidation seam + full branch coverage.              #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (1.0, 1.0),
+        (0.0, 0.0),
+        (42, 42.0),  # int accepted, coerced to float
+        (None, None),  # missing
+        (float("nan"), None),
+        (float("inf"), None),
+        (float("-inf"), None),
+        (-0.5, None),  # negative
+        (True, None),  # bool is an int subclass — rejected
+        (False, None),
+        ("3.0", None),  # non-numeric
+        ([1.0], None),
+    ],
+)
+def test_latency_cost_helper_coercion(raw: object, expected: float | None) -> None:
+    """REFACTOR: _latency_cost coerces exactly the documented set to None."""
+    spec = ExpertSpec("e", "E", {"X": 0.5}, metadata={LATENCY_COST_KEY: raw})
+    assert _latency_cost(spec) == expected
+
+
+def test_latency_cost_helper_missing_key_is_none() -> None:
+    """REFACTOR: an ExpertSpec with NO metadata key ⇒ _latency_cost is None."""
+    assert _latency_cost(ExpertSpec("e", "E", {"X": 0.5})) is None
+
+
+def test_latency_cost_cache_invalidated_by_clear_cache() -> None:
+    """REFACTOR: clear_cache() re-reads latency costs after a registry mutation.
+
+    The cost cache is lazy + invalidated by clear_cache(); after mutating an
+    expert's latency_cost_ms and clearing, the next route reflects the new cost.
+    """
+    reg = ExpertRegistry()
+    cheap = ExpertSpec("e-a", "A", {"PERSON_NAME": 0.60}, metadata={LATENCY_COST_KEY: 1.0})
+    other = ExpertSpec("e-b", "B", {"PERSON_NAME": 0.60}, metadata={LATENCY_COST_KEY: 1.0})
+    reg.register_expert(cheap)
+    reg.register_expert(other)
+    router = MoERouter(reg, sla_bias=SLABias(strength=0.5, reference_ms=10.0))
+
+    before = dict(router.route("PERSON_NAME"))
+    assert math.isclose(before["e-a"], before["e-b"], abs_tol=1e-12)  # equal cost ⇒ equal
+
+    # Make e-a expensive, clear both the route cache AND the latency-cost cache.
+    cheap.metadata[LATENCY_COST_KEY] = 80.0
+    router.clear_cache()
+    after = dict(router.route("PERSON_NAME"))
+    assert after["e-b"] > after["e-a"], "clear_cache() did not invalidate the latency-cost cache"
+
+
+def test_reference_ms_scales_the_penalty() -> None:
+    """REFACTOR: a larger reference_ms shrinks the penalty (unit-decoupling).
+
+    Same β + same costs, two normalizers: the smaller reference_ms applies a
+    HARDER penalty to the costly expert, so the cheap expert's mass is higher.
+    """
+    reg = ExpertRegistry()
+    reg.register_expert(ExpertSpec("e-fast", "F", {"PERSON_NAME": 0.60}, metadata={LATENCY_COST_KEY: 1.0}))
+    reg.register_expert(ExpertSpec("e-slow", "S", {"PERSON_NAME": 0.60}, metadata={LATENCY_COST_KEY: 50.0}))
+    hard = dict(MoERouter(reg, sla_bias=SLABias(strength=1.0, reference_ms=1.0)).route("PERSON_NAME"))
+    soft = dict(MoERouter(reg, sla_bias=SLABias(strength=1.0, reference_ms=100.0)).route("PERSON_NAME"))
+    assert hard["e-fast"] > soft["e-fast"], "reference_ms did not scale the penalty"
+
+
+def test_apply_sla_bias_inert_when_no_costs_in_registry() -> None:
+    """REFACTOR: bias active but NO expert carries a cost ⇒ output unchanged.
+
+    Exercises the `if not costs: return scores` fast path in _apply_sla_bias — an
+    SLA is configured but the registry has no latency metadata, so routing equals
+    the unbiased baseline.
+    """
+    reg = ExpertRegistry()
+    reg.register_expert(ExpertSpec("e-a", "A", {"PERSON_NAME": 0.60}))  # no metadata
+    reg.register_expert(ExpertSpec("e-b", "B", {"PERSON_NAME": 0.40}))  # no metadata
+    baseline = MoERouter(reg).route("PERSON_NAME")
+    biased = MoERouter(reg, sla_bias=_AGGRESSIVE).route("PERSON_NAME")
+    assert biased == baseline, "bias perturbed routing despite NO latency costs in the registry"
+
+
+def test_apply_sla_bias_direct_guard_returns_scores_unchanged() -> None:
+    """REFACTOR: _apply_sla_bias is self-safe — inert guard returns input as-is.
+
+    Calls the helper directly (defensive coverage): with sla_bias=None and with
+    SLABias(strength=0.0) it returns the scores list unchanged, independent of
+    route()'s own sla_active gate.
+    """
+    reg = ExpertRegistry()
+    reg.register_expert(ExpertSpec("e-a", "A", {"PERSON_NAME": 0.60}, metadata={LATENCY_COST_KEY: 5.0}))
+    scores = [("e-a", 0.60)]
+    assert MoERouter(reg, sla_bias=None)._apply_sla_bias(list(scores)) == scores
+    assert MoERouter(reg, sla_bias=SLABias(strength=0.0))._apply_sla_bias(list(scores)) == scores
