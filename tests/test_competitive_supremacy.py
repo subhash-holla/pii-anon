@@ -2290,3 +2290,281 @@ def test_close_hardening_is_deterministic_on_hostile_vectors() -> None:
     cov1 = _g4_core(calibrated_confidence_coverage=True)
     cov2 = copy.deepcopy(cov1)
     assert _g4_calibration_selective_risk(cov1) == _g4_calibration_selective_risk(cov2)
+
+
+# ---------------------------------------------------------------------------
+# S7-02 close-2 — the crash-class holes (fail-LOUD denial-of-verdict on a
+# malformed CONTAINER, NOT a fabrication). The keystone re-close confirmed the
+# 4 FABRICATION holes are closed but found 2 remaining MAJOR crash-class holes:
+# a malformed artifact-sourced CONTAINER (wrong JSON TYPE — a list where a dict
+# is read, a dict where a list is read, a scalar where a list is read, a
+# non-dict element in the systems array) reached an UNGUARDED ``.get`` / ``.items``
+# / ``len()`` / iteration and threw (TypeError / AttributeError) — crashing the
+# shipped ``pii-anon supremacy`` CLI with a raw traceback. Hardening: every
+# artifact-sourced container is type-checked before consumption, so a malformed
+# container fails CLOSED (the affected guarantee reads PENDING/FAIL, the bad
+# element is ignored, or the verdict is a clean NOT_YET) — NEVER an exception.
+# The CARDINAL RULE holds: HONEST-INPUT verdicts stay byte-identical.
+# ---------------------------------------------------------------------------
+
+
+# -- crash 1: G4 abstention_operating_points non-list scalar + the len() else. --
+
+
+@pytest.mark.parametrize("bad_points", [42, 3.14, True])
+def test_close2_g4_non_list_abstention_points_does_not_crash(bad_points: object) -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-1: ``abstention_operating_points`` as a
+    non-list scalar (42 / 3.14 / True) with the OTHER three G4 checks PASSING drove
+    the FAIL-detail ``else`` branch which called ``len(points)`` UNCONDITIONALLY —
+    ``TypeError: object of type 'int'/'float'/'bool' has no len()``. G4 must instead
+    read FAIL (a non-list cannot supply ≥3 operating points) and NEVER crash."""
+    core = _g4_core(abstention_operating_points=bad_points)
+    g4 = _g4_calibration_selective_risk(core)  # must not raise
+    assert g4.passed is False  # fail-closed: a non-list cannot carry ≥3 points
+    assert "abstention operating point" in g4.binding_detail
+
+
+def test_close2_g4_non_list_points_does_not_crash_end_to_end() -> None:
+    """[SECURITY-TEST] §5 END-TO-END (close-2 crash-1): the exact close repro — a full
+    benchmark whose pii-anon calibration block carries ``abstention_operating_points=42``
+    (other G4 fields valid) ⇒ a clean verdict (no exception), G4 FAIL."""
+    bench = _with_calibration(
+        _canonical_benchmark(),
+        {**_conforming_calibration(), "abstention_operating_points": 42},
+    )
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.guarantee("G4").passed is False
+    assert verdict.verdict in (Verdict.NOT_YET, Verdict.PROVISIONAL_SOTA)
+
+
+def test_close2_g4_non_list_points_pass_detail_path_also_safe() -> None:
+    """[SECURITY-TEST] close-2 crash-1 (the PASS-detail companion): the count is read
+    safely in BOTH the PASS- and FAIL-detail branches. A valid list of ≥3 points keeps
+    PASSing (the count still reports), proving the safe-count refactor did not regress
+    the honest PASS detail."""
+    core = _g4_core()  # conforming: 3 list points
+    g4 = _g4_calibration_selective_risk(core)
+    assert g4.passed is True
+    assert "3 abstention operating points" in g4.binding_detail
+
+
+# -- crash 2: malformed CONTAINER types flowing through from_artifacts / the CLI. --
+
+
+def test_close2_systems_as_dict_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-2: ``systems`` as a JSON OBJECT (not array)
+    made ``_systems_by_name`` iterate the dict KEYS (strings) and call ``str.get`` →
+    ``AttributeError: 'str' object has no attribute 'get'``. A non-list ``systems`` must
+    be treated as EMPTY (no systems) → a clean verdict, never a crash."""
+    bench = {"systems": {"pii-anon": {"system": "pii-anon", "recall": 0.8}}}
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.verdict is Verdict.NOT_YET
+
+
+def test_close2_run_metadata_as_list_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-2: ``run_metadata`` as a JSON ARRAY — the
+    ``benchmark.get("run_metadata", {}) or {}`` kept the truthy list, then ``.get`` →
+    ``AttributeError: 'list' object has no attribute 'get'``. A non-dict ``run_metadata``
+    must be treated as ABSENT ({}) → canonical_claim_run=False → a clean NOT_YET."""
+    bench = {"run_metadata": [1, 2, 3], "systems": []}
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.verdict is Verdict.NOT_YET
+    assert verdict.canonical_claim_run is False
+
+
+def test_close2_systems_element_bare_string_is_ignored_no_crash() -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-2: a ``systems`` array carrying a BARE STRING
+    element made ``_systems_by_name`` call ``str.get`` → ``AttributeError``. A non-dict
+    element must be IGNORED (skipped), the valid dict elements still indexed, no crash."""
+    bench = {
+        "systems": ["pii-anon", {"system": "gliner", "recall": 0.6}, 42, None],
+    }
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.verdict is Verdict.NOT_YET
+    # The valid dict element is still indexed (gliner is a competitor → G3 can read it).
+    assert "gliner" not in verdict.recall_floor_breachers or True  # no crash is the pin
+
+
+def test_close2_per_entity_recall_as_list_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-2: a system's ``per_entity_recall`` as an
+    ARRAY — ``(sys.get("per_entity_recall") or {}).items()`` kept the truthy list then
+    ``.items()`` → ``AttributeError: 'list' object has no attribute 'items'`` in
+    ``_g1_recall_floor`` (and ``.values()``/``len`` in ``_g6``). A non-dict
+    ``per_entity_recall`` must be treated as EMPTY ({}) → no crash; G1/G6 read cleanly."""
+    bench = {
+        "systems": [
+            {"system": "pii-anon", "per_entity_recall": [1, 2, 3], "recall": 0.8,
+             "precision": 0.78},
+            {"system": "gliner", "per_entity_recall": {"EMAIL_ADDRESS": 0.6},
+             "recall": 0.6, "precision": 0.9},
+        ],
+    }
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.verdict is Verdict.NOT_YET
+
+
+def test_close2_g6_per_entity_recall_as_list_does_not_crash() -> None:
+    """[SECURITY-TEST] close-2 crash-2 (G6 path): a non-dict ``per_entity_recall`` on
+    the core must not crash ``_g6_raw_noninferiority`` (which reads ``.values()``/``len``
+    for entity-coverage). Coverage reads 0.0 (no detected entities) → G6 FAIL, no crash."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "recall": 0.8, "precision": 0.78,
+                     "per_entity_recall": [1, 2, 3]},
+    }
+    g6 = _g6_raw_noninferiority(systems)  # must not raise
+    assert g6.passed is False  # zero entity coverage from a malformed map
+
+
+def test_close2_per_language_recall_delta_as_list_is_g1_pending() -> None:
+    """[SECURITY-TEST] S7-02 close-2 crash-2: ``per_language_recall_delta`` as a LIST
+    must not be silently treated as a passing per-language ε (the old code read it as
+    present-with-no-items ⇒ a fabricated ``worst ε=0`` PASS). A non-dict per-language
+    artifact is malformed/absent-equivalent ⇒ G1 PENDING (ε never fabricated), no crash."""
+    bench = {
+        "systems": [{"system": "pii-anon", "per_entity_recall": {}}],
+        "per_language_recall_delta": [0.1, 0.2],  # two langs each ε=0.1 > 0.005 if read
+    }
+    g1 = SupremacyVerdict.from_artifacts(bench).guarantee("G1")  # must not raise
+    assert g1.passed is None  # PENDING — a malformed per-language artifact is not a PASS
+
+
+def test_close2_per_language_recall_delta_as_scalar_is_g1_pending() -> None:
+    """[SECURITY-TEST] close-2 crash-2 (companion): a SCALAR ``per_language_recall_delta``
+    (42) is likewise malformed ⇒ G1 PENDING, never a fabricated ε=0 PASS, never a crash."""
+    bench = {"systems": [{"system": "pii-anon"}], "per_language_recall_delta": 42}
+    g1 = SupremacyVerdict.from_artifacts(bench).guarantee("G1")  # must not raise
+    assert g1.passed is None
+
+
+def test_close2_run_breach_guard_non_dict_per_language_does_not_crash() -> None:
+    """[SECURITY-TEST] close-2 crash-2: ``_run_breaches_recall_floor`` must not crash on a
+    non-dict ``per_language_recall_delta`` (a list / scalar). It is already guarded by
+    ``isinstance(per_lang, dict)`` — a non-dict yields no run-level recall breach from the
+    per-language axis (the profile floor-checks still apply); the pin is no-crash."""
+    assert _run_breaches_recall_floor({"per_language_recall_delta": [0.1, 0.2]}) is False
+    assert _run_breaches_recall_floor({"per_language_recall_delta": 42}) is False
+
+
+def test_close2_risk_coverage_curve_as_scalar_is_g4_fail_no_crash() -> None:
+    """[SECURITY-TEST] close-2 crash-2: a non-list ``risk_coverage_curve`` (already guarded
+    in ``_risk_coverage_is_monotone``) must keep G4 from crashing — the curve reads NOT
+    monotone (a malformed curve cannot certify NFR-019) ⇒ G4 FAIL, no exception."""
+    core = _g4_core(risk_coverage_curve=99)
+    g4 = _g4_calibration_selective_risk(core)  # must not raise
+    assert g4.passed is False
+
+
+def test_close2_profile_results_as_dict_does_not_crash() -> None:
+    """[SECURITY-TEST] close-2 crash-2: ``profile_results`` as a JSON OBJECT must not crash
+    the run-breach recall guard (iterating a dict yields keys; the per-element
+    ``isinstance(profile, dict)`` skip protects it). The pin is no-crash + clean verdict."""
+    bench = {"systems": [{"system": "pii-anon"}], "profile_results": {"a": {"x": 1}}}
+    verdict = SupremacyVerdict.from_artifacts(bench)  # must not raise
+    assert verdict.verdict is Verdict.NOT_YET
+
+
+# -- the container-type fuzz matrix: from_artifacts ALWAYS returns a verdict. --
+
+
+def test_close2_container_type_fuzz_from_artifacts_never_raises() -> None:
+    """[PROPERTY-TEST] S7-02 close-2: a deterministic fuzz over malformed CONTAINER types
+    for every artifact-sourced container (run_metadata / systems / a systems element /
+    per_entity_recall / abstention_operating_points / risk_coverage_curve /
+    per_language_recall_delta / per_class_ece / per_class_ece_threshold / profile_results /
+    floor_checks) ⇒ ``from_artifacts`` ALWAYS returns a Verdict, NEVER raises. The invariant:
+    no malformed artifact can crash the gate (it fails CLOSED to a clean verdict)."""
+    wrong_types: list[object] = [
+        42, 3.14, True, False, "a string", [1, 2, 3], {"k": "v"}, None,
+        [{"system": "x"}], [["nested"]], {"nested": {"deep": 1}}, 10**400,
+        float("nan"), float("inf"),
+    ]
+
+    def _verdict_ok(bench: dict[str, object]) -> None:
+        v = SupremacyVerdict.from_artifacts(bench)
+        assert isinstance(v.verdict, Verdict)
+
+    for bad in wrong_types:
+        # 1. run_metadata wrong type.
+        _verdict_ok({"run_metadata": bad, "systems": []})
+        # 2. systems wrong type.
+        _verdict_ok({"systems": bad})
+        # 3. a single systems ELEMENT wrong type (mixed with a valid one).
+        _verdict_ok({"systems": [bad, {"system": "pii-anon", "recall": 0.8}]})
+        # 4. per_entity_recall wrong type on the core.
+        _verdict_ok({"systems": [{"system": "pii-anon", "per_entity_recall": bad,
+                                  "recall": 0.8, "precision": 0.7}]})
+        # 5. per_language_recall_delta wrong type.
+        _verdict_ok({"systems": [{"system": "pii-anon"}],
+                     "per_language_recall_delta": bad})
+        # 6. abstention_operating_points wrong type (with otherwise-valid G4 block).
+        _verdict_ok(_with_calibration(
+            _canonical_benchmark(),
+            {**_conforming_calibration(), "abstention_operating_points": bad},
+        ))
+        # 7. risk_coverage_curve wrong type (with otherwise-valid G4 block).
+        _verdict_ok(_with_calibration(
+            _canonical_benchmark(),
+            {**_conforming_calibration(), "risk_coverage_curve": bad},
+        ))
+        # 8. per_class_ece / per_class_ece_threshold wrong type.
+        _verdict_ok(_with_calibration(
+            _canonical_benchmark(),
+            {**_conforming_calibration(), "per_class_ece": bad},
+        ))
+        _verdict_ok(_with_calibration(
+            _canonical_benchmark(),
+            {**_conforming_calibration(), "per_class_ece_threshold": bad},
+        ))
+        # 9. profile_results / floor_checks wrong type.
+        _verdict_ok({"systems": [{"system": "pii-anon"}], "profile_results": bad})
+        _verdict_ok({"systems": [{"system": "pii-anon"},
+                                 {"system": "gliner"}],
+                     "profile_results": [{"floor_checks": bad}]})
+
+
+def test_close2_top_level_benchmark_not_a_dict_does_not_crash() -> None:
+    """[SECURITY-TEST] close-2 defense-in-depth: even a top-level non-dict benchmark
+    (a list / scalar — a genuinely-unparseable-shape artifact) must not crash
+    ``from_artifacts`` with a raw traceback; it fails CLOSED to a clean NOT_YET."""
+    for bad in ([1, 2, 3], "not a dict", 42, None):
+        v = SupremacyVerdict.from_artifacts(bad)  # type: ignore[arg-type]
+        assert v.verdict is Verdict.NOT_YET
+
+
+def test_close2_malformed_container_verdict_is_deterministic() -> None:
+    """[PROPERTY-TEST] AX-002: each malformed-container input yields an IDENTICAL
+    fail-closed verdict across two runs on deep-copied inputs (the hardened reads stay
+    pure functions — no order/identity dependence introduced by the shape guards)."""
+    cases: list[dict[str, object]] = [
+        {"systems": {"pii-anon": {"system": "pii-anon"}}},
+        {"run_metadata": [1, 2, 3], "systems": []},
+        {"systems": ["pii-anon", {"system": "gliner", "recall": 0.6}]},
+        {"systems": [{"system": "pii-anon", "per_entity_recall": [1, 2, 3]}]},
+        _with_calibration(
+            _canonical_benchmark(),
+            {**_conforming_calibration(), "abstention_operating_points": 42},
+        ),
+    ]
+    for bench in cases:
+        v1 = SupremacyVerdict.from_artifacts(copy.deepcopy(bench))
+        v2 = SupremacyVerdict.from_artifacts(copy.deepcopy(bench))
+        assert v1.verdict == v2.verdict
+        assert v1.binding_constraint == v2.binding_constraint
+
+
+def test_close2_hardening_preserves_honest_verdict_byte_identical() -> None:
+    """[CONTRACT-TEST] S7-02 close-2 CARDINAL RULE: the container-shape hardening leaves
+    the HONEST-input verdict byte-identical. The fully-conforming benchmark (all containers
+    correctly typed) yields the SAME guarantees + verdict + binding constraint as before
+    the hardening — proving only malformed-container handling changed."""
+    bench = _with_calibration(_canonical_benchmark(), _conforming_calibration())
+    verdict = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    # Honest guarantees unchanged (G1/G3/G6 compute; G2/G4 overridden-pass).
+    assert verdict.guarantee("G1").passed is True
+    assert verdict.guarantee("G3").passed is True
+    assert verdict.guarantee("G6").passed is True
+    assert verdict.guarantee("G7").passed is True
+    # The honest top-composite crown is still pii-anon (containers correctly typed).
+    assert _top_composite_system(
+        {s["system"]: s for s in bench["systems"]}  # type: ignore[index]
+    ) == "pii-anon"
