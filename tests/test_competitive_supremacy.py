@@ -39,6 +39,7 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     _g6_raw_noninferiority,
     _is_finite_number,
     _run_breaches_recall_floor,
+    _tier_status_input,
     _top_composite_system,
     f_beta,
     recall_floor_breachers,
@@ -2669,3 +2670,85 @@ def test_close2_hardening_preserves_honest_verdict_byte_identical() -> None:
     assert _top_composite_system(
         {s["system"]: s for s in bench["systems"]}  # type: ignore[index]
     ) == "pii-anon"
+
+
+# ---------------------------------------------------------------------------
+# S7-02 FINAL confirmatory close — the unhashable-ELEMENT crash class.
+# close-2 hardened wrong container TYPES; this closes unhashable ELEMENTS *inside*
+# the two artifact containers that reach a ``set()`` / ``in frozenset``:
+#   (a) an ``available_competitors`` element  -> off-limits ``set(available_competitors)``
+#   (b) a ``floor_checks[].metric`` value     -> ``metric in _RECALL_FLOOR_METRICS``
+# Both raised ``TypeError: unhashable type`` from the PUBLIC ``from_artifacts`` (a
+# denial-of-verdict — no Verdict returned), violating the cardinal "never raises".
+# ---------------------------------------------------------------------------
+
+
+def test_closefinal_available_competitors_unhashable_element_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 final close: ``available_competitors`` carrying an UNHASHABLE
+    element (a dict / nested list) crashed the OFF-LIMITS ``run_status_from_benchmark``
+    (``set(available_competitors)`` → ``TypeError: unhashable type``) via the public
+    ``from_artifacts`` (no Verdict returned). The gate's shield ``_tier_status_input`` must
+    drop non-str (hence every unhashable) elements → a clean verdict, never a crash."""
+    for bad_elem in ({}, {"system": "x"}, ["nested"], [1, 2, 3]):
+        v = SupremacyVerdict.from_artifacts({"available_competitors": [bad_elem]})
+        assert v.verdict is Verdict.NOT_YET
+
+
+def test_closefinal_available_competitors_mixed_keeps_str_drops_unhashable() -> None:
+    """[CONTRACT-TEST] final close: the shield keeps the HASHABLE str names (behaviour-
+    preserving — a real ``available_competitors`` is a list of strings) and drops only the
+    non-str / unhashable elements (crash-safe) before the off-limits ``set(...)`` sees them."""
+    shielded = _tier_status_input(
+        {"available_competitors": ["gliner", {}, "presidio", ["x"], 42]}, {}
+    )
+    assert shielded["available_competitors"] == ["gliner", "presidio"]
+
+
+def test_closefinal_floor_check_metric_unhashable_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 final close: a ``floor_checks`` entry whose ``metric`` is
+    UNHASHABLE (dict / list) crashed ``_run_breaches_recall_floor`` at
+    ``metric in _RECALL_FLOOR_METRICS`` (``TypeError: unhashable type``) via the public
+    ``from_artifacts``. A non-str metric can never be a recall-floor metric → guarded out."""
+    for bad_metric in ({"x": 1}, [1, 2, 3], ["recall"]):
+        bench = {
+            "systems": [{"system": "pii-anon", "recall": 0.8}],
+            "profile_results": [{"floor_checks": [{"metric": bad_metric, "passed": False}]}],
+        }
+        v = SupremacyVerdict.from_artifacts(bench)
+        assert v.verdict is Verdict.NOT_YET
+
+
+def test_closefinal_run_breach_guard_unhashable_metric_no_crash_preserves_str() -> None:
+    """[SECURITY-TEST] final close: ``_run_breaches_recall_floor`` ignores an unhashable
+    metric (no crash, no breach) while a genuine str metric still triggers a breach —
+    behaviour-preserving for honest input (the only added logic is an ``isinstance`` guard)."""
+    assert (
+        _run_breaches_recall_floor(
+            {"profile_results": [{"floor_checks": [{"metric": {"x": 1}, "passed": False}]}]}
+        )
+        is False
+    )
+    # honest str metric "recall" with passed=False still breaches (unchanged behaviour)
+    assert (
+        _run_breaches_recall_floor(
+            {"profile_results": [{"floor_checks": [{"metric": "recall", "passed": False}]}]}
+        )
+        is True
+    )
+
+
+def test_closefinal_unhashable_element_fuzz_from_artifacts_never_raises() -> None:
+    """[PROPERTY-TEST] S7-02 final close: a fuzz over UNHASHABLE elements in the two slots
+    that reach a ``set()`` / ``in frozenset`` (``available_competitors`` element +
+    ``floor_checks[].metric``) — ``from_artifacts`` ALWAYS returns a Verdict, never raises."""
+    unhashables: list[object] = [{}, {"k": "v"}, [1, 2], [{"system": "x"}], [["nested"]]]
+    for bad in unhashables:
+        v1 = SupremacyVerdict.from_artifacts({"available_competitors": [bad, "gliner"]})
+        assert isinstance(v1.verdict, Verdict)
+        v2 = SupremacyVerdict.from_artifacts(
+            {
+                "systems": [{"system": "pii-anon", "recall": 0.8}],
+                "profile_results": [{"floor_checks": [{"metric": bad, "passed": False}]}],
+            }
+        )
+        assert isinstance(v2.verdict, Verdict)
