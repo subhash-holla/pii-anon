@@ -456,13 +456,19 @@ def _tier_status_input(
     (the S7-02 close-2 crash class). The gate cannot edit that module, so it shields
     it at the call site: pass the ALREADY-VALIDATED ``systems`` map (dict-only
     elements, from :func:`_systems_by_name`) re-listed, and ``available_competitors``
-    coerced to a list (a non-list → empty). Pure: builds a new dict, never mutates
-    the input.
+    coerced to a list of its str (hashable) elements — a non-list → empty; non-str /
+    unhashable elements (dict / nested list) are DROPPED so the off-limits ``set(...)``
+    never sees an unhashable element. Pure: builds a new dict, never mutates the input.
     """
     available = benchmark.get("available_competitors")
+    available_list = available if isinstance(available, list) else []
     return {
         "systems": list(systems.values()),
-        "available_competitors": available if isinstance(available, list) else [],
+        # Only str (hashable) names survive: an UNHASHABLE element (dict / nested list)
+        # would crash the off-limits ``set(available_competitors)`` (the S7-02 final-close
+        # unhashable-element class); a non-str can never match a known competitor name, so
+        # dropping it is honest + behaviour-preserving.
+        "available_competitors": [c for c in available_list if isinstance(c, str)],
     }
 
 
@@ -538,7 +544,14 @@ def _run_breaches_recall_floor(benchmark: dict[str, Any]) -> bool:
             if not isinstance(check, dict):
                 continue
             metric = check.get("metric")
-            if metric in _RECALL_FLOOR_METRICS and check.get("passed") is False:
+            # ``metric`` must be a str: an UNHASHABLE metric (dict / list) would crash
+            # ``metric in _RECALL_FLOOR_METRICS`` (the S7-02 final-close unhashable class);
+            # a non-str metric can never name a recall-floor metric, so it is no breach.
+            if (
+                isinstance(metric, str)
+                and metric in _RECALL_FLOOR_METRICS
+                and check.get("passed") is False
+            ):
                 return True
     return False
 
