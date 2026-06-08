@@ -320,7 +320,12 @@ class SupremacyVerdict:
         run_metadata = benchmark.get("run_metadata")
         if not isinstance(run_metadata, dict):
             run_metadata = {}
-        canonical = bool(run_metadata.get("canonical_claim_run", False))
+        # STRICT bool: the flag is BOOLEAN, so only the literal ``True`` certifies — ``bool(…)``
+        # coercion forged a certified run from a TRUTHY-but-not-True value (most damningly the
+        # STRING "false"/"no"/"0", read as false but coerced to True ⇒ forged G7 PASS / SOTA;
+        # the S7-02 final-close canonical_claim_run coercion fabrication). Producer emits a real
+        # bool, so ``is True`` is behaviour-preserving.
+        canonical = run_metadata.get("canonical_claim_run") is True
 
         systems = _systems_by_name(benchmark)
         overrides = pending_overrides or {}
@@ -1278,7 +1283,12 @@ def _g7_certified_run(
     constraint on a non-canonical run stays ``canonical_claim_run=False`` (the
     canonical gate is binding-priority #1; the guard never displaces it).
     """
-    canonical = bool(run_metadata.get("canonical_claim_run", False))
+    # STRICT bool: the flag is BOOLEAN, so only the literal ``True`` certifies. ``bool(…)``
+    # coercion forged a certified run from a TRUTHY-but-not-True value — most damningly the
+    # STRING "false"/"no"/"0" (read as false, coerced to True) ⇒ forged G7 PASS / SOTA (the
+    # S7-02 final-close canonical_claim_run coercion fabrication). The producer emits a real
+    # bool, so ``is True`` is behaviour-preserving.
+    canonical = run_metadata.get("canonical_claim_run") is True
     # A provenance stamp is PRESENT only as a NON-BLANK STRING — ``not …get(f)`` admitted
     # truthy whitespace / int / bool / non-empty containers and forged G7 PASS (the
     # S7-02 final-close G7 fail-OPEN fabrication). Honest stamps (git_sha/sha256/timestamp)
