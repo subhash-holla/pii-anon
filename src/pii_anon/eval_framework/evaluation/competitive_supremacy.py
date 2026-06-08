@@ -1246,6 +1246,18 @@ def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResul
     return GuaranteeResult("G6", passed, core_f2, best_tier_r - EPS_F2, detail)
 
 
+def _is_nonblank_str(value: object) -> bool:
+    """A provenance / identifier stamp is PRESENT only as a NON-BLANK STRING.
+
+    The G7 fail-OPEN fabrication (S7-02 final close): ``not run_metadata.get(f)`` admitted a
+    TRUTHY-but-invalid value (a whitespace-only string, an int, a bool, a non-empty list /
+    dict) as a present provenance stamp and forged a certified-run PASS ⇒ a forged
+    PROVISIONAL_SOTA. A real git_sha / sha256 / ISO timestamp is a non-empty string with
+    non-whitespace content; anything else is missing-equivalent.
+    """
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _g7_certified_run(
     run_metadata: dict[str, Any],
     systems: dict[str, dict[str, Any]],
@@ -1267,7 +1279,11 @@ def _g7_certified_run(
     canonical gate is binding-priority #1; the guard never displaces it).
     """
     canonical = bool(run_metadata.get("canonical_claim_run", False))
-    missing_prov = [f for f in _PROVENANCE_FIELDS if not run_metadata.get(f)]
+    # A provenance stamp is PRESENT only as a NON-BLANK STRING — ``not …get(f)`` admitted
+    # truthy whitespace / int / bool / non-empty containers and forged G7 PASS (the
+    # S7-02 final-close G7 fail-OPEN fabrication). Honest stamps (git_sha/sha256/timestamp)
+    # are non-blank strings, so this is behaviour-preserving for a real certified run.
+    missing_prov = [f for f in _PROVENANCE_FIELDS if not _is_nonblank_str(run_metadata.get(f))]
 
     top_system = _top_composite_system(systems)
     core_breaches = _CORE_SYSTEM in breachers

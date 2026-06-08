@@ -804,9 +804,13 @@ def create_app() -> Any:
         try:
             benchmark = json.loads(path.read_text(encoding="utf-8"))
             verdict = SupremacyVerdict.from_artifacts(benchmark)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
+            # RecursionError: a deeply-nested (>~10k level) JSON artifact makes json.loads
+            # blow the parser's recursion guard — it is NOT a JSONDecodeError, so without
+            # this it tracebacked out of the shipped command (S7-02 final-close DoV crash).
             raise typer.BadParameter(
-                f"benchmark artifact is not valid JSON ({artifact}): {exc}"
+                f"benchmark artifact is not valid JSON ({artifact}): "
+                f"{type(exc).__name__}: {exc}"
             )
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             # The gate is hardened not to reach here on a malformed container; this is

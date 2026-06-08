@@ -741,6 +741,12 @@ class CanonicalRunGate:
             _is_finite_number,
         )
 
+        # A directly-injected hostile payload (the gate class is exported) may be a non-dict
+        # (a json.loads of a top-level array) — ``payload.get`` would crash (S7-02 final-close
+        # DoV). Fail CLOSED, never raise.
+        if not isinstance(payload, dict):
+            return False, ["payload: not a dict (malformed artifact)"]
+
         missing: list[str] = []
         run_metadata = payload.get("run_metadata", {})
         if not isinstance(run_metadata, dict):
@@ -772,7 +778,9 @@ class CanonicalRunGate:
                 if field not in prov:
                     missing.append(f"canonical_provenance.{field}: absent")
             scope = prov.get("scope")
-            if scope not in {"data-v2.0.0", "representative-in-tree"}:
+            # ``scope`` must be a str: an UNHASHABLE scope (a list) crashed ``scope not in {…}``
+            # (TypeError: unhashable — S7-02 final-close DoV). A non-str scope is not honest.
+            if not (isinstance(scope, str) and scope in {"data-v2.0.0", "representative-in-tree"}):
                 missing.append(
                     f"canonical_provenance.scope: {scope!r} not an honest scope"
                 )
