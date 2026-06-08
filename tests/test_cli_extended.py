@@ -115,3 +115,18 @@ def test_cli_main_importerror_path(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert "CLI dependencies are not installed" in str(exc.value)
+
+
+def test_supremacy_deeply_nested_artifact_does_not_traceback(
+    runner, tmp_path: Path
+) -> None:
+    """[SECURITY-TEST] S7-02 final close: a deeply-nested JSON artifact made ``json.loads`` raise
+    ``RecursionError`` (NOT a ``JSONDecodeError``), bypassing the CLI's JSON-parse catch ⇒ a raw
+    RecursionError traceback out of the shipped ``supremacy`` command. The CLI must emit a clean
+    error + non-zero exit, never leak a RecursionError."""
+    app = create_app()
+    deep = tmp_path / "deep.json"
+    deep.write_text("[" * 60000 + "1" + "]" * 60000, encoding="utf-8")
+    result = runner.invoke(app, ["supremacy", "--artifact", str(deep)])
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, RecursionError)

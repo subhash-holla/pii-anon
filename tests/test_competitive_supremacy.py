@@ -2752,3 +2752,41 @@ def test_closefinal_unhashable_element_fuzz_from_artifacts_never_raises() -> Non
             }
         )
         assert isinstance(v2.verdict, Verdict)
+
+
+# ---------------------------------------------------------------------------
+# S7-02 FINAL close (round 2) — the G7 provenance fail-OPEN FABRICATION.
+# G7 read each provenance stamp "present" via ``not run_metadata.get(f)``, so a
+# TRUTHY-but-invalid value (whitespace-only string / int / bool / non-empty list
+# or dict) was admitted as present ⇒ a forged G7 PASS ⇒ a forged PROVISIONAL_SOTA
+# certified run. A real git_sha / sha256 / ISO-timestamp is a NON-BLANK STRING.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("forged", ["   ", "\t\n ", 1, True, [1, 2], {"a": 1}])
+def test_closefinal_g7_truthy_nonstring_provenance_does_not_forge_pass(forged: object) -> None:
+    """[SECURITY-TEST] S7-02 final close (FABRICATION): a TRUTHY-but-invalid provenance value
+    (whitespace-only string, int, bool, non-empty list/dict) was read as a present stamp by
+    ``not run_metadata.get(f)`` ⇒ forged G7 PASS. A non-blank STRING is required; anything
+    else is missing-equivalent ⇒ G7 FAIL."""
+    bench = _canonical_benchmark()
+    bench["run_metadata"]["git_sha"] = forged  # type: ignore[index]
+    assert SupremacyVerdict.from_artifacts(bench).guarantee("G7").passed is False
+
+
+def test_closefinal_g7_honest_provenance_still_passes() -> None:
+    """[CONTRACT-TEST] CARDINAL RULE: real non-blank-string provenance still PASSES G7
+    (behaviour-preserving — ``_canonical_benchmark`` carries git_sha='deadbeef' etc.)."""
+    assert SupremacyVerdict.from_artifacts(_canonical_benchmark()).guarantee("G7").passed is True
+
+
+def test_closefinal_g7_whitespace_provenance_does_not_forge_provisional_sota() -> None:
+    """[SECURITY-TEST] end-to-end FABRICATION pin: a strong artifact (all guarantees pass via
+    overrides) with WHITESPACE on all 4 provenance fields + canonical_claim_run=True FORGED a
+    PROVISIONAL_SOTA (G7 PASS). The forge must collapse to NOT_YET (G7 FAIL)."""
+    bench = _canonical_benchmark()
+    for f in ("git_sha", "dataset_sha256", "matrix_sha256", "timestamp_utc"):
+        bench["run_metadata"][f] = "   "  # type: ignore[index]
+    v = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    assert v.guarantee("G7").passed is False
+    assert v.verdict is Verdict.NOT_YET

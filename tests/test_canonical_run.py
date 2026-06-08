@@ -1022,3 +1022,49 @@ def _without_timestamp(payload: dict[str, Any]) -> str:
     prov = rm.get("canonical_provenance", {})
     prov.pop("timestamp_utc", None)
     return json.dumps(clean, sort_keys=True, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# S7-02 FINAL close (round 2) — CanonicalRunGate.validate must FAIL-CLOSED, not
+# crash, on a hostile directly-injected payload (the gate class is exported).
+# ---------------------------------------------------------------------------
+
+
+def test_closefinal_canonical_gate_validate_non_dict_payload_does_not_crash() -> None:
+    """[SECURITY-TEST] S7-02 final close: ``CanonicalRunGate.validate`` on a non-dict payload
+    (a ``json.loads`` of a top-level array) called ``payload.get`` → ``AttributeError``. It
+    must fail CLOSED (ok=False), never raise."""
+    ok, missing = CanonicalRunGate().validate([1, 2, 3])  # type: ignore[arg-type]
+    assert ok is False
+    assert missing
+
+
+def test_closefinal_canonical_gate_validate_unhashable_scope_does_not_crash() -> None:
+    """[SECURITY-TEST] final close: an UNHASHABLE ``canonical_provenance.scope`` (a list)
+    crashed ``scope not in {…}`` (``TypeError: unhashable``). A non-str scope is not an honest
+    scope ⇒ ok=False + a scope finding, never a crash."""
+    payload = {
+        "run_metadata": {
+            "git_sha": "a",
+            "dataset_sha256": "b",
+            "matrix_sha256": "c",
+            "timestamp_utc": "t",
+            "canonical_provenance": {
+                "seed": 1,
+                "gate_id": "g",
+                "scope": ["data-v2.0.0"],
+                "sample_size": 8,
+                "dataset_sha256": "b",
+                "matrix_sha256": "c",
+                "git_sha": "a",
+                "timestamp_utc": "t",
+                "dataset_version": "v",
+                "power_cells": {},
+            },
+        },
+        "per_language_recall_delta": {"en": 0.0},
+        "systems": [{"system": "pii-anon"}, {"system": "gliner"}],
+    }
+    ok, missing = CanonicalRunGate().validate(payload)  # must not raise
+    assert ok is False
+    assert any("scope" in m for m in missing)
