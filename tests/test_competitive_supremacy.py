@@ -2790,3 +2790,30 @@ def test_closefinal_g7_whitespace_provenance_does_not_forge_provisional_sota() -
     v = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
     assert v.guarantee("G7").passed is False
     assert v.verdict is Verdict.NOT_YET
+
+
+@pytest.mark.parametrize("forged", ["false", "no", "0", "True", 1, [1], {"x": 1}])
+def test_closefinal_canonical_claim_run_must_be_strict_true_no_coercion_forge(
+    forged: object,
+) -> None:
+    """[SECURITY-TEST] S7-02 final close (FABRICATION): ``canonical_claim_run`` was read via
+    ``bool(run_metadata.get(...))``, so a TRUTHY-but-not-True value forged a certified run —
+    most damningly the STRING "false"/"no"/"0" (which a human reads as false) coerces to True ⇒
+    forged G7 PASS ⇒ forged PROVISIONAL_SOTA. The flag is BOOLEAN; only the literal ``True``
+    (a real bool, as the producer emits) certifies the run."""
+    bench = _canonical_benchmark()
+    bench["run_metadata"]["canonical_claim_run"] = forged  # type: ignore[index]
+    v = SupremacyVerdict.from_artifacts(bench, pending_overrides=_ALL_PENDING_PASS)
+    assert v.guarantee("G7").passed is False
+    assert v.canonical_claim_run is False
+    assert v.verdict is Verdict.NOT_YET
+
+
+def test_closefinal_canonical_claim_run_real_true_still_certifies() -> None:
+    """[CONTRACT-TEST] CARDINAL RULE: a real bool ``True`` (the producer's output) still
+    certifies — G7 PASS + canonical_claim_run True (behaviour-preserving)."""
+    v = SupremacyVerdict.from_artifacts(
+        _canonical_benchmark(), pending_overrides=_ALL_PENDING_PASS
+    )
+    assert v.canonical_claim_run is True
+    assert v.guarantee("G7").passed is True
