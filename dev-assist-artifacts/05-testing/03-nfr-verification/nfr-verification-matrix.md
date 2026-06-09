@@ -13,7 +13,7 @@
 | NFR-003 | bootstrap CI coverage 93–97% | DEFERRED | S3-02 (MLE tier) |
 | NFR-004 | power tiers 1522/753/200 | DEFERRED | S1-03 + eval-data power ladder (exists) |
 | NFR-006 | canonical-run provenance 100% | DEFERRED | S4-02 (CanonicalRunGate) |
-| NFR-007/008/009/010 | latency (honest tiers) + throughput | DEFERRED | S2/S7; commit p50/p95/p99 per class (S7-04) |
+| NFR-007/008/009/010 | latency (honest tiers) + throughput | NFR-009 VERIFIED-in-tree (S7-04: committed p50/p95/p99 ceilings `latency_ceilings.py` pinned by `test_latency_ceilings.py`; gate `_g5_audit_latency` + producer measured-latency LIVE; full-census latency = Pass-2); NFR-007/008/010 DEFERRED | S2/S7; per-detector-class p50/p95/p99 = Pass-2 (the `detector_class` seam) |
 | NFR-012 | Tier-3 RRS powered ≥385 | DEFERRED | S5-02; ⛓ eval-data S6 `assemble_paired_set` |
 | NFR-013 | MIA LiRA@128 + TPR@low-FPR | DEFERRED | S5-03; ⛓ eval-data S6 canary |
 | NFR-014/015 | pseudonymization integrity + key/state separation | DEFERRED | S4-01/S6-03 |
