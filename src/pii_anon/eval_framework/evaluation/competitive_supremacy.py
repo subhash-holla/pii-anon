@@ -35,7 +35,15 @@ to ``False`` with ``all(...)``.
   calibration fields the S4-03 ``SelectiveRiskReporter`` emits; PENDING when the
   artifact lacks those fields (the current smoke artifact does — never
   fabricated). **computable now (S4-03).**
-* **G5** Audit + orchestration latency / interception — PENDING ← S5/S6.
+* **G5** Audit + orchestration latency / interception — measured full-swarm
+  p50/p95/p99 within the committed NFR-009 ceilings (``latency_ceilings.py``;
+  artifact thresholds TIGHTEN-only) ∧ the 4-channel interception audit clean
+  (all four channels intercepted, ``no_raw_pii_persist`` strictly ``True``,
+  zero leaked spans, injection ASR ≤ 0 with benign-task success ≥ 0.95).
+  Computed by ``_g5_audit_latency`` from the ``run_metadata.latency_summary`` +
+  ``audit_summary`` blocks the S7 canonical run emits; PENDING when the
+  artifact lacks those blocks (the current smoke artifact does — never
+  fabricated). **computable now (S7-04).**
 * **G6** Non-inferiority on raw detection — core F2 ≥ best **Tier-R** F2 − ε_F ∧
   entity coverage ≥ 0.80. A Tier-C raw-F1 (e.g. OpenAI ≈0.96) exceeding pii-anon
   does NOT fail G6 — the explicit honesty carve-out, always recorded. **now.**
@@ -76,6 +84,7 @@ from .competitor_tiers import (
     unrun_tier_r,
     waive,
 )
+from .latency_ceilings import ceiling_for
 
 __all__ = [
     "J_BAR",
@@ -103,6 +112,20 @@ G4_ECE_BAR_HIGH_RESOURCE: float = 0.05  # NFR-017 high-resource ECE bar
 G4_ECE_BAR_LONG_TAIL: float = 0.08  # NFR-017 long-tail ECE bar
 G4_MIN_ABSTENTION_POINTS: int = 3  # NFR-021 ≥3 operating points
 G4_COVERAGE_REQUIRED: float = 1.0  # NFR-020 calibrated-confidence-coverage (the MUST)
+
+# G5 (audit + orchestration latency / interception, S7-04) bars — gate-owned,
+# NOT artifact-overridable (an artifact ceiling may only TIGHTEN the latency
+# bars; the audit bars cannot be touched at all). The committed per-profile
+# latency ceilings live in latency_ceilings.py (NFR-009).
+G5_MAX_ATTACK_SUCCESS_RATE: float = 0.0  # FR-029: zero exfiltration past the guard
+G5_MIN_BENIGN_TASK_SUCCESS: float = 0.95  # FR-029 anti-degenerate pairing
+# The four S6-02 agent channels (mirrors agentic.AgentChannel without importing
+# it — the gate stays import-isolated; a contract test pins the membership).
+_G5_CHANNELS: tuple[str, ...] = ("PROMPT", "MEMORY", "TOOL_IO", "TRACE")
+# A sane upper bound for artifact-supplied counts (records / channel counts):
+# a count beyond this is not a real measurement (and an absurd int must never
+# reach a detail string un-truncated — the int→str digit-limit DoV class).
+_G5_MAX_COUNT: int = 10**12
 
 # The system-under-test names (the "pii-anon recall ladder"); the moat axes are
 # measured on the best of these, raw non-inferiority on the core engine.
@@ -349,12 +372,20 @@ class SupremacyVerdict:
             if "G4" in overrides
             else _g4_calibration_selective_risk(systems)
         )
+        # G5 is now COMPUTED from the run_metadata latency/audit blocks (S7-04);
+        # an explicit pending_overrides['G5'] still wins (the successor-override
+        # seam is preserved for callers that drive G5 directly).
+        g5 = (
+            _pending_guarantee("G5", overrides["G5"])
+            if "G5" in overrides
+            else _g5_audit_latency(systems, run_metadata)
+        )
         guarantees = (
             _g1_recall_floor(benchmark, systems),
             g2,
             _g3_recall_dominance(systems),
             g4,
-            _pending_guarantee("G5", overrides.get("G5")),
+            g5,
             _g6_raw_noninferiority(systems),
             _g7_certified_run(run_metadata, systems, breachers),
         )
@@ -663,7 +694,7 @@ def _g1_recall_floor(
             "G1", None, float("nan"), EPS_RECALL_PER_LANG,
             "G1 PENDING: per_language_recall_delta artifact absent or malformed "
             "(structural superset "
-            + ("holds" if superset_ok else f"BREACHED on {sorted(missing, key=str)}")
+            + ("holds" if superset_ok else f"BREACHED on {_safe_names(missing)}")
             + "); per-language ε never fabricated",
         )
     # Each ε is a DELTA (can be negative) — validated by `_is_finite_number`, NOT
@@ -687,10 +718,10 @@ def _g1_recall_floor(
             f"ε={worst_lang_eps:.4g} ≤ {EPS_RECALL_PER_LANG}"
         )
     elif not superset_ok:
-        detail = f"G1 FAIL: ensemble misses competitor-detected entities {sorted(missing, key=str)}"
+        detail = f"G1 FAIL: ensemble misses competitor-detected entities {_safe_names(missing)}"
     elif corrupt_langs:
         detail = (
-            f"G1 FAIL: per-language recall ε on {sorted(corrupt_langs, key=str)} is non-finite / "
+            f"G1 FAIL: per-language recall ε on {_safe_names(corrupt_langs)} is non-finite / "
             f"out-of-float-range — a corrupt measurement that cannot certify the recall "
             f"floor (never slips ≤ {EPS_RECALL_PER_LANG}, never crashes)"
         )
@@ -700,6 +731,42 @@ def _g1_recall_floor(
             f"{EPS_RECALL_PER_LANG}"
         )
     return GuaranteeResult("G1", passed, worst_lang_eps, EPS_RECALL_PER_LANG, detail)
+
+
+def _safe_repr(value: object, limit: int = 120) -> str:
+    """A repr that can NEVER crash a gate detail string.
+
+    Two artifact-reachable crash classes (fail-loud denial-of-verdict):
+
+    * the CPython int→str conversion limit — ``repr``/``str`` of an int wider
+      than ~4300 digits (e.g. ``10**5000``) raises :class:`ValueError`. The
+      prior close rounds fuzzed ``10**400`` (401 digits, under the limit), so
+      this class survived seven rounds un-probed;
+    * a direct-dict caller can supply an object whose ``__repr__`` itself
+      raises (the public ``from_artifacts`` accepts any dict).
+
+    Both fail CLOSED into a typed placeholder; long honest reprs are truncated
+    so a detail string stays readable. Honest str/float values render exactly
+    as ``repr`` would (behaviour-preserving for every real artifact).
+    """
+    try:
+        out = repr(value)
+    except Exception:
+        return f"<unrepresentable {type(value).__name__}>"
+    if len(out) > limit:
+        return out[:limit] + "…(truncated)"
+    return out
+
+
+def _safe_names(items: Any) -> str:
+    """A crash-free, deterministically-ordered list rendering for detail strings.
+
+    ``f"{sorted(items, key=str)}"`` crashes twice on a huge-int member (the
+    sort key's ``str`` AND the list repr's element repr both hit the int→str
+    digit limit). Sorting and rendering through :func:`_safe_repr` keeps the
+    total order and the exact ``['a', 'b']`` shape for honest str members.
+    """
+    return "[" + ", ".join(_safe_repr(x) for x in sorted(items, key=_safe_repr)) + "]"
 
 
 def _is_finite_number(value: object) -> TypeGuard[int | float]:
@@ -1055,11 +1122,13 @@ def _g4_calibration_selective_risk(
     worst_slack = -math.inf  # (ece - bar); a non-finite ECE is the worst breach
     ece_ok = True
     finite_eces: list[float] = []
-    # ``key=str``: a direct dict caller can supply MIXED-TYPE keys (a str entity name + an
-    # int) — bare ``sorted`` then raises ``TypeError: '<' not supported between str and int``
-    # (the S7-02 close-8 DoV). A str-repr total order keeps every class (each ECE value is
-    # still validated below); JSON keys are always str so an honest run is unaffected.
-    for et in sorted(per_class_ece, key=str):
+    # ``key=_safe_repr``: a direct dict caller can supply MIXED-TYPE keys (a str entity
+    # name + an int) — bare ``sorted`` then raises ``TypeError: '<' not supported between
+    # str and int`` (the S7-02 close-8 DoV), and ``key=str`` itself crashes on an int KEY
+    # wider than the ~4300-digit int→str conversion limit (the S7-04 DoV class). A
+    # crash-free repr total order keeps every class (each ECE value is still validated
+    # below); JSON keys are always str so an honest run is unaffected.
+    for et in sorted(per_class_ece, key=_safe_repr):
         raw = per_class_ece[et]
         bar = _g4_class_bar(thresholds.get(et))
         if not _is_finite_number(raw):
@@ -1067,8 +1136,8 @@ def _g4_calibration_selective_risk(
             if worst_slack < math.inf:
                 worst_slack = math.inf
                 worst_detail = (
-                    f"per-class ECE on {et!r} is non-finite ({raw!r}) — a corrupt "
-                    f"measurement, not ≤ bar {bar:.4g} (NFR-017)"
+                    f"per-class ECE on {_safe_repr(et)} is non-finite ({_safe_repr(raw)}) "
+                    f"— a corrupt measurement, not ≤ bar {bar:.4g} (NFR-017)"
                 )
             continue
         ece = float(raw)
@@ -1087,9 +1156,9 @@ def _g4_calibration_selective_risk(
             if slack > worst_slack:
                 worst_slack = slack
                 worst_detail = (
-                    f"per-class ECE on {et!r} is negative ({ece:.4g}) — non-physical "
-                    f"(ECE ≥ 0 by construction), a corrupt measurement, not ≤ bar "
-                    f"{bar:.4g} (NFR-017)"
+                    f"per-class ECE on {_safe_repr(et)} is negative ({ece:.4g}) — "
+                    f"non-physical (ECE ≥ 0 by construction), a corrupt measurement, "
+                    f"not ≤ bar {bar:.4g} (NFR-017)"
                 )
             continue
         finite_eces.append(ece)
@@ -1099,7 +1168,7 @@ def _g4_calibration_selective_risk(
             if slack > worst_slack:
                 worst_slack = slack
                 worst_detail = (
-                    f"per-class ECE breach on {et!r} (ECE={ece:.4g} > bar "
+                    f"per-class ECE breach on {_safe_repr(et)} (ECE={ece:.4g} > bar "
                     f"{bar:.4g}; NFR-017)"
                 )
     max_ece = max(finite_eces, default=0.0)
@@ -1150,8 +1219,8 @@ def _g4_calibration_selective_risk(
     elif not coverage_ok:
         if not coverage_in_range:
             detail = (
-                f"G4 FAIL: calibrated-confidence-coverage={coverage!r} is not a "
-                f"valid fraction (finite, in [0,1], non-bool) — a bool / value >1.0 / "
+                f"G4 FAIL: calibrated-confidence-coverage={_safe_repr(coverage)} is not "
+                f"a valid fraction (finite, in [0,1], non-bool) — a bool / value >1.0 / "
                 f"non-finite is a corrupt artifact, never a pass (NFR-020 requires "
                 f"EXACTLY 1.0)"
             )
@@ -1206,6 +1275,393 @@ def _risk_coverage_is_monotone(curve: Any) -> bool:
     pts.sort(key=lambda cr: cr[0])
     risks = [r for _, r in pts]
     return all(hi >= lo - 1e-9 for lo, hi in zip(risks, risks[1:]))
+
+
+# ---------------------------------------------------------------------------
+# G5 — audit + orchestration latency / interception (S7-04)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _G5Half:
+    """One half of G5 (latency / audit), three-valued like the guarantee itself.
+
+    ``ok`` is ``True`` (clean) / ``False`` (a breach or a corrupt present
+    value) / ``None`` (missing-shape — a required block/key is absent, the
+    half cannot be evaluated and must read PENDING, never fabricated).
+    """
+
+    ok: bool | None
+    observed: float
+    bar: float
+    detail: str
+
+
+def _g5_genuine_count(value: object, *, minimum: int) -> int | None:
+    """``value`` as an int IFF it is a GENUINE count: an ``int`` that is not a
+    bool (``isinstance(True, int)`` is ``True`` — a flag is not a count), at
+    least ``minimum``, and within :data:`_G5_MAX_COUNT` (an absurd 10**5000
+    "count" is not a measurement — and must never reach a detail string
+    un-truncated, the int→str digit-limit DoV). ``None`` otherwise.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    if value < minimum or value > _G5_MAX_COUNT:
+        return None
+    return value
+
+
+def _g5_latency_bar(committed: float, artifact_threshold: object) -> float:
+    """The authoritative latency bar (ms), TIGHTENED — never loosened — by an
+    artifact-supplied ceiling (the :func:`_g4_class_bar` pattern on the latency
+    axis).
+
+    The committed per-profile budget (``latency_ceilings.py``) is the LOOSEST
+    bar the gate will ever permit. An artifact-supplied ceiling may only make
+    the bar STRICTER: ``min(artifact, committed)``. A non-finite / non-positive
+    artifact value (``NaN`` / ``+inf`` / ``-5`` / a bool / a huge int) is
+    REJECTED and the committed budget stands — a benchmark can never mask an
+    over-budget latency with a loosened (e.g. ``1e9``) ceiling.
+    """
+    if not _is_finite_number(artifact_threshold):
+        return committed
+    candidate = float(artifact_threshold)
+    if candidate <= 0.0:
+        return committed
+    return min(candidate, committed)
+
+
+def _g5_latency_half(
+    latency: dict[str, Any],
+    artifact_ceiling: Any,
+    systems: dict[str, dict[str, Any]],
+) -> _G5Half:
+    """The G5 latency half: measured full-swarm p50/p95/p99 ≤ the committed
+    NFR-009 per-profile budget (artifact ceiling TIGHTEN-only).
+
+    Missing-shape (an absent key / a literal ``None``) ⇒ ``ok=None`` (PENDING).
+    A present-but-invalid value (non-finite, negative, bool, out-of-order
+    percentiles, an unknown profile, a non-SUT system) ⇒ ``ok=False`` — a
+    corrupt present measurement can never certify, never crash, never pass.
+    """
+    required = ("system", "profile", "p50_ms", "p95_ms", "p99_ms", "n_records")
+    absent = [k for k in required if latency.get(k) is None]
+    if absent:
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            f"latency_summary lacks {absent} (missing-shape)",
+        )
+
+    system = latency.get("system")
+    if (
+        not _is_nonblank_str(system)
+        or system not in _LADDER_SYSTEMS
+        or system not in systems
+    ):
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"latency system {_safe_repr(system)} is not a benchmarked pii-anon "
+            f"ladder member — a non-SUT measurement cannot certify NFR-009",
+        )
+
+    profile = latency.get("profile")
+    committed = ceiling_for(profile)
+    if committed is None:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"latency profile {_safe_repr(profile)} names no committed budget — "
+            f"cannot certify against a committed ceiling (NFR-009)",
+        )
+
+    measured: dict[str, float] = {}
+    for key in ("p50_ms", "p95_ms", "p99_ms"):
+        raw = latency.get(key)
+        # Latency is milliseconds (NOT unit-bounded) — validated by
+        # _is_finite_number + a non-negativity bound. A NaN must never slip a
+        # ``≤ bar`` compare (silently False), a bool is a flag, a negative
+        # latency is non-physical, and a 10**400 must never crash float().
+        if not _is_finite_number(raw) or float(raw) < 0.0:
+            return _G5Half(
+                False, float("nan"), float("nan"),
+                f"measured {key}={_safe_repr(raw)} is not a real non-negative "
+                f"latency — a corrupt measurement cannot certify (NFR-009)",
+            )
+        measured[key] = float(raw)
+
+    if not (measured["p50_ms"] <= measured["p95_ms"] <= measured["p99_ms"]):
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"measured percentiles are out of order (p50={measured['p50_ms']:.4g} / "
+            f"p95={measured['p95_ms']:.4g} / p99={measured['p99_ms']:.4g} ms) — "
+            f"percentiles are monotone by construction; a corrupt measurement",
+        )
+
+    n_records = _g5_genuine_count(latency.get("n_records"), minimum=1)
+    if n_records is None:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"latency n_records={_safe_repr(latency.get('n_records'))} is not a "
+            f"genuine record count ≥ 1 — a corrupt timing-sample size",
+        )
+
+    ceiling_block = artifact_ceiling if isinstance(artifact_ceiling, dict) else {}
+    bars = {
+        "p50_ms": _g5_latency_bar(committed.p50_ms, ceiling_block.get("p50_ms")),
+        "p95_ms": _g5_latency_bar(committed.p95_ms, ceiling_block.get("p95_ms")),
+        "p99_ms": _g5_latency_bar(committed.p99_ms, ceiling_block.get("p99_ms")),
+    }
+
+    worst_key = ""
+    worst_slack = -math.inf
+    for key in ("p50_ms", "p95_ms", "p99_ms"):
+        slack = measured[key] - bars[key]
+        if slack > 0.0 and slack > worst_slack:
+            worst_slack = slack
+            worst_key = key
+    if worst_key:
+        return _G5Half(
+            False, measured[worst_key], bars[worst_key],
+            f"measured {worst_key.removesuffix('_ms')}={measured[worst_key]:.4g} ms "
+            f"> ceiling {bars[worst_key]:.4g} ms (profile {_safe_repr(profile)}; "
+            f"NFR-009)",
+        )
+
+    return _G5Half(
+        True, measured["p99_ms"], bars["p99_ms"],
+        f"latency within ceiling (p50 {measured['p50_ms']:.4g}/{bars['p50_ms']:.4g}, "
+        f"p95 {measured['p95_ms']:.4g}/{bars['p95_ms']:.4g}, "
+        f"p99 {measured['p99_ms']:.4g}/{bars['p99_ms']:.4g} ms; "
+        f"profile {_safe_repr(profile)}; n={n_records})",
+    )
+
+
+def _g5_audit_half(audit: dict[str, Any]) -> _G5Half:
+    """The G5 audit half: 4-channel least-privilege interception complete ∧
+    ``no_raw_pii_persist`` strictly ``True`` ∧ zero leaked spans ∧ injection
+    ASR ≤ :data:`G5_MAX_ATTACK_SUCCESS_RATE` with benign-task success ≥
+    :data:`G5_MIN_BENIGN_TASK_SUCCESS` (FR-026 / FR-028 / FR-029).
+
+    Every value is NESTED artifact data (the close-9 lesson — nested values are
+    first-class fabrication surface): counts via :func:`_g5_genuine_count`,
+    rates via :func:`_finite_unit_score`, the persist stamp via strict
+    ``is True`` (the canonical_claim_run coercion lesson). Missing-shape ⇒
+    PENDING; a present-but-invalid value or an honest breach ⇒ FAIL.
+    """
+    interception = audit.get("interception")
+    sankey = audit.get("leakage_sankey")
+    injection = audit.get("injection_resistance")
+    if (
+        not isinstance(interception, dict)
+        or not isinstance(sankey, dict)
+        or not isinstance(injection, dict)
+    ):
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            "audit_summary lacks a well-formed interception / leakage_sankey / "
+            "injection_resistance block (missing-shape)",
+        )
+
+    counts = interception.get("counts_by_channel")
+    if not isinstance(counts, dict):
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            "interception.counts_by_channel absent or malformed (missing-shape)",
+        )
+    missing_channels = [c for c in _G5_CHANNELS if c not in counts]
+    if missing_channels:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"interception is incomplete — channel(s) {missing_channels} carry no "
+            f"interception record (4-channel least-privilege requires ALL FOUR; "
+            f"FR-026/AX-006)",
+        )
+    for channel in _G5_CHANNELS:
+        if _g5_genuine_count(counts.get(channel), minimum=1) is None:
+            return _G5Half(
+                False, float("nan"), float("nan"),
+                f"interception count on {channel} = "
+                f"{_safe_repr(counts.get(channel))} is not a genuine count ≥ 1 — "
+                f"an unexercised or corrupt channel cannot certify",
+            )
+
+    persist = interception.get("no_raw_pii_persist")
+    if persist is None:
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            "interception.no_raw_pii_persist absent (missing-shape)",
+        )
+    # STRICT bool: only the literal True certifies (the canonical_claim_run
+    # coercion lesson — the string "true" / the int 1 are NOT an audit pass;
+    # an honest False is a real breach).
+    if persist is not True:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"no_raw_pii_persist={_safe_repr(persist)} — only the literal True "
+            f"certifies (a raw-PII persistence breach or a corrupt stamp; FR-026)",
+        )
+
+    blocked_raw = sankey.get("blocked")
+    leaked_raw = sankey.get("leaked")
+    if blocked_raw is None or leaked_raw is None:
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            "leakage_sankey.blocked/leaked absent (missing-shape)",
+        )
+    if _g5_genuine_count(blocked_raw, minimum=0) is None:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"leakage_sankey.blocked={_safe_repr(blocked_raw)} is not a genuine "
+            f"count — a corrupt flow accounting cannot certify",
+        )
+    leaked = _g5_genuine_count(leaked_raw, minimum=0)
+    if leaked is None:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"leakage_sankey.leaked={_safe_repr(leaked_raw)} is not a genuine "
+            f"count — a corrupt flow accounting cannot certify",
+        )
+    if leaked > 0:
+        return _G5Half(
+            False, float(leaked), 0.0,
+            f"{leaked} PII value(s) leaked past the agent boundary "
+            f"(leakage-Sankey; FR-028 requires zero leaked edges)",
+        )
+
+    asr_raw = injection.get("attack_success_rate")
+    benign_raw = injection.get("benign_task_success_rate")
+    n_payloads_raw = injection.get("n_payloads")
+    if asr_raw is None or benign_raw is None or n_payloads_raw is None:
+        return _G5Half(
+            None, float("nan"), float("nan"),
+            "injection_resistance.attack_success_rate / benign_task_success_rate / "
+            "n_payloads absent (missing-shape)",
+        )
+    asr = _finite_unit_score(asr_raw)
+    if asr is None:
+        return _G5Half(
+            False, float("nan"), G5_MAX_ATTACK_SUCCESS_RATE,
+            f"attack_success_rate={_safe_repr(asr_raw)} is not a valid (finite, "
+            f"[0,1], non-bool) rate — a corrupt ASR cannot certify",
+        )
+    if asr > G5_MAX_ATTACK_SUCCESS_RATE:
+        return _G5Half(
+            False, asr, G5_MAX_ATTACK_SUCCESS_RATE,
+            f"attack_success_rate {asr:.4g} > {G5_MAX_ATTACK_SUCCESS_RATE} — "
+            f"adversarial payload(s) exfiltrated past the guard (FR-029)",
+        )
+    benign = _finite_unit_score(benign_raw)
+    if benign is None:
+        return _G5Half(
+            False, float("nan"), G5_MIN_BENIGN_TASK_SUCCESS,
+            f"benign_task_success_rate={_safe_repr(benign_raw)} is not a valid "
+            f"(finite, [0,1], non-bool) rate — a corrupt rate cannot certify",
+        )
+    if benign < G5_MIN_BENIGN_TASK_SUCCESS:
+        return _G5Half(
+            False, benign, G5_MIN_BENIGN_TASK_SUCCESS,
+            f"benign_task_success_rate {benign:.4g} < {G5_MIN_BENIGN_TASK_SUCCESS} "
+            f"— a guard that over-blocks benign content is not resistance (the "
+            f"FR-029 anti-degenerate pairing)",
+        )
+    if _g5_genuine_count(n_payloads_raw, minimum=1) is None:
+        return _G5Half(
+            False, float("nan"), float("nan"),
+            f"injection_resistance.n_payloads={_safe_repr(n_payloads_raw)} is not "
+            f"a genuine payload count ≥ 1 — an unexercised scorer cannot certify",
+        )
+
+    return _G5Half(
+        True, asr, G5_MAX_ATTACK_SUCCESS_RATE,
+        f"audit clean (4/4 channels intercepted; no-raw-PII-persist; 0 leaked; "
+        f"ASR {asr:.4g} ≤ {G5_MAX_ATTACK_SUCCESS_RATE}; benign {benign:.4g} ≥ "
+        f"{G5_MIN_BENIGN_TASK_SUCCESS})",
+    )
+
+
+def _g5_audit_latency(
+    systems: dict[str, dict[str, Any]], run_metadata: dict[str, Any]
+) -> GuaranteeResult:
+    """G5 — audit + orchestration latency / interception (S7-04; three-valued).
+
+    The last placeholder guarantee goes computed: **G5 = audit-pass ∧
+    latency-within-ceiling** (the S4-CS-01 §3 definition), read from the two
+    ``run_metadata`` blocks the S7-04 canonical-run producer emits:
+
+    * ``latency_summary`` — the measured full-swarm per-record p50/p95/p99
+      (milliseconds) vs the committed NFR-009 per-profile budget
+      (``latency_ceilings.py``). An artifact-supplied ``latency_ceiling_ms``
+      may only TIGHTEN the bars (:func:`_g5_latency_bar`).
+    * ``audit_summary`` — the S6-02/S6-05 audit surface summary (4-channel
+      interception completeness, the strict ``no_raw_pii_persist`` stamp, the
+      leakage-Sankey zero-leak accounting, the FR-029 injection ASR/benign
+      pairing).
+
+    Three-valued outcome:
+
+    * **PENDING** (``None``) — either block absent/malformed, or a required
+      key missing within a present block (missing-shape). A half-populated
+      artifact cannot certify and is never fabricated against (the G2
+      precedent); omission can never read BETTER than the old placeholder.
+    * **FAIL** — an honest breach (over-budget latency, a leaked span, a
+      positive ASR, an over-blocking guard, an unexercised channel) OR a
+      present-but-invalid value (a corrupt measurement cannot certify — the
+      G1-corrupt-ε / G4-corrupt-ECE precedent). A real breach in one half
+      outranks missing-shape in the other (fail-closed).
+    * **PASS** — both halves clean.
+
+    Every artifact value routes through a validator (``_is_finite_number`` for
+    latency ms, ``_finite_unit_score`` for rates, ``_g5_genuine_count`` for
+    counts, ``_is_nonblank_str`` + registry/ladder membership for stamps,
+    strict ``is True`` for the persist flag) — the no-fabrication invariant,
+    nested values included. Pure: reads the benchmark, never mutates it
+    (AX-002).
+    """
+    latency = run_metadata.get("latency_summary")
+    audit = run_metadata.get("audit_summary")
+
+    if not isinstance(latency, dict) and not isinstance(audit, dict):
+        return GuaranteeResult(
+            "G5", None, float("nan"), float("nan"),
+            "G5 PENDING: benchmark lacks the latency/audit fields "
+            "(run_metadata.latency_summary + run_metadata.audit_summary); "
+            f"{_PENDING_SUCCESSORS['G5']} — emitted by the S7 canonical run",
+        )
+    if not isinstance(latency, dict) or not isinstance(audit, dict):
+        absent_half = (
+            "audit_summary (the audit half)"
+            if isinstance(latency, dict)
+            else "latency_summary (the latency half)"
+        )
+        return GuaranteeResult(
+            "G5", None, float("nan"), float("nan"),
+            f"G5 PENDING: benchmark lacks {absent_half} — a half-populated "
+            f"artifact cannot certify (never fabricated); "
+            f"{_PENDING_SUCCESSORS['G5']}",
+        )
+
+    lat = _g5_latency_half(latency, run_metadata.get("latency_ceiling_ms"), systems)
+    aud = _g5_audit_half(audit)
+
+    # A real breach (False) outranks missing-shape (None) — fail-closed: a
+    # half-written artifact cannot bury a breach in the other half.
+    if lat.ok is False or aud.ok is False:
+        breaches = [h.detail for h in (lat, aud) if h.ok is False]
+        first = lat if lat.ok is False else aud
+        return GuaranteeResult(
+            "G5", False, first.observed, first.bar,
+            "G5 FAIL: " + "; ".join(breaches),
+        )
+    if lat.ok is None or aud.ok is None:
+        gaps = [h.detail for h in (lat, aud) if h.ok is None]
+        return GuaranteeResult(
+            "G5", None, float("nan"), float("nan"),
+            "G5 PENDING: " + "; ".join(gaps) + " — never fabricated",
+        )
+    return GuaranteeResult(
+        "G5", True, lat.observed, lat.bar,
+        f"G5 PASS: {lat.detail}; {aud.detail} (NFR-009 / FR-026 / FR-028 / "
+        f"FR-029; AX-006)",
+    )
 
 
 def _finite_f2(system: dict[str, Any]) -> float | None:
