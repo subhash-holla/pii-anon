@@ -794,6 +794,12 @@ def create_app() -> Any:
         path = Path(artifact)
         if not path.exists():
             raise typer.BadParameter(f"benchmark artifact not found: {artifact}")
+        if not path.is_file():
+            # S7-02 close-10: a directory (or other non-regular file) passes path.exists()
+            # but path.read_text() would raise IsADirectoryError (a subclass of OSError) — not
+            # in the parse-except tuple below — leaking a raw traceback out of the shipped
+            # command. Reject a non-file up front with a clean usage error.
+            raise typer.BadParameter(f"benchmark artifact is not a file: {artifact}")
         # Defense-in-depth (S7-02 close-2): the gate itself is now hardened so NO
         # malformed CONTAINER can crash `from_artifacts` (it fails CLOSED to a clean
         # verdict). This CLI backstop catches the one thing UPSTREAM of the gate — a
@@ -804,12 +810,15 @@ def create_app() -> Any:
         try:
             benchmark = json.loads(path.read_text(encoding="utf-8"))
             verdict = SupremacyVerdict.from_artifacts(benchmark)
-        except (json.JSONDecodeError, RecursionError) as exc:
+        except (json.JSONDecodeError, RecursionError, OSError) as exc:
             # RecursionError: a deeply-nested (>~10k level) JSON artifact makes json.loads
             # blow the parser's recursion guard — it is NOT a JSONDecodeError, so without
             # this it tracebacked out of the shipped command (S7-02 final-close DoV crash).
+            # OSError (S7-02 close-10): the is_file() guard above rejects a directory, but a
+            # read that still fails (a TOCTOU race, a permission error, a named pipe) raises
+            # an OSError subclass (e.g. IsADirectoryError) that must not traceback either.
             raise typer.BadParameter(
-                f"benchmark artifact is not valid JSON ({artifact}): "
+                f"benchmark artifact could not be read or parsed as JSON ({artifact}): "
                 f"{type(exc).__name__}: {exc}"
             )
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
