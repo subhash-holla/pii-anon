@@ -230,7 +230,8 @@ def test_verdict_is_honest_on_produced_artifact(
     from the FRESH-measured detection metrics — it is NOT hardcoded to
     PROVISIONAL_SOTA.
 
-    The MACHINERY is asserted (canonical_claim_run True; G7 PASS; G5 PENDING). The
+    The MACHINERY is asserted (canonical_claim_run True; G7 PASS; G5 PASS — S7-04
+    closed the last placeholder). The
     verdict is one of {PROVISIONAL_SOTA, NOT_YET} (scale-dependent — the composite/J
     crown genuinely requires full-census scale, so a small CI sample typically lands
     NOT_YET), and IF NOT_YET the binding constraint is an HONEST raw-detection axis
@@ -260,8 +261,11 @@ def test_verdict_is_honest_on_produced_artifact(
             "J=" in binding  # the composite-rank J gap
             or "J unavailable" in binding
             or any(
-                f"{ax} FAIL" in binding for ax in ("G1", "G3", "G6", "G7")
-            )  # a raw-detection guarantee
+                # G5 is unreachable here today (asserted PASS above) but listed
+                # so the guard stays complete if a future env honestly breaches
+                # the latency ceiling.
+                f"{ax} FAIL" in binding for ax in ("G1", "G3", "G5", "G6", "G7")
+            )  # an honest measured guarantee
         )
         assert honest_axis, f"NOT_YET must bind on an honest axis, got: {binding}"
 
@@ -379,7 +383,10 @@ def test_same_seed_byte_identical_modulo_timestamp(
     tmp_path: Path,
 ) -> None:
     """[PROPERTY-TEST] A18 / NFR-005 / AX-002: two produces with the same seed are
-    byte-identical after excluding the LONE non-reproducible ``timestamp_utc``."""
+    byte-identical after excluding the TWO sanctioned non-reproducible surfaces —
+    ``timestamp_utc`` + the measured wall-clock ``latency_summary`` (S7-04; see
+    ``_without_timestamp``). The keyed-deterministic ``audit_summary`` is INCLUDED
+    in the comparison."""
     a = produce_canonical_artifact(
         seed=_SEED, output_dir=str(tmp_path / "a"), max_samples=_REPRESENTATIVE_MAX_SAMPLES
     )
