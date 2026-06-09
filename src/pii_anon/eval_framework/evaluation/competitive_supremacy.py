@@ -1165,15 +1165,22 @@ def _risk_coverage_is_monotone(curve: Any) -> bool:
     """
     if not isinstance(curve, list) or not curve:
         return False
-    try:
-        pts = sorted(
-            ((float(p["coverage"]), float(p["risk"])) for p in curve),
-            key=lambda cr: cr[0],
-        )
-    except (KeyError, TypeError, ValueError, OverflowError):
-        # OverflowError: a coverage/risk that is a Python int wider than a C double
-        # (10**400) — a malformed curve cannot certify NFR-019; fail loud, never crash.
-        return False
+    pts: list[tuple[float, float]] = []
+    for p in curve:
+        if not isinstance(p, dict):
+            return False  # a malformed (non-dict) row cannot certify NFR-019
+        cov = p.get("coverage")
+        risk = p.get("risk")
+        # coverage AND risk must be FINITE numbers. ``float(NaN)`` does NOT raise, so a NaN /
+        # ±inf (or non-numeric / huge-int / bool) value entered the sort + the ``>=`` compare
+        # (NaN compares False to everything), LAUNDERING a genuinely non-monotone curve into a
+        # fabricated 'monotone' ⇒ G4 PASS ⇒ CLAIM_GRADE_SOTA (the S7-02 close-7 CATASTROPHIC —
+        # nested curve-row fields bypassed the validators). A curve carrying a non-finite point
+        # cannot certify NFR-019 ⇒ NOT monotone. (``_is_finite_number`` also rejects 10**400.)
+        if not _is_finite_number(cov) or not _is_finite_number(risk):
+            return False
+        pts.append((float(cov), float(risk)))
+    pts.sort(key=lambda cr: cr[0])
     risks = [r for _, r in pts]
     return all(hi >= lo - 1e-9 for lo, hi in zip(risks, risks[1:]))
 

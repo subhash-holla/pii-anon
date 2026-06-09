@@ -809,10 +809,14 @@ class CanonicalRunGate:
                     f"{EPS_RECALL_PER_LANG}"
                 )
 
+        # Guard the artifact ``systems`` field: a non-list (None/int/float/bool) crashed
+        # ``for s in …`` ('not iterable') and an UNHASHABLE system-name (list/dict) crashed the
+        # dict-comp KEY (S7-02 close-7 DoV). A non-list → empty; a non-str name → skipped.
+        raw_systems = payload.get("systems")
         systems = {
-            s.get("system"): s
-            for s in payload.get("systems", [])
-            if isinstance(s, dict)
+            name: s
+            for s in (raw_systems if isinstance(raw_systems, list) else [])
+            if isinstance(s, dict) and isinstance((name := s.get("system")), str)
         }
 
         # 4. pii-anon's G2 family fields valid (reuse the gate's OWN validator).
