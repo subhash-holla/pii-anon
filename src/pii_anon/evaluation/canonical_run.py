@@ -68,8 +68,12 @@ stamped from the ACTUAL sampler used — an in-tree run is NEVER ``data-v2.0.0``
 Determinism (NFR-005 / AX-002)
 ------------------------------
 Seed-driven; ``enable_parallel=False``; canonical ``json.dumps(sort_keys=True,
-indent=2)`` with every float ``round(., 6)``; ``timestamp_utc`` is the LONE
-non-reproducible field (excluded from the determinism comparison).
+indent=2)`` with every float ``round(., 6)``. TWO sanctioned non-reproducible
+surfaces are excluded from the determinism comparison: ``timestamp_utc`` and
+the MEASURED wall-clock ``latency_summary`` values (S7-04 — NFR-005 itself
+excludes wall-clock speed from determinism; the timing varies run-to-run by
+construction). The G5 ``audit_summary`` is keyed-deterministic (a seed-derived
+surrogate key) and IS compared byte-identical.
 
 Output path (story §2a RISK-6)
 ------------------------------
@@ -81,6 +85,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import random
 import subprocess
 import time
@@ -88,6 +93,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pii_anon.agentic.interception import AgentChannel, FourChannelGuard
+from pii_anon.agentic.leakage_sankey import (
+    build_leakage_sankey,
+    score_injection_resistance,
+)
 from pii_anon.benchmarks import load_benchmark_dataset
 from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     EPS_RECALL_PER_LANG,
@@ -106,6 +116,7 @@ from pii_anon.eval_framework.metrics.selective_risk import (
 from pii_anon.eval_framework.metrics.span_metrics import _aligned_prf
 from pii_anon.evaluation.competitor_compare import (
     _COMPETITOR_META,
+    _ensemble_detector,
     compare_competitors,
 )
 from pii_anon.fusion import build_fusion
@@ -122,6 +133,8 @@ __all__ = [
     "KEY_PER_LANGUAGE_RECALL_DELTA",
     "KEY_CALIBRATED_CONFIDENCE_COVERAGE",
     "KEY_PER_CLASS_ECE",
+    "KEY_LATENCY_SUMMARY",
+    "KEY_AUDIT_SUMMARY",
 ]
 
 GATE_ID = "CanonicalRunGate.v1"
@@ -149,6 +162,9 @@ KEY_UNAUTHORIZED_REVERSAL_RATE = "unauthorized_reversal_rate"
 KEY_PER_LANGUAGE_RECALL_DELTA = "per_language_recall_delta"
 KEY_CALIBRATED_CONFIDENCE_COVERAGE = "calibrated_confidence_coverage"
 KEY_PER_CLASS_ECE = "per_class_ece"
+# The S7-04 G5 blocks the gate's _g5_audit_latency reads at run_metadata.*.
+KEY_LATENCY_SUMMARY = "latency_summary"
+KEY_AUDIT_SUMMARY = "audit_summary"
 
 # The 4 SDO-G7 provenance fields the gate's _g7_certified_run reads at
 # run_metadata.* (also mirrored into the richer canonical_provenance block).
@@ -733,6 +749,152 @@ def _synthetic_calibrated_findings() -> list[ScoredFinding]:
 
 
 # ---------------------------------------------------------------------------
+# G5 — the latency + audit blocks (S7-04).
+# ---------------------------------------------------------------------------
+
+# Cap the per-record TIMING sample (a latency percentile needs a representative
+# sample, not a census — a full-corpus timing pass would add hours for no
+# measurement value). The timed count is stamped honestly as n_records.
+_LATENCY_TIMING_CAP = 200
+# Mirror compare_competitors' warmup discipline: the first records absorb
+# lazy-init (model loads / cache warm) and are then RE-timed warm.
+_LATENCY_WARMUP_RECORDS = 2
+
+_G5_SCOPE = "canonical-g5"
+# Synthetic PII only (AX-001) — shapes the in-tree default masker detects.
+_G5_SYNTH_EMAIL = "jane.roe@example.test"
+_G5_SYNTH_PHONE_A = "555-1000"
+_G5_SYNTH_PHONE_B = "555-2000"
+
+
+def _measure_swarm_latency(
+    sampler: _Sampler, max_samples: int | None
+) -> dict[str, Any]:
+    """Measure the REAL full-swarm per-record latency (the NFR-009 subject).
+
+    Times the EXACT detect path ``compare_competitors`` benchmarks for
+    ``pii-anon-swarm`` (the ``_ensemble_detector`` — objective ``ensemble``;
+    the off-limits module is imported read-only, never modified) over the same
+    record draw the detection run used, capped at :data:`_LATENCY_TIMING_CAP`.
+    Nearest-rank percentiles over a sorted per-record sample, so
+    ``p50 ≤ p95 ≤ p99`` by construction. The wall-clock values are
+    NON-reproducible by construction — NFR-005 excludes wall-clock speed from
+    determinism, so ``latency_summary`` joins ``timestamp_utc`` as a sanctioned
+    determinism-comparison exclusion. Never fabricated: every number is a real
+    timed detection on the current code.
+    """
+    records = load_benchmark_dataset(sampler.dataset, source=sampler.dataset_source)  # type: ignore[arg-type]
+    if max_samples is not None:
+        records = records[:max_samples]
+    timing_records = records[:_LATENCY_TIMING_CAP]
+
+    detector = _ensemble_detector(
+        use_case="default",
+        allow_fallback_detectors=True,
+        require_native_competitors=False,
+    )
+    for record in timing_records[:_LATENCY_WARMUP_RECORDS]:
+        detector(record)
+
+    latencies_ms: list[float] = []
+    for record in timing_records:
+        t0 = time.perf_counter()
+        detector(record)
+        latencies_ms.append((time.perf_counter() - t0) * 1000.0)
+    latencies_ms.sort()
+    n = len(latencies_ms)
+
+    def pct(p: float) -> float:
+        # Nearest-rank on the sorted sample; monotone in p by construction.
+        return latencies_ms[max(0, math.ceil(p * n) - 1)] if n else 0.0
+
+    return {
+        "system": "pii-anon-swarm",
+        "profile": "ensemble",
+        "p50_ms": round(pct(0.50), 3),
+        "p95_ms": round(pct(0.95), 3),
+        "p99_ms": round(pct(0.99), 3),
+        "n_records": n,
+        "measurement": "fresh-in-tree-per-record-detection-timing",
+    }
+
+
+def _attach_g5_fields(
+    payload: dict[str, Any],
+    *,
+    seed: int,
+    sampler: _Sampler,
+    max_samples: int | None,
+) -> None:
+    """Attach the S7-04 G5 blocks: the measured latency + the REAL audit surface.
+
+    The audit half runs the LIVE S6-02/S6-05 surface — never a hand-written
+    summary:
+
+    * a :class:`FourChannelGuard` under a SEED-DERIVED fixed surrogate key
+      (keyed HMAC ⇒ byte-deterministic given the seed — the FR-030 reproducible
+      path) intercepts a synthetic payload on EVERY one of the four channels
+      (AX-001 — synthetic PII only). ``intercept_all`` RAISES on any raw-PII
+      survival, so reaching the emit at all IS the no-raw-PII-persist invariant
+      holding — the ``True`` stamp is earned, never asserted;
+    * :func:`build_leakage_sankey` over the real ledger + the masked outbound
+      payloads (the caller-known-values membership test — non-circular);
+    * :func:`score_injection_resistance` on a SEPARATE guard (same key) so the
+      interception channel counts stay semantically clean.
+
+    Writes only ``run_metadata.latency_summary`` + ``run_metadata.audit_summary``.
+    """
+    latency_summary = _measure_swarm_latency(sampler, max_samples)
+
+    surrogate_key = hashlib.sha256(f"canonical-run-g5:{seed}".encode("utf-8")).digest()
+    guard = FourChannelGuard(surrogate_key=surrogate_key)
+    known_values = (_G5_SYNTH_EMAIL, _G5_SYNTH_PHONE_A, _G5_SYNTH_PHONE_B)
+    channel_payloads = {
+        AgentChannel.PROMPT: f"Contact {_G5_SYNTH_EMAIL} about the audit window.",
+        AgentChannel.MEMORY: f"Customer phone {_G5_SYNTH_PHONE_A} retained in scratchpad.",
+        AgentChannel.TOOL_IO: (
+            f"lookup({_G5_SYNTH_EMAIL}) returned alternate {_G5_SYNTH_PHONE_B}."
+        ),
+        AgentChannel.TRACE: f"span.user = {_G5_SYNTH_EMAIL}",
+    }
+    results = guard.intercept_all(channel_payloads, scope=_G5_SCOPE)
+    outbound = {channel: result.masked_text for channel, result in results.items()}
+    sankey = build_leakage_sankey(guard.ledger, outbound, known_values=known_values)
+
+    injection_guard = FourChannelGuard(surrogate_key=surrogate_key)
+    injection = score_injection_resistance(injection_guard, scope=_G5_SCOPE)
+
+    counts_by_channel = {
+        channel.value: count
+        for channel, count in guard.ledger.counts_by_channel().items()
+    }
+    audit_summary = {
+        "interception": {
+            "counts_by_channel": counts_by_channel,
+            # Earned, not asserted: intercept_all RAISES NoRawPIIPersistError on
+            # any survival — this line is only reachable when the invariant held.
+            "no_raw_pii_persist": True,
+            "records_total": len(guard.ledger.records()),
+        },
+        "leakage_sankey": {
+            "blocked": sankey.blocked_count(),
+            "leaked": sankey.leaked_count(),
+        },
+        "injection_resistance": {
+            "attack_success_rate": round(float(injection.attack_success_rate), 6),
+            "benign_task_success_rate": round(
+                float(injection.benign_task_success_rate), 6
+            ),
+            "n_payloads": int(injection.n_payloads),
+        },
+    }
+
+    run_metadata = payload.setdefault("run_metadata", {})
+    run_metadata[KEY_LATENCY_SUMMARY] = latency_summary
+    run_metadata[KEY_AUDIT_SUMMARY] = audit_summary
+
+
+# ---------------------------------------------------------------------------
 # CanonicalRunGate — fail-closed validation BEFORE canonical_claim_run=True.
 # ---------------------------------------------------------------------------
 
@@ -754,8 +916,13 @@ class CanonicalRunGate:
         """Return ``(ok, missing)`` — fail-closed validation of the canonical run."""
         from pii_anon.eval_framework.evaluation.competitive_supremacy import (
             _finite_unit_score,
+            _g5_audit_half,
+            _g5_genuine_count,
             _is_finite_number,
+            _is_nonblank_str,
+            _safe_repr,
         )
+        from pii_anon.eval_framework.evaluation.latency_ceilings import ceiling_for
 
         # A directly-injected hostile payload (the gate class is exported) may be a non-dict
         # (a json.loads of a top-level array) — ``payload.get`` would crash (S7-02 final-close
@@ -796,9 +963,12 @@ class CanonicalRunGate:
             scope = prov.get("scope")
             # ``scope`` must be a str: an UNHASHABLE scope (a list) crashed ``scope not in {…}``
             # (TypeError: unhashable — S7-02 final-close DoV). A non-str scope is not honest.
+            # ``_safe_repr``: a >4300-digit int scope crashed this very detail f-string
+            # (the int→str conversion limit — the S7-04 DoV class); honest str scopes
+            # render identically.
             if not (isinstance(scope, str) and scope in {"data-v2.0.0", "representative-in-tree"}):
                 missing.append(
-                    f"canonical_provenance.scope: {scope!r} not an honest scope"
+                    f"canonical_provenance.scope: {_safe_repr(scope)} not an honest scope"
                 )
 
         # 3. per_language_recall_delta present ∧ max(|ε|) ≤ 0.005.
@@ -811,11 +981,15 @@ class CanonicalRunGate:
             for lang, eps in delta.items():
                 # Reject a non-finite ε (NaN/±inf) the same way the moat axes do
                 # via _finite_unit_score — a NaN must never slip ``abs() > bound``
-                # (whose result against NaN is silently False).
+                # (whose result against NaN is silently False). The language KEY
+                # is rendered crash-free: a >4300-digit int key crashed this
+                # f-string (the S7-04 DoV class); honest str keys render bare,
+                # exactly as before.
                 if not _is_finite_number(eps):
                     ok_values = False
+                    lang_label = lang if isinstance(lang, str) else _safe_repr(lang)
                     missing.append(
-                        f"{KEY_PER_LANGUAGE_RECALL_DELTA}.{lang}: not a real (finite) number"
+                        f"{KEY_PER_LANGUAGE_RECALL_DELTA}.{lang_label}: not a real (finite) number"
                     )
                     continue
                 worst = max(worst, abs(float(eps)))
@@ -867,10 +1041,14 @@ class CanonicalRunGate:
                 # out-of-[0,1] value, and crucially a NEGATIVE ECE (non-physical;
                 # ECE ≥ 0 by construction), symmetric with the SDO gate's close-3 fix
                 # where a sub-zero ECE is a breach, never a vacuous 'within bar' PASS.
+                # ``_safe_repr`` on BOTH the key and the value: a >4300-digit int
+                # in either slot crashed this f-string (the S7-04 DoV class);
+                # honest str keys / float values render identically to ``!r``.
                 for et, ece in per_class_ece.items():
                     if _finite_unit_score(ece) is None:
                         missing.append(
-                            f"{_CORE_SYSTEM}.{KEY_PER_CLASS_ECE}[{et!r}]: {ece!r} is "
+                            f"{_CORE_SYSTEM}.{KEY_PER_CLASS_ECE}[{_safe_repr(et)}]: "
+                            f"{_safe_repr(ece)} is "
                             "not a valid (finite, non-negative, [0,1], non-bool) ECE"
                         )
             coverage = core.get(KEY_CALIBRATED_CONFIDENCE_COVERAGE)
@@ -894,6 +1072,76 @@ class CanonicalRunGate:
                 f"no competitor carries a valid {KEY_PSEUDONYMIZATION_INTEGRITY_SCORE}"
                 " (SO-11 — dominance unprovable without a comparator)"
             )
+
+        # 7. The S7-04 G5 blocks — present + shape-valid + audit-INTEGRITY bars.
+        #    The latency CEILING comparison is deliberately NOT enforced here (it
+        #    is the SDO gate's job): an over-budget-but-REAL measurement still
+        #    certifies and G5 then honestly FAILS — certification ≠ performance
+        #    (the G6-F2 parallel). An AUDIT-integrity breach (a leaked span, a
+        #    corrupt persist stamp, an exfiltration) DOES refuse certification
+        #    (like the step-3 ε bound): the artifact itself is then untrustworthy.
+        latency = run_metadata.get(KEY_LATENCY_SUMMARY)
+        if not isinstance(latency, dict):
+            missing.append(f"run_metadata.{KEY_LATENCY_SUMMARY}: absent or malformed")
+        else:
+            for field in ("system", "profile", "p50_ms", "p95_ms", "p99_ms", "n_records"):
+                if latency.get(field) is None:
+                    missing.append(f"{KEY_LATENCY_SUMMARY}.{field}: absent")
+            system_name = latency.get("system")
+            if system_name is not None and (
+                not _is_nonblank_str(system_name)
+                or system_name not in _LADDER_SYSTEMS
+                or system_name not in systems
+            ):
+                missing.append(
+                    f"{KEY_LATENCY_SUMMARY}.system: {_safe_repr(system_name)} is not "
+                    "a benchmarked pii-anon ladder member (a non-SUT measurement "
+                    "cannot certify NFR-009)"
+                )
+            profile = latency.get("profile")
+            if profile is not None and ceiling_for(profile) is None:
+                missing.append(
+                    f"{KEY_LATENCY_SUMMARY}.profile: {_safe_repr(profile)} names no "
+                    "committed budget (NFR-009)"
+                )
+            percentiles: list[float] = []
+            percentiles_valid = True
+            for field in ("p50_ms", "p95_ms", "p99_ms"):
+                raw = latency.get(field)
+                if raw is None:
+                    percentiles_valid = False
+                    continue
+                if not _is_finite_number(raw) or float(raw) < 0.0:
+                    percentiles_valid = False
+                    missing.append(
+                        f"{KEY_LATENCY_SUMMARY}.{field}: {_safe_repr(raw)} is not a "
+                        "real non-negative latency"
+                    )
+                    continue
+                percentiles.append(float(raw))
+            if percentiles_valid and len(percentiles) == 3 and not (
+                percentiles[0] <= percentiles[1] <= percentiles[2]
+            ):
+                missing.append(
+                    f"{KEY_LATENCY_SUMMARY}: percentiles out of order "
+                    "(p50 ≤ p95 ≤ p99 required — non-physical measurement)"
+                )
+            n_raw = latency.get("n_records")
+            if n_raw is not None and _g5_genuine_count(n_raw, minimum=1) is None:
+                missing.append(
+                    f"{KEY_LATENCY_SUMMARY}.n_records: {_safe_repr(n_raw)} is not a "
+                    "genuine record count ≥ 1"
+                )
+        audit = run_metadata.get(KEY_AUDIT_SUMMARY)
+        if not isinstance(audit, dict):
+            missing.append(f"run_metadata.{KEY_AUDIT_SUMMARY}: absent or malformed")
+        else:
+            # REUSE the SDO gate's OWN audit half — the producer/consumer
+            # no-fabrication contract is identical on both sides. ok must be
+            # True: a PENDING (missing-shape) audit cannot certify either.
+            outcome = _g5_audit_half(audit)
+            if outcome.ok is not True:
+                missing.append(f"{KEY_AUDIT_SUMMARY}: {outcome.detail}")
 
         return (not missing), missing
 
@@ -1104,6 +1352,9 @@ def produce_canonical_artifact(
     _attach_g1_per_language_delta(payload, seed=seed)
     _attach_g2_deid_families(payload)
     _attach_g4_calibration(payload)
+    # S7-04: the G5 latency + audit blocks (a real timed detection pass + the
+    # real S6-02/S6-05 audit surface under a seed-derived key).
+    _attach_g5_fields(payload, seed=seed, sampler=sampler, max_samples=max_samples)
 
     # Honest provenance (real digests / timestamp). The sample_size is the ACTUAL
     # number of records the detection run drew (the real records-processed count).
