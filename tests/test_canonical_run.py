@@ -241,7 +241,9 @@ def test_verdict_is_honest_on_produced_artifact(
     # The run IS certified (the gate validated the fields) — the machinery is honest.
     assert verdict.canonical_claim_run is True
     assert verdict.guarantee("G7").passed is True, verdict.guarantee("G7").binding_detail
-    assert verdict.guarantee("G5").passed is None  # PENDING (S7-04 follow-up)
+    # G5 COMPUTES on the produced artifact (S7-04): real measured latency within
+    # the committed ceiling + a clean audit ⇒ PASS (no longer the placeholder).
+    assert verdict.guarantee("G5").passed is True, verdict.guarantee("G5").binding_detail
     # The verdict is honest, scale-dependent — NOT a manufactured PROVISIONAL_SOTA.
     assert verdict.verdict in (Verdict.PROVISIONAL_SOTA, Verdict.NOT_YET), verdict.verdict
     if verdict.verdict is Verdict.PROVISIONAL_SOTA:
@@ -268,13 +270,13 @@ def test_produced_artifact_round_trips_through_from_artifacts_without_overrides(
     produced: dict[str, Any],
 ) -> None:
     """[INTEGRATION-TEST] A11: the produced artifact drives the gate WITHOUT any
-    ``pending_overrides`` — G1/G2/G3/G4 all COMPUTE from the emitted fields alone (the
-    override seam is NOT relied upon). The only PENDING axis is G5 (honest — no G5
-    field this pass); the verdict is whatever the fresh metrics honestly yield."""
+    ``pending_overrides`` — G1/G2/G3/G4/G5 ALL COMPUTE from the emitted fields alone
+    (the override seam is NOT relied upon; S7-04 closed the last placeholder). NO
+    axis is PENDING; the verdict is whatever the fresh metrics honestly yield."""
     verdict = SupremacyVerdict.from_artifacts(produced)  # no pending_overrides
-    # G1/G2/G3/G4 compute (NOT PENDING) from the emitted fields; only G5 is PENDING.
+    # Every guarantee computes (NOT PENDING) from the emitted fields (S7-04).
     pending = [g.axis for g in verdict.guarantees if g.passed is None]
-    assert pending == ["G5"], pending
+    assert pending == [], pending
     # The verdict is honestly computed (one of the two valid endpoints) — not hardcoded.
     assert verdict.verdict in (Verdict.PROVISIONAL_SOTA, Verdict.NOT_YET), verdict.verdict
 
@@ -738,6 +740,34 @@ def _synthetic_produced_shape() -> dict[str, Any]:
                 "dataset_version": "in-tree-benchmark-1.0",
                 "power_cells": {"verdict": "n/a-in-tree", "sample_size": 8},
             },
+            # The S7-04 G5 blocks (latency + audit) — required for certification.
+            "latency_summary": {
+                "system": "pii-anon-swarm",
+                "profile": "ensemble",
+                "p50_ms": 80.5,
+                "p95_ms": 112.0,
+                "p99_ms": 133.3,
+                "n_records": 8,
+                "measurement": "fresh-in-tree-per-record-detection-timing",
+            },
+            "audit_summary": {
+                "interception": {
+                    "counts_by_channel": {
+                        "PROMPT": 2,
+                        "MEMORY": 1,
+                        "TOOL_IO": 1,
+                        "TRACE": 1,
+                    },
+                    "no_raw_pii_persist": True,
+                    "records_total": 5,
+                },
+                "leakage_sankey": {"blocked": 5, "leaked": 0},
+                "injection_resistance": {
+                    "attack_success_rate": 0.0,
+                    "benign_task_success_rate": 1.0,
+                    "n_payloads": 4,
+                },
+            },
         },
         "per_language_recall_delta": {"en": 0.0, "de": 0.0},
         "systems": [
@@ -748,6 +778,7 @@ def _synthetic_produced_shape() -> dict[str, Any]:
                 "unauthorized_reversal_rate": 0.0,
                 **core_g4,
             },
+            {"system": "pii-anon-swarm"},
             {"system": "gliner", "pseudonymization_integrity_score": 0.0},
         ],
     }
@@ -1063,14 +1094,18 @@ def _system(payload: dict[str, Any], name: str) -> dict[str, Any]:
 
 
 def _without_timestamp(payload: dict[str, Any]) -> str:
-    """Canonical JSON of a payload with every ``timestamp_utc`` removed.
+    """Canonical JSON of a payload with the non-reproducible surfaces removed.
 
-    ``timestamp_utc`` is the LONE non-reproducible field (NFR-005); it is excluded
-    from the determinism comparison.
+    Two sanctioned exclusions (NFR-005): ``timestamp_utc`` and the MEASURED
+    wall-clock ``latency_summary`` (S7-04 — NFR-005 itself excludes wall-clock
+    speed from determinism; the timing values vary run-to-run by construction).
+    Everything else — including the keyed-deterministic ``audit_summary`` —
+    MUST be byte-identical across same-seed produces.
     """
     clean = copy.deepcopy(payload)
     rm = clean.get("run_metadata", {})
     rm.pop("timestamp_utc", None)
+    rm.pop("latency_summary", None)
     prov = rm.get("canonical_provenance", {})
     prov.pop("timestamp_utc", None)
     return json.dumps(clean, sort_keys=True, indent=2)
@@ -1137,3 +1172,173 @@ def test_closefinal_canonical_gate_validate_hostile_systems_does_not_crash(
     ok, missing = CanonicalRunGate().validate({"run_metadata": {}, "systems": bad_systems})
     assert ok is False
     assert missing
+
+
+# ---------------------------------------------------------------------------
+# S7-04 — the producer emits the G5 latency + audit blocks; the gate requires
+# them (shape + audit-integrity) for certification; the LATENCY CEILING
+# comparison stays the SDO gate's job (over-budget = an honest G5 FAIL on a
+# still-certified run, like G6's F2 — deliberately NOT a certification defect).
+# ---------------------------------------------------------------------------
+
+
+def test_g5_produced_artifact_emits_latency_and_audit_blocks(
+    produced: dict[str, Any],
+) -> None:
+    """[INTEGRATION-TEST] S7-04: the produced artifact carries BOTH G5 blocks —
+    a REAL measured full-swarm latency summary (ordered percentiles, the actual
+    timing-sample size) and the REAL S6-02/S6-05 audit summary (4 channels, no
+    persist breach, zero leaks, ASR 0 with full benign preservation)."""
+    rm = produced["run_metadata"]
+    lat = rm["latency_summary"]
+    assert lat["system"] == "pii-anon-swarm"
+    assert lat["profile"] == "ensemble"
+    assert 0.0 <= lat["p50_ms"] <= lat["p95_ms"] <= lat["p99_ms"]
+    assert lat["n_records"] == _REPRESENTATIVE_MAX_SAMPLES
+    assert isinstance(lat["measurement"], str) and lat["measurement"]
+
+    audit = rm["audit_summary"]
+    counts = audit["interception"]["counts_by_channel"]
+    assert set(counts) == {"PROMPT", "MEMORY", "TOOL_IO", "TRACE"}
+    assert all(isinstance(v, int) and v >= 1 for v in counts.values())
+    assert audit["interception"]["no_raw_pii_persist"] is True
+    assert audit["leakage_sankey"]["leaked"] == 0
+    assert audit["leakage_sankey"]["blocked"] >= 4
+    inj = audit["injection_resistance"]
+    assert inj["attack_success_rate"] == 0.0
+    assert inj["benign_task_success_rate"] == 1.0
+    assert inj["n_payloads"] >= 4
+
+
+def test_g5_audit_summary_carries_no_raw_pii(produced: dict[str, Any]) -> None:
+    """[SECURITY-TEST] S7-04 / FR-026: the emitted audit summary is
+    surrogate-only — none of the synthetic raw PII values used to exercise the
+    guard survive anywhere in the emitted artifact."""
+    blob = json.dumps(produced)
+    for raw in ("jane.roe@example.test", "555-1000", "555-2000"):
+        assert raw not in blob
+
+
+def test_g5_audit_summary_deterministic_same_seed(tmp_path: Path) -> None:
+    """[PROPERTY-TEST] S7-04 / NFR-005 / AX-002: the audit half is
+    keyed-deterministic — two same-seed produces yield a byte-identical
+    audit_summary (only the wall-clock latency_summary values may differ; the
+    main determinism test excludes exactly timestamp_utc + latency_summary)."""
+    a = produce_canonical_artifact(
+        seed=_SEED, output_dir=str(tmp_path / "a"), max_samples=_REPRESENTATIVE_MAX_SAMPLES
+    )
+    b = produce_canonical_artifact(
+        seed=_SEED, output_dir=str(tmp_path / "b"), max_samples=_REPRESENTATIVE_MAX_SAMPLES
+    )
+    assert a["run_metadata"]["audit_summary"] == b["run_metadata"]["audit_summary"]
+
+
+def test_gate_refuses_when_g5_latency_summary_missing() -> None:
+    """[SECURITY-TEST] S7-04: a canonical run REQUIRES the latency block — a
+    payload without it cannot certify (fail-closed)."""
+    payload = _synthetic_produced_shape()
+    del payload["run_metadata"]["latency_summary"]
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("latency_summary" in m for m in missing), missing
+
+
+def test_gate_refuses_when_g5_audit_summary_missing() -> None:
+    """[SECURITY-TEST] S7-04: a canonical run REQUIRES the audit block — a
+    payload without it cannot certify (fail-closed)."""
+    payload = _synthetic_produced_shape()
+    del payload["run_metadata"]["audit_summary"]
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("audit_summary" in m for m in missing), missing
+
+
+def test_gate_refuses_audit_integrity_breach_leak() -> None:
+    """[SECURITY-TEST] S7-04: an audit-integrity breach (a leaked span) makes
+    the artifact itself untrustworthy — certification REFUSED (like the step-3
+    ε bound), not merely a G5 FAIL."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["audit_summary"]["leakage_sankey"]["leaked"] = 1
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("leak" in m.lower() for m in missing), missing
+
+
+def test_gate_refuses_audit_persist_not_strict_true() -> None:
+    """[SECURITY-TEST] S7-04: the no_raw_pii_persist stamp certifies only as
+    the literal True — the string 'true' is a corrupt stamp (the
+    canonical_claim_run coercion lesson), certification REFUSED."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["audit_summary"]["interception"]["no_raw_pii_persist"] = "true"
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+
+
+def test_gate_refuses_corrupt_latency_shape() -> None:
+    """[SECURITY-TEST] S7-04: a shape-corrupt latency block (NaN percentile /
+    inverted order / bogus profile) cannot certify — fail-closed, no crash."""
+    for mutation in (
+        {"p50_ms": float("nan")},
+        {"p50_ms": 200.0, "p95_ms": 100.0},
+        {"profile": "bogus"},
+        {"system": "gliner"},
+        {"n_records": True},
+    ):
+        payload = _synthetic_produced_shape()
+        payload["run_metadata"]["latency_summary"].update(mutation)
+        ok, missing = CanonicalRunGate().validate(payload)
+        assert ok is False, mutation
+
+
+def test_gate_accepts_over_budget_latency_shape_g5_fails_honestly() -> None:
+    """[CONTRACT-TEST] S7-04 — the deliberate design line: an OVER-BUDGET but
+    shape-valid measured latency still CERTIFIES (the run is honest; the
+    measurement is real) and G5 then honestly FAILS at the SDO gate — exactly
+    like G6's F2 on a certified run. Certification ≠ performance."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["latency_summary"]["p99_ms"] = 5000.0  # > 1000 committed
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is True, missing
+
+    payload["run_metadata"]["canonical_claim_run"] = True
+    verdict = SupremacyVerdict.from_artifacts(payload)
+    assert verdict.canonical_claim_run is True
+    assert verdict.guarantee("G5").passed is False
+    assert verdict.verdict is Verdict.NOT_YET
+    assert "G5 FAIL" in verdict.binding_constraint
+
+
+def test_gate_validate_huge_int_lang_key_never_crashes() -> None:
+    """[SECURITY-TEST] S7-04 DoV class: a >4300-digit int KEY in
+    per_language_recall_delta crashed validate's missing-detail f-string (the
+    int→str conversion limit) — must fail CLOSED, never raise."""
+    payload = _synthetic_produced_shape()
+    payload["per_language_recall_delta"] = {10**5000: float("nan")}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert missing
+
+
+def test_gate_validate_huge_int_ece_key_and_value_never_crash() -> None:
+    """[SECURITY-TEST] S7-04 DoV class: a huge-int per_class_ece KEY (with an
+    invalid value, forcing the detail format) and a huge-int ECE VALUE both
+    crashed validate's f-strings — must fail CLOSED, never raise."""
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["per_class_ece"] = {10**5000: float("nan")}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+
+    payload = _synthetic_produced_shape()
+    _system(payload, "pii-anon")["per_class_ece"] = {"EMAIL_ADDRESS": 10**5000}
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+
+
+def test_gate_validate_huge_int_scope_never_crashes() -> None:
+    """[SECURITY-TEST] S7-04 DoV class: a huge-int canonical_provenance.scope
+    crashed the not-an-honest-scope detail f-string — must fail CLOSED."""
+    payload = _synthetic_produced_shape()
+    payload["run_metadata"]["canonical_provenance"]["scope"] = 10**5000
+    ok, missing = CanonicalRunGate().validate(payload)
+    assert ok is False
+    assert any("scope" in m for m in missing), missing
