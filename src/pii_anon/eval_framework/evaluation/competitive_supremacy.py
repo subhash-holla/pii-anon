@@ -644,7 +644,7 @@ def _g1_recall_floor(
             "G1", None, float("nan"), EPS_RECALL_PER_LANG,
             "G1 PENDING: per_language_recall_delta artifact absent or malformed "
             "(structural superset "
-            + ("holds" if superset_ok else f"BREACHED on {sorted(missing)}")
+            + ("holds" if superset_ok else f"BREACHED on {sorted(missing, key=str)}")
             + "); per-language ε never fabricated",
         )
     # Each ε is a DELTA (can be negative) — validated by `_is_finite_number`, NOT
@@ -668,10 +668,10 @@ def _g1_recall_floor(
             f"ε={worst_lang_eps:.4g} ≤ {EPS_RECALL_PER_LANG}"
         )
     elif not superset_ok:
-        detail = f"G1 FAIL: ensemble misses competitor-detected entities {sorted(missing)}"
+        detail = f"G1 FAIL: ensemble misses competitor-detected entities {sorted(missing, key=str)}"
     elif corrupt_langs:
         detail = (
-            f"G1 FAIL: per-language recall ε on {sorted(corrupt_langs)} is non-finite / "
+            f"G1 FAIL: per-language recall ε on {sorted(corrupt_langs, key=str)} is non-finite / "
             f"out-of-float-range — a corrupt measurement that cannot certify the recall "
             f"floor (never slips ≤ {EPS_RECALL_PER_LANG}, never crashes)"
         )
@@ -1036,7 +1036,11 @@ def _g4_calibration_selective_risk(
     worst_slack = -math.inf  # (ece - bar); a non-finite ECE is the worst breach
     ece_ok = True
     finite_eces: list[float] = []
-    for et in sorted(per_class_ece):
+    # ``key=str``: a direct dict caller can supply MIXED-TYPE keys (a str entity name + an
+    # int) — bare ``sorted`` then raises ``TypeError: '<' not supported between str and int``
+    # (the S7-02 close-8 DoV). A str-repr total order keeps every class (each ECE value is
+    # still validated below); JSON keys are always str so an honest run is unaffected.
+    for et in sorted(per_class_ece, key=str):
         raw = per_class_ece[et]
         bar = _g4_class_bar(thresholds.get(et))
         if not _is_finite_number(raw):
