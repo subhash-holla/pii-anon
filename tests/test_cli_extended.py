@@ -130,3 +130,19 @@ def test_supremacy_deeply_nested_artifact_does_not_traceback(
     result = runner.invoke(app, ["supremacy", "--artifact", str(deep)])
     assert result.exit_code != 0
     assert not isinstance(result.exception, RecursionError)
+
+
+def test_supremacy_directory_artifact_does_not_traceback(
+    runner, tmp_path: Path
+) -> None:
+    """[SECURITY-TEST] S7-02 close-10: a DIRECTORY artifact path passes the CLI's
+    ``path.exists()`` guard (a directory exists) but ``path.read_text()`` raises
+    ``IsADirectoryError`` — a subclass of ``OSError`` NOT in the JSON-parse except tuple
+    ``(json.JSONDecodeError, RecursionError)`` — so it leaked a raw traceback out of the
+    shipped ``supremacy`` command. The CLI must emit a clean error + non-zero exit, never
+    leak an OSError/IsADirectoryError. (Mirror of the deeply-nested RecursionError case
+    above; ``tmp_path`` is itself a directory.)"""
+    app = create_app()
+    result = runner.invoke(app, ["supremacy", "--artifact", str(tmp_path)])
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, (IsADirectoryError, OSError))
