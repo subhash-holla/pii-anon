@@ -1618,32 +1618,39 @@ def _g5_audit_latency(
     """
     latency = run_metadata.get("latency_summary")
     audit = run_metadata.get("audit_summary")
+    latency_present = isinstance(latency, dict)
+    audit_present = isinstance(audit, dict)
 
-    if not isinstance(latency, dict) and not isinstance(audit, dict):
-        return GuaranteeResult(
-            "G5", None, float("nan"), float("nan"),
-            "G5 PENDING: benchmark lacks the latency/audit fields "
-            "(run_metadata.latency_summary + run_metadata.audit_summary); "
-            f"{_PENDING_SUCCESSORS['G5']} — emitted by the S7 canonical run",
+    # CRITICAL — evaluate each PRESENT half BEFORE deciding missing-shape; an
+    # ABSENT/non-dict block is itself a missing-shape half (ok=None), NOT a
+    # short-circuit to PENDING. The S7-04 close MAJOR (breach-bury fabrication):
+    # the old code returned PENDING the moment ONE block was absent, WITHOUT
+    # evaluating the present block — so a REAL breach in the present half (an
+    # over-budget latency, a leaked span) was laundered into PENDING, escalating
+    # the verdict NOT_YET → PROVISIONAL_SOTA (PENDING blocks CLAIM_GRADE but not
+    # PROVISIONAL). Routing an absent block through a missing-shape _G5Half makes
+    # the breach-outranks-missing combiner below apply at the WHOLE-BLOCK level,
+    # so a present-half breach can never be buried by omitting the other half.
+    lat = (
+        _g5_latency_half(latency, run_metadata.get("latency_ceiling_ms"), systems)
+        if isinstance(latency, dict)
+        else _G5Half(
+            None, float("nan"), float("nan"),
+            "latency_summary block absent (missing-shape)",
         )
-    if not isinstance(latency, dict) or not isinstance(audit, dict):
-        absent_half = (
-            "audit_summary (the audit half)"
-            if isinstance(latency, dict)
-            else "latency_summary (the latency half)"
+    )
+    aud = (
+        _g5_audit_half(audit)
+        if isinstance(audit, dict)
+        else _G5Half(
+            None, float("nan"), float("nan"),
+            "audit_summary block absent (missing-shape)",
         )
-        return GuaranteeResult(
-            "G5", None, float("nan"), float("nan"),
-            f"G5 PENDING: benchmark lacks {absent_half} — a half-populated "
-            f"artifact cannot certify (never fabricated); "
-            f"{_PENDING_SUCCESSORS['G5']}",
-        )
+    )
 
-    lat = _g5_latency_half(latency, run_metadata.get("latency_ceiling_ms"), systems)
-    aud = _g5_audit_half(audit)
-
-    # A real breach (False) outranks missing-shape (None) — fail-closed: a
-    # half-written artifact cannot bury a breach in the other half.
+    # A real breach (False) in EITHER half outranks missing-shape (None) —
+    # fail-closed: a half-written artifact cannot bury a breach in the other half
+    # (the close MAJOR), exactly as a present-but-corrupt nested value cannot.
     if lat.ok is False or aud.ok is False:
         breaches = [h.detail for h in (lat, aud) if h.ok is False]
         first = lat if lat.ok is False else aud
@@ -1651,11 +1658,22 @@ def _g5_audit_latency(
             "G5", False, first.observed, first.bar,
             "G5 FAIL: " + "; ".join(breaches),
         )
+    # No breach. EITHER half missing-shape ⇒ PENDING (a single clean half cannot
+    # certify G5; both are required) — never fabricated. The both-absent case
+    # keeps the original successor-named detail for honest-surface stability.
     if lat.ok is None or aud.ok is None:
+        if not latency_present and not audit_present:
+            return GuaranteeResult(
+                "G5", None, float("nan"), float("nan"),
+                "G5 PENDING: benchmark lacks the latency/audit fields "
+                "(run_metadata.latency_summary + run_metadata.audit_summary); "
+                f"{_PENDING_SUCCESSORS['G5']} — emitted by the S7 canonical run",
+            )
         gaps = [h.detail for h in (lat, aud) if h.ok is None]
         return GuaranteeResult(
             "G5", None, float("nan"), float("nan"),
-            "G5 PENDING: " + "; ".join(gaps) + " — never fabricated",
+            "G5 PENDING: " + "; ".join(gaps) + " — a half-populated artifact "
+            f"cannot certify (never fabricated); {_PENDING_SUCCESSORS['G5']}",
         )
     return GuaranteeResult(
         "G5", True, lat.observed, lat.bar,
