@@ -104,8 +104,12 @@ def test_s3_05_at_least_one_rating_module_scanned() -> None:
 # untouched by this gate either way.
 # ---------------------------------------------------------------------------
 
+# latency_ceilings.py joined the gate's import graph in S7-04 (the committed
+# NFR-009 ceiling registry the G5 latency half reads) — it is stdlib-only
+# (separately pinned by tests/test_latency_ceilings.py) and scanned here so it
+# can never widen the gate boundary.
 _GATE_MODULE_FILES: frozenset[str] = frozenset(
-    {"competitive_supremacy.py", "competitor_tiers.py"}
+    {"competitive_supremacy.py", "competitor_tiers.py", "latency_ceilings.py"}
 )
 
 
