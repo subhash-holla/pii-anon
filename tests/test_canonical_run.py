@@ -1068,3 +1068,20 @@ def test_closefinal_canonical_gate_validate_unhashable_scope_does_not_crash() ->
     ok, missing = CanonicalRunGate().validate(payload)  # must not raise
     assert ok is False
     assert any("scope" in m for m in missing)
+
+
+@pytest.mark.parametrize(
+    "bad_systems",
+    [None, 42, 3.14, True, [{"system": ["x"]}], [{"system": {"k": 1}}]],
+)
+def test_closefinal_canonical_gate_validate_hostile_systems_does_not_crash(
+    bad_systems: object,
+) -> None:
+    """[SECURITY-TEST] S7-02 final close (round 4): ``CanonicalRunGate.validate`` crashed on a
+    non-iterable ``systems`` (None/int/float/bool → 'object is not iterable') and on an
+    UNHASHABLE system-name (list/dict → 'unhashable' in the ``{s.get("system"): s}`` dict-comp
+    key). It must fail CLOSED (ok=False), never raise — the EXPORTED gate is callable directly
+    on a hostile dict (the close-5 ``systems`` guard was incomplete)."""
+    ok, missing = CanonicalRunGate().validate({"run_metadata": {}, "systems": bad_systems})
+    assert ok is False
+    assert missing

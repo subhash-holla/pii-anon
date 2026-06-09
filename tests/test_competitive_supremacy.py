@@ -38,6 +38,7 @@ from pii_anon.eval_framework.evaluation.competitive_supremacy import (
     _g4_calibration_selective_risk,
     _g6_raw_noninferiority,
     _is_finite_number,
+    _risk_coverage_is_monotone,
     _run_breaches_recall_floor,
     _tier_status_input,
     _top_composite_system,
@@ -2817,3 +2818,51 @@ def test_closefinal_canonical_claim_run_real_true_still_certifies() -> None:
     )
     assert v.canonical_claim_run is True
     assert v.guarantee("G7").passed is True
+
+
+# ---------------------------------------------------------------------------
+# S7-02 FINAL close (round 4) — the CATASTROPHIC NaN-curve FABRICATION.
+# ``_risk_coverage_is_monotone`` did ``float(p["coverage"])`` — ``float(NaN)`` does
+# NOT raise, so a NaN coverage/risk entered the sort + the ``>=`` compare (NaN
+# compares False to everything), LAUNDERING a genuinely non-monotone curve into a
+# fabricated 'monotone' ⇒ G4 PASS ⇒ CLAIM_GRADE_SOTA. The nested curve-row fields
+# bypassed the finiteness validators (the audit's blind spot).
+# ---------------------------------------------------------------------------
+
+
+def test_closefinal_g4_nan_coverage_in_curve_does_not_launder_non_monotone_pass() -> None:
+    """[SECURITY-TEST] S7-02 final close (CATASTROPHIC FABRICATION): a NaN ``coverage`` in a
+    ``risk_coverage_curve`` row laundered a genuinely NON-monotone curve into a fabricated
+    'monotone' ⇒ G4 PASS ⇒ (with the other axes) CLAIM_GRADE_SOTA. A row with a non-finite
+    coverage/risk cannot certify NFR-019 ⇒ NOT monotone."""
+    non_monotone_finite = [{"coverage": 0.8, "risk": 0.2}, {"coverage": 0.4, "risk": 0.6}]
+    assert _risk_coverage_is_monotone(non_monotone_finite) is False  # control: genuinely non-monotone
+    with_nan = [
+        {"coverage": 0.8, "risk": 0.2},
+        {"coverage": float("nan"), "risk": 0.3},
+        {"coverage": 0.4, "risk": 0.6},
+    ]
+    assert _risk_coverage_is_monotone(with_nan) is False  # the NaN must NOT launder it
+
+
+@pytest.mark.parametrize(
+    "bad", [float("nan"), float("inf"), float("-inf"), 10**400, "x", None, True, [1], {"k": 1}]
+)
+def test_closefinal_g4_non_finite_curve_field_is_not_monotone(bad: object) -> None:
+    """[SECURITY-TEST] a non-finite / non-numeric / huge-int / bool coverage OR risk in any
+    curve row ⇒ NOT monotone (cannot certify NFR-019), never a launder, never a crash."""
+    assert (
+        _risk_coverage_is_monotone([{"coverage": bad, "risk": 0.2}, {"coverage": 0.5, "risk": 0.3}])
+        is False
+    )
+    assert (
+        _risk_coverage_is_monotone([{"coverage": 0.8, "risk": bad}, {"coverage": 0.5, "risk": 0.3}])
+        is False
+    )
+
+
+def test_closefinal_g4_honest_monotone_curve_still_passes() -> None:
+    """[CONTRACT-TEST] CARDINAL: an honest monotone-non-increasing curve (risk non-decreasing as
+    coverage ascends) still certifies (behaviour-preserving)."""
+    honest = [{"coverage": 0.4, "risk": 0.1}, {"coverage": 0.8, "risk": 0.3}]
+    assert _risk_coverage_is_monotone(honest) is True
