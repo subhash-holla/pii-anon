@@ -2979,7 +2979,7 @@ def test_closefinal_g1_honest_superset_still_passes() -> None:
 
 def _g5_latency_summary(**over: object) -> dict[str, object]:
     """A VALID measured-latency block (in-ceiling for the committed ensemble
-    budget 250/500/1000 ms)."""
+    budget 500/1000/2000 ms)."""
     base: dict[str, object] = {
         "system": "pii-anon-swarm",
         "profile": "ensemble",
@@ -3097,7 +3097,7 @@ def test_g5_passes_on_valid_in_ceiling_artifact() -> None:
     assert g5.passed is True
     assert "G5 PASS" in g5.binding_detail
     assert g5.observed == pytest.approx(133.3)
-    assert g5.bar == pytest.approx(1000.0)
+    assert g5.bar == pytest.approx(2000.0)
 
 
 def test_g5_fails_when_p99_over_committed_ceiling() -> None:

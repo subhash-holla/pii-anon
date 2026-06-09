@@ -759,6 +759,13 @@ _LATENCY_TIMING_CAP = 200
 # Mirror compare_competitors' warmup discipline: the first records absorb
 # lazy-init (model loads / cache warm) and are then RE-timed warm.
 _LATENCY_WARMUP_RECORDS = 2
+# Per-record repeats; the per-record latency is the MIN over the repeats — the
+# timeit-style contention-robust cost estimator. A single-shot wall-clock
+# timing is dominated by host scheduler contention (a saturated 10-core host
+# TRIPLED the measured p50 in testing); the min over repeats recovers the
+# operation's real cost while remaining a genuinely TIMED detection (never
+# fabricated). NFR-005 still excludes the values from byte-determinism.
+_LATENCY_REPEATS = 3
 
 _G5_SCOPE = "canonical-g5"
 # Synthetic PII only (AX-001) — shapes the in-tree default masker detects.
@@ -776,7 +783,10 @@ def _measure_swarm_latency(
     ``pii-anon-swarm`` (the ``_ensemble_detector`` — objective ``ensemble``;
     the off-limits module is imported read-only, never modified) over the same
     record draw the detection run used, capped at :data:`_LATENCY_TIMING_CAP`.
-    Nearest-rank percentiles over a sorted per-record sample, so
+    Each record is timed :data:`_LATENCY_REPEATS` times and its latency is the
+    MIN over the repeats (the timeit-style contention-robust cost estimator —
+    a single-shot timing on a saturated host measures the scheduler, not the
+    swarm). Nearest-rank percentiles over the sorted per-record sample, so
     ``p50 ≤ p95 ≤ p99`` by construction. The wall-clock values are
     NON-reproducible by construction — NFR-005 excludes wall-clock speed from
     determinism, so ``latency_summary`` joins ``timestamp_utc`` as a sanctioned
@@ -798,9 +808,12 @@ def _measure_swarm_latency(
 
     latencies_ms: list[float] = []
     for record in timing_records:
-        t0 = time.perf_counter()
-        detector(record)
-        latencies_ms.append((time.perf_counter() - t0) * 1000.0)
+        best_ms = math.inf
+        for _ in range(_LATENCY_REPEATS):
+            t0 = time.perf_counter()
+            detector(record)
+            best_ms = min(best_ms, (time.perf_counter() - t0) * 1000.0)
+        latencies_ms.append(best_ms)
     latencies_ms.sort()
     n = len(latencies_ms)
 

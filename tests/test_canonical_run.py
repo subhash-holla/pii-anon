@@ -1296,7 +1296,7 @@ def test_gate_accepts_over_budget_latency_shape_g5_fails_honestly() -> None:
     measurement is real) and G5 then honestly FAILS at the SDO gate — exactly
     like G6's F2 on a certified run. Certification ≠ performance."""
     payload = _synthetic_produced_shape()
-    payload["run_metadata"]["latency_summary"]["p99_ms"] = 5000.0  # > 1000 committed
+    payload["run_metadata"]["latency_summary"]["p99_ms"] = 5000.0  # > 2000 committed
     ok, missing = CanonicalRunGate().validate(payload)
     assert ok is True, missing
 
