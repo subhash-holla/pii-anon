@@ -496,6 +496,27 @@ def _recall_map(system: dict[str, Any]) -> dict[str, Any]:
     return per if isinstance(per, dict) else {}
 
 
+def _detected_entity_names(recall_map: dict[str, Any]) -> set[str]:
+    """The entity types a system genuinely DETECTS — those whose per-entity recall is a VALID
+    score (finite, in [0, 1], NOT a bool) STRICTLY > 0.
+
+    The S7-02 close-9 SHOWSTOPPERS: this NESTED ``per_entity_recall`` value drives BOTH the G6
+    entity-coverage NFR floor AND the G1 recall-floor-by-construction superset, but was read
+    via a bare ``isinstance(r, (int, float)) [and r > 0]`` — so a NON-PHYSICAL value
+    (``isinstance(True, int)`` is True; ``+inf > 0`` / ``1e40 > 0`` are True) counted as a
+    detected entity it never detected: forging G6 PASS (inflated coverage) AND masking G1 (an
+    entity listed at ``0.0`` / negative sat in the ensemble set ⇒ ensemble ⊇ shared). Routing
+    each value through :func:`_finite_unit_score` (which rejects bool / non-finite / out-of-
+    [0,1]) and requiring ``> 0`` closes both — the no-fabrication invariant on a nested field.
+    """
+    out: set[str] = set()
+    for entity, raw in recall_map.items():
+        score = _finite_unit_score(raw)
+        if score is not None and score > 0.0:
+            out.add(entity)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # RecallFloorVerdictGuard — the recall-floor-breach predicate (story §3 G7)
 # ---------------------------------------------------------------------------
@@ -615,21 +636,19 @@ def _g1_recall_floor(
 
     # Structural: the pii-anon ladder must detect every entity any competitor
     # detects (the recall-floor-by-construction invariant).
+    # An entity counts toward a system's detected set ONLY if its per-entity recall is a
+    # VALID score > 0 (via _detected_entity_names) — a 0.0 / negative / bool / +inf / NaN
+    # value is NOT a detection. Closes the G1 recall-floor MASK (close-9 SHOWSTOPPER): an
+    # entity listed at 0.0 used to sit in the ensemble set (no >0 filter) ⇒ ensemble ⊇ shared
+    # ⇒ forged G1 PASS, even though the ensemble detects NOTHING for that entity.
     ensemble_entities: set[str] = set()
     for ladder in _LADDER_SYSTEMS:
         sys = systems.get(ladder)
         if sys:
-            ensemble_entities |= {
-                e for e, r in _recall_map(sys).items()
-                if isinstance(r, (int, float))
-            }
+            ensemble_entities |= _detected_entity_names(_recall_map(sys))
     shared_entities: set[str] = set()
     for name in _competitor_names(systems):
-        per = _recall_map(systems[name])
-        shared_entities |= {
-            e for e, r in per.items()
-            if isinstance(r, (int, float)) and r > 0.0
-        }
+        shared_entities |= _detected_entity_names(_recall_map(systems[name]))
     missing = shared_entities - ensemble_entities
     superset_ok = not missing
 
@@ -1247,8 +1266,12 @@ def _g6_raw_noninferiority(systems: dict[str, dict[str, Any]]) -> GuaranteeResul
     # per_entity_recall (the S7-02 close-2 crash class) reads as EMPTY via `_recall_map`
     # ⇒ 0 detected / 0 total ⇒ coverage 0.0 (fail-closed), never an AttributeError on
     # `.values()` / `len`.
+    # Only a VALID score > 0 is a detection (close-9 SHOWSTOPPER): a bool True / +inf / huge-
+    # int / NaN per-entity recall used to count via ``isinstance(r,(int,float)) and r>0`` ⇒
+    # inflated coverage past the 0.80 floor ⇒ forged G6 PASS. _detected_entity_names rejects
+    # the non-physical values; ``total`` stays the full listed set so padding cannot help.
     per = _recall_map(core)
-    detected = sum(1 for r in per.values() if isinstance(r, (int, float)) and r > 0.0)
+    detected = len(_detected_entity_names(per))
     total = len(per)
     coverage = (detected / total) if total else 0.0
     coverage_ok = coverage >= ENTITY_COVERAGE_MIN
