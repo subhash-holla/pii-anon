@@ -558,6 +558,58 @@ def test_gate_read_systems_are_fresh_not_census_literals(
     assert core["recall"] != 0.7958, "gate-read recall must be fresh, not the census literal"
 
 
+def test_producer_strips_benchmark_ignore_sentinel_from_emitted_per_entity_recall() -> None:
+    """[REGRESSION] The benchmark-exclusion sentinel ``_BENCHMARK_IGNORE`` (schema.py maps
+    LATITUDE_LONGITUDE / TIMESTAMP / SWIFT_BIC_CODE to it; the gold side skips labels mapped
+    to it at schema.py:377) must NEVER leak into a system's EMITTED ``per_entity_recall``.
+
+    The leak made the SDO gate's G1 spuriously FAIL: a competitor that "detects" the sentinel
+    (recall > 0, e.g. gliner 0.333) while the ensemble does not (0.0, not a detection) reads as
+    ``ensemble misses competitor-detected entities ['_BENCHMARK_IGNORE']`` — a FAIL on a
+    non-entity that is BY DEFINITION excluded from benchmarking. The prediction-side
+    per_entity_recall the gate reads must mirror the gold-side exclusion. Real entities are
+    preserved verbatim (no over-stripping)."""
+    from types import SimpleNamespace
+
+    from pii_anon.evaluation.canonical_run import _assemble_base_payload
+
+    report = SimpleNamespace(
+        dataset="synthetic",
+        dataset_source="in-tree",
+        systems=[
+            SimpleNamespace(
+                system="pii-anon",
+                recall=0.9,
+                precision=0.9,
+                per_entity_recall={"EMAIL": 0.95, "_BENCHMARK_IGNORE": 0.0},
+                qualification_status="core",
+                available=True,
+                samples=8,
+            ),
+            SimpleNamespace(
+                system="gliner",
+                recall=0.8,
+                precision=0.8,
+                per_entity_recall={"EMAIL": 0.7, "_BENCHMARK_IGNORE": 0.333},
+                qualification_status="qualified",
+                available=True,
+                samples=8,
+            ),
+        ],
+    )
+    sampler = SimpleNamespace(dataset="synthetic", dataset_source="in-tree")
+    payload = _assemble_base_payload(
+        report, scope="representative-in-tree", sampler=sampler, max_samples=8
+    )
+
+    for s in payload["systems"]:
+        assert "_BENCHMARK_IGNORE" not in s["per_entity_recall"], (
+            f"{s['system']} leaks the _BENCHMARK_IGNORE sentinel into emitted per_entity_recall"
+        )
+        # The real entity is preserved verbatim — the filter strips ONLY the sentinel.
+        assert s["per_entity_recall"].get("EMAIL") is not None, s["system"]
+
+
 def test_pass2_full_census_reference_present_and_not_gate_read(
     produced: dict[str, Any],
 ) -> None:
