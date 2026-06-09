@@ -32,7 +32,6 @@ from pii_anon.eval_framework.attacks.reid_tier3 import (
     ReidPowerLadder,
     RepresentativeTier3ReidAttack,
     assess_rrs_power,
-    tier3_reid_attack_runner,
     wilson_interval,
 )
 

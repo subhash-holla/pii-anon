@@ -57,6 +57,22 @@ from pii_anon.eval_framework.attacks.reid import (
     score_reid_attack,
 )
 
+# S5-02 — the Tier-3 representative adversary (QIC+BSL, de-circularized) + the
+# NFR-012 RRS power machinery (Wilson CIs + the 2-rung ladder). Imported here so
+# the package surface + the import-boundary / dangerous-call AST guards scan
+# reid_tier3.py alongside the substrate, and its runner registers below.
+from pii_anon.eval_framework.attacks.reid_tier3 import (
+    RRS_RUNG_REID_HIGH,
+    RRS_RUNG_REID_LOW,
+    TIER3_REID_ATTACK_REGISTRY,
+    ReidPowerCell,
+    ReidPowerLadder,
+    RepresentativeTier3ReidAttack,
+    assess_rrs_power,
+    tier3_reid_attack_runner,
+    wilson_interval,
+)
+
 # Additively merge the re-identification runners into the sandbox default
 # allow-list registry. ``DEFAULT_ATTACK_REGISTRY`` (defined in ``sandbox``) is the
 # single plain-dict allow-list ``run_attack_under_sandbox`` resolves against; we
@@ -64,7 +80,7 @@ from pii_anon.eval_framework.attacks.reid import (
 # stays registered and the merge is the ONLY way the new bodies join the
 # allow-list (no new dynamic-import path is introduced). The registry remains a
 # plain in-code dict — the only way a spec selects code.
-for _name, _runner in REID_ATTACK_REGISTRY.items():
+for _name, _runner in {**REID_ATTACK_REGISTRY, **TIER3_REID_ATTACK_REGISTRY}.items():
     # SAFETY: ``DEFAULT_ATTACK_REGISTRY`` is annotated ``Final[Mapping[...]]`` in
     # ``sandbox.py`` so a static checker treats it as read-only, but the object
     # bound to that name IS a plain mutable ``dict`` — it is the SAME dict the
@@ -114,4 +130,14 @@ __all__ = [
     "reid_attack_runner",
     "REID_ATTACK_REGISTRY",
     "ANTI_ANONYMITY_CAVEAT",
+    # reid tier-3 surface (S5-02)
+    "RepresentativeTier3ReidAttack",
+    "wilson_interval",
+    "ReidPowerCell",
+    "ReidPowerLadder",
+    "assess_rrs_power",
+    "tier3_reid_attack_runner",
+    "TIER3_REID_ATTACK_REGISTRY",
+    "RRS_RUNG_REID_LOW",
+    "RRS_RUNG_REID_HIGH",
 ]
