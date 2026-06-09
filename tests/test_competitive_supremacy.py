@@ -2907,3 +2907,62 @@ def test_closefinal_mixed_type_dict_keys_do_not_crash_sorted() -> None:
         }
     )
     assert isinstance(v3.verdict, Verdict)
+
+
+# ---------------------------------------------------------------------------
+# S7-02 FINAL close (round 6) — TWO SHOWSTOPPER fabrications via NESTED
+# per_entity_recall VALUES (bool/+inf/huge-int/0.0/negative) that drive the G6
+# entity-coverage floor AND the G1 recall-floor superset. The fix: a detection
+# requires a VALID [0,1] score > 0 (via _detected_entity_names).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [True, float("inf"), 10**40, float("nan"), -0.5, "x"])
+def test_closefinal_g6_coverage_rejects_non_physical_per_entity_recall(bad: object) -> None:
+    """[SECURITY-TEST] S7-02 close-9 SHOWSTOPPER: a non-physical per_entity_recall value
+    (bool/+inf/huge-int/NaN/negative) counted as a 'detected' entity, inflating the G6
+    entity-coverage NFR floor past 0.80 ⇒ forged G6 PASS ⇒ CLAIM_GRADE. Only a valid [0,1]
+    score > 0 is a detection ⇒ honest coverage 4/10=0.40 < 0.80 ⇒ G6 FAIL."""
+    per = {f"REAL_{i}": 0.9 for i in range(4)}
+    per.update({f"FAKE_{i}": bad for i in range(6)})
+    core = {"system": "pii-anon", "recall": 0.9, "precision": 0.9, "per_entity_recall": per}
+    gliner = {"system": "gliner", "recall": 0.6, "precision": 0.9, "per_entity_recall": {"REAL_0": 0.6}}
+    g6 = _g6_raw_noninferiority({"pii-anon": core, "gliner": gliner})
+    assert g6.passed is False  # coverage 0.40, NOT laundered to 1.0
+
+
+def test_closefinal_g6_honest_coverage_still_passes() -> None:
+    """[CONTRACT-TEST] honest real recalls (>0) still count ⇒ coverage unchanged ⇒ G6 PASS."""
+    per = {f"E{i}": 0.9 for i in range(9)}
+    per["E9"] = 0.0  # 9/10 = 0.90 ≥ 0.80 floor
+    core = {"system": "pii-anon", "recall": 0.9, "precision": 0.9, "per_entity_recall": per}
+    gliner = {"system": "gliner", "recall": 0.6, "precision": 0.9, "per_entity_recall": {"E0": 0.6}}
+    g6 = _g6_raw_noninferiority({"pii-anon": core, "gliner": gliner})
+    assert g6.passed is True
+
+
+@pytest.mark.parametrize("mask", [0.0, -5.0, True, float("inf"), float("nan")])
+def test_closefinal_g1_recall_floor_mask_rejected(mask: object) -> None:
+    """[SECURITY-TEST] S7-02 close-9 SHOWSTOPPER: listing an entity with a 0.0 / negative /
+    non-physical recall on the pii-anon ladder put it in the ENSEMBLE set (no >0 filter),
+    masking the G1 recall-floor-by-construction superset ⇒ forged G1 PASS ⇒ CLAIM_GRADE. An
+    entity is in the ensemble only if genuinely detected (valid score > 0); a competitor that
+    detects it (>0) then exposes the miss ⇒ G1 FAIL."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "per_entity_recall": {"OTHER": 0.9, "IBAN": mask}},
+        "pii-anon-swarm": {"system": "pii-anon-swarm", "per_entity_recall": {"OTHER": 0.9, "IBAN": mask}},
+        "gliner": {"system": "gliner", "per_entity_recall": {"IBAN": 0.7}},
+    }
+    g1 = _g1_recall_floor({"per_language_recall_delta": {"en": 0.0}}, systems)
+    assert g1.passed is False  # ensemble misses IBAN (a mask is not a detection)
+
+
+def test_closefinal_g1_honest_superset_still_passes() -> None:
+    """[CONTRACT-TEST] an honest ensemble that genuinely detects all competitor entities (>0)
+    still PASSES G1 (behaviour-preserving)."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "per_entity_recall": {"OTHER": 0.9, "IBAN": 0.8}},
+        "gliner": {"system": "gliner", "per_entity_recall": {"IBAN": 0.7}},
+    }
+    g1 = _g1_recall_floor({"per_language_recall_delta": {"en": 0.0}}, systems)
+    assert g1.passed is True
