@@ -2966,3 +2966,489 @@ def test_closefinal_g1_honest_superset_still_passes() -> None:
     }
     g1 = _g1_recall_floor({"per_language_recall_delta": {"en": 0.0}}, systems)
     assert g1.passed is True
+
+
+# ===========================================================================
+# S7-04 — G5 (audit + orchestration latency / interception) goes placeholder →
+# computed: _g5_audit_latency(systems, run_metadata). Three-valued; every
+# artifact value validated; the overrides["G5"] successor seam preserved.
+# The imports are LAZY (inside each test) so the file keeps collecting while
+# the gate change is RED.
+# ===========================================================================
+
+
+def _g5_latency_summary(**over: object) -> dict[str, object]:
+    """A VALID measured-latency block (in-ceiling for the committed ensemble
+    budget 250/500/1000 ms)."""
+    base: dict[str, object] = {
+        "system": "pii-anon-swarm",
+        "profile": "ensemble",
+        "p50_ms": 80.5,
+        "p95_ms": 112.0,
+        "p99_ms": 133.3,
+        "n_records": 12,
+        "measurement": "fresh-in-tree-per-record-detection-timing",
+    }
+    base.update(over)
+    return base
+
+
+def _g5_audit_summary(**over: object) -> dict[str, object]:
+    """A VALID audit block (4 channels, no persist breach, zero leaks, ASR 0)."""
+    base: dict[str, object] = {
+        "interception": {
+            "counts_by_channel": {"PROMPT": 2, "MEMORY": 1, "TOOL_IO": 1, "TRACE": 1},
+            "no_raw_pii_persist": True,
+            "records_total": 5,
+        },
+        "leakage_sankey": {"blocked": 5, "leaked": 0},
+        "injection_resistance": {
+            "attack_success_rate": 0.0,
+            "benign_task_success_rate": 1.0,
+            "n_payloads": 4,
+        },
+    }
+    base.update(over)
+    return base
+
+
+def _g5_systems() -> dict[str, dict[str, object]]:
+    """A minimal systems map carrying the ladder (the latency SUT)."""
+    return {
+        "pii-anon": {"system": "pii-anon"},
+        "pii-anon-swarm": {"system": "pii-anon-swarm"},
+        "gliner": {"system": "gliner"},
+    }
+
+
+def _g5(
+    latency: object = "default", audit: object = "default"
+) -> object:
+    """Call _g5_audit_latency with the given blocks ('default' = valid block;
+    None = omit the key entirely; anything else verbatim)."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _g5_audit_latency,
+    )
+
+    rm: dict[str, object] = {}
+    if latency == "default":
+        rm["latency_summary"] = _g5_latency_summary()
+    elif latency is not None:
+        rm["latency_summary"] = latency
+    if audit == "default":
+        rm["audit_summary"] = _g5_audit_summary()
+    elif audit is not None:
+        rm["audit_summary"] = audit
+    return _g5_audit_latency(_g5_systems(), rm)
+
+
+def test_g5_pending_when_both_blocks_absent_never_fabricated() -> None:
+    """[CONTRACT-TEST] S7-04: the smoke-artifact path — no latency/audit fields
+    ⇒ G5 PENDING (None), naming the successor; NEVER fabricated."""
+    g5 = _g5(latency=None, audit=None)
+    assert g5.passed is None
+    assert "PENDING" in g5.binding_detail
+    assert "G5←S5/S6" in g5.binding_detail
+
+
+def test_g5_pending_when_audit_half_absent() -> None:
+    """[CONTRACT-TEST] a half-populated artifact cannot certify (G2 precedent):
+    latency present, audit absent ⇒ PENDING naming the audit half."""
+    g5 = _g5(audit=None)
+    assert g5.passed is None
+    assert "audit" in g5.binding_detail.lower()
+
+
+def test_g5_pending_when_latency_half_absent() -> None:
+    """[CONTRACT-TEST] symmetric: audit present, latency absent ⇒ PENDING
+    naming the latency half."""
+    g5 = _g5(latency=None)
+    assert g5.passed is None
+    assert "latency" in g5.binding_detail.lower()
+
+
+def test_g5_override_seam_preserved_exactly_like_g2_g4() -> None:
+    """[CONTRACT-TEST] the pending_overrides['G5'] successor seam wins over
+    computation — True/False/None all honored (caller-kwarg-only)."""
+    bench = _canonical_benchmark()
+    for override, expected in ((True, True), (False, False), (None, None)):
+        verdict = SupremacyVerdict.from_artifacts(
+            bench, pending_overrides={"G5": override}
+        )
+        assert verdict.guarantee("G5").passed is expected
+        if override is not None:
+            assert "supplied by successor" in verdict.guarantee("G5").binding_detail
+
+
+def test_g5_smoke_benchmark_stays_pending_with_stable_successor_string() -> None:
+    """[CONTRACT-TEST] the no-G5-fields benchmark computes G5 PENDING via the
+    REAL method (no override) and axes_pending keeps the byte-stable successor
+    string (honest-input surface stability)."""
+    verdict = SupremacyVerdict.from_artifacts(_canonical_benchmark())
+    assert verdict.guarantee("G5").passed is None
+    assert "G5←S5/S6 (latency budgets + 4-channel interception)" in verdict.axes_pending
+
+
+def test_g5_passes_on_valid_in_ceiling_artifact() -> None:
+    """[CONTRACT-TEST] the honest produced-artifact path: valid measured latency
+    within the committed ensemble ceiling + a clean audit ⇒ G5 PASS; observed/bar
+    carry the p99 pair."""
+    g5 = _g5()
+    assert g5.passed is True
+    assert "G5 PASS" in g5.binding_detail
+    assert g5.observed == pytest.approx(133.3)
+    assert g5.bar == pytest.approx(1000.0)
+
+
+def test_g5_fails_when_p99_over_committed_ceiling() -> None:
+    """[CONTRACT-TEST] honest latency breach: measured p99 5000 ms > committed
+    ensemble p99 1000 ms ⇒ FAIL naming the percentile."""
+    g5 = _g5(latency=_g5_latency_summary(p99_ms=5000.0))
+    assert g5.passed is False
+    assert "p99" in g5.binding_detail
+
+
+def test_g5_fails_when_leaked_positive() -> None:
+    """[CONTRACT-TEST] honest audit breach: a leaked span ⇒ FAIL."""
+    g5 = _g5(audit=_g5_audit_summary(leakage_sankey={"blocked": 5, "leaked": 1}))
+    assert g5.passed is False
+    assert "leak" in g5.binding_detail.lower()
+
+
+def test_g5_fails_when_asr_positive() -> None:
+    """[CONTRACT-TEST] honest audit breach: attack_success_rate 0.25 > the
+    committed 0.0 bar ⇒ FAIL."""
+    audit = _g5_audit_summary()
+    audit["injection_resistance"] = {
+        "attack_success_rate": 0.25,
+        "benign_task_success_rate": 1.0,
+        "n_payloads": 4,
+    }
+    g5 = _g5(audit=audit)
+    assert g5.passed is False
+    assert "attack" in g5.binding_detail.lower() or "ASR" in g5.binding_detail
+
+
+def test_g5_fails_when_benign_task_success_below_bar() -> None:
+    """[CONTRACT-TEST] the FR-029 anti-degenerate pairing: a guard that blocks
+    everything (ASR 0 but benign 0.5 < 0.95) ⇒ FAIL — masking everything is not
+    resistance."""
+    audit = _g5_audit_summary()
+    audit["injection_resistance"] = {
+        "attack_success_rate": 0.0,
+        "benign_task_success_rate": 0.5,
+        "n_payloads": 4,
+    }
+    g5 = _g5(audit=audit)
+    assert g5.passed is False
+    assert "benign" in g5.binding_detail.lower()
+
+
+@pytest.mark.parametrize("persist", [False, "true", 1, [], "yes", 0])
+def test_g5_persist_stamp_must_be_strict_true(persist: object) -> None:
+    """[SECURITY-TEST] no_raw_pii_persist certifies ONLY as the literal True —
+    the canonical_claim_run coercion lesson (close-6): a truthy-but-not-True
+    value (the string 'true', the int 1) or an honest False all FAIL."""
+    inter = {
+        "counts_by_channel": {"PROMPT": 2, "MEMORY": 1, "TOOL_IO": 1, "TRACE": 1},
+        "no_raw_pii_persist": persist,
+        "records_total": 5,
+    }
+    g5 = _g5(audit=_g5_audit_summary(interception=inter))
+    assert g5.passed is False
+
+
+def test_g5_pending_when_persist_key_absent() -> None:
+    """[CONTRACT-TEST] missing-shape (an absent key) is PENDING, never a PASS
+    and never a fabricated FAIL-mask: omission can never read BETTER than the
+    placeholder did."""
+    inter = {
+        "counts_by_channel": {"PROMPT": 2, "MEMORY": 1, "TOOL_IO": 1, "TRACE": 1},
+        "records_total": 5,
+    }
+    g5 = _g5(audit=_g5_audit_summary(interception=inter))
+    assert g5.passed is None
+
+
+def test_g5_fails_when_a_channel_is_missing() -> None:
+    """[CONTRACT-TEST] 4-channel least-privilege interception means ALL FOUR
+    channels exercised — a counts_by_channel missing TRACE ⇒ FAIL (incomplete
+    interception is a breach, not a missing-shape)."""
+    inter = {
+        "counts_by_channel": {"PROMPT": 2, "MEMORY": 1, "TOOL_IO": 1},
+        "no_raw_pii_persist": True,
+        "records_total": 4,
+    }
+    g5 = _g5(audit=_g5_audit_summary(interception=inter))
+    assert g5.passed is False
+    assert "TRACE" in g5.binding_detail
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [float("nan"), float("inf"), float("-inf"), -1.0, True, 10**400, "80", []],
+)
+@pytest.mark.parametrize("key", ["p50_ms", "p95_ms", "p99_ms"])
+def test_g5_corrupt_latency_value_fails_never_crashes_never_passes(
+    key: str, corrupt: object
+) -> None:
+    """[SECURITY-TEST] the no-fabrication invariant on the latency half: a
+    NaN/±inf/negative/bool/huge-int/str/container percentile is NOT a
+    measurement — FAIL (a corrupt present value cannot certify), never a crash,
+    never a PASS."""
+    g5 = _g5(latency=_g5_latency_summary(**{key: corrupt}))
+    assert g5.passed is False
+
+
+def test_g5_percentile_inversion_is_corrupt() -> None:
+    """[SECURITY-TEST] p50 > p95 is non-physical (percentiles are monotone) — a
+    corrupt measurement, FAIL."""
+    g5 = _g5(latency=_g5_latency_summary(p50_ms=200.0, p95_ms=100.0))
+    assert g5.passed is False
+    assert "order" in g5.binding_detail.lower() or "p50" in g5.binding_detail
+
+
+@pytest.mark.parametrize("profile", ["bogus", "", ["ensemble"], {"p": 1}, 7, True])
+def test_g5_unknown_or_hostile_profile_fails_never_crashes(profile: object) -> None:
+    """[SECURITY-TEST] a profile naming no committed budget can never certify;
+    a hostile non-str profile (list/dict — unhashable) must never crash the
+    registry lookup."""
+    g5 = _g5(latency=_g5_latency_summary(profile=profile))
+    assert g5.passed is False
+
+
+def test_g5_non_ladder_or_unknown_system_fails() -> None:
+    """[SECURITY-TEST] the latency SUT must be a ladder member present in the
+    benchmark — a competitor's (or phantom) latency cannot certify the SUT's
+    NFR-009."""
+    assert _g5(latency=_g5_latency_summary(system="gliner")).passed is False
+    assert _g5(latency=_g5_latency_summary(system="phantom-sys")).passed is False
+    assert _g5(latency=_g5_latency_summary(system=["pii-anon-swarm"])).passed is False
+
+
+def test_g5_artifact_ceiling_cannot_loosen_committed_budget() -> None:
+    """[SECURITY-TEST] the _g4_class_bar lesson on the latency axis: an
+    artifact-supplied ceiling may only TIGHTEN. measured p99=5000 with a
+    loosening artifact ceiling 1e9 still FAILS against the committed 1000."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _g5_audit_latency,
+    )
+
+    rm: dict[str, object] = {
+        "latency_summary": _g5_latency_summary(p99_ms=5000.0),
+        "latency_ceiling_ms": {"p99_ms": 1e9},
+        "audit_summary": _g5_audit_summary(),
+    }
+    assert _g5_audit_latency(_g5_systems(), rm).passed is False
+
+
+def test_g5_artifact_ceiling_tightening_is_honored() -> None:
+    """[CONTRACT-TEST] a TIGHTER artifact ceiling binds: measured p50=80.5
+    passes the committed 250 but FAILS a self-imposed 10.0; a GARBAGE artifact
+    ceiling (NaN) is rejected and the committed budget stands (PASS)."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _g5_audit_latency,
+    )
+
+    rm: dict[str, object] = {
+        "latency_summary": _g5_latency_summary(),
+        "latency_ceiling_ms": {"p50_ms": 10.0},
+        "audit_summary": _g5_audit_summary(),
+    }
+    assert _g5_audit_latency(_g5_systems(), rm).passed is False
+
+    rm["latency_ceiling_ms"] = {"p50_ms": float("nan"), "p95_ms": -5.0, "p99_ms": True}
+    assert _g5_audit_latency(_g5_systems(), rm).passed is True
+
+
+@pytest.mark.parametrize(
+    "count",
+    [True, 0, -1, 1.5, "2", None, 10**5000],
+    ids=["bool", "zero", "negative", "float", "str", "none", "huge-int"],
+)
+def test_g5_invalid_channel_count_fails_never_crashes(count: object) -> None:
+    """[SECURITY-TEST] a channel count must be a genuine int ≥ 1 (a bool is a
+    flag; a 10**5000 must never crash a detail string — the int→str digit
+    limit is a DoV vector)."""
+    inter = {
+        "counts_by_channel": {"PROMPT": count, "MEMORY": 1, "TOOL_IO": 1, "TRACE": 1},
+        "no_raw_pii_persist": True,
+        "records_total": 4,
+    }
+    g5 = _g5(audit=_g5_audit_summary(interception=inter))
+    assert g5.passed is False
+
+
+@pytest.mark.parametrize(
+    "n",
+    [0, -1, True, "12", 1.5, 10**5000],
+    ids=["zero", "negative", "bool", "str", "float", "huge-int"],
+)
+def test_g5_invalid_n_records_fails_never_crashes(n: object) -> None:
+    """[SECURITY-TEST] the timing sample size must be a genuine int in a sane
+    range — a bool/str/float/absurd value is corrupt."""
+    g5 = _g5(latency=_g5_latency_summary(n_records=n))
+    assert g5.passed is False
+
+
+@pytest.mark.parametrize(
+    ("latency", "audit"),
+    [
+        (["not", "a", "dict"], "default"),
+        ("default", "scalar"),
+        (42, "default"),
+        ("default", ["x"]),
+    ],
+)
+def test_g5_non_dict_blocks_read_as_absent_pending_never_crash(
+    latency: object, audit: object
+) -> None:
+    """[SECURITY-TEST] the close-2 container-shape class: a non-dict block is
+    ABSENT-equivalent ⇒ PENDING (fail-closed), never a crash, never a PASS."""
+    g5 = _g5(latency=latency, audit=audit)
+    assert g5.passed is None
+
+
+@pytest.mark.parametrize(
+    "audit_over",
+    [
+        {"interception": []},
+        {"interception": {"counts_by_channel": [], "no_raw_pii_persist": True, "records_total": 1}},
+        {"leakage_sankey": 7},
+        {"injection_resistance": "x"},
+    ],
+)
+def test_g5_non_dict_audit_subblocks_pending_never_crash(
+    audit_over: dict[str, object],
+) -> None:
+    """[SECURITY-TEST] NESTED container garbage (the close-9 lesson — nested
+    values are first-class): a non-dict sub-block / counts container is
+    missing-shape ⇒ PENDING, never a crash."""
+    g5 = _g5(audit=_g5_audit_summary(**audit_over))
+    assert g5.passed is None
+
+
+def test_g5_computed_true_supports_claim_grade_end_to_end() -> None:
+    """[CONTRACT-TEST] integration: a fully-passing benchmark whose G5 is
+    COMPUTED (not overridden) reaches CLAIM_GRADE with G2/G4 overridden True,
+    a strong posterior, and all tiers waived — G5 participates in the §5
+    predicate as a real guarantee."""
+    theta, names = _strong_posterior()
+    bench = _canonical_benchmark()
+    rm = bench["run_metadata"]
+    assert isinstance(rm, dict)
+    rm["latency_summary"] = _g5_latency_summary()
+    rm["audit_summary"] = _g5_audit_summary()
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G2": True, "G4": True},
+        tier_c_waivers={
+            "aws-comprehend": "no credentials in CI",
+            "azure-ai-language": "no credentials in CI",
+            "openai-privacy-filter": "no credentials in CI",
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not yet implemented"},
+    )
+    assert verdict.guarantee("G5").passed is True
+    assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
+
+
+def test_g5_computed_fail_binds_as_lowest_failing_guarantee() -> None:
+    """[CONTRACT-TEST] integration: a computed G5 FAIL (leaked=1) on an
+    otherwise-passing benchmark binds the verdict (G5 < G6 in the guarantee
+    order) ⇒ NOT_YET with the G5 detail as the binding constraint."""
+    bench = _canonical_benchmark()
+    rm = bench["run_metadata"]
+    assert isinstance(rm, dict)
+    rm["latency_summary"] = _g5_latency_summary()
+    rm["audit_summary"] = _g5_audit_summary(
+        leakage_sankey={"blocked": 5, "leaked": 1}
+    )
+    verdict = SupremacyVerdict.from_artifacts(
+        bench, pending_overrides={"G2": True, "G4": True}
+    )
+    assert verdict.guarantee("G5").passed is False
+    assert verdict.verdict is Verdict.NOT_YET
+    assert verdict.binding_constraint == verdict.guarantee("G5").binding_detail
+
+
+# ===========================================================================
+# S7-04 DoV hardening — the int→str digit-limit crash class (NEW; the prior
+# closes fuzzed 10**400 = 401 digits, under the 4300-digit conversion limit).
+# Formatting a >4300-digit int into a detail string (repr / str / sort key)
+# raises ValueError — a fail-loud denial-of-verdict on the live gate.
+# ===========================================================================
+
+
+def test_dov_g4_huge_int_ece_value_fails_never_crashes() -> None:
+    """[SECURITY-TEST] a 10**5000 per-class ECE value is non-finite (rejected)
+    AND its detail string must not crash on repr (the digit limit)."""
+    systems = {
+        "pii-anon": {
+            "per_class_ece": {"EMAIL": 10**5000},
+            "calibrated_confidence_coverage": 1.0,
+            "risk_coverage_curve": [{"coverage": 1.0, "risk": 0.1}],
+            "abstention_operating_points": [1, 2, 3],
+        }
+    }
+    g4 = _g4_calibration_selective_risk(systems)
+    assert g4.passed is False
+    assert "EMAIL" in g4.binding_detail
+
+
+def test_dov_g4_huge_int_ece_key_never_crashes() -> None:
+    """[SECURITY-TEST] a 10**5000 ECE KEY must not crash the sorted(key=str)
+    iteration (close-8 kept mixed-type keys; the digit limit broke str). The
+    class's valid 0.01 value still evaluates (close-8 precedent: every class
+    is kept)."""
+    systems = {
+        "pii-anon": {
+            "per_class_ece": {10**5000: 0.01},
+            "calibrated_confidence_coverage": 1.0,
+            "risk_coverage_curve": [{"coverage": 1.0, "risk": 0.1}],
+            "abstention_operating_points": [1, 2, 3],
+        }
+    }
+    g4 = _g4_calibration_selective_risk(systems)
+    assert g4.passed is True  # 0.01 ≤ the 0.05 bar; the key is just a label
+
+
+def test_dov_g4_huge_int_coverage_fails_never_crashes() -> None:
+    """[SECURITY-TEST] a 10**5000 calibrated_confidence_coverage is rejected by
+    _finite_unit_score and the FAIL detail must not crash on its repr."""
+    systems = {
+        "pii-anon": {
+            "per_class_ece": {"EMAIL": 0.01},
+            "calibrated_confidence_coverage": 10**5000,
+            "risk_coverage_curve": [{"coverage": 1.0, "risk": 0.1}],
+            "abstention_operating_points": [1, 2, 3],
+        }
+    }
+    g4 = _g4_calibration_selective_risk(systems)
+    assert g4.passed is False
+    assert "coverage" in g4.binding_detail.lower()
+
+
+def test_dov_g1_huge_int_entity_key_never_crashes() -> None:
+    """[SECURITY-TEST] a 10**5000 per-entity KEY on a competitor (a genuinely
+    detected entity the ladder misses) must not crash the G1 missing-entities
+    detail (sorted key=str + list formatting both hit the digit limit)."""
+    systems = {
+        "pii-anon": {"system": "pii-anon", "per_entity_recall": {"OTHER": 0.9}},
+        "gliner": {"system": "gliner", "per_entity_recall": {10**5000: 0.7}},
+    }
+    g1 = _g1_recall_floor({"per_language_recall_delta": {"en": 0.0}}, systems)
+    assert g1.passed is False  # the ladder honestly misses that entity
+
+
+def test_dov_g1_huge_int_lang_key_never_crashes() -> None:
+    """[SECURITY-TEST] a 10**5000 language KEY with a corrupt ε must not crash
+    the corrupt-language detail formatting."""
+    core = {"system": "pii-anon", "per_entity_recall": {"OTHER": 0.9}}
+    g1 = _g1_recall_floor(
+        {"per_language_recall_delta": {10**5000: float("nan")}},
+        {"pii-anon": core},
+    )
+    assert g1.passed is False  # corrupt ε fails closed, crash-free
