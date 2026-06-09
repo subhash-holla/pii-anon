@@ -3355,6 +3355,85 @@ def test_g5_computed_true_supports_claim_grade_end_to_end() -> None:
     assert verdict.verdict is Verdict.CLAIM_GRADE_SOTA
 
 
+def test_g5_breach_in_present_half_not_buried_by_absent_other_half() -> None:
+    """[SECURITY-TEST] S7-04 close MAJOR (breach-bury fabrication): a REAL breach
+    in the PRESENT G5 half must NOT be laundered into PENDING by OMITTING the
+    other block. The breach-outranks-missing rule applies at the WHOLE-BLOCK
+    level, not only within two present blocks. Omitting audit_summary while
+    latency_summary carries an over-budget p99 used to read PENDING (G5=None),
+    escalating the verdict NOT_YET -> PROVISIONAL_SOTA — a forged escalation a
+    corrupt artifact did not earn."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _g5_audit_latency,
+    )
+
+    systems = _g5_systems()
+    # Latency BREACH present (p99 9999 > 2000 committed), audit block OMITTED.
+    rm_lat_breach = {"latency_summary": _g5_latency_summary(p99_ms=9999.0)}
+    g5 = _g5_audit_latency(systems, rm_lat_breach)
+    assert g5.passed is False, "a present latency breach must FAIL, not bury to PENDING"
+    assert "p99" in g5.binding_detail
+
+    # Symmetric: audit BREACH present (a real leak), latency block OMITTED.
+    rm_audit_breach = {
+        "audit_summary": _g5_audit_summary(
+            leakage_sankey={"blocked": 5, "leaked": 3}
+        )
+    }
+    g5b = _g5_audit_latency(systems, rm_audit_breach)
+    assert g5b.passed is False, "a present audit leak must FAIL, not bury to PENDING"
+    assert "leak" in g5b.binding_detail.lower()
+
+
+def test_g5_clean_present_half_with_absent_other_still_pending() -> None:
+    """[CONTRACT-TEST] S7-04: the breach-bury fix is surgical — a CLEAN present
+    half with the other block absent still reads PENDING (a single clean half
+    cannot certify G5; both halves are required). Only a real BREACH escapes the
+    missing-shape gate."""
+    from pii_anon.eval_framework.evaluation.competitive_supremacy import (
+        _g5_audit_latency,
+    )
+
+    systems = _g5_systems()
+    # Clean in-budget latency, audit omitted => PENDING (cannot certify on one half).
+    assert _g5_audit_latency(systems, {"latency_summary": _g5_latency_summary()}).passed is None
+    # Clean audit, latency omitted => PENDING.
+    assert _g5_audit_latency(systems, {"audit_summary": _g5_audit_summary()}).passed is None
+
+
+def test_g5_breach_bury_end_to_end_no_verdict_escalation() -> None:
+    """[SECURITY-TEST] S7-04 close MAJOR end-to-end: on an otherwise-PROVISIONAL
+    benchmark (G6 forced PASS, strong J, tiers waived, G2/G4 overridden), a real
+    G5 latency breach with the audit block OMITTED must hold the verdict at
+    NOT_YET (binding G5 FAIL) — it must NOT escalate to PROVISIONAL_SOTA by
+    burying the breach into PENDING."""
+    theta, names = _strong_posterior()
+    bench = _canonical_benchmark()
+    # Force G6 PASS: make pii-anon core dominate raw F2.
+    for s in bench["systems"]:  # type: ignore[attr-defined]
+        if s["system"] == "pii-anon":
+            s["recall"], s["precision"] = 0.99, 0.99
+    rm = bench["run_metadata"]
+    assert isinstance(rm, dict)
+    rm["latency_summary"] = _g5_latency_summary(p99_ms=9999.0)  # real breach
+    rm.pop("audit_summary", None)  # OMIT the other half
+    verdict = SupremacyVerdict.from_artifacts(
+        bench,
+        theta_samples=theta,
+        posterior_names=names,
+        pending_overrides={"G2": True, "G4": True},
+        tier_c_waivers={
+            "aws-comprehend": "no creds",
+            "azure-ai-language": "no creds",
+            "openai-privacy-filter": "no creds",
+        },
+        unrun_tier_r_waivers={"gliner2": "adapter not implemented"},
+    )
+    assert verdict.guarantee("G5").passed is False
+    assert verdict.verdict is Verdict.NOT_YET
+    assert "G5 FAIL" in verdict.binding_constraint
+
+
 def test_g5_computed_fail_binds_as_lowest_failing_guarantee() -> None:
     """[CONTRACT-TEST] integration: a computed G5 FAIL (leaked=1) on an
     otherwise-passing benchmark binds the verdict (G5 < G6 in the guarantee
