@@ -133,6 +133,14 @@ DEFAULT_SEED = 20240601
 _LADDER_SYSTEMS: frozenset[str] = frozenset({"pii-anon", "pii-anon-swarm"})
 _CORE_SYSTEM = "pii-anon"
 
+# The benchmark-exclusion sentinel: schema.py maps LATITUDE_LONGITUDE / TIMESTAMP /
+# SWIFT_BIC_CODE to it, and the gold side SKIPS labels mapped to it (schema.py:377). The
+# prediction-side per_entity_recall the gate reads must mirror that exclusion — otherwise a
+# competitor that "detects" the sentinel (recall > 0) while the ensemble does not (0.0, not a
+# detection) makes the SDO gate's G1 spuriously FAIL on a non-entity. No constant is exported
+# from schema, so we mirror the literal here.
+_BENCHMARK_IGNORE_ENTITY = "_BENCHMARK_IGNORE"
+
 # -- Field-name constants (shared producer/consumer contract; DRY). ----------
 # The exact field names the SDO gate's validators read off each system block.
 KEY_PSEUDONYMIZATION_INTEGRITY_SCORE = "pseudonymization_integrity_score"
@@ -384,7 +392,15 @@ def _assemble_base_payload(
                 "precision": round(precision, 6),
                 "f1": round(_f1(precision, recall), 6),
                 "composite_score": round(float(composite.score), 6),
-                "per_entity_recall": {k: round(float(v), 6) for k, v in per_entity.items()},
+                # The benchmark-exclusion sentinel is dropped from the EMITTED prediction-side
+                # map (it is not a real entity; the gold side skips it), so the gate's G1 / G6
+                # never read it. The composite_score above is computed over the UNFILTERED
+                # per_entity (its detected/total coverage) and is deliberately left unchanged.
+                "per_entity_recall": {
+                    k: round(float(v), 6)
+                    for k, v in per_entity.items()
+                    if k != _BENCHMARK_IGNORE_ENTITY
+                },
                 "qualification_status": m["qualification_status"],
                 "available": m["available"],
             }
