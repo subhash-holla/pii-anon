@@ -2866,3 +2866,44 @@ def test_closefinal_g4_honest_monotone_curve_still_passes() -> None:
     coverage ascends) still certifies (behaviour-preserving)."""
     honest = [{"coverage": 0.4, "risk": 0.1}, {"coverage": 0.8, "risk": 0.3}]
     assert _risk_coverage_is_monotone(honest) is True
+
+
+def test_closefinal_mixed_type_dict_keys_do_not_crash_sorted() -> None:
+    """[SECURITY-TEST] S7-02 final close (round 5): a MIXED-TYPE dict KEY (str + int) in
+    ``per_class_ece`` (G4 ``sorted``), the G1 entity maps (``sorted(missing)``) or the
+    per-language map (``sorted(corrupt_langs)``) crashed ``sorted(...)`` with
+    ``TypeError: '<' not supported between 'str' and 'int'`` — a denial-of-verdict reachable
+    via a DIRECT dict caller (JSON object keys are always str). from_artifacts must always
+    return a Verdict, never raise; the details sort by ``key=str`` (a total order)."""
+    # G4: per_class_ece mixed keys (the sorted iteration).
+    v1 = SupremacyVerdict.from_artifacts(
+        {
+            "systems": [
+                {
+                    "system": "pii-anon",
+                    "per_class_ece": {1: 0.1, "EMAIL": 0.2},
+                    "calibrated_confidence_coverage": 1.0,
+                }
+            ],
+            "run_metadata": {"canonical_claim_run": True},
+        }
+    )
+    assert isinstance(v1.verdict, Verdict)
+    # G1: entity-name mixed keys drive sorted(missing) in the FAIL/superset detail.
+    v2 = SupremacyVerdict.from_artifacts(
+        {
+            "systems": [
+                {"system": "pii-anon", "per_entity_recall": {"Z": 0.9}},
+                {"system": "gliner", "per_entity_recall": {1: 0.5, "E": 0.5}},
+            ],
+        }
+    )
+    assert isinstance(v2.verdict, Verdict)
+    # G1: per-language mixed keys drive sorted(corrupt_langs).
+    v3 = SupremacyVerdict.from_artifacts(
+        {
+            "systems": [{"system": "pii-anon", "per_entity_recall": {"E": 0.9}}],
+            "per_language_recall_delta": {1: float("nan"), "en": float("inf")},
+        }
+    )
+    assert isinstance(v3.verdict, Verdict)
