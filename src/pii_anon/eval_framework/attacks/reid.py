@@ -193,7 +193,9 @@ class ReidAttack(Protocol):
         targets: Sequence[ReidTarget],
         candidates: Sequence[ReidPersona],
         candidate_set_size: int,
-    ) -> list[ReidGuess]: ...
+    ) -> list[ReidGuess]:
+        """See the ReidAttack protocol docstring (one guess per target)."""
+        ...
 
 
 @runtime_checkable
@@ -210,7 +212,9 @@ class MiaAttack(Protocol):
     adversary_id: str
     deterministic: bool
 
-    def membership_scores(self, records: Sequence[Any]) -> list[float]: ...
+    def membership_scores(self, records: Sequence[Any]) -> list[float]:
+        """See the MiaAttack protocol docstring (one score per record)."""
+        ...
 
 
 # --------------------------------------------------------------------------- #
@@ -274,6 +278,7 @@ class BaselineDeterministicReidAttack:
         candidates: Sequence[ReidPersona],
         candidate_set_size: int,
     ) -> list[ReidGuess]:
+        """Greedy token-overlap matching per the ReidAttack protocol contract."""
         # Pre-tokenise candidates once; deterministic (input-order-independent).
         candidate_tokens: list[tuple[str, frozenset[str]]] = [
             (persona.persona_id, _persona_tokens(persona)) for persona in candidates

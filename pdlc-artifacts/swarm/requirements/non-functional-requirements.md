@@ -12,6 +12,8 @@
 
 The system must complete swarm detection in <= 200ms per record (p50) when all four layers are active. When the regex fast-pass accepts directly (Layer 1 only), latency must be <= 2ms per record.
 
+> **Supersession note (2026-06-09, release-gate reconciliation):** this Discovery-era 200ms p50 figure is superseded by the R10-rescoped, in-tree-verified **NFR-009** ensemble budget (p50 <= 500ms / p95 <= 1000ms / p99 <= 2000ms; committed in `src/pii_anon/eval_framework/evaluation/latency_ceilings.py` per S7-04/SO-16). The eval-pillar numbering in `dev-assist-artifacts/` uses a DIFFERENT scheme where NFR-001 = Bradley-Terry convergence — do not conflate the two.
+
 **Measurement**: Benchmark 1000 records, report p50 and p99 latency. Fast-pass path measured separately.
 
 ### NFR-002: Swarm throughput
