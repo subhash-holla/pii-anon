@@ -322,6 +322,24 @@ def configure_from_config(
 # set being sized accordingly.
 _WORD_RE = re.compile(r"[A-Za-zÀ-ÿ]+")
 
+# S7-03 (FR-038): the containment map the comment above has always promised.
+# Keywords with NO Latin-alphabet run (CJK / Hangul / Arabic — scripts the
+# tokenizer can never produce as tokens) match by lowercase substring
+# containment instead. Precomputed once at import (the S6-01 hoist lesson);
+# snapshots CONTEXT_WORDS at import time — runtime mutation of CONTEXT_WORDS
+# (not a supported surface) does not refresh it. Latin keywords (incl.
+# accented "teléfono" and dead-but-Latin aliases like "e-mail") stay on the
+# token path EXCLUSIVELY, keeping ASCII/Latin behavior byte-identical.
+_NON_LATIN_CONTEXT_KW: dict[str, tuple[str, ...]] = {
+    entity_type: non_latin
+    for entity_type, keywords in CONTEXT_WORDS.items()
+    if (
+        non_latin := tuple(
+            sorted(kw for kw in keywords if _WORD_RE.search(kw) is None)
+        )
+    )
+}
+
 
 def extract_context(text: str, start: int, end: int) -> str:
     """Return lowercased text surrounding the matched span.
@@ -369,7 +387,18 @@ def has_context_words(entity_type: str, context_text: str) -> bool:
     # ``not words.isdisjoint(...)`` short-circuits on the first common
     # element and avoids materialising a full list.  The context_text
     # is already lowercased by ``extract_context``.
-    return not words.isdisjoint(_WORD_RE.findall(context_text))
+    if not words.isdisjoint(_WORD_RE.findall(context_text)):
+        return True
+    # S7-03 (FR-038): non-Latin keywords (CJK/Hangul/Arabic) can never be
+    # produced as tokens by ``_WORD_RE`` — they match by substring
+    # containment, activating the multilingual context feature the keyword
+    # sets have carried all along. Latin keywords never take this path.
+    non_latin = _NON_LATIN_CONTEXT_KW.get(entity_type)
+    if non_latin:
+        for keyword in non_latin:
+            if keyword in context_text:
+                return True
+    return False
 
 
 def adjust_confidence(
