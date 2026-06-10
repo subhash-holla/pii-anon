@@ -17,8 +17,9 @@ schema_version: 2
 | 01-Discovery | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 02-Requirements | COMPLETE | 2026-05-30 | 2026-05-30 |
 | 03-Design | COMPLETE | 2026-05-30 | 2026-05-30 |
-| 04-Development | IN_PROGRESS | 2026-05-30 | — (Sprint-1 COMPLETE: S1-01..05 DONE, recall-floor LIVE; S2–S7 TODO) |
+| 04-Development | COMPLETE | 2026-05-30 | 2026-06-09 (ALL feature stories DONE through SO-23; S2-03 alone DEFERRED-blocked on the user-WIP orchestrator — tracked, not program work) |
 | 05-Testing | COMPLETE | 2026-05-30 | 2026-05-30 (verdict: SHIP-WITH-CAVEATS foundation / DEFER full redesign) |
+| 06-Documentation | COMPLETE | 2026-06-09 | 2026-06-09 (verdict: **DOCUMENTED** — 6/6 deliverables, 0 orphans/51 IDs, API-matches-code post retry-1 [a CATASTROPHIC RatingEnginePort fabrication caught + closed by D4], a11y N/A-with-reason [markdown-only; render deferred to the sibling pii-anon-doc site]; `06-documentation/05-synthesis/documentation-readiness-report.md`) |
 
 Valid status values: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETE`, `BLOCKED`, `DEFERRED`, `SUPERSEDED`.
 
