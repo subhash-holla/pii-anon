@@ -35,6 +35,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 
 from .base import LabeledSpan, MatchMode
 from .span_metrics import _aligned_prf
@@ -64,7 +65,7 @@ class LanguageGroupSlice:
 class FairnessGateReport:
     """The gate's verdict + full per-group evidence (FR-039/NFR-025)."""
 
-    verdict: str  # "PASS" | "FAIL" | "INSUFFICIENT_POWER"
+    verdict: Literal["PASS", "FAIL", "INSUFFICIENT_POWER"]
     worst_group_recall_gap: float | None
     gap_threshold: float
     power_floor: int
