@@ -1,0 +1,98 @@
+sign_off_id: SO-17-s5-02-tier3-adversary
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S5-02 — the Tier-3 representative re-identification adversary + the NFR-012 RRS
+  statistical-power machinery. Builds on the S5-01 ReidAttack foundation with a
+  materially stronger, still-deterministic adversary (the honest in-tree stand-in
+  for the real Tier-3 LLM adversary, FR-011): QIC (quasi-identifier-combination)
+  overlap fused with a BSL (background-signal-linkage) prior from the persona's
+  auxiliary_knowledge, de-circularized via a margin-based commit/abstain (FR-012 —
+  commits only on a clear margin; never consults the gold link). Plus the NFR-012
+  power half: a Wilson score interval on integer counts + the 2-rung paired-persona
+  ladder (REID_LOW ≥385 / REID_HIGH ≥897) with a per-cell powered verdict, all
+  carrying the non-strippable NFR-016 caveat. Runs under the S5-04 sandbox, reuses
+  the S5-01 scorer + caveat, additively registers (reid_baseline survives). This is
+  a FEATURE work-stream — it does NOT touch competitive_supremacy.py, so NO
+  adversarial SDO close is required (the standing S5 sprint-close adversarial run
+  remains the catch-net for the attack surface). dep: S5-01 (DONE) + S5-04 (DONE).
+
+stories_closed:
+  - id: S5-02
+    title: Tier-3 representative re-identification adversary + RRS power (Wilson CIs + 2-rung ladder) (DC-09)
+    gate: _reviews/story/S5-02/   # 5/5 APPROVE (security-sast PRIMARY + axiom-compliance + traceability + requirements-coverage + code-quality); 0 MAJOR; 7 substantive findings remediated in-loop
+    implements: [FR-011, FR-012, NFR-012]   # + reuses NFR-016 (non-strippable caveat)
+    upholds: [AX-001, AX-002, NFR-016]
+    effect: >
+      new src/pii_anon/eval_framework/attacks/reid_tier3.py: RepresentativeTier3ReidAttack
+      (QIC+BSL fused, margin-commit de-circularized; conforms to the S5-01 ReidAttack
+      Protocol; deterministic total order), wilson_interval (NFR-012 CI on integer
+      counts, fail-loud-domain-named on corrupt counts), ReidPowerCell/ReidPowerLadder/
+      assess_rrs_power (the 2-rung ≥385/≥897 ladder with the non-strippable caveat),
+      tier3_reid_attack_runner + TIER3_REID_ATTACK_REGISTRY. Additive __init__ merge.
+      The real LLM adversary + the real ≥385 DATA cohort (assemble_paired_set, ABSENT)
+      are # SWITCH-POINT Pass-2.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5
+  adversarial_close: NOT_REQUIRED   # no competitive_supremacy.py change (gate md5 byte-identical 3b842e81…); the S5 sprint-close adversarial run is the standing catch-net for the attacks surface
+  findings_remediated_in_loop: 7
+  findings:
+    - "SEC-01 (security-sast OBS): wilson_interval failed with a generic 'math domain error' on a corrupt count (successes<0 / >n / negative n) -> a leading DOMAIN-named ValueError guard + a test; honest paths unaffected; never an out-of-[0,1] interval."
+    - "RC-01 (requirements-coverage MINOR): FR-012 'non-stationarity' sub-clause was neither covered nor explicitly deferred -> story §5 now explicitly defers it to Pass-2 (FR-012 is a SHOULD; circularity + contamination controlled now)."
+    - "RC-02 (requirements-coverage MINOR): the Wilson CI was bounds-tested but not anchored -> added a textbook-reference assertion wilson_interval(2,10)==(0.0566809,0.5098432)."
+    - "CQ-01/02/03 (code-quality MINOR x3): docstrings on the public attack() conformance method + the two security-relevant JSON decoders; moved score_reid_attack to the top-level import (no circular hazard)."
+  findings_no_action:
+    - "SEC-02 (Final-Mapping type-ignore — correctly scoped + SAFETY-documented), the 2 axiom OBS (docstring-only LLM marker; caveat-safe asdict bypass), the 2 trace OBS (requirement-keyed matrix row; DC-09 MIA half = S5-03), RC-03 (FR-011 honest BUILD-AND-FLAG), CQ-04/05 (local decode helpers; acceptance-ID test names — both house conventions)."
+
+decisions_acknowledged:
+  - "★ A re-identification FEATURE flips NO SDO guarantee. The committed smoke-artifact verdict is UNCHANGED (NOT_YET / canonical_claim_run=False (G7)); the SDO gate competitive_supremacy.py is byte-identical (md5 3b842e81c3f03eafd11f9c655c1789a0). No adversarial SDO close was required — the standing rule fires only for a competitive_supremacy.py change / a control-path-artifact producer-consumer / a security work-stream's sprint close, not for every attack-surface feature."
+  - "FR-011 is an HONEST BUILD-AND-FLAG: the in-tree representative adversary (QIC+BSL+margin) is stronger than the S5-01 baseline (A2 verified live — links the correct persona via the BSL aux-knowledge channel where the baseline mis-links the higher-raw-overlap decoy), with the real Tier-3 LLM-call adversary + the real offline DATA adversary (IDF weighting) flagged # SWITCH-POINT Pass-2. Not silently claimed real."
+  - "NFR-012 ships an HONEST assertion-now / cohort-later split: the Wilson CI + the 2-rung ≥385/≥897 ladder (the power-ASSERTION machinery) are LIVE + tested; the real ≥385 paired-persona COHORT (assemble_paired_set) is DATA-ABSENT and tracked Pass-2 (traceability-matrix S6 blocking dep). The name-collision with rating/paired_set.py:assemble_paired_set is incidental (that is the Bradley-Terry paired-COMPARISON set for FR-004, a different artifact)."
+  - "FR-012 de-circularization is an integrity control: attack(targets, candidates, candidate_set_size) structurally excludes the ground-truth link (it lives only in score_reid_attack); A13 proves the adversary follows the SIGNAL even when it contradicts gold (scored correct==0). The margin-commit abstains on ambiguity (precision-preserving)."
+  - "AX-001/AX-002/NFR-016 upheld: synthetic-only fixtures; deterministic total-order ranking + pure Wilson math (no random/uuid/time/secrets); the non-strippable caveat REUSED (imported) from reid.py, re-asserted at construction on ReidPowerCell + ReidPowerLadder. The attacks import-boundary + dangerous-call AST guards auto-cover reid_tier3.py (stdlib + reid + sandbox.AttackCallable only)."
+
+findings_waived_or_deferred:
+  - id: real-tier3-llm-adversary
+    disposition: pass2
+    detail: "The real Tier-3 LLM-call adversary (lazy/optional LLM path) — # SWITCH-POINT(LLM). The in-tree representative QIC+BSL adversary is the deterministic stand-in."
+  - id: real-data-cohort-and-idf
+    disposition: pass2-cross-repo
+    detail: "The real offline DATA adversary (IDF-weighted QIC + behavioral signals) + the real ≥385/≥897 paired-persona cohort (assemble_paired_set, VERIFIED ABSENT in pii_anon_datasets) — # SWITCH-POINT(DATA); eval-data S6. The power-ASSERTION machinery ships now."
+  - id: fr012-non-stationarity
+    disposition: pass2
+    detail: "FR-012's non-stationarity sub-clause (background-knowledge drift across epochs) — the in-tree representative is single-epoch by construction; deferred with the real DATA cohort (FR-012 is a SHOULD; circularity + contamination controlled now)."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-16. A re-identification feature flips no guarantee; the SDO gate is byte-identical."
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): exit 0, 3715 passed / 16 skipped / 0 failed (+30 over SO-16's 3685: the S5-02 A1-A14 suite)."
+  coverage: "88.69% (>= 84 gate; reid_tier3.py >= 90% by its own tests)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 138 files."
+  env: "AGENT_SIMULATED on the local .venv. The representative adversary + Wilson power machinery + sandbox run + the import/AST guards run for REAL in-tree against SYNTHETIC personas/targets. The real LLM/DATA adversary + the ≥385 cohort are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md, benchmark-diagnostics.json, artifacts/benchmarks/*, docs/* — S2-03 stays BLOCKED
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903; reid.py/sandbox.py/spec.py unchanged
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_module_md5: reid_tier3.py   # the only new src file; stdlib + reid + sandbox.AttackCallable imports only
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED 3c9d58b / GREEN 2ccf348 / remediation b3efaa9
+  no_new_hard_dependency: true
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S5-02."
+  immediate: "S5-03 (MIA representative — the LiRA@128 + Secret-Sharer family via the S5-01 MiaAttack Protocol seam; NFR-013 power TPR@low-FPR; run via run_attack_under_sandbox; attacks import-boundary stays green; real LiRA@128 + DATA canary splits = Pass-2). Author via /dev-assist-story-new. NOT a control-path change -> no SDO close."
+  feature_surface: "then S6-01 (query-aware masking; the FR-028/UC-22 6-channel vs FR-025/DC-13 4-channel reconciliation is a tracked PO item), S6-04 (BYO-SDK adapter), S7-01 (multimodal readers), S7-03 (multilingual fairness) — SEQUENTIAL in the main tree."
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) -> packaging extras -> tagged RC on pdlc/sota-program -> build sdist+wheel (NOT published)."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J (numpyro/jax absent); the real Tier-3 LLM adversary + the real ≥385 DATA cohort (S5-02); per-detector-class latency ceilings (S7-04 seam); the G7 _safe_repr sweep; DATA bradley_terry/canary/query-aware; Papers 1 & 2 (siblings FLAGGED FOLLOW-ON — code-only this run)."
+  milestone: "M4 (CODE v2) — the re-identification attack surface now hosts both the S5-01 baseline + the S5-02 Tier-3 representative adversary + the NFR-012 RRS power-assertion machinery. The SDO verdict is UNCHANGED (a re-id feature flips no guarantee); the binding constraint remains the draw-sensitive G6 raw-F2 axis pending the full-census Pass-2."

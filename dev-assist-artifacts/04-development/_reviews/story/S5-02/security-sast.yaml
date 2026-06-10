@@ -1,0 +1,33 @@
+reviewer: security-sast
+story: S5-02
+gate: story
+verdict: APPROVE
+summary: >
+  PRIMARY reviewer for this attack-surface story. All seven RISK invariants hold
+  under live probing: the tier3 runner executes ONLY via the S5-04 sandbox and
+  returns a Mapping; the module has ZERO dangerous primitives (only json.loads of
+  scalars + math.sqrt); import-isolated + AST-scanned; the adversary is
+  structurally de-circularized (attack() has no gold-link param — the link lives
+  only in score_reid_attack); the NFR-016 caveat is the SAME object reused from
+  reid.py; the Wilson math is bounded + (post-remediation) fail-loud-domain-named
+  on corrupt counts; all fixtures synthetic. Registry merge additive (reid_baseline
+  + the S5-04 recon runner both survive). Off-limits substrate byte-identical; the
+  SDO gate untouched (3b842e81…) so NO SDO close is required. 100 targeted tests pass.
+findings:
+  - id: S5-02-SEC-01
+    severity: OBSERVATION
+    title: wilson_interval failed LOUD (generic math domain error) on corrupt counts
+    where: src/pii_anon/eval_framework/attacks/reid_tier3.py wilson_interval
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — a leading domain-named ValueError guard (successes<0 / >n / negative n) + a test; honest paths unaffected, never an out-of-[0,1] interval.
+  - id: S5-02-SEC-02
+    severity: OBSERVATION
+    title: Final-Mapping type-ignore on the in-place registry merge
+    disposition: NO ACTION — correctly scoped + SAFETY-documented (the same S5-01 additive-merge idiom; introduces no new dynamic-import path).
+offlimits_md5_ok: true
+notes: >
+  Feature story — no competitive_supremacy.py change (md5 byte-stable
+  3b842e81c3f03eafd11f9c655c1789a0), so the mandatory SDO adversarial close does
+  NOT apply. The S5 sprint-close adversarial run remains the standing catch-net
+  for the attack surface (now hosting S5-01 baseline + S5-02 tier3 + the RRS
+  power-assertion machinery). Pass-2 SWITCH-POINT seams (real LLM / real DATA
+  cohort) correctly stubbed.

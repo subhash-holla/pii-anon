@@ -4,7 +4,7 @@
 |---|---|
 | Story | S5-02 |
 | Sprint | 5 |
-| State | **TODO** (authored 2026-06-09; SO-16 `next` feature surface) |
+| State | **DONE** (2026-06-09; SO-17. 5/5-APPROVE story gate — security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage + code-quality; 0 MAJOR; 7 substantive findings (2 sec OBS + 2 RC MINOR + 3 CQ MINOR) remediated/dispositioned in-loop. NO SDO close (no `competitive_supremacy.py` change — gate md5 `3b842e81…` byte-identical). See §Evidence.) |
 | Size | M |
 | Implements | **FR-011** (real Tier-3 LLM-adversary re-id RRS/QIC/BSL, de-circularized — the in-tree REPRESENTATIVE stand-in; the real LLM-call path is lazy/optional + Pass-2) + **FR-012** (control Tier-3 circularity/contamination/non-stationarity — a SHOULD; the margin-commit + no-gold-link-consulted de-circularization invariant) + **NFR-012** (Tier-3 RRS power — Wilson CIs on integer counts + the 2-rung paired-persona ladder ≥385 REID_LOW / ≥897; the real paired-persona COHORT assembly is DATA-blocked → Pass-2). Upholds **AX-001** (synthetic-only), **AX-002** (deterministic total-order ranking + pure Wilson math), **NFR-016** (the non-strippable anti-anonymity caveat — REUSED from S5-01, carried on every emitted power report), and the **attacks import-isolation invariant** (auto-scanned by the standing CI guard). |
 | Traces | Design **DC-09** (`D-implementation-ready-design.md:19` — "`attacks/` package: real Tier-3 LLM-adversary (de-circularized)"; `:58` — "Tier-3 de-circularization lives in `attacks/`"). UC-09. The S5-01 `ReidAttack` Protocol + `ReidPersona`/`ReidTarget`/`ReidGuess`/`ReidSuccessMetrics`/`score_reid_attack` + the `ANTI_ANONYMITY_CAVEAT` — **consumed, not changed.** The S5-04 sandbox substrate (`run_attack_under_sandbox`) — consumed, not changed. |
@@ -76,4 +76,19 @@ S5-01 laid the `ReidAttack` foundation with a deliberately-weak **baseline** (pl
 - [ ] **SDO verdict UNCHANGED** — recompute `pii-anon supremacy` (a re-id feature flips no guarantee; expect NOT_YET / `canonical_claim_run=False` byte-stable).
 
 ## Evidence (filled on completion)
-_(pending)_
+
+*Provisional status: AGENT_SIMULATED. The representative Tier-3 adversary (QIC+BSL fused, de-circularized), the Wilson-CI RRS power machinery, the sandbox run, the de-circularization, and the import/AST guards run for REAL in-tree against SYNTHETIC personas/targets. The real Tier-3 LLM-call adversary + the real offline DATA adversary (IDF weighting) + the real ≥385/≥897 paired-persona cohort (`assemble_paired_set`, VERIFIED ABSENT) are Pass-2 / cross-repo (eval-data S6).*
+
+**Commits (RED→GREEN→remediation, on `pdlc/sota-program`):** RED `3c9d58b` (tests-only; `ModuleNotFoundError` on `eval_framework.attacks.reid_tier3`) → GREEN `2ccf348` (the module + additive `__init__` merge) → remediation `b3efaa9` (the 7 story-gate findings).
+
+**Files:** `src/pii_anon/eval_framework/attacks/reid_tier3.py` (new), `src/pii_anon/eval_framework/attacks/__init__.py` (additive re-exports + the `{**REID, **TIER3}` registry merge), `tests/test_attack_reid_tier3.py` (new — A1–A14, 30 cases). `reid.py`/`sandbox.py`/`spec.py` byte-identical (consumed read-only).
+
+**Acceptance → tests (A1–A14, 30 cases):** A1 protocol conformance; A2 stronger-than-baseline via QIC+BSL (verified live — rep links P1@0.5 vs decoy P2@0.333; baseline mis-links P2); A3 margin-abstain; A4 clear-margin commit; A5 deterministic total order + permutation-invariant; A6 Wilson bounded + brackets + symmetry + **textbook-reference anchor** (2/10 → (0.0566809, 0.5098432)) + **corrupt-count domain-guard** refusal; A7 the 385/897 literals; A8 powered threshold; A9 non-strippable caveat; A10 runs under the sandbox; A11 additive registry merge (reid_baseline survives); A12 import-boundary scanned; A13 de-circularization (follows signal, not the gold link); A14 sandboxed replay-equal.
+
+**Story gate (5/5 APPROVE; `_reviews/story/S5-02/`):** security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage + code-quality. **0 MAJOR.** 7 substantive findings remediated/dispositioned in-loop (`b3efaa9`): SEC-01 (wilson domain guard), RC-01 (FR-012 non-stationarity explicit Pass-2 defer), RC-02 (Wilson reference anchor), CQ-01/02/03 (per-API docstrings on `attack()` + the two JSON decoders; move `score_reid_attack` to the top-level import). 6 OBSERVATIONs dispositioned NO-ACTION (SEC-02 type-ignore, the 2 axiom OBS, the 2 trace OBS, RC-03, CQ-04/05).
+
+**SDO — UNCHANGED (a re-id feature flips no guarantee):** `pii-anon supremacy` on the committed smoke artifact reads **NOT_YET / `canonical_claim_run=False` (G7)** — byte-identical to SO-16. The SDO gate `competitive_supremacy.py` is byte-identical (md5 `3b842e81c3f03eafd11f9c655c1789a0`), so **no adversarial SDO close was required**. Off-limits `competitor_compare.py` `7cae16c8…` / `competitor_tiers.py` `d9202479…` + user-WIP `orchestrator.py` `0afc6dee…` / `test_moe_enhancements.py` `910e9cd6…` byte-identical.
+
+**Quality:** full xdist suite green (see SO-17 sign-off for the final count); ruff clean (src+tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` (138 files). The attacks import-boundary + dangerous-call AST guards auto-cover `reid_tier3.py`.
+
+**DoD:** all checkboxes met. Pass-2 (tracked): the real LLM-call adversary; the real offline DATA adversary + IDF weighting; the live ≥385/≥897 paired-persona RRS cohort; the FR-012 non-stationarity sub-clause.
