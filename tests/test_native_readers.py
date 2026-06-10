@@ -348,14 +348,14 @@ def test_a12_stream_vs_batch_parity_and_text_round_trip(
     ]
 
     # Text round-trip stays REAL (FR-032 for text formats): write records
-    # back out and re-read byte-identical texts.
+    # back out in the writers' result shape and re-read byte-identical texts.
     out = tmp_path / "round-trip.jsonl"
     records = list(read_file(txt))
     write_results(
-        [{"text": r.text, "record_id": r.record_id} for r in records],
+        iter({"transformed_payload": {"text": r.text}} for r in records),
         str(out),
     )
-    reread = list(read_file(out))
+    reread = list(read_file(out, IngestConfig(text_column="transformed_text")))
     assert [r.text for r in reread] == [r.text for r in records]
 
 

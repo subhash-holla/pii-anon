@@ -82,6 +82,15 @@ scrubadub = "pii_anon.eval_framework.byo_pipeline:scrubadub_predictor"
 spacy_ner = "pii_anon.eval_framework.byo_pipeline:spacy_ner_predictor"
 stanza_ner = "pii_anon.eval_framework.byo_pipeline:stanza_ner_predictor"
 
+# S7-01 (FR-031): native-format readers. Third-party packages advertise
+# their own NativeReader here; the five in-tree readers ship on the group.
+[project.entry-points."pii_anon.readers"]
+pdf = "pii_anon.ingestion.native_pdf:PdfTextReader"
+image = "pii_anon.ingestion.native:ImageOcrReader"
+screenshot = "pii_anon.ingestion.native:ScreenshotOcrReader"
+dicom = "pii_anon.ingestion.native:DicomReader"
+audio = "pii_anon.ingestion.native:AudioReader"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
@@ -125,6 +134,11 @@ crypto = ["cryptography>=41.0"]
 gate-signing = ["cryptography>=41.0"]
 cli = ["typer>=0.12", "rich>=13.0", "pyyaml>=6.0"]
 datasets = ["pii-anon-datasets>=1.0.0"]
+# S7-01 (DC-14): native-format reader backends. The PDF reader is pure-stdlib
+# (no extra); OCR + DICOM are lazy-imported and fail LOUD naming these extras
+# when absent (NFR-026 — no silent recall loss).
+ocr = ["pytesseract>=0.3", "Pillow>=10"]
+dicom = ["pydicom>=2.4"]
 swarm-ml = ["xgboost>=2.0", "scikit-learn>=1.4", "numpy>=1.24"]
 swarm-train = [
   "xgboost>=2.0",
@@ -210,6 +224,10 @@ module = [
   "datasets",
   "datasets.*",
   "pii_anon_datasets",
+  "pytesseract",
+  "PIL",
+  "PIL.*",
+  "pydicom",
   "numpyro",
   "numpyro.*",
   "jax",
