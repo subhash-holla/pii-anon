@@ -1,0 +1,111 @@
+sign_off_id: SO-20-s6-04-byo-pipeline-sdk
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S6-04 — the BYO-pipeline SDK adapter + identical-incumbent scoring (FR-001 MUST /
+  FR-002 SHOULD, UC-01, DC-12). FR-001's missing SDK half: a third-party package can
+  now ADVERTISE a Predictor under the new pii_anon.byo_pipelines entry-point group and
+  be discovered with zero harness-core edits (BYOPipelineRegistry — the rating-registry
+  pattern verbatim: thread-safe, fail-closed register, NFR-026 never-raise discovery
+  that resolves function objects only and can never construct an engine/load a model
+  at enumeration time). FR-002's identical path: the five in-tree incumbents
+  (presidio/gliner/scrubadub/spacy_ner/stanza_ner) are expressed as ordinary
+  module-level Predictors via the engine_predictor bridge (None/bool-span drops — the
+  bool-is-int trap), and evaluate_incumbent is a SINGLE delegation to the literal
+  evaluate_external_system — NO scoring logic of its own, so the incumbent path and
+  the BYO path are the same function BY CONSTRUCTION (contract-pinned: identity +
+  monkeypatch single-call + exact score-equality + signature-subset tests).
+  build_identical_path_leaderboard ranks any incumbent/BYO mix through that one path.
+  FEATURE work-stream — does NOT touch competitive_supremacy.py and writes NO
+  artifacts (not a control-path-artifact producer, independently confirmed by
+  security-sast), so NO adversarial SDO close.
+
+stories_closed:
+  - id: S6-04
+    title: BYO-pipeline SDK adapter (entry-point discovery) + identical-incumbent scoring (DC-12)
+    gate: _reviews/story/S6-04/   # 5/5 APPROVE (0 MAJOR / 2 MINOR / 9 OBS; run wf_1fe5c271-7f5); MINORs remediated in-loop
+    implements: [FR-001, FR-002]   # SO-19's "FR-019" next-step reference was an ERRATUM (FR-019 = reversible pseudonymization, UC-16) — corrected per the requirements doc + DC-12; confirmed independently by requirements-coverage AND traceability
+    upholds: [NFR-026, AX-001, AX-002]
+    effect: >
+      new src/pii_anon/eval_framework/byo_pipeline.py: BYOPipelineRegistry
+      (pii_anon.byo_pipelines discovery), engine_predictor (EngineAdapter->Predictor
+      bridge), 5 lazy incumbent predictors + INCUMBENT_SYSTEMS/incumbent_predictor,
+      evaluate_incumbent (single literal delegation), build_identical_path_leaderboard.
+      Additive pyproject entry-points + eval_framework re-exports (full surface incl.
+      the 5 predictors post-remediation) + docs/evaluate-your-pipeline.md SDK/identical-
+      path sections with the legacy-vs-identical-path artifact-divergence honesty note.
+      The pii-anon-itself predictor is # SWITCH-POINT(ORCH) Pass-2; full-census artifact
+      regeneration through the identical path is # SWITCH-POINT(DATA) Pass-2.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5 first-pass APPROVE; 0 SHOWSTOPPER/CATASTROPHIC/MAJOR, 2 MINOR, 9 OBSERVATION
+  adversarial_close: NOT_REQUIRED   # no competitive_supremacy.py change (md5 byte-identical 3b842e81…); the module writes no control-path artifacts (security-sast confirmed)
+  findings_remediated_in_loop:
+    - "CQ-01: one-line docstrings added to BYOPipelineRegistry.unregister/get/names (bbb8def)."
+    - "CQ-02: the five incumbent predictor functions re-exported from eval_framework.__init__ (+ __all__) — resolves the module-vs-package __all__ asymmetry (`from pii_anon.eval_framework import presidio_predictor` now works) (bbb8def)."
+  findings_dispositioned:
+    - "code-quality OBS (py<3.12 entry_points().get() fallback uncovered): NO-ACTION — compat shim; module coverage 92% >= the 90% new-module floor."
+    - "requirements-coverage OBS x3 + traceability OBS x2 + axiom-compliance OBS x3: all upheld-with-evidence confirmations (FR-019 erratum disposition, the two FR-001 Pass-2 SWITCH-POINT deferrals-with-successor, NFR-026 on the discovery surface, AX-001/002 evidence, AX-003/005 not-triggered) — carried to the epic-gate delta ledger + S8 notes; no action at this gate."
+  gate_evidence_note: >
+    The review-gate workflow's scribe step failed on a subagent session limit before
+    writing files; the per-reviewer YAMLs + synthesis.md under _reviews/story/S6-04/
+    were transcribed verbatim from the workflow's structured result (verdicts, counts,
+    and findings text are the reviewers' own; dispositions added at remediation).
+
+decisions_acknowledged:
+  - "★ A BYO/SDK eval feature flips NO SDO guarantee. The committed smoke-artifact verdict is UNCHANGED (NOT_YET / canonical_claim_run=False (G7)) — recomputed against `git show HEAD:artifacts/benchmarks/benchmark-results.json` (NOT the working-tree copy, which carries user-WIP edits). The SDO gate competitive_supremacy.py is byte-identical (3b842e81c3f03eafd11f9c655c1789a0). No adversarial SDO close required; re-evaluate if byo_pipeline ever becomes a control-path-artifact producer/consumer."
+  - "★ FR-002 pins the PATH, not retroactive artifact parity: identical-path incumbent numbers will legitimately differ from the committed benchmark-results.json rows (strict matching over the eval dataset vs the frozen overlap-matching legacy path in evaluation/competitor_compare.py, which stays byte-identical 7cae16c8… as the legacy artifact producer). Disclosed in the module docstring AND docs — pre-empts a false identical-numbers claim (axiom-compliance confirmed)."
+  - "★ Discovery can never load a model: entry-point targets are module-level functions; engines construct lazily on first CALL under a lock; A2 pins the empty cache after discovery. The entry-point surface follows the standing Python trust model (same as pii_anon.engines / pii_anon.rating_engines); register() is fail-closed (TypeError on non-callable); enumeration never raises (NFR-026)."
+  - "The S2-03 orchestrator-block discipline held: the pii-anon-itself predictor (scoring pii-anon/pii-anon-swarm rows through the identical path) needs the orchestrator detect seam — # SWITCH-POINT(ORCH) Pass-2; orchestrator.py byte-identical (0afc6deed62bbd0653ae1051b723bace)."
+  - "AX-001/AX-002 upheld with reviewer-verified evidence: synthetic-only fixtures (zero real-PII/secret heuristic matches across all six touched files); no random/uuid/time/secrets in the module; sorted-name evaluation order; exact-value anchors (per_record_f1 == [1.0, 0.0, 2/3]) — the recurring exact-anchor lesson honored on the first pass this time."
+
+findings_waived_or_deferred:
+  - id: pii-anon-itself-predictor
+    disposition: pass2-blocked-on-user-wip
+    detail: "Scoring the pii-anon/pii-anon-swarm rows through the identical path needs the orchestrator detect seam (the S2-03 block class). # SWITCH-POINT(ORCH); land when the orchestrator user-WIP clears."
+  - id: full-census-identical-path-artifact-regen
+    disposition: pass2-data
+    detail: "Regenerating the committed benchmark artifact rows through the identical path at full census — # SWITCH-POINT(DATA); the benchmark script also rewrites user-WIP files and must never be run by stories."
+  - id: s8-docs-fr-crosslink
+    disposition: s8-followon
+    detail: "Optional FR-001/FR-002 cross-reference in docs/evaluate-your-pipeline.md near the SDK-packaging section (traceability OBS-2) — the S8 contributor-readiness docs check."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-19. A BYO/SDK eval feature flips no guarantee; the SDO gate is byte-identical."
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): EXIT=0, 3764 passed / 16 skipped / 0 failed (3780 collected; +13 over SO-19's 3751: the S6-04 A1-A13). NOTE: an earlier concurrent run (suite + reviewer pytest sub-runs sharing the CWD .coverage data) produced a corrupted 56.88% coverage read — discarded; the clean re-run on the final post-remediation state is the evidence."
+  coverage: "88.76% (>= 84 gate; byo_pipeline.py 92% >= the 90% new-module floor per the code-quality reviewer)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 141 files."
+  env: "AGENT_SIMULATED on the local .venv. The registry/discovery/bridge/identical-path delegation + the contract proofs run for REAL in-tree against SYNTHETIC mini-datasets + stub engines. The pii-anon-itself predictor + full-census artifact regen are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee… (S2-03 stays BLOCKED), test_moe_enhancements.py 910e9cd6…, README.md, benchmark-diagnostics.json, docs/benchmark-summary.md, docs/pii-rate-elo-value.md, artifacts/benchmarks/* — none staged
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903; canonical_run.py d8f0f80e113c3b5d59c06d0b5fd36fac
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_module: eval_framework/byo_pipeline.py   # imports only external_evaluator / metrics.composite / rating.* (+ engines lazily inside function bodies); nothing from swarm/moe/fusion/orchestrator (A13 AST audit)
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED f361063 / GREEN b45f9b5 / REFACTOR-docs 7eaedf1 / remediation bbb8def
+  no_new_hard_dependency: true   # entry-points only; editable metadata refreshed (pip install -e . --no-deps)
+
+content_hashes:
+  story_file: 95405b74e0bf15607f7ab9b3b6960dcf0b4e68355ec4aafbfb2500a84ffc547d
+  gate_synthesis: d2beb57000c760fccc70a1b7591fccd9f9796243b06ed3d5bea5917dc2d961fd
+  module: 385eab2c9d2728843e9067997368d7630e89d3018366cd493b0834f3da080698
+  tests: aed5bdb3298b1f90b7f3d194e00ad26afdf5006a510bacdbe2214039e2bff6c4
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S6-04."
+  immediate: "S7-01 (native-format readers — FR-031..035, DC-14; story pre-authored at 02-stories/sprint-7/S7-01-native-format-readers.md). Reader Protocol + registry mirroring rating/registry.py; REAL stdlib PDF-text reader; capability-honest lazy OCR/DICOM/audio stubs with loud extras-naming errors (NFR-026 no-silent-recall-loss). NOT a control-path change -> no SDO close."
+  feature_surface: "then S7-03 (multilingual fairness — FR-038/039/NFR-025; pre-authored; the CJK/Arabic CONTEXT_WORDS keywords are provably DEAD today — [A-Za-zÀ-ÿ]+ tokenizer, no containment pass — a clean TDD RED) and S7-05 (docs discoverability [DOCS MUST]; pre-authored; must land LAST of the feature stories, BEFORE Stage-6). (S6-04 DONE; S7-01/S7-03/S7-05 remain.)"
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) -> version 1.4.0 -> 1.5.0rc1 + CHANGELOG -> tag v1.5.0-rc1 LOCAL ONLY (release.yml auto-publishes ANY pushed tag: rc->TestPyPI — NEVER push the tag) -> make build + twine-check (sdist+wheel NOT published) -> final sign-off."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J; the real Tier-3 LLM adversary + >=385 DATA cohort (S5-02); the real LiRA@128 + canary splits (S5-03); the query-aware DATA scorer + orchestrator wire-in (S6-01); the pii-anon-itself predictor + full-census identical-path artifact regen (S6-04); real OCR/DICOM/ASR extraction + span-level coords (S7-01); the corpus-scale fairness number + the CANONICAL fairness wire-in [SDO close required] (S7-03); the G7 _safe_repr sweep; Papers 1 & 2."
+  milestone: "M4 (CODE v2) — the eval-framework UC-01 promise is now structurally honest: ONE scoring path for everyone (BYO and incumbents alike), discoverable as an SDK. The SDO verdict is UNCHANGED; the binding constraint remains the draw-sensitive G6 raw-F2 axis pending the full-census Pass-2."
