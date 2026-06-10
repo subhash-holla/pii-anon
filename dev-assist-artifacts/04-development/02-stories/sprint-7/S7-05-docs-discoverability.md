@@ -4,7 +4,7 @@
 |---|---|
 | Story | S7-05 |
 | Sprint | 7 |
-| State | **TODO** (authored 2026-06-09) |
+| State | **DONE** (2026-06-09; SO-23. Story gate iter-1 **REQUEST_CHANGES** (1 MAJOR: the certify-a-run example referenced `benchmark-results.json` — a file the canonical-run producer never writes; not copy-paste-runnable) → remediated `5f825b6` (the real `canonical-run.json` path + A5 path-teeth + the FloorProjectingFusion mention) → iter-2 **5/5 APPROVE** (0 MAJOR/MINOR; the teeth counterfactually proven to bite). See §Evidence.) |
 | provisional_status | REAL (docs + a teeth test; no behavior change). |
 | Size | S |
 | Implements | The **[DOCS MUST]** dev-log W2 commitment + the three open **D6 SME Docs MAJORs** (Documentation stage): (1) surface the distinct anonymization-vs-pseudonymization APIs (the **FR-010** headline — distinct families, no-merge invariant); (2) update `docs/evaluate-your-pipeline.md` (S6-04 landed the BYO/identical-path sections — extend with canonical-run + supremacy CLI); (3) fix the divergent recall-floor docs (align to the SharedLayerProjector/FloorProjectingFusion reality). Plus the SO-19 `rc_close` positioning deliverable: vanilla-vs-swarm. |
@@ -43,3 +43,11 @@ The program shipped major API families that `docs/` does not surface: the rating
 - [ ] **Story-gate APPROVE** — `_reviews/story/S7-05/`.
 
 ## Evidence (filled on completion)
+
+**Commits:** RED `e573243` (A1–A7; 5/7 failing honestly; user-WIP docs excluded from the index requirement AND the link sweep) → GREEN `8c9cec3` (the FR-010 doc + index + api-reference program-surfaces + certify-a-run section + CLI epilog + the PRE-EXISTING `docs-smoke` Makefile fix — the target referenced a notebook that never existed; Makefile recorded as an implicit owned file, a necessary precondition for A9) → remediation `5f825b6`.
+
+**Story gate (iter-1 REQUEST_CHANGES → iter-2 5/5 APPROVE; `_reviews/story/S7-05/`; runs `wf_941b38c6-52f` → `wf_d8d3ca4e-c16`):** iter-1 MAJOR (requirements-coverage): the certify-a-run step-2 example read `./certified/benchmark-results.json` — the producer writes ONLY `<output-dir>/canonical-run.json` (`canonical_run.py:1275`, `cli.py:908`); verbatim execution raised BadParameter; the A5 substring teeth couldn't catch it. Remediated: the real path + a comment naming the emitted file + A5 tightened (any `supremacy --artifact` example in a certified dir must end `canonical-run.json` — iter-2 confirmed the counterfactual old path FAILS the assertion). security-sast verified every security-adjacent doc claim accurate against source (token store AEAD semantics, supremacy exit semantics `cli.py:865-866`, the bounded-FlateDecode mention, fail-closed gates) — docs do not overstate code. The iter-1 orchestrator-md5 OBS resolved as a measurement-frame artifact (working-tree user-WIP `0afc6dee…` vs committed blob `4a837c52…` — BOTH unchanged; stories touched neither). FloorProjectingFusion mention added to recall-floor.md (verified vs `routing/floor_fusion.py:59`).
+
+**Quality:** owned tests 7/7 (incl. the tightened A5); `make docs-smoke` EXIT=0 (the notebook now actually executes); `make cli-smoke` EXIT=0; full xdist suite EXIT=0 @ 88.87% on the GREEN state (the remediation is docs+test-assertion-only); ruff clean; mypy clean BOTH modes (144 files); user-WIP docs byte-identical (`pii-rate-elo-value.md` `89cc6d03…`, `benchmark-summary.md` `e575a730…`, root README untouched).
+
+**DoD:** all checkboxes met. The three D6 SME Docs MAJORs are CLOSED (anon/pseudo APIs surfaced + evaluate-your-pipeline current incl. the SDO CLI + recall-floor doc verified-live with the FloorProjectingFusion completion).

@@ -1,0 +1,25 @@
+reviewer: security-sast
+story: S7-05
+gate: story
+iteration: 2
+verdict: APPROVE  # 0 MAJOR/MINOR across both iterations; 5 OBSERVATIONS (all positive confirmations)
+runs: wf_941b38c6-52f (iter-1) -> wf_d8d3ca4e-c16 (iter-2); transcribed from the workflow structured results
+summary: >
+  Docs + help text + a Makefile path fix — minimal surface, clean. Every
+  security-adjacent doc claim verified ACCURATE against source (not
+  overstated): EncryptedSQLiteTokenStore AEAD semantics (AESGCM/ChaCha20,
+  per-encryption nonce, AAD-bound blind index, envelope-wrapped DEK);
+  supremacy exit semantics (cli.py:865-866 — non-blocking default, exit 1
+  only under --canonical-claim without CLAIM_GRADE_SOTA); canonical-run
+  fail-closed; deid_families AX-004 no-merge verbatim; native-reader
+  capability honesty + the real 64 MiB bounded-FlateDecode ceiling; fairness
+  gate fail-closed. The cli.py change is epilog text only (no command/flag/
+  behavior change). No dependency manifests touched. The A7 subprocess test
+  is hermetic (no shell, constrained env); the A2 http prefixes SKIP
+  external links (no egress). The iter-1 orchestrator-md5 OBS resolved as a
+  measurement-frame artifact: working-tree user-WIP 0afc6dee… AND committed
+  blob 4a837c52… BOTH unchanged; git diff across the full story range is
+  empty on every invariant + user-WIP file.
+findings: []
+context_bounds_respected: true
+offlimits_md5_ok: true
