@@ -65,6 +65,7 @@ from pii_anon.eval_framework.attacks.reid import (
     ReidGuess,
     ReidPersona,
     ReidTarget,
+    score_reid_attack,
 )
 from pii_anon.eval_framework.attacks.sandbox import AttackCallable
 
@@ -176,6 +177,16 @@ class RepresentativeTier3ReidAttack:
         candidates: Sequence[ReidPersona],
         candidate_set_size: int,
     ) -> list[ReidGuess]:
+        """Link each pseudonymous target to its best candidate persona (or abstain).
+
+        For each target, scores every candidate by the fused QIC+BSL similarity
+        and commits the top-ranked persona ONLY when the margin over the
+        runner-up clears :data:`_MARGIN_THRESHOLD` (FR-012 de-circularization);
+        otherwise returns an abstain (``guessed_persona_id=None``). An empty
+        candidate pool abstains. Sees ONLY ``(targets, candidates,
+        candidate_set_size)`` — never the ground-truth link (AX-002 total order;
+        the gold link lives in :func:`score_reid_attack`).
+        """
         guesses: list[ReidGuess] = []
         for target in targets:
             t_tokens = _normalise_tokens(target.observed_signals)
@@ -216,8 +227,21 @@ def wilson_interval(successes: int, n: int, *, z: float = _WILSON_Z_95) -> tuple
     ⇒ ``(0.0, 0.0)`` (no observations, no interval). The result is clamped to
     ``[0, 1]`` and brackets the point estimate ``successes / n``. Pure +
     deterministic (``math.sqrt`` only).
+
+    A corrupt count (``successes < 0`` or ``successes > n``, or a negative ``n``)
+    is non-physical and is refused LOUDLY with a DOMAIN-named ``ValueError``
+    rather than left to surface as a lower-level ``math domain error`` from the
+    negative-radicand ``sqrt`` (the S5-02 security-sast SEC-01 observation). Honest
+    callers (a success count is, by construction, ``0 ≤ successes ≤ n``) never trip
+    it; this only converts a corrupt-input crash into a self-describing one — it
+    NEVER fabricates an out-of-``[0, 1]`` interval.
     """
-    if n <= 0:
+    if successes < 0 or n < 0 or successes > n:
+        raise ValueError(
+            f"wilson_interval domain error: require 0 <= successes <= n "
+            f"(got successes={successes}, n={n})"
+        )
+    if n == 0:
         return (0.0, 0.0)
     p = successes / n
     z2 = z * z
@@ -368,6 +392,12 @@ def _string_tuple(item: Mapping[str, Any], key: str, *, label: str) -> tuple[str
 
 
 def _targets_from_json(targets_json: str) -> list[ReidTarget]:
+    """Decode targets from a JSON array of plain mappings (stdlib parser only).
+
+    Reads scalar fields out of plain mappings via the shared object-array
+    decoder — it NEVER constructs objects named in the data (no
+    unsafe-deserialization). Mirrors the S5-01 ``reid.py`` decode discipline.
+    """
     return [
         ReidTarget(
             target_id=str(item["target_id"]),
@@ -379,6 +409,13 @@ def _targets_from_json(targets_json: str) -> list[ReidTarget]:
 
 
 def _personas_from_json(candidates_json: str) -> list[ReidPersona]:
+    """Decode candidate personas from a JSON array of plain mappings.
+
+    Reads scalar fields + the ``auxiliary_knowledge`` object (defaulting to
+    ``{}`` when absent, refused loudly when non-object) out of plain mappings via
+    the shared stdlib decoder — it NEVER constructs objects named in the data (no
+    unsafe-deserialization). Mirrors the S5-01 ``reid.py`` decode discipline.
+    """
     out: list[ReidPersona] = []
     for item in _decode_object_array(candidates_json, label="candidate"):
         aux = item.get("auxiliary_knowledge", {})
@@ -412,8 +449,6 @@ def tier3_reid_attack_runner(
     return :meth:`ReidSuccessMetrics.as_outcome` (a ``Mapping[str, Any]`` — the
     sandbox contract). Pure + deterministic over its scalar inputs (AX-002).
     """
-    from pii_anon.eval_framework.attacks.reid import score_reid_attack
-
     targets = _targets_from_json(targets_json)
     candidates = _personas_from_json(candidates_json)
     adversary = RepresentativeTier3ReidAttack()

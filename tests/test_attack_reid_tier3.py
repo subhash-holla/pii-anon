@@ -153,6 +153,27 @@ def test_a6_wilson_interval_is_bounded_and_brackets_rate(
         assert low <= rate <= high
 
 
+def test_a6_wilson_interval_matches_textbook_reference() -> None:
+    """[UNIT-TEST] A6: anchor the Wilson interval against an authoritative
+    reference value (not merely bounds) — Wilson score interval for 2/10 at
+    z=1.96 is ≈ (0.05668, 0.50984). Pins the math is CORRECT, not just in-range."""
+    low, high = wilson_interval(2, 10)
+    assert low == pytest.approx(0.0566809, abs=1e-6)
+    assert high == pytest.approx(0.5098432, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("successes", "n"),
+    [(-1, 10), (11, 10), (1, -5), (5, 4)],
+)
+def test_a6_wilson_interval_refuses_corrupt_counts(successes: int, n: int) -> None:
+    """[SECURITY-TEST] A6 / SEC-01: a corrupt count (successes<0, successes>n, or
+    negative n) is non-physical and is refused with a DOMAIN-named ValueError —
+    never a lower-level 'math domain error' and never an out-of-[0,1] interval."""
+    with pytest.raises(ValueError, match="domain"):
+        wilson_interval(successes, n)
+
+
 def test_a6_wilson_interval_known_symmetry() -> None:
     """[UNIT-TEST] A6: the Wilson interval is symmetric under successes↔failures
     (the interval for k/n mirrors the interval for (n-k)/n about 0.5)."""
