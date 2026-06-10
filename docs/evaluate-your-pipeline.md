@@ -347,10 +347,11 @@ Leaderboard numbers are *comparative*; certified claims go through the SDO
 ```bash
 # Produce the certified evaluation artifact (fail-closed CanonicalRunGate:
 # every guarantee field validated; fabricated/malformed values are rejected).
+# Writes <output-dir>/canonical-run.json.
 pii-anon canonical-run --output-dir ./certified
 
 # Read the CompetitiveSupremacyGate verdict + the binding constraint.
-pii-anon supremacy --artifact ./certified/benchmark-results.json
+pii-anon supremacy --artifact ./certified/canonical-run.json
 # -> verdict: NOT_YET | PROVISIONAL_SOTA | CLAIM_GRADE_SOTA, plus per-guarantee
 #    G1..G7 statuses and the single binding constraint.
 ```

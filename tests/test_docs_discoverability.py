@@ -121,6 +121,14 @@ def test_a5_evaluate_your_pipeline_covers_sdo_cli_and_sdk_group() -> None:
     assert "pii_anon.byo_pipelines" in text
     assert "supremacy" in text
     assert "canonical-run" in text
+    # Copy-paste-runnability teeth (gate-remediation, S7-05 MAJOR-1): any
+    # `supremacy --artifact <path>` example following a canonical-run step
+    # must read a file the producer actually writes (canonical-run.json) —
+    # never a phantom filename.
+    for match in re.finditer(r"supremacy\s+--artifact\s+(\S+)", text):
+        artifact = match.group(1)
+        if "certified" in artifact:
+            assert artifact.endswith("canonical-run.json"), artifact
 
 
 # ---------------------------------------------------------------------------

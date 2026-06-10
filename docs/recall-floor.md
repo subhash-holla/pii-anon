@@ -12,7 +12,7 @@ entities(output) ⊇ entities(shared)
 
 The **shared layer** is the always-on, high-precision, checksum/keyword-gated regex pass (`regex-oss`). Any span it finds is guaranteed to survive into the final output — even if a downstream emission threshold or semantic-type corroboration gate would otherwise have dropped it. This closes a real leak where a sub-fast-pass regex hit entering fusion could be suppressed by the Layer-4 gate.
 
-The floor is a **projection**, decoupled from any routing/early-exit policy, so it holds for any present or future router.
+The floor is a **projection**, decoupled from any routing/early-exit policy, so it holds for any present or future router. In the fusion path it is applied by `FloorProjectingFusion` (`pii_anon.routing.floor_fusion`) — a wrapper that runs any inner `FusionStrategy` and then projects the shared-layer floor onto its output.
 
 ## Usage
 
