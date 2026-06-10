@@ -62,24 +62,42 @@ def _tokens(text: str) -> frozenset[str]:
     return frozenset(_TOKEN_RE.findall(text.lower()))
 
 
+# A small fixed synonym map for the common entity types (module-level constant —
+# allocated once, not per call; the Pass-2 router-pre-filter wire-in calls the
+# gate per span). Deterministic. EVERY synonym token MUST be producible by
+# :data:`_TOKEN_RE` (i.e. a ``[a-z0-9]+`` run) — a hyphenated/multi-word value
+# (e.g. ``"e-mail"``) can never match a tokenised query and would be silent dead
+# weight. # SWITCH-POINT(DATA): the real DATA scorer uses a learned relevance
+# model instead of this fixed map.
+_ENTITY_SYNONYMS: dict[str, frozenset[str]] = {
+    "EMAIL_ADDRESS": frozenset({"email", "mail"}),
+    "PHONE_NUMBER": frozenset({"phone", "telephone", "mobile", "cell"}),
+    "PERSON_NAME": frozenset({"name", "person", "who"}),
+    "US_SSN": frozenset({"ssn", "social", "security"}),
+    "CREDIT_CARD": frozenset({"card", "credit", "payment"}),
+    "STREET_ADDRESS": frozenset({"address", "street", "location"}),
+}
+
+
 def _entity_aliases(entity_type: str) -> frozenset[str]:
     """The query-facing alias tokens for an entity type.
 
     An entity type is query-named when the query mentions any of its alias tokens
     — its own underscore-split parts (``EMAIL_ADDRESS`` → ``{email, address}``)
-    plus a small fixed synonym map for the common types. Deterministic + pure.
-    # SWITCH-POINT(DATA): the real DATA scorer uses a learned relevance model.
+    plus the fixed :data:`_ENTITY_SYNONYMS` map for the common types.
+    Deterministic + pure.
+
+    Note (a known heuristic limitation): underscore-split parts can be SHARED
+    across entity types — e.g. ``"address"`` is a part of both ``EMAIL_ADDRESS``
+    and ``STREET_ADDRESS``, so a query naming "address" matches BOTH; ``"security"``
+    (a US_SSN synonym) matches a "security" query. This deterministic
+    approximation is replaced by a learned relevance model at the
+    ``# SWITCH-POINT(DATA)`` seam, which disambiguates with calibrated confidence.
+    The collision is on the privacy-safe side relative to under-retention only when
+    the query genuinely names the shared token.
     """
     parts = frozenset(p for p in entity_type.lower().split("_") if p)
-    synonyms: dict[str, frozenset[str]] = {
-        "EMAIL_ADDRESS": frozenset({"email", "e-mail", "mail"}),
-        "PHONE_NUMBER": frozenset({"phone", "telephone", "mobile", "cell"}),
-        "PERSON_NAME": frozenset({"name", "person", "who"}),
-        "US_SSN": frozenset({"ssn", "social", "security"}),
-        "CREDIT_CARD": frozenset({"card", "credit", "payment"}),
-        "STREET_ADDRESS": frozenset({"address", "street", "location"}),
-    }
-    return parts | synonyms.get(entity_type, frozenset())
+    return parts | _ENTITY_SYNONYMS.get(entity_type, frozenset())
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,72 @@
+# S6-01 — query-aware masking gate (retain query-relevant PII, mask the rest) + a representative over-redaction/false-retention bound
+
+| Field | Value |
+|---|---|
+| Story | S6-01 |
+| Sprint | 6 |
+| State | **TODO** (authored 2026-06-09; SO-18 `next` feature surface) |
+| provisional_status | **AGENT_SIMULATED** — the `QueryAwareMaskingGate` decision logic, the subtractive-on-mask invariant, the default-to-mask privacy floor, and the representative FR-024 over-redaction/false-retention bound all run for REAL in-tree against SYNTHETIC spans + queries (AX-001). The real DATA query-aware **scorer** (FR-024 bound vs the curated baseline corpus) is DATA-owned (`pii_anon_datasets` S5) → Pass-2 / cross-repo (`# SWITCH-POINT(DATA)`). The **orchestrator router-pre-filter wire-in** (DC-13 "intercept + mask in policy/router before engines/prompt assembly") is BLOCKED on the protected user-WIP `orchestrator.py` (the S2-03 block class) → Pass-2 (`# SWITCH-POINT(ORCH)`). |
+| Size | M |
+| Implements | **FR-023** (query-aware masking gate — retain query-relevant PII, mask the rest; UC-19, swarm, SHOULD) + a **representative FR-024** (bound query-aware over-redaction + false-retention vs a baseline; UC-19, eval, SHOULD — the real DATA scorer is Pass-2). Upholds **AX-001** (synthetic-only), **AX-002** (deterministic, pure decision logic), **AX-006-adjacent** (least-privilege / privacy-safe default — default-to-mask). |
+| Traces | Design **DC-13** (`D-implementation-ready-design.md:23` — "Agentic interception: router pre-filter + **query-aware gate** + 4-channel least-privilege + no-raw-PII-persist"; `:49` — "subtractive-on-mask **query-aware gate**" + "router pre-filter surface (intercept + mask in `policy/router` before engines/prompt assembly)"). UC-19. CONSUMES read-only: `policy/router.py` (the `PolicyRouter`/`ExecutionPlan` home — the gate lives alongside it, NOT inside it; router.py byte-identical), `types.py` (`EngineFinding`/`LabeledSpan` span shape). |
+| Files owned | `src/pii_anon/policy/query_aware.py` (**new** — `MaskCandidate`, `QueryAwareDecision`, `QueryAwareMaskingGate`, `QueryAwareBoundReport`/`score_query_aware_bound`). **Additive** to `src/pii_anon/policy/__init__.py` (re-exports). `tests/test_query_aware_masking.py` (**new**). |
+| Depends on | None hard (a standalone primitive). CONSUMES read-only `policy/router.py` + `types.py`. The real DATA query-aware scorer (FR-024, eval-data S5) + the orchestrator wire-in (DC-13) are Pass-2. |
+
+## 1. Intent
+Query-aware masking is the UC-19 swarm capability: when PII is processed in service of a *query* (e.g. an agent answering "what is the customer's email?"), the masker should **retain the PII the query legitimately needs and mask the rest** — narrower than a blanket mask-everything, without leaking PII the query does not need. S6-01 ships the **decision primitive** (FR-023): a deterministic `QueryAwareMaskingGate` that, given a set of detected PII spans + a query/context, decides per-span **retain vs mask**. It is **subtractive-on-mask** (DC-13): relative to the privacy-safe baseline (mask everything), the gate SUBTRACTS from the masked set only the spans it can positively justify as query-relevant — it **defaults to mask** and retains ONLY on a positive relevance signal. The dangerous error is **false-retention** (leaking query-irrelevant PII); over-redaction (masking a query-relevant span) is the safe error. S6-01 also ships a **representative FR-024 bound** measuring over-redaction-rate + false-retention-rate against a labelled baseline (the real DATA scorer over the curated corpus is Pass-2). The orchestrator router-pre-filter wire-in (calling the gate before prompt assembly) is blocked on the protected `orchestrator.py` (the S2-03 class) → Pass-2; the gate ships + is tested as a standalone composable primitive, exactly as the S5 attack bodies ship without touching the orchestrator.
+
+## 2. Approach / scope — the carried DESIGN decisions
+
+### (a) The gate primitive (FR-023) — standalone, default-to-mask, subtractive
+* **`MaskCandidate`** (frozen) — a detected PII span the gate decides over: `{entity_type, span_start, span_end, surface: str, field_path: str | None}`. (`surface` is the detected text; supplied by the caller — the gate never re-detects.)
+* **`QueryAwareDecision`** (frozen) — per-candidate outcome: `{candidate, retain: bool, reason: str}`.
+* **`QueryAwareMaskingGate`** — `decide(candidates, *, query: str) -> list[QueryAwareDecision]`. The **subtractive-on-mask** contract: a candidate is `retain=True` **ONLY** when a positive relevance signal fires; absent any signal it is `retain=False` (masked) — the privacy-safe default. Relevance is a deterministic, pure decision (AX-002): a candidate is query-relevant when EITHER (i) its `entity_type` is named/aliased in the query (e.g. query contains "email" ⟹ EMAIL_ADDRESS relevant), OR (ii) its `surface` tokens overlap the query tokens (the query references the specific value). `# SWITCH-POINT(DATA)`: the real DATA scorer uses a richer learned relevance model. No `random`/`uuid`/`time`/`secrets`.
+* **The safety invariant (headline):** an empty/whitespace query, or a query with no relevance signal for any candidate, ⟹ EVERY candidate masked (zero retention) — the gate never leaks by default. A `[SECURITY-TEST]` proves no candidate is retained without a positive, reason-stamped signal.
+* **`# SWITCH-POINT(ORCH)`:** the real router-pre-filter wire-in (DC-13: intercept + mask in `policy/router` before engines/prompt assembly) requires the orchestrator detect path, which is protected user-WIP (`orchestrator.py`, the S2-03 block) → Pass-2. The gate is shipped as a pure primitive the wire-in will call.
+
+### (b) The representative FR-024 bound — over-redaction + false-retention vs baseline
+* **`QueryAwareBoundReport`** (frozen) — `{over_redaction_rate, false_retention_rate, n_candidates, n_query_relevant_gold, baseline}` over a labelled candidate set (each candidate carries a synthetic gold `is_query_relevant`).
+* **`score_query_aware_bound(decisions, gold_relevant) -> QueryAwareBoundReport`** — `false_retention_rate` = (retained ∧ ¬gold-relevant) / total (the leak rate — the bounded-dangerous error); `over_redaction_rate` = (masked ∧ gold-relevant) / total (the safe error); `baseline` = the mask-all baseline (false-retention 0, over-redaction = all-gold-relevant). Pure + deterministic; fail-loud on a decisions/gold length mismatch (the S5-02/03 domain-guard discipline). `# SWITCH-POINT(DATA)`: the real DATA scorer computes these over the curated UC-19 corpus with CIs.
+
+## 2a. Pre-claim de-risk (verify against live code on claim)
+- **RISK-1 (privacy-safe default — the headline):** the gate defaults to mask; a `[SECURITY-TEST]` proves no candidate is retained without a positive reason-stamped relevance signal (empty query ⟹ 0 retained).
+- **RISK-2 (subtractive-on-mask):** the gate can only RETAIN (subtract from the masked set) — it never produces a "mask the baseline kept" decision; retention requires a positive signal. A property test pins: retained ⊆ {candidates with a relevance signal}.
+- **RISK-3 (determinism, AX-002):** `decide` + the bound scorer are pure; no `random`/`uuid`/`time`/`secrets`; a `[PROPERTY-TEST]` pins replay + candidate-order independence.
+- **RISK-4 (no orchestrator touch — the S2-03 block):** `orchestrator.py` byte-identical (`0afc6deed62bbd0653ae1051b723bace`); the gate is standalone; the wire-in is `# SWITCH-POINT(ORCH)` Pass-2.
+- **RISK-5 (off-limits + AX-001):** `policy/router.py` byte-identical (consumed read-only); `competitive_supremacy.py` (`3b842e8…`) + `competitor_compare.py` (`7cae16c8…`) byte-identical (the SDO gate NOT touched ⇒ **no SDO close**); all spans/queries SYNTHETIC.
+- **RISK-6 (fail-loud bound):** `score_query_aware_bound` refuses a decisions/gold length mismatch with a domain-named `ValueError` (the S5-02/03 discipline).
+
+## 3. Given / When / Then (acceptance)
+- **A1 — retains a query-named entity type `[UNIT-TEST]`.** Query "what is the customer's email?" + an EMAIL_ADDRESS candidate ⟹ that candidate `retain=True` (reason names the entity-type match).
+- **A2 — masks an unrelated entity type `[UNIT-TEST]`.** Same query + a US_SSN candidate ⟹ `retain=False` (masked — the query did not ask for it).
+- **A3 — retains a surface-token match `[UNIT-TEST]`.** Query mentioning a specific synthetic name ⟹ the matching PERSON_NAME candidate `retain=True`.
+- **A4 — default-to-mask on an empty/blank query (SAFETY) `[SECURITY-TEST]`.** Empty / whitespace-only query ⟹ EVERY candidate `retain=False` (zero retention; no leak).
+- **A5 — no retention without a positive signal `[SECURITY-TEST]`.** A query unrelated to any candidate ⟹ zero retention; every retained decision (across A1–A3) carries a non-empty `reason`.
+- **A6 — subtractive-on-mask property `[PROPERTY-TEST]`.** For any (candidates, query): the retained set ⊆ the candidates with a relevance signal; no candidate is retained that has neither an entity-type nor a surface-token match.
+- **A7 — deterministic + order-independent `[PROPERTY-TEST]`.** Two runs + a candidate permutation yield the same per-candidate decisions.
+- **A8 — `score_query_aware_bound` computes the rates `[UNIT-TEST]`.** On a labelled fixture, `false_retention_rate` + `over_redaction_rate` match the hand-computed integer-count rates; the mask-all `baseline` has false-retention 0.
+- **A9 — false-retention is bounded below the mask-all leak surface `[UNIT-TEST]`.** On a fixture where the gate correctly retains only gold-relevant spans, `false_retention_rate == 0.0` (no leak) while `over_redaction_rate < 1.0` (it retained something — better than mask-all's over-redaction = all-relevant).
+- **A10 — fail-loud on corrupt input `[SECURITY-TEST]`.** `score_query_aware_bound` with a decisions/gold length mismatch ⟹ domain-named `ValueError`.
+- **A11 — no orchestrator / off-limits touch `[AUDIT]`.** `orchestrator.py` + `policy/router.py` + the SDO gate byte-identical; `query_aware.py` imports nothing from `swarm`/`moe`/`fusion`/`orchestrator`.
+
+## 5. Notes / non-goals
+- **Non-goal:** the orchestrator router-pre-filter wire-in (DC-13 "intercept + mask in policy/router before engines/prompt assembly") — BLOCKED on the protected `orchestrator.py` user-WIP (the S2-03 class); `# SWITCH-POINT(ORCH)` Pass-2. Re-check the orchestrator md5 each session; land when the WIP clears.
+- **Non-goal:** the real DATA query-aware scorer (FR-024 bound vs the curated UC-19 baseline corpus with CIs) — `# SWITCH-POINT(DATA)`; eval-data S5 Pass-2. The in-tree representative bound ships now.
+- **Non-goal:** a learned relevance model — the representative gate uses deterministic entity-type/surface-token matching; `# SWITCH-POINT(DATA)` for the learned model. **Pass-2 hardening tracked (security-sast SEC-01 + SEC-02):** the representative surface-token signal can *over*-retain when a candidate's surface token collides with a common-word query token (e.g. a `PERSON_NAME` "Mark" retained for "please **mark** this complete") — a bounded false-retention on the privacy-*safe* side of the default-mask floor (it still requires the caller to have put the literal token in the query, and the default is mask). The fix belongs to the Pass-2 DATA scorer (a stop-word/common-word filter on short single-token surfaces + the FR-024 false-retention-rate metric at corpus scale), NOT the in-tree representative gate (a stop-word filter without a corpus risks mis-masking a legitimately-queried person). Likewise the ASCII-fold tokenisation masks a homoglyph/non-Latin query token (the privacy-*safe* direction — fails to retain) — a recall consideration for the DATA scorer, never a leak. Both are tracked here so the learned model closes them with calibrated confidence.
+- **Non-goal:** touching the SDO gate — `competitive_supremacy.py` NOT changed ⇒ **no adversarial SDO close**.
+
+## 9. Test-type tags + reviewer set
+`[UNIT-TEST]` `[SECURITY-TEST]` `[PROPERTY-TEST]` `[AUDIT]`. **Reviewers (canonical 5-gate story set):** **security-sast** (**PRIMARY** — the default-to-mask / no-leak-without-signal privacy invariant is the headline risk; the fail-loud bound) + **axiom-compliance** (AX-001 + AX-002 + the privacy-safe default + the no-orchestrator-touch S2-03 discipline) + **code-quality** + **requirements-coverage** (FR-023 gate + the representative FR-024 bound; the Pass-2 DATA-scorer + orchestrator-wire-in splits tracked) + **traceability** (DC-13 → FR-023/FR-024 + UC-19). All five APPROVE. **No SDO adversarial close** (no `competitive_supremacy.py` change).
+
+## 12. Definition of Done
+- [ ] **RED**: `tests/test_query_aware_masking.py` (A1–A11) first & failing (`ModuleNotFoundError` on `policy.query_aware`). RED precedes GREEN.
+- [ ] **GREEN**: `policy/query_aware.py` + additive `policy/__init__` — all A1–A11 green.
+- [ ] **Quality gate**: full xdist suite green; ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `--strict`; coverage ≥84% (new module ≥90%).
+- [ ] **Security (headline)**: A4 (default-to-mask) + A5 (no retention without a signal) + A6 (subtractive) + A10 (fail-loud) + A11 (no orchestrator/off-limits touch).
+- [ ] **Determinism (AX-002)**: A7 byte-identical replay; no random/uuid/time/secrets.
+- [ ] **Untouched / off-limits**: `orchestrator.py` (`0afc6dee…`) + `policy/router.py` + `competitive_supremacy.py` (`3b842e81…`) + `competitor_compare.py` (`7cae16c8…`) byte-identical; `artifacts/benchmarks/*` never written; narrow `git add` of owned files only.
+- [ ] **Story-gate APPROVE** — `_reviews/story/S6-01/`, all 5 reviewers APPROVE; substantive MINOR + ALL MAJOR remediated in-loop.
+- [ ] **SDO verdict UNCHANGED** — recompute `pii-anon supremacy` (a masking-gate feature flips no guarantee; expect NOT_YET / `canonical_claim_run=False` byte-stable).
+
+## Evidence (filled on completion)
+_(pending)_

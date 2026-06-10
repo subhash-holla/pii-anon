@@ -17,6 +17,7 @@ import pytest
 from pii_anon.policy.query_aware import (
     MaskCandidate,
     QueryAwareBoundReport,
+    QueryAwareDecision,
     QueryAwareMaskingGate,
     score_query_aware_bound,
 )
@@ -38,7 +39,11 @@ _PERSON = MaskCandidate(
 )
 
 
-def _decisions(gate: QueryAwareMaskingGate, candidates, query):
+def _decisions(
+    gate: QueryAwareMaskingGate,
+    candidates: list[MaskCandidate],
+    query: str,
+) -> dict[str, QueryAwareDecision]:
     return {d.candidate.entity_type: d for d in gate.decide(candidates, query=query)}
 
 
@@ -62,6 +67,17 @@ def test_a3_retains_surface_token_match() -> None:
     gate = QueryAwareMaskingGate()
     d = _decisions(gate, [_PERSON], query="please confirm the record for Jane Roe")
     assert d["PERSON_NAME"].retain is True
+
+
+def test_a3_retains_via_synonym_only_alias() -> None:
+    """[UNIT-TEST] A3: a query using an entity-type SYNONYM that is not an
+    underscore-split part (e.g. "social"/"security" → US_SSN) retains the
+    candidate — guards the _ENTITY_SYNONYMS map as a documented FR-023 signal
+    (the RC-02 coverage gap)."""
+    gate = QueryAwareMaskingGate()
+    d = _decisions(gate, [_SSN], query="what is the social security number")
+    assert d["US_SSN"].retain is True
+    assert d["US_SSN"].reason
 
 
 def test_a4_default_to_mask_on_blank_query_is_safe() -> None:
@@ -119,11 +135,14 @@ def test_a8_score_query_aware_bound_computes_rates() -> None:
     report = score_query_aware_bound(decisions, gold)
     assert isinstance(report, QueryAwareBoundReport)
     assert report.n_candidates == 3
+    assert report.n_query_relevant_gold == 1
     # EMAIL retained ∧ gold-relevant ⇒ no false-retention, no over-redaction here.
     assert report.false_retention_rate == pytest.approx(0.0)
     assert report.over_redaction_rate == pytest.approx(0.0)
     assert report.baseline["false_retention_rate"] == pytest.approx(0.0)
-    assert report.baseline["over_redaction_rate"] > 0.0  # mask-all over-redacts the relevant span
+    # mask-all over-redacts the 1 gold-relevant span of 3 ⇒ EXACTLY 1/3 (anchored,
+    # not merely > 0 — the S5-02 RC-02 / S5-03 RC-01 exact-rate lesson).
+    assert report.baseline["over_redaction_rate"] == pytest.approx(1 / 3)
 
 
 def test_a9_false_retention_zero_when_gate_retains_only_relevant() -> None:
@@ -135,7 +154,11 @@ def test_a9_false_retention_zero_when_gate_retains_only_relevant() -> None:
     gold = [True, False]
     report = score_query_aware_bound(decisions, gold)
     assert report.false_retention_rate == pytest.approx(0.0)
-    assert report.over_redaction_rate < 1.0
+    # The gate retained the gold-relevant EMAIL and masked the non-relevant SSN,
+    # so its over-redaction is EXACTLY 0.0 — strictly better than the mask-all
+    # baseline's 1/2 (anchored exact, not merely < 1.0).
+    assert report.over_redaction_rate == pytest.approx(0.0)
+    assert report.baseline["over_redaction_rate"] == pytest.approx(0.5)
 
 
 def test_a10_score_bound_fails_loud_on_length_mismatch() -> None:
