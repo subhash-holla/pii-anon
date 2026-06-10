@@ -246,6 +246,99 @@ report; the `--artifact-dir` output gives you stable files for CI gating.
 
 ---
 
+## Package your detector as an SDK plugin (entry-point discovery)
+
+You don't have to pass `--predictor` paths around. A package can
+**advertise** its predictor under the `pii_anon.byo_pipelines` entry-point
+group and be discovered with zero pii-anon edits:
+
+```toml
+# your package's pyproject.toml
+[project.entry-points."pii_anon.byo_pipelines"]
+my-detector = "my_pkg.detector:predict"
+```
+
+```python
+from pii_anon.eval_framework import BYOPipelineRegistry
+
+registry = BYOPipelineRegistry()
+names = registry.discover_entrypoint_pipelines()   # ['my-detector', ...]
+predictor = registry.get("my-detector")
+```
+
+Discovery rules:
+
+- Targets must be **callables** (module-level functions are the canonical
+  shape). Classes are not instantiated at discovery time.
+- Discovery **never raises** — a broken or absent package is skipped and
+  the rest are returned (graceful degradation), so an optional dependency
+  can never break callers that enumerate pipelines.
+- Discovery resolves function objects only; **no model is loaded** until a
+  predictor is actually called.
+- Returning `True`/`False` as span offsets is rejected by the in-tree
+  bridges; your own predictor should likewise return real `int` offsets
+  (`bool` is an `int` subclass in Python and would otherwise coerce to
+  `1`/`0`).
+
+The five in-tree incumbents (`gliner`, `presidio`, `scrubadub`,
+`spacy_ner`, `stanza_ner`) ship under this same group — your detector and
+the incumbents are discovered, registered, and scored identically. The CLI
+composes with this too, with zero shims:
+
+```bash
+pii-anon rate-elo --predictor pii_anon.eval_framework.byo_pipeline:presidio_predictor
+```
+
+---
+
+## Incumbents are scored on the identical path
+
+`evaluate_incumbent` scores an in-tree incumbent through the **same
+function** (`evaluate_external_system`) that scores your detector — it
+contains no scoring logic of its own, so there is no "house path" for
+incumbents and a different path for you:
+
+```python
+from pii_anon.eval_framework import (
+    INCUMBENT_SYSTEMS,            # ('gliner', 'presidio', 'scrubadub', 'spacy_ner', 'stanza_ner')
+    evaluate_incumbent,
+    build_identical_path_leaderboard,
+    incumbent_predictor,
+)
+
+# One incumbent, same path / same knobs as evaluate_external_system:
+result = evaluate_incumbent("presidio", max_records=2_000)
+
+# Apples-to-apples board: any mix of incumbents and your systems,
+# every row produced by the same evaluator over the same dataset:
+board, results = build_identical_path_leaderboard(
+    {
+        "presidio": incumbent_predictor("presidio"),
+        "my-detector": my_detector,
+    },
+    max_records=2_000,
+)
+print(board.to_markdown())
+```
+
+Notes:
+
+- The incumbent adapters use each engine's pii-anon integration
+  (`pii_anon.engines.*`). Engines whose native dependency is missing fall
+  back to their built-in degraded behavior — install the engine package
+  (e.g. `presidio-analyzer`) for native-strength numbers.
+- **The committed baseline artifact uses a different (legacy) path.** The
+  rows in `artifacts/benchmarks/benchmark-results.json` were produced by
+  the frozen legacy comparison (overlap matching over the benchmark
+  dataset), while the identical path uses strict span matching over the
+  eval dataset — so identical-path incumbent numbers will legitimately
+  differ from the committed artifact rows. The identical path pins *how
+  all future scoring happens*, not retroactive artifact parity. Avoid
+  mixing rows from the two paths in one table; `build_identical_path_leaderboard`
+  is the unmixed alternative.
+
+---
+
 ## Reading the results
 
 Example output:
