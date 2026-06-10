@@ -1,0 +1,26 @@
+reviewer: axiom-compliance
+story: S7-01
+gate: story
+iteration: 2
+verdict: APPROVE  # 0 findings at iter-2; 1 forward-looking OBSERVATION at iter-1
+runs: wf_44f8b3ae-51b (iter-1) -> wf_2d10a313-630 (iter-2); transcribed from the workflow structured results
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # synthetic fixtures only — handcrafted synthetic PDFs, zz-alias@synthetic.test, 000-0000; no real PII; no real documents
+  - { id: AX-pii-anon-002, status: UPHELD }  # deterministic byte-driven reads — A5 5x replay byte-identical; no random/uuid/time in either module
+  - { id: AX-pii-anon-003, status: NOT_TRIGGERED }  # detection/routing path untouched (A13 AST audit)
+  - { id: AX-pii-anon-005, status: NOT_TRIGGERED }  # router/abstention path untouched
+findings:
+  - id: axiom-compliance-story-01
+    severity: OBSERVATION
+    location: native.py SWITCH-POINT(OCR)/(DICOM)/(AUDIO-ASR); native_pdf.py SWITCH-POINT(PDF-LIB)/(COORDS)
+    description: >
+      Pass-2 honesty well-stamped: supports_reconstruction=False (no false
+      FR-032 claim), audio extracts_text=False + refuses silent empty text,
+      switch-points named in docstrings AND capability notes. Forward note:
+      when real OCR/ASR backends land, those paths introduce inferential
+      (non-byte-literal) text — add an AX-002 anchor pinning determinism or
+      recording provenance for the inferential step.
+    suggested_resolution: At the Pass-2 backend story, pin replay-determinism or provenance for OCR/ASR inference. No change in S7-01.
+    disposition: CARRY-FORWARD to the Pass-2 backend story.
+context_bounds_respected: true
+offlimits_md5_ok: true

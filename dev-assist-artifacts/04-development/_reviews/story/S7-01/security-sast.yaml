@@ -1,0 +1,51 @@
+reviewer: security-sast
+story: S7-01
+gate: story
+iteration: 2  # iter-1 REQUEST_CHANGES (1 MAJOR) -> remediated 258d3ec -> iter-2 APPROVE
+verdict: APPROVE
+runs: wf_44f8b3ae-51b (iter-1) -> wf_2d10a313-630 (iter-2); per-reviewer YAML transcribed from the workflow structured results (the scribe wrote synthesis.md only); findings text verbatim
+summary: >
+  iter-2 clean. The iter-1 MAJOR is genuinely closed: _decode_stream bounds
+  TOTAL inflated output via a chunked decompressobj loop (1 MiB steps) with
+  the 64 MiB per-stream ceiling applied to loop chunks AND the flush tail;
+  over-ceiling raises zlib.error into read()'s existing skip branch (never
+  partial extraction); the no-progress guard terminates corrupt streams;
+  boundary semantics exact (== ceiling passes, +1 raises). A14 pins the
+  bomb-skip + honest-page extraction; A4/A16b pin honest behavior unchanged.
+  No new surface added by the remediation (max_bytes kwarg internal,
+  default safe). Off-limits md5s byte-identical.
+findings:
+  - id: security-sast-story-iter1-01
+    severity: MAJOR
+    location: src/pii_anon/ingestion/native_pdf.py _decode_stream (iter-1)
+    description: >
+      Unbounded FlateDecode decompression on the untrusted-PDF path was a
+      memory-exhaustion (zip-bomb) DoS vector: ~200KB crafted stream
+      inflated to ~200MB (~1000x; peak RSS ~459MB); max_record_chars
+      truncated only the final string AFTER full inflate. Local DoS only
+      (no RCE/exfiltration) — MAJOR not CATASTROPHIC.
+    suggested_resolution: Bound the inflate with a per-stream output ceiling via the chunked decompressobj loop; reject over-ceiling streams like corrupt ones; pin with an exact-value test.
+    disposition: REMEDIATED (258d3ec) — confirmed closed at iter-2.
+  - id: security-sast-story-02
+    severity: OBSERVATION
+    location: pyproject.toml [project.optional-dependencies] ocr/dicom
+    description: >
+      The ocr/dicom extras (pytesseract>=0.3, Pillow>=10, pydicom>=2.4) are
+      not installed in this env so cannot be CVE-scanned at the story gate;
+      lazy-imported + loud-on-absent so the default-install surface is
+      unchanged. Pillow has a historically active CVE stream; assert the
+      resolved version clean at the epic gate.
+    suggested_resolution: At the epic gate, install the ocr+dicom extras and run pip-audit; no HIGH/CRITICAL in the transitive closure before release.
+    disposition: CARRY-FORWARD to the epic/release gate.
+  - id: security-sast-story-03
+    severity: OBSERVATION
+    location: pyproject.toml [project.entry-points."pii_anon.readers"]; native.py discovery
+    description: >
+      The pii_anon.readers group follows the standing entry-point trust
+      model (same as byo_pipelines / rating_engines / engines): discovery
+      never executes beyond ep.load()+no-arg instantiation, protocol-checks
+      targets, swallows failures. No new trust boundary.
+    suggested_resolution: At a future epic/release security gate, consider whether third-party-reader discovery warrants an allowlist/signing posture (consistent across all groups).
+    disposition: CARRY-FORWARD (standing assumption recorded).
+context_bounds_respected: true
+offlimits_md5_ok: true
