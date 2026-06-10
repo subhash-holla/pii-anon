@@ -19,7 +19,6 @@ import pytest
 from pii_anon.eval_framework.attacks.reid import ANTI_ANONYMITY_CAVEAT, MiaAttack
 from pii_anon.eval_framework.attacks.mia import (
     MIA_MIN_SHADOW_MODELS,
-    MiaPowerReport,
     MiaRecord,
     MiaSuccessReport,
     RepresentativeMiaAttack,

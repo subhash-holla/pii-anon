@@ -73,6 +73,27 @@ from pii_anon.eval_framework.attacks.reid_tier3 import (
     wilson_interval,
 )
 
+# S5-03 — the representative membership-inference adversary (LiRA-shape) +
+# Secret-Sharer canary exposure + the NFR-013 TPR@low-FPR / ≥128-shadow power
+# machinery. Imported here so the package surface + the import-boundary /
+# dangerous-call AST guards scan mia.py alongside the substrate, and its runner
+# registers below.
+from pii_anon.eval_framework.attacks.mia import (
+    MIA_ATTACK_REGISTRY,
+    MIA_FPR_TARGETS,
+    MIA_MIN_SHADOW_MODELS,
+    MiaPowerReport,
+    MiaRecord,
+    MiaSuccessReport,
+    RepresentativeMiaAttack,
+    SecretSharerReport,
+    assess_mia_power,
+    canary_exposure,
+    mia_attack_runner,
+    score_mia_attack,
+    tpr_at_fpr,
+)
+
 # Additively merge the re-identification runners into the sandbox default
 # allow-list registry. ``DEFAULT_ATTACK_REGISTRY`` (defined in ``sandbox``) is the
 # single plain-dict allow-list ``run_attack_under_sandbox`` resolves against; we
@@ -80,7 +101,11 @@ from pii_anon.eval_framework.attacks.reid_tier3 import (
 # stays registered and the merge is the ONLY way the new bodies join the
 # allow-list (no new dynamic-import path is introduced). The registry remains a
 # plain in-code dict — the only way a spec selects code.
-for _name, _runner in {**REID_ATTACK_REGISTRY, **TIER3_REID_ATTACK_REGISTRY}.items():
+for _name, _runner in {
+    **REID_ATTACK_REGISTRY,
+    **TIER3_REID_ATTACK_REGISTRY,
+    **MIA_ATTACK_REGISTRY,
+}.items():
     # SAFETY: ``DEFAULT_ATTACK_REGISTRY`` is annotated ``Final[Mapping[...]]`` in
     # ``sandbox.py`` so a static checker treats it as read-only, but the object
     # bound to that name IS a plain mutable ``dict`` — it is the SAME dict the
@@ -140,4 +165,18 @@ __all__ = [
     "TIER3_REID_ATTACK_REGISTRY",
     "RRS_RUNG_REID_LOW",
     "RRS_RUNG_REID_HIGH",
+    # mia surface (S5-03)
+    "MiaRecord",
+    "RepresentativeMiaAttack",
+    "tpr_at_fpr",
+    "MiaSuccessReport",
+    "score_mia_attack",
+    "canary_exposure",
+    "SecretSharerReport",
+    "MiaPowerReport",
+    "assess_mia_power",
+    "mia_attack_runner",
+    "MIA_ATTACK_REGISTRY",
+    "MIA_MIN_SHADOW_MODELS",
+    "MIA_FPR_TARGETS",
 ]
