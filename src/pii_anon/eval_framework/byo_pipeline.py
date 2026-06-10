@@ -123,14 +123,17 @@ class BYOPipelineRegistry:
             self._pipelines[name] = predictor
 
     def unregister(self, name: str) -> None:
+        """Remove ``name`` from the registry (no-op when absent)."""
         with self._lock:
             self._pipelines.pop(name, None)
 
     def get(self, name: str) -> Predictor | None:
+        """Return the predictor registered under ``name``, or ``None``."""
         with self._lock:
             return self._pipelines.get(name)
 
     def names(self) -> list[str]:
+        """Return the registered pipeline names, sorted."""
         with self._lock:
             return sorted(self._pipelines.keys())
 

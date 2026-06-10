@@ -187,7 +187,12 @@ from .byo_pipeline import (
     build_identical_path_leaderboard,
     engine_predictor,
     evaluate_incumbent,
+    gliner_predictor,
     incumbent_predictor,
+    presidio_predictor,
+    scrubadub_predictor,
+    spacy_ner_predictor,
+    stanza_ner_predictor,
 )
 
 # -- Research references ----------------------------------------------------
@@ -305,7 +310,12 @@ __all__ = [
     "build_identical_path_leaderboard",
     "engine_predictor",
     "evaluate_incumbent",
+    "gliner_predictor",
     "incumbent_predictor",
+    "presidio_predictor",
+    "scrubadub_predictor",
+    "spacy_ner_predictor",
+    "stanza_ner_predictor",
     # Research
     "EVIDENCE_REGISTRY",
     "ResearchReference",
