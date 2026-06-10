@@ -4,7 +4,7 @@
 |---|---|
 | Story | S6-01 |
 | Sprint | 6 |
-| State | **TODO** (authored 2026-06-09; SO-18 `next` feature surface) |
+| State | **DONE** (2026-06-09; SO-19. 5/5 story gate — security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage all APPROVE; code-quality REQUEST_CHANGES (5 MINOR, 0 MAJOR) → all remediated/dispositioned in-loop → APPROVE. NO SDO close (no `competitive_supremacy.py` change — gate md5 `3b842e81…` byte-identical); the orchestrator wire-in stayed Pass-2 (orchestrator.py byte-identical, the S2-03 discipline). See §Evidence.) |
 | provisional_status | **AGENT_SIMULATED** — the `QueryAwareMaskingGate` decision logic, the subtractive-on-mask invariant, the default-to-mask privacy floor, and the representative FR-024 over-redaction/false-retention bound all run for REAL in-tree against SYNTHETIC spans + queries (AX-001). The real DATA query-aware **scorer** (FR-024 bound vs the curated baseline corpus) is DATA-owned (`pii_anon_datasets` S5) → Pass-2 / cross-repo (`# SWITCH-POINT(DATA)`). The **orchestrator router-pre-filter wire-in** (DC-13 "intercept + mask in policy/router before engines/prompt assembly") is BLOCKED on the protected user-WIP `orchestrator.py` (the S2-03 block class) → Pass-2 (`# SWITCH-POINT(ORCH)`). |
 | Size | M |
 | Implements | **FR-023** (query-aware masking gate — retain query-relevant PII, mask the rest; UC-19, swarm, SHOULD) + a **representative FR-024** (bound query-aware over-redaction + false-retention vs a baseline; UC-19, eval, SHOULD — the real DATA scorer is Pass-2). Upholds **AX-001** (synthetic-only), **AX-002** (deterministic, pure decision logic), **AX-006-adjacent** (least-privilege / privacy-safe default — default-to-mask). |
@@ -69,4 +69,17 @@ Query-aware masking is the UC-19 swarm capability: when PII is processed in serv
 - [ ] **SDO verdict UNCHANGED** — recompute `pii-anon supremacy` (a masking-gate feature flips no guarantee; expect NOT_YET / `canonical_claim_run=False` byte-stable).
 
 ## Evidence (filled on completion)
-_(pending)_
+
+**Commits (RED→GREEN→remediation, on `pdlc/sota-program`):** RED `3c459aa` (tests-only; `ModuleNotFoundError` on `policy.query_aware`) → GREEN `b0ac07e` (the module + additive `policy/__init__`) → remediation `753c90d` (the story-gate findings).
+
+**Files:** `src/pii_anon/policy/query_aware.py` (new — `MaskCandidate`, `QueryAwareDecision`, `QueryAwareMaskingGate`, `QueryAwareBoundReport`, `score_query_aware_bound`, the module-level `_ENTITY_SYNONYMS`), `src/pii_anon/policy/__init__.py` (additive re-exports), `tests/test_query_aware_masking.py` (new — A1–A11 + the synonym-only A3, 12 cases). `policy/router.py` byte-identical (the gate lives alongside it, consumed read-only).
+
+**Acceptance → tests (A1–A11, 12 cases):** A1 retain query-named entity type; A2 mask unrelated; A3 surface-token retain + the synonym-only retain (US_SSN via "social security"); A4 default-to-mask on a blank query (SAFETY); A5 no retention without a positive reason-stamped signal; A6 subtractive-on-mask property; A7 deterministic + order-independent; A8 bound rates anchored EXACT (baseline over-redaction 1/3, n_query_relevant_gold 1); A9 false-retention 0 + over-redaction EXACTLY 0.0 vs the mask-all baseline 0.5; A10 fail-loud on a length mismatch; A11 no forbidden imports.
+
+**Story gate (5/5 APPROVE; `_reviews/story/S6-01/`):** security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage APPROVE; code-quality REQUEST_CHANGES (5 MINOR, 0 MAJOR) → remediated → APPROVE. **0 unremediated MAJOR.** Remediated in-loop (`753c90d`): RC-01/CQ-04 (A8/A9 exact-rate anchors — the recurring RC lesson), RC-02 (synonym-only test), CQ-01 (removed the dead `e-mail` alias), CQ-02/axiom-OBS-2 (hoisted `_ENTITY_SYNONYMS` to a module constant), CQ-03 (typed the `_decisions` helper), CQ-06 (documented the shared-token alias collision). Dispositioned: security SEC-01/SEC-02 + axiom AX-005 (story §5 Pass-2 notes — the common-word surface-collision false-retention + the homoglyph fold + the learned-model calibration, all privacy-safe-direction, deferred to the DATA scorer); CQ-05 NO-ACTION (the repo house convention is acceptance-ID test names + docstring FR citations — the 4 sibling attack test files); CQ-07 NO-ACTION (S8 contributor-readiness follow-on).
+
+**SDO — UNCHANGED (a masking-gate feature flips no guarantee):** `pii-anon supremacy` on the committed smoke artifact reads **NOT_YET / `canonical_claim_run=False` (G7)** — byte-identical to SO-18. The SDO gate `competitive_supremacy.py` byte-identical (md5 `3b842e81c3f03eafd11f9c655c1789a0`), so **no adversarial SDO close was required**. `orchestrator.py` byte-identical (`0afc6dee…`, the S2-03 discipline — the router-pre-filter wire-in is Pass-2), `policy/router.py` + `competitor_compare.py` (`7cae16c8…`) byte-identical.
+
+**Quality:** full xdist suite green (see SO-19 for the count); ruff clean (src+tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` (140 files).
+
+**DoD:** all checkboxes met. Pass-2 (tracked): the orchestrator router-pre-filter wire-in (`# SWITCH-POINT(ORCH)`, blocked on the user-WIP `orchestrator.py`); the real DATA query-aware scorer + learned relevance model (`# SWITCH-POINT(DATA)`, eval-data S5); the SEC-01 common-word surface-collision hardening.

@@ -1,0 +1,27 @@
+reviewer: requirements-coverage
+story: S6-01
+gate: story
+verdict: APPROVE
+summary: >
+  FR-023 (query-aware masking gate, SHOULD) + the representative FR-024 bound
+  (SHOULD) are both implemented + tested; all acceptance criteria map 1:1 to a
+  passing test. The headline FR-023 privacy guarantee — false-retention=0 by
+  default — is covered by two security tests (A4 empty/blank, A5 no-signal). The
+  Pass-2 deferrals (real DATA scorer, learned relevance model, orchestrator
+  wire-in) are honestly flagged via # SWITCH-POINT(DATA/ORCH) + story §5 and
+  tracked in the traceability matrix (UC-19 → DATA scorer S5). Neither SHOULD is
+  silently claimed complete. Off-limits intact (no SDO close).
+findings:
+  - id: RC-01
+    severity: MINOR
+    title: A8/A9 left the discriminating over_redaction/baseline rates at BOUNDS, not exact integer-count values (the S5-02 RC-02 / S5-03 RC-01 recurrence)
+    disposition: REMEDIATED IN-LOOP (753c90d) — A8 pins baseline over_redaction == 1/3 + n_query_relevant_gold == 1; A9 pins over_redaction == 0.0 + baseline == 0.5.
+  - id: RC-02
+    severity: OBSERVATION
+    title: the synonym-alias retention path (a distinct representative FR-023 signal) was untested
+    disposition: REMEDIATED IN-LOOP (753c90d) — added test_a3_retains_via_synonym_only_alias (US_SSN via "social security").
+offlimits_md5_ok: true
+notes: >
+  No MUST in scope (FR-023/FR-024 are SHOULD); both honestly verified-or-Pass-2-
+  deferred-with-tracked-successor (DATA scorer S5; ORCH wire-in when the orchestrator
+  WIP clears). No DIVERGED FR/NFR. No SDO close required.

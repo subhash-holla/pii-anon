@@ -298,6 +298,15 @@ _Populated by `/dev-assist-signoff` at stage / gate transitions (policy: po-requ
 >
 > **NEXT (priority order):** **S6-01** (query-aware masking — FR-023/FR-024; the FR-028/UC-22 6-channel vs FR-025/DC-13 4-channel reconciliation is a tracked PO item) → then S6-04 (BYO-SDK), S7-01 (multimodal readers), S7-03 (multilingual fairness) — SEQUENTIAL in the main tree, via `/dev-assist-story-new`. Then the RC close (Stage-6 docs → release gate → tagged RC → sdist/wheel). **Pass-2:** ★ full-census G6 (headline) + real Tier-C + real-NUTS J + the real Tier-3 LLM/DATA adversary (S5-02) + the real LiRA@128/canary splits (S5-03) + the G7 `_safe_repr` sweep + per-detector-class latency + Papers 1 & 2.
 
+### S6-01 DONE — query-aware masking gate (FR-023) + representative FR-024 bound; 5/5 story gate, no SDO close (2026-06-09)
+> **The query-aware masking gate is LIVE** (the agentic FR-023/UC-19 capability). New standalone `policy/query_aware.py`: `QueryAwareMaskingGate.decide(candidates, *, query)` — **subtractive-on-mask**, **default-to-mask**; retains a detected PII span ONLY on a positive reason-stamped relevance signal (the query names an entity-type alias, or the query tokens overlap the span surface), so **false-retention (the leak) cannot occur by default** — over-redaction is the safe error. Plus `QueryAwareBoundReport`/`score_query_aware_bound` (the representative FR-024 over-redaction/false-retention bound vs the mask-all baseline; fail-loud on a length mismatch). Shipped as a **pure primitive alongside `router.py`** — the DC-13 router-pre-filter **wire-in** (intercept + mask before prompt assembly) is BLOCKED on the protected user-WIP `orchestrator.py` (the S2-03 block) → `# SWITCH-POINT(ORCH)` Pass-2; the real DATA query-aware scorer + learned relevance model are `# SWITCH-POINT(DATA)` Pass-2.
+>
+> **Story gate: 4/5 APPROVE + code-quality REQUEST_CHANGES (5 MINOR, 0 MAJOR) → all remediated/dispositioned in-loop → APPROVE; NO SDO close (correct).** Remediated (`753c90d`): RC-01/CQ-04 (A8/A9 **exact** integer-count rate anchors — the recurring S5-02 RC-02 / S5-03 RC-01 lesson), RC-02 (synonym-only retention test), CQ-01 (removed the dead `e-mail` alias), CQ-02/axiom-OBS-2 (hoisted `_ENTITY_SYNONYMS` module constant), CQ-03 (typed the test helper), CQ-06 (documented the shared-token alias collision). Dispositioned Pass-2/NO-ACTION: security SEC-01/SEC-02 (the common-word surface-collision false-retention + homoglyph — privacy-safe-direction, deferred to the DATA scorer), axiom AX-005 (calibration → learned model), CQ-05 (FR-IDs-in-test-names — the house convention is acceptance-ID names + docstring citations), CQ-07 (Examples → S8). **FR-023 implemented + tested; the representative FR-024 ships with the real scorer Pass-2 — both SHOULDs, neither silently claimed real.**
+>
+> **SDO — UNCHANGED.** A masking-gate feature flips no guarantee: `pii-anon supremacy` on the committed smoke artifact still reads **NOT_YET / `canonical_claim_run=False` (G7)**, byte-identical to SO-18. `orchestrator.py` byte-identical (`0afc6dee…`, the S2-03 discipline — the wire-in stayed Pass-2), off-limits (`competitor_compare.py` `7cae16c8…`) + `policy/router.py` + the SDO gate (`3b842e81…`) byte-identical. Full suite exit 0 (3751 pass / 16 skip / 0 fail), ruff + BOTH-mypy clean (140 files). Signed off `_signoffs/SO-19-s6-01-query-aware-masking.yaml`.
+>
+> **NEXT (priority order):** **S6-04** (BYO-SDK adapter) → then S7-01 (multimodal readers), S7-03 (multilingual fairness) — SEQUENTIAL in the main tree, via `/dev-assist-story-new`. (S5-02/03 + S6-01 DONE; S6-04/S7-01/S7-03 remain of the SO-15 feature list.) Then the RC close (Stage-6 docs → release gate → tagged RC → sdist/wheel). **Pass-2:** ★ full-census G6 (headline) + real Tier-C + real-NUTS J + the real Tier-3/MIA adversaries (S5-02/03) + the query-aware DATA scorer + the orchestrator router-pre-filter wire-in (S6-01) + the G7 `_safe_repr` sweep + Papers 1 & 2.
+
 ## Pivots Log
 
 | Date | Stage(s) affected | Source finding | Plan file |
@@ -336,8 +345,9 @@ Sibling files:
 | Development | +18 (**S7-04 session**: 5 story reviewers + round-1 close wf 7 [6 refuters + 1 verify] + round-2 confirmatory close wf 6 [6 refuters, 0 upheld]) | 229 |
 | Development | +5 (**S5-02 session**: 5 story reviewers — no SDO close, feature story) | 234 |
 | Development | +5 (**S5-03 session**: 5 story reviewers — no SDO close, feature story) | 239 |
-| Testing | 0 | 239 |
-| **Total** | **239** | **239** |
+| Development | +5 (**S6-01 session**: 5 story reviewers — no SDO close, feature story) | 244 |
+| Testing | 0 | 244 |
+| **Total** | **244** | **244** |
 
 _(Ledger note: the Development running-total was last fully reconciled at SO-12; the S7-02 keystone sessions [SO-14/SO-15, ~40+ close-round agents across iter-3..round-8] are not itemised above — the S7-04 row adds only this session's 18.)_
 

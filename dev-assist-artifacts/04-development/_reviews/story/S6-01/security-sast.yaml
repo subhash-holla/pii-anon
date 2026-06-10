@@ -1,0 +1,29 @@
+reviewer: security-sast
+story: S6-01
+gate: story
+verdict: APPROVE
+summary: >
+  PRIMARY reviewer. The privacy default-to-mask invariant (RISK-1) holds under
+  adversarial probing: empty/whitespace/punctuation/symbol/NBSP/zero-width queries
+  all yield ZERO retention; a candidate with neither an entity-alias match nor a
+  surface-token overlap is provably impossible to retain. Subtractive-on-mask
+  (RISK-2) is structural (exactly one decision per candidate; the gate only flips
+  retain on baseline-masked candidates). No re-detection (RISK-3 — re + stdlib
+  only). Fail-loud bound (RISK-6 — domain-named ValueError on length mismatch;
+  rates always finite in [0,1]). Off-limits byte-identical; the SDO gate untouched
+  (no SDO close). 11/11 (now 12/12) targeted tests pass.
+findings:
+  - id: SEC-S601-01
+    severity: MINOR
+    title: surface-token relevance can over-retain a PERSON_NAME on a common-word query (false-retention via token collision)
+    where: src/pii_anon/policy/query_aware.py (surface_hit branch)
+    disposition: PASS-2 NOTE (no in-loop code change, per the PRIMARY reviewer's explicit recommendation) — within the # SWITCH-POINT(DATA) representative-heuristic scope; privacy-SAFE direction (default is mask; requires the caller's literal token); satisfies the A6 shipped contract. Tracked in story §5 as a Pass-2 hardening for the DATA scorer (a common-word filter on short single-token surfaces + the FR-024 false-retention-rate metric at corpus scale). A stop-word filter without a corpus risks mis-masking a legitimately-queried person.
+  - id: SEC-S601-02
+    severity: OBSERVATION
+    title: ASCII-fold tokenisation masks a homoglyph/non-Latin query token (privacy-safe)
+    disposition: PASS-2 NOTE (story §5) — the privacy-safe direction (fails to retain → masks); a recall consideration for the DATA scorer, never a leak.
+offlimits_md5_ok: true
+notes: >
+  Feature story — competitive_supremacy.py byte-identical (3b842e81…), so the
+  mandatory SDO close does NOT apply. Both findings are on the privacy-safe side
+  of the default-to-mask floor and within the documented representative scope.

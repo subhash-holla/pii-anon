@@ -1,0 +1,28 @@
+reviewer: traceability
+story: S6-01
+gate: story
+verdict: APPROVE
+summary: >
+  The FR-023/FR-024 → story → test → DC-13 chain is fully intact and honest. Both
+  FR IDs exist in requirements-document.md (lines 36-37) with wording matching the
+  story; pinned by docstring/behaviour-citing G/W/T tests (FR-023 via A1/A2/A3 +
+  A4/A5/A6; FR-024 via A8/A9). DC-13 trace exact; UC-19 traced. provisional_status=
+  AGENT_SIMULATED present from authoring (the S5-03 TRACE-01 lesson applied);
+  # SWITCH-POINT(DATA)/(ORCH) markers in code + story §5. RED precedes GREEN;
+  scope exactly the 3 owned files; off-limits + the SDO gate byte-identical (no SDO close).
+findings:
+  - id: TRACE-OBS-1
+    severity: OBSERVATION
+    title: the project traceability-matrix UC-19 Story/Test backfill is the sprint-gate close-out duty (correctly absent from this code+tests diff)
+    disposition: NO ACTION at story gate (the UC-19 row already maps FR-023/FR-024 + the DATA-scorer Pass-2 edge); backfill at the S6 sprint gate.
+  - id: TRACE-OBS-2
+    severity: OBSERVATION
+    title: FR-024's authoritative DATA scorer remains the open cross-repo trace edge (eval-data S5)
+    disposition: NO ACTION (tracked Pass-2; the in-tree representative bound is not the authoritative FR-024 verification).
+offlimits_md5_ok: true
+notes: >
+  Exemplary on the S5-03 TRACE-01 lesson — provisional_status + the SWITCH-POINT
+  markers were present from authoring, so the in-tree representative work is never
+  conflated with the Pass-2 real DATA scorer / learned model / orchestrator wire-in.
+  DC-13 is a multi-FR contract (FR-023..030); S6-01 correctly claims only the
+  FR-023 gate + representative FR-024 slice.
