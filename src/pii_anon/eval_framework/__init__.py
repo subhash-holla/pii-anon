@@ -178,6 +178,18 @@ from .external_evaluator import (
     resolve_predictor_path,
 )
 
+# -- BYO-pipeline SDK + identical-incumbent scoring (S6-04) ------------------
+# Entry-point discovery for third-party predictors plus the incumbents
+# expressed as ordinary BYO pipelines on the identical scoring path.
+from .byo_pipeline import (
+    INCUMBENT_SYSTEMS,
+    BYOPipelineRegistry,
+    build_identical_path_leaderboard,
+    engine_predictor,
+    evaluate_incumbent,
+    incumbent_predictor,
+)
+
 # -- Research references ----------------------------------------------------
 from .research.references import (
     EVIDENCE_REGISTRY,
@@ -287,6 +299,13 @@ __all__ = [
     "evaluate_external_system",
     "load_baseline_leaderboard",
     "resolve_predictor_path",
+    # BYO-pipeline SDK (S6-04)
+    "BYOPipelineRegistry",
+    "INCUMBENT_SYSTEMS",
+    "build_identical_path_leaderboard",
+    "engine_predictor",
+    "evaluate_incumbent",
+    "incumbent_predictor",
     # Research
     "EVIDENCE_REGISTRY",
     "ResearchReference",

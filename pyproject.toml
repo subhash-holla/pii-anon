@@ -72,6 +72,16 @@ glicko-legacy = "pii_anon.eval_framework.rating.elo:PIIRateEloEngine"
 bradley-terry-mle = "pii_anon.eval_framework.rating.bradley_terry:BradleyTerryMLEEngine"
 bayes-bt = "pii_anon.eval_framework.rating.bayes_bt:BayesBTEngine"
 
+# S6-04 (FR-001/FR-002): BYO-pipeline predictors. Third-party packages
+# advertise their own Predictor under this group; the five in-tree
+# incumbents ship here so they ride the identical scoring path.
+[project.entry-points."pii_anon.byo_pipelines"]
+gliner = "pii_anon.eval_framework.byo_pipeline:gliner_predictor"
+presidio = "pii_anon.eval_framework.byo_pipeline:presidio_predictor"
+scrubadub = "pii_anon.eval_framework.byo_pipeline:scrubadub_predictor"
+spacy_ner = "pii_anon.eval_framework.byo_pipeline:spacy_ner_predictor"
+stanza_ner = "pii_anon.eval_framework.byo_pipeline:stanza_ner_predictor"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
