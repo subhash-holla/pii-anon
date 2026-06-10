@@ -39,7 +39,16 @@ def _build_orchestrator(token_key: str, config_path: str | None) -> PIIOrchestra
 def create_app() -> Any:
     import typer
 
-    app = typer.Typer(add_completion=False, help="pii-anon command line interface")
+    app = typer.Typer(
+        add_completion=False,
+        help="pii-anon command line interface",
+        epilog=(
+            "Docs: docs/README.md — BYO-pipeline scoring (rate-elo + the "
+            "pii_anon.byo_pipelines group) · SDO certification (canonical-run, "
+            "supremacy) · native readers (pdf/image/dicom/audio) · "
+            "multilingual fairness gate · anonymization-vs-pseudonymization."
+        ),
+    )
 
     @app.command("detect")
     def detect(

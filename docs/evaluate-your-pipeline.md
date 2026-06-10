@@ -339,6 +339,29 @@ Notes:
 
 ---
 
+## Certify a run: `canonical-run` + `supremacy`
+
+Leaderboard numbers are *comparative*; certified claims go through the SDO
+(state-of-the-art dominance objective) machinery:
+
+```bash
+# Produce the certified evaluation artifact (fail-closed CanonicalRunGate:
+# every guarantee field validated; fabricated/malformed values are rejected).
+pii-anon canonical-run --output-dir ./certified
+
+# Read the CompetitiveSupremacyGate verdict + the binding constraint.
+pii-anon supremacy --artifact ./certified/benchmark-results.json
+# -> verdict: NOT_YET | PROVISIONAL_SOTA | CLAIM_GRADE_SOTA, plus per-guarantee
+#    G1..G7 statuses and the single binding constraint.
+```
+
+`supremacy` is non-blocking by default (always exit 0); with
+`--canonical-claim` it exits 1 unless the verdict is `CLAIM_GRADE_SOTA` —
+the only mode where a non-supreme result is a hard failure. The honest
+current verdict on the committed smoke artifact is `NOT_YET`.
+
+---
+
 ## Reading the results
 
 Example output:

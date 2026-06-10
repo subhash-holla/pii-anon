@@ -96,3 +96,40 @@ All symbols below are imported from `pii_anon.eval_framework`.
 - `pii-anon benchmark-publish-suite ...` for end-to-end canonical publish-grade benchmark workflow
 - `pii-anon benchmark-publish-suite ... --reuse-current-env --install-no-deps` for pre-provisioned/offline environments
 - `pii-anon compare-competitors ... --dataset-source package-only --require-all-competitors --require-native-competitors` for strict canonical competitor runs
+
+## PDLC SOTA program surfaces
+
+New API families shipped by the SOTA program (branch `pdlc/sota-program`),
+each a standalone, deterministic primitive:
+
+**De-identification scoring (the two distinct families — never merged)**
+— `pii_anon.eval_framework.metrics.deid_families`:
+- `AnonymizationScorer` → `AnonymizationScore` (irreversibility: re-id risk, leakage, canary exposure)
+- `PseudonymizationIntegrityScorer` → `PseudonymizationIntegrityScore` (authorized-only reversal, referential integrity, collision rate, key-state separation)
+- See [anonymization-vs-pseudonymization.md](anonymization-vs-pseudonymization.md) for the no-merge invariant.
+
+**Agentic privacy** — `pii_anon.policy.query_aware` + `pii_anon.agentic` + `pii_anon.tokenization.encrypted_store`:
+- `QueryAwareMaskingGate` — subtractive-on-mask, default-to-mask per-span retain/mask decisions for query-serving flows (+ `score_query_aware_bound`)
+- `pii_anon.agentic` — 4-channel least-privilege interception + the leakage-Sankey audit surface
+- `EncryptedSQLiteTokenStore` — AEAD-encrypted-at-rest token store (keyed surrogates, authorized reversal only)
+
+**BYO-pipeline SDK (identical-incumbent scoring)** — `pii_anon.eval_framework.byo_pipeline`:
+- `BYOPipelineRegistry` — discovers third-party predictors under the `pii_anon.byo_pipelines` entry-point group
+- `evaluate_incumbent` / `build_identical_path_leaderboard` — incumbents and BYO systems scored by the literal same evaluator
+- `engine_predictor`, `incumbent_predictor`, `INCUMBENT_SYSTEMS`
+
+**Native-format readers** — `pii_anon.ingestion.native` / `pii_anon.ingestion.native_pdf`:
+- `NativeReaderRegistry` (+ the `pii_anon.readers` entry-point group), `NativeReader`, `ReaderCapabilities`
+- `reader_capabilities()` — what can this environment ingest (pdf is stdlib-real; image/screenshot/dicom need `pii-anon[ocr]`/`[dicom]`; audio awaits an ASR backend)
+- `PdfTextReader` — pure-stdlib PDF text extraction with a bounded FlateDecode inflate
+
+**Multilingual fairness** — `pii_anon.eval_framework.metrics.fairness_gate`:
+- `evaluate_language_fairness` → `FairnessGateReport` — powered worst-group recall-gap gate (PASS / FAIL / INSUFFICIENT_POWER, fail-closed)
+- The CJK/Hangul/Arabic context keywords in the regex engine are active (substring containment for non-Latin scripts)
+
+**Attacks seam (re-id / MIA)** — `pii_anon.eval_framework.attacks`:
+- `ReidAttack` / `MiaAttack` protocols, the sandboxed runner, the Tier-3 representative adversary and the LiRA-shaped + Secret-Sharer MIA family
+
+**SDO certification CLI**:
+- `pii-anon canonical-run ...` — produce the certified evaluation artifact (fail-closed `CanonicalRunGate`)
+- `pii-anon supremacy --artifact ...` — the `CompetitiveSupremacyGate` verdict + binding constraint (G1–G7)

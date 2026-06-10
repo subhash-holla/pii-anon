@@ -335,6 +335,6 @@ cli-smoke:
 	pii-anon health --output json
 
 docs-smoke:
-	jupyter nbconvert --to notebook --execute notebooks/llm_pipeline_quickstart.ipynb --output /tmp/llm_pipeline_quickstart.executed.ipynb
+	$(PYTHON) -m jupyter nbconvert --to notebook --execute notebooks/quickstart.ipynb --output /tmp/quickstart.executed.ipynb
 
 all: lint type test perf build twine-check package-size cli-smoke
