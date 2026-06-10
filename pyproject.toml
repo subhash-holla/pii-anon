@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-anon"
-version = "1.4.0"
+version = "1.5.0rc1"
 description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +29,9 @@ keywords = [
   "nist",
 ]
 classifiers = [
-  "Development Status :: 5 - Production/Stable",
+  # RC classifier (release-gate CQ finding): revert to "5 - Production/Stable"
+  # when the final 1.5.0 (non-rc) is tagged.
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
   "Intended Audience :: Science/Research",

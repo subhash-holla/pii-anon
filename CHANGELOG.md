@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0-rc.1] — 2026-06-09
+
+**The PDLC SOTA program release candidate** (branch `pdlc/sota-program`; LOCAL-ONLY
+tag — not published). The full program changelog with per-story trace IDs lives at
+`dev-assist-artifacts/06-documentation/03-authoring/changelog.md`; the program
+narrative at `.../project-journey.md`.
+
+**Honest status:** the SDO (state-of-the-art dominance) verdict is **NOT_YET** —
+binding constraint G6 (raw-detection F2 non-inferiority, draw-sensitive; attributed
+to evaluation methodology, not a code regression); G1/G2/G3/G4/G5/G7 all PASS on a
+certified run. All program cohort research is AGENT_SIMULATED with a tracked Pass-2
+roadmap. This RC claims honest machinery, not the crown.
+
+### Added — evaluation integrity & the SDO gate
+- Rating-engine ladder behind `RatingEnginePort` (+ `pii_anon.rating_engines` entry
+  points): glicko-legacy, `bradley-terry-mle`, claim-grade `bayes-bt` with an
+  NFR-001 convergence gate; coherent significance + Davidson ties (S3-01..04).
+- The `CompetitiveSupremacyGate` (`pii-anon supremacy`) — G1–G7 guarantee verdicts
+  with a single binding constraint; fabrication-hardened across 9 adversarial
+  closes (11 holes / 6 fabrications found and closed; final closes 0-upheld).
+- The certified-run producer (`pii-anon canonical-run`) with the fail-closed
+  `CanonicalRunGate`; NFR-009 latency ceilings registry (S7-02/S7-04).
+- Distinct de-identification scorer families — `AnonymizationScorer` vs
+  `PseudonymizationIntegrityScorer`, never merged (AX-004; S4-01) — and the
+  per-class calibration/selective-risk reporter (S4-03).
+
+### Added — privacy attack surface (representative; sandboxed)
+- `eval_framework/attacks/`: `ReidAttack`/`MiaAttack` protocols, the resource-
+  sandboxed runner, the Tier-3 LLM-adversary representative (RRS/QIC/BSL,
+  de-circularized) and the LiRA-shaped + Secret-Sharer MIA family (S5-01..04).
+
+### Added — swarm routing & the recall floor
+- `SharedLayerProjector` + `FloorProjectingFusion`: recall-floor by construction
+  (`entities(output) ⊇ entities(shared)`), per-language ε-gate CI teeth (S1).
+- MoE learned routing core: feature-conditioned `route()`, the signed
+  `gate_v1.json` verify-on-load boundary, `DistilledTopKGate`, aux-loss-free SLA
+  bias (S2-01/02/04/05).
+
+### Added — agentic privacy
+- `QueryAwareMaskingGate` — subtractive-on-mask, default-to-mask (S6-01).
+- 4-channel least-privilege interception + leakage-Sankey audit (S6-02/05).
+- `EncryptedSQLiteTokenStore` — AEAD at rest, AAD-bound rows, envelope-wrapped
+  DEK, fail-loud (S6-03, adversarially closed).
+
+### Added — extensibility & multimodal
+- BYO-pipeline SDK: `pii_anon.byo_pipelines` entry points, `BYOPipelineRegistry`,
+  `evaluate_incumbent` / `build_identical_path_leaderboard` — incumbents and BYO
+  systems scored by the literal same evaluator (S6-04).
+- Native-format readers behind `Iterator[IngestRecord]`: a pure-stdlib PDF text
+  reader (bounded FlateDecode inflate — zip-bomb hardened), capability-honest
+  OCR/DICOM/audio seams + `ocr`/`dicom` extras, `pii_anon.readers` entry points
+  (S7-01).
+- Multilingual context activation (CJK/Hangul/Arabic keywords now fire) + the
+  fail-closed powered worst-group fairness gate `evaluate_language_fairness`
+  (S7-03).
+
+### Documentation
+- Docs discoverability with standing teeth (`tests/test_docs_discoverability.py`),
+  the anonymization-vs-pseudonymization guide, the certify-a-run guide, the
+  program-surfaces API reference; `make docs-smoke` fixed (S7-05). Stage-6
+  documentation set compiled (verdict: DOCUMENTED).
+
+### Changed
+- Trove classifier → `4 - Beta` for the RC (revert at final 1.5.0).
+
 ## [1.4.0] — 2026-04-18
 
 Major additive release focused on **evaluation as a first-class offering**
