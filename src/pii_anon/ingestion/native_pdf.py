@@ -136,16 +136,55 @@ def _extract_text_chunks(content: bytes) -> list[str]:
     return chunks
 
 
-def _decode_stream(raw: bytes, dict_text: bytes) -> bytes:
+# Per-stream inflate ceiling (security-sast S7-01 MAJOR-1): FlateDecode has
+# ~1000x amplification, so an unbounded decompress() of untrusted PDF bytes
+# is a memory-exhaustion (zip-bomb) DoS vector. A stream whose inflated size
+# exceeds this ceiling is treated as undecodable and skipped — exactly like
+# a corrupt stream — never partially mis-extracted.
+_MAX_DECOMPRESSED_STREAM_BYTES = 64 * 1024 * 1024  # 64 MiB
+_INFLATE_STEP = 1 << 20  # 1 MiB per decompress() call
+
+
+def _decode_stream(
+    raw: bytes, dict_text: bytes, *, max_bytes: int | None = None
+) -> bytes:
     """Inflate a content stream when its object dict declares FlateDecode.
 
-    Uses ``decompressobj`` so trailing bytes after the zlib stream (e.g. the
-    newline before ``endstream``) never raise.
+    Uses a chunked ``decompressobj`` loop so (a) trailing bytes after the
+    zlib stream (e.g. the newline before ``endstream``) never raise, and
+    (b) the inflated output is BOUNDED: once it exceeds the per-stream
+    ceiling the stream is rejected with :class:`zlib.error` (the caller's
+    skip path), so a crafted FlateDecode bomb cannot exhaust memory.
     """
-    if b"/FlateDecode" in dict_text:
-        inflater = zlib.decompressobj()
-        return inflater.decompress(raw) + inflater.flush()
-    return raw
+    if b"/FlateDecode" not in dict_text:
+        return raw
+    limit = _MAX_DECOMPRESSED_STREAM_BYTES if max_bytes is None else max_bytes
+    inflater = zlib.decompressobj()
+    out: list[bytes] = []
+    total = 0
+    buf = raw
+    while buf and not inflater.eof:
+        chunk = inflater.decompress(buf, _INFLATE_STEP)
+        if chunk:
+            total += len(chunk)
+            if total > limit:
+                raise zlib.error(
+                    "FlateDecode output exceeds the per-stream ceiling"
+                )
+            out.append(chunk)
+        remaining = inflater.unconsumed_tail
+        if not chunk and remaining == buf:
+            break  # no progress — corrupt/truncated stream
+        buf = remaining
+    tail = inflater.flush()
+    if tail:
+        total += len(tail)
+        if total > limit:
+            raise zlib.error(
+                "FlateDecode output exceeds the per-stream ceiling"
+            )
+        out.append(tail)
+    return b"".join(out)
 
 
 class PdfTextReader:
@@ -155,6 +194,7 @@ class PdfTextReader:
     native_dependency: str | None = None  # stdlib zlib only
 
     def capabilities(self) -> ReaderCapabilities:
+        """Report PDF reader capabilities — always available (stdlib-only)."""
         return ReaderCapabilities(
             format_name=self.format_name,
             native_dependency=None,

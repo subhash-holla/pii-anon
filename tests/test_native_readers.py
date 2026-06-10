@@ -360,6 +360,174 @@ def test_a12_stream_vs_batch_parity_and_text_round_trip(
 
 
 # ---------------------------------------------------------------------------
+# A14 — bounded FlateDecode inflate (gate remediation: security-sast MAJOR-1)
+# ---------------------------------------------------------------------------
+
+def test_a14_flatedecode_bomb_stream_is_skipped_not_inflated(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """[SECURITY-TEST] A14: a FlateDecode stream whose inflated size exceeds
+    the per-stream ceiling is treated as undecodable and SKIPPED (no record,
+    no unbounded memory) while an honest page in the same PDF still
+    extracts. Honest-input behavior unchanged (A4 still passes)."""
+    import pii_anon.ingestion.native_pdf as native_pdf
+
+    monkeypatch.setattr(native_pdf, "_MAX_DECOMPRESSED_STREAM_BYTES", 4096)
+
+    bomb_payload = zlib.compress(b"BT (" + b"A" * 100_000 + b") Tj ET")
+    honest_payload = b"BT (" + _PAGE_2_TEXT.encode("latin-1") + b") Tj ET"
+    parts = [
+        b"%PDF-1.4\n",
+        (
+            f"4 0 obj\n<< /Length {len(bomb_payload)} "
+            "/Filter /FlateDecode >>\nstream\n"
+        ).encode("latin-1"),
+        bomb_payload,
+        b"\nendstream\nendobj\n",
+        (f"6 0 obj\n<< /Length {len(honest_payload)} >>\nstream\n").encode(
+            "latin-1"
+        ),
+        honest_payload,
+        b"\nendstream\nendobj\n%%EOF\n",
+    ]
+    p = tmp_path / "bomb.pdf"
+    p.write_bytes(b"".join(parts))
+
+    records = list(PdfTextReader().read(p, IngestConfig()))
+    assert [r.text for r in records] == [_PAGE_2_TEXT]
+
+    # Direct unit pin: the bounded decoder refuses the bomb with zlib.error.
+    with pytest.raises(zlib.error, match="ceiling"):
+        native_pdf._decode_stream(
+            bomb_payload, b"<< /Filter /FlateDecode >>", max_bytes=4096
+        )
+
+
+# ---------------------------------------------------------------------------
+# A15 / A16 / A17 — parser edge paths + registry guards (code-quality MAJOR-2)
+# ---------------------------------------------------------------------------
+
+def test_a15_literal_string_escapes_nested_parens_and_quote_ops() -> None:
+    """[UNIT-TEST] A15: octal/named/escaped-paren escapes, CRLF line
+    continuation, balanced nested parentheses, and the ' / " show operators
+    all decode to the exact expected chunks."""
+    from pii_anon.ingestion.native_pdf import _extract_text_chunks
+
+    content = (
+        b"BT (Esc\\101ped\\n\\(line\\)) Tj "
+        b"(outer (inner) tail) Tj "
+        b"(ab\\\r\ncd) Tj "
+        b"(quoted) ' "
+        b"(dq) \" ET"
+    )
+    assert _extract_text_chunks(content) == [
+        "EscAped\n(line)",
+        "outer (inner) tail",
+        "abcd",
+        "quoted",
+        "dq",
+    ]
+    # A string never followed by a show operator is dropped.
+    assert _extract_text_chunks(b"BT (orphan) ET") == []
+
+
+def test_a16_corrupt_zlib_empty_streams_and_truncation(
+    tmp_path: Path, pdf_path: Path
+) -> None:
+    """[UNIT-TEST] A16: a corrupt FlateDecode stream is skipped while honest
+    pages survive; a no-text content stream yields no record; and
+    max_record_chars truncates the page text exactly."""
+    honest_payload = b"BT (" + _PAGE_1_TEXT.encode("latin-1") + b") Tj ET"
+    drawing_payload = b"0 0 m 10 10 l S"
+    parts = [
+        b"%PDF-1.4\n",
+        b"4 0 obj\n<< /Length 8 /Filter /FlateDecode >>\nstream\n",
+        b"not-zlib",
+        b"\nendstream\nendobj\n",
+        (
+            f"5 0 obj\n<< /Length {len(drawing_payload)} >>\nstream\n"
+        ).encode("latin-1"),
+        drawing_payload,
+        b"\nendstream\nendobj\n",
+        (f"6 0 obj\n<< /Length {len(honest_payload)} >>\nstream\n").encode(
+            "latin-1"
+        ),
+        honest_payload,
+        b"\nendstream\nendobj\n%%EOF\n",
+    ]
+    p = tmp_path / "mixed.pdf"
+    p.write_bytes(b"".join(parts))
+    records = list(PdfTextReader().read(p, IngestConfig()))
+    assert [r.text for r in records] == [_PAGE_1_TEXT]
+
+    truncated = list(
+        PdfTextReader().read(pdf_path, IngestConfig(max_record_chars=4))
+    )
+    assert [r.text for r in truncated] == [
+        _PAGE_1_TEXT[:4],
+        _PAGE_2_TEXT[:4],
+    ]
+
+
+def test_a16b_parser_and_decoder_edge_paths(tmp_path: Path) -> None:
+    """[UNIT-TEST] A16b: truncation/edge guards — a literal string cut off
+    mid-escape, a multi-megabyte (within-ceiling) FlateDecode stream that
+    exercises the chunked-inflate loop + flush tail, and a stream keyword
+    with no endstream (skipped while honest pages survive)."""
+    import pii_anon.ingestion.native_pdf as native_pdf
+    from pii_anon.ingestion.native_pdf import _parse_literal_string
+
+    # Backslash at end-of-content: parser returns what it has, no crash.
+    text, idx = _parse_literal_string(b"(abc\\", 0)
+    assert text == "abc"
+    assert idx == 5
+
+    # A 3 MiB-inflating stream WITHIN the ceiling extracts fully (the
+    # chunked loop runs multiple 1 MiB steps; the flush tail is appended).
+    big = b"A" * (3 * 1024 * 1024)
+    payload = zlib.compress(b"BT (" + big + b") Tj ET")
+    decoded = native_pdf._decode_stream(
+        payload, b"<< /Filter /FlateDecode >>"
+    )
+    assert decoded == b"BT (" + big + b") Tj ET"
+
+    # A `stream` keyword with no matching endstream is skipped; the honest
+    # page in the same file still extracts.
+    honest_payload = b"BT (" + _PAGE_1_TEXT.encode("latin-1") + b") Tj ET"
+    parts = [
+        b"%PDF-1.4\n",
+        (f"4 0 obj\n<< /Length {len(honest_payload)} >>\nstream\n").encode(
+            "latin-1"
+        ),
+        honest_payload,
+        b"\nendstream\nendobj\n",
+        b"6 0 obj\n<< /Length 5 >>\nstream\n",  # no endstream follows
+        b"(x) Tj%%EOF\n",
+    ]
+    p = tmp_path / "no-endstream.pdf"
+    p.write_bytes(b"".join(parts))
+    records = list(PdfTextReader().read(p, IngestConfig()))
+    assert [r.text for r in records] == [_PAGE_1_TEXT]
+
+
+def test_a17_registry_fail_closed_and_round_trip() -> None:
+    """[UNIT-TEST] A17: register() refuses a non-conformant object with
+    TypeError (fail-closed); register/get/unregister round-trip works."""
+    registry = NativeReaderRegistry()
+    with pytest.raises(TypeError, match="NativeReader"):
+        registry.register("bad", object())  # type: ignore[arg-type]
+
+    reader = PdfTextReader()
+    registry.register("pdf", reader)
+    assert registry.get("pdf") is reader
+    assert registry.names() == ["pdf"]
+    registry.unregister("pdf")
+    registry.unregister("pdf")  # no-op when absent
+    assert registry.get("pdf") is None
+    assert registry.names() == []
+
+
+# ---------------------------------------------------------------------------
 # A13 — import-boundary audit
 # ---------------------------------------------------------------------------
 
