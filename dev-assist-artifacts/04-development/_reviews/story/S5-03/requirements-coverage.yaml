@@ -1,0 +1,28 @@
+reviewer: requirements-coverage
+story: S5-03
+gate: story
+verdict: APPROVE
+summary: >
+  Every MUST in scope (FR-013, NFR-013, NFR-016) is verified-or-honestly-
+  BUILD-AND-FLAGged with the deferred half tracked via # SWITCH-POINT(DATA) +
+  story §5. No MUST silently claimed complete; none unverified-and-untracked. All
+  14 acceptance criteria have passing tests. FR-013: representative LiRA-shape
+  adversary + Secret-Sharer + TPR@low-FPR + de-circularization implemented +
+  tested (real ≥128-shadow LiRA training = Pass-2). NFR-013: both committed FPRs
+  reported (A5) + the ≥128-shadow power assertion (A7) + Secret-Sharer (A6); the
+  assertion-now / training-Pass-2 split is honest + tracked. NFR-016: caveat on
+  all three reports (A8).
+findings:
+  - id: RC-01
+    severity: MINOR
+    title: tpr_at_fpr (the NFR-013 TPR@low-FPR primitive) not anchored at an intermediate reference value
+    disposition: REMEDIATED IN-LOOP (f23de77) — added an exact partial-separation anchor (tpr_at_fpr(...)==0.5) + tightened the flat fixture to ==0.0 + removed the tautological 1e-9 assertion (the S5-02 RC-02 lesson applied).
+  - id: RC-02
+    severity: OBSERVATION
+    title: the Wilson CI on the TPR@1e-2 TP count rides along uncovered (beyond the NFR-013 MUST surface)
+    disposition: NO ACTION (additive nicety; NFR-013 mandates ≥128 shadows + Secret-Sharer + TPR@both-FPRs, all present + tested).
+offlimits_md5_ok: true
+notes: >
+  All three Pass-2 items (real LiRA@128 training, real canary splits, live
+  TPR@scale) anchored to # SWITCH-POINT(DATA) markers + story §5. No SDO close
+  required (gate byte-identical).

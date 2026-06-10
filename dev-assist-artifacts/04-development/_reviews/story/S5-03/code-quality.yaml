@@ -1,0 +1,35 @@
+reviewer: code-quality
+story: S5-03
+gate: story
+verdict: APPROVE
+summary: >
+  ruff clean; mypy clean under BOTH the canonical invocation and --strict (139
+  files); 24 mia + 2 import-boundary tests pass. TDD RED→GREEN confirmed (32913d7
+  tests-only precedes 350b9cd). Scope exactly the 3 owned files (additive __init__
+  merge {**REID,**TIER3,**MIA}; substrate untouched). Math verified by probes:
+  tpr_at_fpr (threshold sweep, all-one-class→0.0, ties), _auc (Mann-Whitney 0.5
+  ties), canary_exposure (log2 bounds), wilson_interval reuse. Idiomatic fit with
+  reid.py/reid_tier3.py; every public symbol documented (the S5-02 missing-docstring
+  finding does NOT recur).
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    title: A4 "unachievable FPR" sub-case comment misleading (1e-9 yields 1.0 on the separable fixture, not 0.0)
+    disposition: REMEDIATED IN-LOOP (f23de77) — the tautological 1e-9 sub-case was replaced by an exact partial-separation anchor (==0.5) + a flat-fixture ==0.0 assertion (also the RC-01 fix); the misleading comment is gone.
+  - id: code-quality-story-02
+    severity: MINOR
+    title: slots=True on MiaRecord but not the report dataclasses (internal inconsistency; MiaRecord is the outlier vs the sibling convention)
+    disposition: REMEDIATED IN-LOOP (f23de77) — dropped slots=True from MiaRecord to match the reid.py/reid_tier3.py value-object + report convention.
+  - id: code-quality-story-03
+    severity: OBSERVATION
+    title: _gold_from_json silently coerced null→False / int→truthiness
+    disposition: REMEDIATED IN-LOOP (f23de77) — _gold_from_json now fails loud on a non-boolean element (the fail-loud-domain-named discipline), paired with the observed_loss finiteness guard.
+  - id: code-quality-story-04
+    severity: OBSERVATION
+    title: the caveat __post_init__ guards non-blankness, not the exact canonical string (inherited S5-01 pattern)
+    disposition: NO ACTION (idiomatic + consistent across the attack surface; a future NFR-016 hardening would update all report families together).
+offlimits_md5_ok: true
+notes: >
+  Zero SHOWSTOPPER/CATASTROPHIC/MAJOR. All MINORs + both decode-boundary OBSERVATIONs
+  remediated in the same iteration. No SDO close needed (competitive_supremacy.py
+  unchanged).

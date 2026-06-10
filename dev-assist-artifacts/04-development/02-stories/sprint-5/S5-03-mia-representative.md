@@ -4,7 +4,7 @@
 |---|---|
 | Story | S5-03 |
 | Sprint | 5 |
-| State | **TODO** (authored 2026-06-09; SO-17 `next` feature surface) |
+| State | **DONE** (2026-06-09; SO-18. 5/5-APPROVE story gate — security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage + code-quality; 1 MAJOR (provisional_status field) + substantive MINORs remediated/dispositioned in-loop. NO SDO close (no `competitive_supremacy.py` change — gate md5 `3b842e81…` byte-identical). See §Evidence.) |
 | provisional_status | **AGENT_SIMULATED** — the `RepresentativeMiaAttack`, the `tpr_at_fpr`/`score_mia_attack` ROC machinery, `canary_exposure`, the ≥128-shadow power assertion, the sandbox run, the de-circularization, and the import/AST guards all run for REAL in-tree against SYNTHETIC records (AX-001). The real **LiRA@128** shadow-model training + the real **Secret-Sharer** canary in/out splits are DATA-absent (`pii_anon_datasets` S6) → Pass-2 / cross-repo (`# SWITCH-POINT(DATA)`). Mirrors the source FR-013/NFR-013/UC-10 AGENT_SIMULATED rows (`traceability-matrix.md`). |
 | Size | M |
 | Implements | **FR-013** (full-power MIA: LiRA@128 + Secret-Sharer, TPR@low-FPR — the in-tree REPRESENTATIVE stand-in; the real ≥128-shadow-model LiRA training + DATA canary splits are Pass-2) + **NFR-013** (MIA power: ≥128 shadow models + Secret-Sharer; report TPR@FPR∈{1e-3,1e-2}). Upholds **AX-001** (synthetic-only), **AX-002** (deterministic membership scoring + pure ROC/exposure math), **NFR-016** (the non-strippable anti-anonymity caveat — REUSED from S5-01, carried on every emitted MIA report). |
@@ -75,4 +75,19 @@ Membership inference is the second half of the DC-09 attack surface (UC-10; the 
 - [ ] **SDO verdict UNCHANGED** — recompute `pii-anon supremacy` (a MIA feature flips no guarantee; expect NOT_YET / `canonical_claim_run=False` byte-stable).
 
 ## Evidence (filled on completion)
-_(pending)_
+
+*Provisional status: AGENT_SIMULATED (see the metadata `provisional_status` field). The `RepresentativeMiaAttack`, the `tpr_at_fpr`/`score_mia_attack` ROC machinery, `canary_exposure`, the ≥128-shadow power assertion, the sandbox run, the de-circularization, and the import/AST guards run for REAL in-tree against SYNTHETIC records. The real LiRA@128 shadow-model training + real Secret-Sharer canary in/out splits are Pass-2 / cross-repo (eval-data S6, `# SWITCH-POINT(DATA)`).*
+
+**Commits (RED→GREEN→remediation, on `pdlc/sota-program`):** RED `32913d7` (tests-only; `ModuleNotFoundError` on `eval_framework.attacks.mia`) → GREEN `350b9cd` (the module + additive `__init__` merge) → remediation `f23de77` (the story-gate findings).
+
+**Files:** `src/pii_anon/eval_framework/attacks/mia.py` (new), `src/pii_anon/eval_framework/attacks/__init__.py` (additive re-exports + the `{**REID,**TIER3,**MIA}` registry merge), `tests/test_attack_mia.py` (new — A1–A14, 24 cases). `reid.py`/`reid_tier3.py`/`sandbox.py`/`spec.py` byte-identical (consumed read-only).
+
+**Acceptance → tests (A1–A14, 24 cases):** A1 MiaAttack conformance; A2 members rank above non-members; A3 de-circularization (identical observed_loss → identical score regardless of gold); A4 ROC anchored at 1.0 / 0.0 / **0.5** (the exact partial-separation intermediate — RC-01 fix); A5 TPR@both committed FPRs; A6 Secret-Sharer exposure (exact + monotone); A7 ≥128-shadow power; A8 non-strippable caveat on all three reports; A9 deterministic scores; A10 runs under the sandbox; A11 additive registry merge (reid_baseline + reid_tier3_representative survive); A12 import-boundary scanned; A13 corrupt-input fail-loud (tpr_at_fpr + canary_exposure + **the runner decode boundary** — non-finite observed_loss / non-bool gold); A14 sandboxed replay-equal.
+
+**Story gate (5/5 APPROVE; `_reviews/story/S5-03/`):** security-sast (PRIMARY) + axiom-compliance + traceability + requirements-coverage + code-quality. **0 unremediated MAJOR.** Remediated in-loop (`f23de77`): TRACE-01 (the provisional_status field — MAJOR), RC-01 (the tpr_at_fpr intermediate anchor — also resolves CQ-01), CQ-02 (drop slots from MiaRecord), and the two decode-boundary OBSERVATIONs (security NaN/inf + CQ-03 bool-coercion) → `_records_from_json`/`_gold_from_json` now fail loud. Dispositioned NO-ACTION: RC-02 + CQ-04 (the caveat non-blank-vs-exact-string pattern, inherited from S5-01) + TRACE-03; TRACE-02 (matrix backfill) deferred to the S5 sprint gate.
+
+**SDO — UNCHANGED (a MIA feature flips no guarantee):** `pii-anon supremacy` on the committed smoke artifact reads **NOT_YET / `canonical_claim_run=False` (G7)** — byte-identical to SO-17. The SDO gate `competitive_supremacy.py` is byte-identical (md5 `3b842e81c3f03eafd11f9c655c1789a0`), so **no adversarial SDO close was required**. Off-limits `competitor_compare.py` `7cae16c8…` + user-WIP `orchestrator.py` `0afc6dee…` / `test_moe_enhancements.py` `910e9cd6…` byte-identical.
+
+**Quality:** full xdist suite green (see SO-18 for the count); ruff clean (src+tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` (139 files). The attacks import-boundary + dangerous-call AST guards auto-cover `mia.py`.
+
+**DoD:** all checkboxes met. Pass-2 (tracked): the real LiRA@128 shadow training; the real Secret-Sharer canary in/out splits; the live TPR@low-FPR at real scale.

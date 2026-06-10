@@ -1,0 +1,25 @@
+reviewer: security-sast
+story: S5-03
+gate: story
+verdict: APPROVE
+summary: >
+  PRIMARY reviewer. The representative MIA body is clean against every security
+  axis: executes ONLY via the S5-04 sandbox + returns a Mapping; ZERO dangerous
+  primitives (only json.loads of scalars + math); imports nothing from
+  swarm/moe/fusion/policy (auto-scanned); de-circularized (membership_scores reads
+  only observed_loss, never the gold label — A3); fail-loud domain guards on
+  tpr_at_fpr + canary_exposure (A13); all three reports carry the non-strippable
+  NFR-016 caveat (REUSED ANTI_ANONYMITY_CAVEAT object). Off-limits + the SDO gate
+  byte-identical (no SDO close). 70/70 targeted tests pass.
+findings:
+  - id: OBS-1
+    severity: OBSERVATION
+    title: NaN/inf in observed_loss/scores propagated silently (bounded/non-fabricated)
+    where: src/pii_anon/eval_framework/attacks/mia.py (membership_scores / tpr_at_fpr / _auc)
+    disposition: REMEDIATED IN-LOOP (f23de77) — _records_from_json now fails loud on a non-finite observed_loss at the decode boundary (the same domain-named discipline as tpr_at_fpr/canary_exposure), closing the silent-NaN ingress. A13 extended.
+offlimits_md5_ok: true
+notes: >
+  Feature story — competitive_supremacy.py byte-identical (md5 3b842e81…), so the
+  mandatory SDO close does NOT apply. The S5 sprint-close adversarial run is the
+  standing catch-net for the attack surface (now 3 live bodies: reid_baseline,
+  reid_tier3, mia).

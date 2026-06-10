@@ -1,0 +1,25 @@
+reviewer: axiom-compliance
+story: S5-03
+gate: story
+verdict: APPROVE
+axioms_in_scope:
+  - { id: AX-pii-anon-001, upheld: true }  # synthetic-only — record_ids + observed_loss floats + bool gold; zero real-PII
+  - { id: AX-pii-anon-002, upheld: true }  # determinism — membership_scores pure (observed_loss only); ROC/exposure pure math; no random/uuid/time/secrets; A9+A14 replay-equal; fixed constants
+  - { id: NFR-016, upheld: true }          # caveat REUSED from reid.py (same object) on all 3 reports; non-strippable; A8
+  - { id: attacks-import-isolation, upheld: true }  # mia.py auto-scanned; 0 forbidden imports; wilson_interval reuse is intra-attacks
+  - { id: FR-013-de-circularization, upheld: true } # MiaRecord has no gold field; A3
+findings: []
+honest_scope:
+  build_and_flag: true
+  note: "4 # SWITCH-POINT(DATA) markers (real LiRA@128 shadow training + real canary splits) + story §5 Pass-2 flags; the ≥128-shadow figure is a representative-count ASSERTION, not a claim of trained shadows. tpr_at_fpr returns 0.0 (not fabricated) when no threshold achieves the target FPR."
+sdo_verdict_invariant:
+  competitive_supremacy_md5: 3b842e81c3f03eafd11f9c655c1789a0
+  ok: true
+  supremacy_verdict: NOT_YET
+  note: "A MIA feature flips no guarantee; gate byte-identical; no SDO close required."
+offlimits_md5_ok: true
+notes: >
+  Clean APPROVE, no findings at any severity. All 5 triggered axioms upheld. The
+  story-gate remediation (f23de77) added the provisional_status field +
+  decode-boundary fail-loud guards — both strengthen the AGENT_SIMULATED honesty
+  + the determinism/fail-loud posture I verified.
