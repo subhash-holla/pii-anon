@@ -75,7 +75,7 @@ MIA_MIN_SHADOW_MODELS: Final[int] = 128
 # --------------------------------------------------------------------------- #
 # The attacker-observable record + the representative adversary.              #
 # --------------------------------------------------------------------------- #
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class MiaRecord:
     """One candidate record AS THE ATTACKER OBSERVES IT.
 
@@ -393,11 +393,19 @@ def _records_from_json(records_json: str) -> list[MiaRecord]:
     for element in decoded:
         if not isinstance(element, Mapping):
             raise ValueError(f"each record must be a JSON object (got {type(element).__name__})")
-        out.append(
-            MiaRecord(
-                record_id=str(element["record_id"]),
-                observed_loss=float(element["observed_loss"]),
+        observed_loss = float(element["observed_loss"])
+        # Fail LOUD on a non-finite observed_loss (NaN / ±inf) at the decode
+        # boundary — the same fail-loud-domain-named discipline tpr_at_fpr /
+        # canary_exposure use. A NaN loss would otherwise propagate a NaN
+        # membership score silently (it stays bounded/non-fabricated in the ROC,
+        # but a corrupt real-loss feed at the Pass-2 LiRA switch-point should be
+        # refused, not laundered). Honest synthetic inputs are always finite.
+        if not math.isfinite(observed_loss):
+            raise ValueError(
+                f"record observed_loss must be a finite number (got {observed_loss!r})"
             )
+        out.append(
+            MiaRecord(record_id=str(element["record_id"]), observed_loss=observed_loss)
         )
     return out
 
@@ -409,7 +417,18 @@ def _gold_from_json(gold_membership_json: str) -> list[bool]:
         raise ValueError(
             f"gold_membership must decode to a JSON array (got {type(decoded).__name__})"
         )
-    return [bool(value) for value in decoded]
+    # Each label must be a genuine JSON boolean — fail LOUD rather than silently
+    # coerce ``null`` → False (a dropped membership label read as non-member) or
+    # an int/string to truthiness. Same fail-loud-domain-named discipline as the
+    # record decoder; honest inputs are always bool.
+    out: list[bool] = []
+    for value in decoded:
+        if not isinstance(value, bool):
+            raise ValueError(
+                f"each gold_membership element must be a JSON boolean (got {type(value).__name__})"
+            )
+        out.append(value)
+    return out
 
 
 def mia_attack_runner(

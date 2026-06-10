@@ -70,19 +70,28 @@ def test_a3_decircularization_score_depends_only_on_observed_signal() -> None:
 
 
 def test_a4_tpr_at_fpr_is_correct_integer_count_roc() -> None:
-    """[UNIT-TEST] A4: separable scores ⇒ TPR=1.0 at FPR=1e-2; a non-separable
-    fixture ⇒ TPR<1; an unachievable FPR target ⇒ 0.0 (never fabricated)."""
+    """[UNIT-TEST] A4: the integer-count ROC anchored at three EXACT values
+    (not bounds): fully-separable ⇒ 1.0; fully-overlapping ⇒ 0.0; a
+    partial-separation fixture ⇒ an exact intermediate 0.5 (the discriminating
+    point that catches a subtly-wrong threshold-sweep / FPR-bucket — the S5-02
+    RC-02 lesson)."""
     adv = RepresentativeMiaAttack()
     scores = adv.membership_scores(_RECORDS)
+    # Fully separable (members' -loss strictly above non-members') ⇒ TPR=1.0.
     assert tpr_at_fpr(scores, _GOLD, fpr_target=1e-2) == pytest.approx(1.0)
 
-    # Fully-overlapping signal: members and non-members identical ⇒ no separation.
+    # Fully-overlapping signal: members and non-members identical ⇒ no threshold
+    # achieves FPR ≤ target without sweeping in every FP ⇒ EXACTLY 0.0.
     flat = [0.5] * 8
     gold = [True, True, True, True, False, False, False, False]
-    assert tpr_at_fpr(flat, gold, fpr_target=1e-2) < 1.0
+    assert tpr_at_fpr(flat, gold, fpr_target=1e-2) == pytest.approx(0.0)
 
-    # An FPR target below 1/n_non_members is unachievable with any FP ⇒ 0.0.
-    assert tpr_at_fpr(scores, _GOLD, fpr_target=1e-9) in (0.0, pytest.approx(1.0))
+    # PARTIAL separation: 2 of 4 members sit cleanly above all non-members, 2
+    # below them. The best zero-FP threshold admits exactly those 2 ⇒ TPR=0.5
+    # (a non-degenerate anchor — the 0/1 endpoints alone could pass a broken sweep).
+    partial_scores = [0.9, 0.8, 0.3, 0.2, 0.5, 0.45, 0.4, 0.35]
+    partial_gold = [True, True, True, True, False, False, False, False]
+    assert tpr_at_fpr(partial_scores, partial_gold, fpr_target=1e-2) == pytest.approx(0.5)
 
 
 def test_a5_report_carries_tpr_at_both_committed_fprs() -> None:
@@ -250,6 +259,32 @@ def test_a13_canary_exposure_refuses_corrupt_input(rank: int, n: int) -> None:
     exposure."""
     with pytest.raises(ValueError):
         canary_exposure(rank, n)
+
+
+def test_a13_runner_refuses_corrupt_decode_input() -> None:
+    """[SECURITY-TEST] A13: the sandbox runner's decode boundary fails LOUD on a
+    non-finite observed_loss (NaN/±inf) or a non-boolean gold label, rather than
+    silently propagating a NaN score / coercing null→False — the same
+    fail-loud-domain-named discipline as tpr_at_fpr/canary_exposure. (Closes the
+    security NaN/inf + the bool-coercion review observations.)"""
+    from pii_anon.eval_framework.attacks.mia import mia_attack_runner
+
+    good_records = json.dumps([{"record_id": "m0", "observed_loss": 0.1}])
+    good_gold = json.dumps([True])
+    # NaN observed_loss (CPython json.loads parses bare NaN) ⇒ refused.
+    with pytest.raises(ValueError, match="finite"):
+        mia_attack_runner(
+            records_json='[{"record_id": "m0", "observed_loss": NaN}]',
+            gold_membership_json=good_gold,
+            shadow_model_count=128,
+        )
+    # A null gold label (would coerce to False) ⇒ refused.
+    with pytest.raises(ValueError, match="boolean"):
+        mia_attack_runner(
+            records_json=good_records,
+            gold_membership_json=json.dumps([None]),
+            shadow_model_count=128,
+        )
 
 
 def test_a14_sandboxed_result_is_replay_equal() -> None:
