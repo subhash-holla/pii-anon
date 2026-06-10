@@ -13,7 +13,7 @@ Critical path (eval-integrity + recall-floor first, per the POV): **S1-01 → S1
 
 | Sprint | Theme | Stories | Status |
 |---|---|---|---|
-| **S1** | Recall-floor foundation (DC-01) | S1-01 SharedLayerProjector · S1-02 wire projector into MoE+Swarm fusion (post-merge delegate) · S1-03 per-language recall-floor CI ε-gate · S1-04 property-test infra (hypothesis migration) | **S1-01 DONE**; S1-02/03/04 TODO |
+| **S1** | Recall-floor foundation (DC-01) | S1-01 SharedLayerProjector · S1-02 wire projector into MoE+Swarm fusion (post-merge delegate) · S1-03 per-language recall-floor CI ε-gate · S1-04 property-test infra (hypothesis migration) | **COMPLETE** (S1-01..05 DONE; SO-07 sprint-close) |
 | **S2** | MoE-router (DC-02/03) | S2-01 widen `MoERouter.route()` + construction seam · S2-02 DistilledTopKGate + offline distillation trainer · S2-03 rules-first Depth-1 early-exit (orchestrator hook) · S2-04 aux-loss-free SLA bias · **S2-05 sign+verify `gate_v1.json` [SECURITY MUST]** | TODO |
 | **S3** | Eval rating engine (DC-06/07) | S3-01 `RatingEnginePort`+`RatingEngineRegistry`+glicko-legacy facade · S3-02 bradley-terry-mle [⛓ DATA S6 `bradley_terry.py`; temp local MM until then] · S3-03 bayes-bt (NumPyro) claim-grade + convergence gate · S3-04 coherent significance + record-level paired outcomes + Davidson ties · S3-05 CI import-boundary test (rating ⊄ detection) | TODO |
 | **S4** | Privacy-eval families (DC-08/10/11) | S4-01 distinct anon/pseudo scoring APIs + no-merge CI guard · S4-02 CanonicalRunGate + provenance + RecallFloorVerdictGuard · S4-03 calibration & selective-risk reporter (per-class ECE/Brier/AURC) | TODO |

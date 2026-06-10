@@ -4,7 +4,7 @@
 |---|---|
 | Story | S7-03 |
 | Sprint | 7 |
-| State | **TODO** (authored 2026-06-09) |
+| State | **DONE** (2026-06-09; SO-22. 5/5 first-pass story gate APPROVE — security-sast ZERO findings (the fail-closed power semantics + the monotonic-additive containment pass independently verified); code-quality 1 MINOR (Literal verdict type) remediated in-loop `0e35431`; axiom-compliance 5 upheld-with-evidence OBS incl. the AX-003 IBAN inverted-polarity proof. NO SDO close (gate + canonical_run byte-identical). See §Evidence.) |
 | provisional_status | **AGENT_SIMULATED** — the CJK/Hangul/Arabic context-keyword activation runs for REAL in detection (the keywords already shipped in `CONTEXT_WORDS`; S7-03 makes them able to fire) and the fairness gate computes for REAL on synthetic per-language fixtures (AX-001). What stays Pass-2: the corpus-scale fairness number over the 60-language eval set (`# SWITCH-POINT(DATA)`; NFR-004 powered slices need the eval-data corpus), and wiring the gate verdict into `canonical_run.py` — that is a control-path-artifact change which would MANDATE the adversarial SDO close, explicitly deferred (`# SWITCH-POINT(CANONICAL)`). |
 | Size | S |
 | Implements | **FR-038** (multilingual non-EN context feature active in detection; UC-28, swarm, SHOULD) + **FR-039** (per-language fairness gap bounded + gated; UC-28, both, SHOULD) + **NFR-025** (multilingual worst-group fairness — worst-group recall gap ≤ 0.10 across POWERED language groups; SHOULD). Upholds **NFR-004** (power tiers define "powered" — long-tail floor 200 gold positives as the default), **NFR-024/AX-001** (synthetic fixtures), **AX-002** (pure deterministic gate). |
@@ -71,3 +71,17 @@
 - [ ] **SDO verdict UNCHANGED** — a fairness-gate primitive flips no guarantee (it is not wired into the canonical artifact).
 
 ## Evidence (filled on completion)
+
+**Commits (RED→GREEN→remediation, on `pdlc/sota-program`):** RED `4209ed6` (tests-only; ImportError on `_NON_LATIN_CONTEXT_KW` + ModuleNotFoundError on `fairness_gate`) → GREEN `e8cc897` (the containment map + fallthrough; `fairness_gate.py`) → remediation `0e35431` (the Literal verdict type).
+
+**Files:** additive `src/pii_anon/engines/regex/confidence.py` (`_NON_LATIN_CONTEXT_KW` import-time map + the containment fallthrough — Latin keywords token-path-exclusive, ASCII behavior byte-identical), `src/pii_anon/eval_framework/metrics/fairness_gate.py` (new — `LanguageGroupSlice`, `FairnessGateReport` with `Literal` verdict, `evaluate_language_fairness`; 100% module coverage), `tests/test_multilingual_fairness.py` (A1–A11).
+
+**Acceptance → tests (A1–A11, all green):** A1 ZH activation + exact `base+CONTEXT_BOOST`; A2 JA/KO/AR/ZH keywords fire + non-matching CJK stays False; A3 Latin token-path pins (call/teléfono/underscored/unknown-type); A4 exact partition (the map == keywords with zero Latin runs; both-direction completeness; dead Latin aliases NOT revived); A5 determinism ×5; A6 FAIL exact (gap 0.25, violators `["es"]`); A7 dyadic boundary (1.0 vs 7/8 @ 0.125 → PASS inclusive; 6/8 → FAIL); A8 power filter (unpowered observational); A9 fail-closed (0 AND 1 powered → INSUFFICIENT_POWER; corrupt-input ValueErrors); A10 [CONTRACT] gate recalls == `_aligned_prf` STRICT recalls; A11 import-boundary audit.
+
+**Story gate (5/5 first-pass APPROVE; `_reviews/story/S7-03/`; run `wf_bb94aa83-837`):** 0 MAJOR / 1 MINOR (Literal type — remediated `0e35431`) / 9 OBSERVATION. security-sast ZERO findings. axiom-compliance highlights: AX-003 upheld BY CONSTRUCTION (the containment pass runs only after the token miss, flips False→True never True→False; the one inverted-polarity caller — `regex_adapter.py:674` IBAN/SWIFT suppression — is provably unaffected since IBAN carries only Latin keywords); the fail-closed gate upholds the no-fabrication spirit (an unpowered cohort can never manufacture a PASS). Doc-hygiene OBS (stale S1 dev-log cell) remediated at close. The scribe wrote synthesis.md; per-reviewer YAMLs transcribed.
+
+**SDO — UNCHANGED:** `canonical_run.py` `d8f0f80e…` + `competitive_supremacy.py` `3b842e81…` + `competitor_compare.py` `7cae16c8…` + `orchestrator.py` `0afc6dee…` byte-identical; the gate writes no artifacts; the `# SWITCH-POINT(CANONICAL)` wire-in stays Pass-2 (it would mandate the adversarial close).
+
+**Quality:** owned tests 11/11; `fairness_gate.py` 100%; full xdist suite EXIT=0 @ 88.87% (pre-remediation; the remediation is annotation-only, re-verified by owned tests + BOTH-mypy); ruff clean; mypy clean BOTH modes (144 files); confidence neighbor suites green (95 tests).
+
+**DoD:** all checkboxes met. Pass-2 (tracked): the corpus-scale fairness number (`# SWITCH-POINT(DATA)`); the canonical wire-in (`# SWITCH-POINT(CANONICAL)`, SDO-close-gated); the NFR-025 matrix annotation (epic/sprint snapshot).

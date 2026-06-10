@@ -1,0 +1,107 @@
+sign_off_id: SO-22-s7-03-multilingual-fairness
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S7-03 — multilingual context activation + the powered worst-group fairness
+  gate (DC-15, UC-28). FR-038: the ZH/JA/KO/AR context keywords CONTEXT_WORDS
+  has carried since the multilingual expansion were provably DEAD — the
+  [A-Za-zÀ-ÿ]+ tokenizer cannot produce a non-Latin token and the containment
+  fallthrough the tokenizer comment promised was never implemented. S7-03
+  activates them: keywords with ZERO Latin-alphabet runs (exactly the
+  CJK/Hangul/Arabic sets — the partition is test-pinned both directions) match
+  by lowercase substring containment AFTER the token-set miss; every
+  Latin/ASCII keyword stays token-path-exclusive (behavior byte-identical;
+  dead-but-Latin aliases like "e-mail" deliberately NOT revived). FR-039 /
+  NFR-025: evaluate_language_fairness — per-language recall via the SAME
+  _aligned_prf STRICT primitive S1-03 uses (one recall definition
+  program-wide, contract-pinned), NFR-004 power filter (long-tail 200
+  default), worst_group_recall_gap = max−min over POWERED groups, verdict
+  PASS / FAIL(violators named) / INSUFFICIENT_POWER — FAIL-CLOSED: zero or
+  one powered group can NEVER PASS; unpowered groups reported
+  observationally, never silently dropped. FEATURE work-stream — no
+  competitive_supremacy.py / canonical_run.py change ⇒ NO SDO close (the
+  # SWITCH-POINT(CANONICAL) wire-in is explicitly Pass-2 BECAUSE it would
+  mandate the close).
+
+stories_closed:
+  - id: S7-03
+    title: multilingual context activation (CJK/Hangul/Arabic) + powered worst-group fairness gate (DC-15)
+    gate: _reviews/story/S7-03/   # 5/5 first-pass APPROVE (0 MAJOR / 1 MINOR remediated 0e35431 / 9 OBS; security-sast ZERO findings)
+    implements: [FR-038, FR-039]   # + NFR-025 semantics with NFR-004 power filtering — all SHOULDs, honestly representative
+    upholds: [NFR-004, NFR-024, AX-001, AX-002, AX-003]
+    effect: >
+      additive engines/regex/confidence.py: _NON_LATIN_CONTEXT_KW (import-time
+      precomputed, sorted) + the containment fallthrough in has_context_words.
+      new eval_framework/metrics/fairness_gate.py: LanguageGroupSlice +
+      FairnessGateReport (Literal verdict) + evaluate_language_fairness
+      (fail-closed, exact inclusive boundary, domain-named ValueErrors).
+      The corpus-scale number is # SWITCH-POINT(DATA); the canonical wire-in
+      is # SWITCH-POINT(CANONICAL) Pass-2 (SDO-close-gated).
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5 first-pass
+  adversarial_close: NOT_REQUIRED   # no control-path change; canonical_run.py byte-identical d8f0f80e…
+  findings_remediated_in_loop:
+    - "code-quality MINOR: FairnessGateReport.verdict bare-str -> Literal['PASS','FAIL','INSUFFICIENT_POWER'] (0e35431; mypy exhaustiveness at call sites)."
+    - "traceability OBS (doc-hygiene): the stale S1 dev-log summary cell refreshed to COMPLETE (S1-01..05 DONE; SO-07)."
+  findings_dispositioned:
+    - "requirements-coverage OBS: the NFR-025 matrix row stays DEFERRED (correct — corpus-scale is DATA Pass-2); optionally annotate 'gate primitive in-tree (A6-A10)' at the epic/sprint snapshot, mirroring the NFR-009 phrasing."
+    - "axiom-compliance OBS x5: all upheld-with-evidence — AX-002 (import-time-frozen map, dyadic-exact A7 boundary, 5x replay), ★ AX-003 BY CONSTRUCTION (the containment pass is additive+monotonic — False->True only; the ONE inverted-polarity caller, regex_adapter.py:674 IBAN/SWIFT suppression, is provably unaffected since IBAN carries only Latin keywords — that suppression gate byte-identical), the fail-closed no-fabrication posture (an unpowered cohort can never manufacture a PASS), the one-recall-definition contract pin (A10), Pass-2 honesty stamps."
+
+decisions_acknowledged:
+  - "★ The FR-038 RED was REAL and is now closed: the multilingual context feature the keyword sets advertised was structurally inactive for every non-Latin script; activation is purely ADDITIVE (a context match can only boost confidence) and script-partitioned (Latin keywords cannot take the containment path), so ASCII/Latin behavior is byte-identical — pinned by A3/A4 + the 95-test confidence neighbor suites."
+  - "★ The fairness gate is FAIL-CLOSED by construction: a PASS requires >= 2 POWERED groups within the inclusive gap threshold; INSUFFICIENT_POWER otherwise; corrupt input refused with domain-named ValueErrors. An unpowered or degenerate cohort can never fabricate a fairness claim (the program's no-fabrication spirit at the gate boundary)."
+  - "★ The CANONICAL wire-in is deliberately Pass-2: emitting this verdict from canonical_run.py makes it a control-path-artifact field and MANDATES the adversarial SDO close — the deferral is the discipline, not an omission. canonical_run.py byte-identical (d8f0f80e113c3b5d59c06d0b5fd36fac)."
+  - "The A7 boundary is float-EXACT by design (dyadic rationals: 1.0 vs 7/8 at threshold 0.125) — the exact-value-anchor lesson applied at the construction level, not just the assertion level."
+  - "AX-001/AX-002 upheld: synthetic CJK/AR sentences + synthetic spans only; deterministic import-time map + sorted group lists; 5x replay identical."
+
+findings_waived_or_deferred:
+  - id: corpus-scale-fairness-number
+    disposition: pass2-data
+    detail: "The real worst-group fairness number over the 60-language eval set at full NFR-004 power tiers — # SWITCH-POINT(DATA); eval-data. The gate primitive is real now; NFR-025's matrix row stays DEFERRED until then."
+  - id: canonical-run-fairness-wire-in
+    disposition: pass2-sdo-close-gated
+    detail: "Emitting the fairness verdict from canonical_run.py = a control-path-artifact change ⇒ MANDATORY adversarial close. # SWITCH-POINT(CANONICAL); schedule the close when wired."
+  - id: nfr-025-matrix-annotation
+    disposition: epic-snapshot
+    detail: "Optional 'gate primitive in-tree' annotation on the NFR-025 matrix row (out of this story's owned files)."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-21. A context/fairness feature flips no guarantee; the SDO gate + producer are byte-identical."
+
+quality:
+  suite: "full xdist: EXIT=0 @ 88.87% coverage (3809 collected = 3793 passed / 16 skipped; +11 over SO-21's 3798). The suite ran on the GREEN state; the post-gate remediation (0e35431) is type-annotation-only, re-verified by the 11 owned tests + BOTH-mypy + ruff."
+  coverage: "88.87% (>= 84 gate; fairness_gate.py 100% — the new-module floor exceeded)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 144 files."
+  env: "AGENT_SIMULATED on the local .venv. The activation + the gate run for REAL in-tree on synthetic fixtures; corpus scale is Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md, benchmark artifacts, docs WIP — none staged
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c8…; competitor_tiers.py d9202479…; canonical_run.py d8f0f80e…
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_module: eval_framework/metrics/fairness_gate.py   # imports only metrics.base + metrics.span_metrics; nothing from swarm/moe/fusion/orchestrator (A11 AST audit)
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true   # AX-003 upheld BY CONSTRUCTION (additive monotonic containment; IBAN suppression gate byte-identical)
+  narrow_git_add_only: true   # RED 4209ed6 / GREEN e8cc897 / remediation 0e35431
+  no_new_hard_dependency: true
+
+content_hashes:
+  story_file: fd2f9af54fe81b26e89acaad88f5c9800853ba066e188f5f3fc3bdcdee1f346f
+  gate_synthesis: 7e09464e365fbcdab8d9b019fbc917817f3e0a5c80c3c0aad6b802f06507504d
+  fairness_gate_module: f658bb3c1ef7d960d1ff22057a5fd44b888bd877e66358cbd4bfedf256fc02da
+  confidence_module: 73c61783a22b0dcfe5637b1ed9058744fb00b7e2bc7291ed139d42c4eda0305f
+  tests: b3e76f7d60f614de71f6d0df41f2d386fe2c2ed4db4fd325b83064771050a57a
+
+next:
+  binding_constraint: "G6 FAIL (raw-F2, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S7-03."
+  immediate: "S7-05 (docs discoverability [DOCS MUST] — the LAST feature story; pre-authored; RED staged). Surfaces: the FR-010 anon-vs-pseudo doc + vanilla-vs-swarm positioning, api-reference headline symbols, evaluate-your-pipeline supremacy/canonical-run coverage, index completeness + link teeth, additive CLI epilog. NEVER touches README.md / docs/pii-rate-elo-value.md / docs/benchmark-summary.md (user-WIP)."
+  rc_close: "Stage-6 Documentation -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET; pip-audit the ocr/dicom extras) -> version 1.5.0rc1 + CHANGELOG -> tag v1.5.0-rc1 LOCAL ONLY (NEVER push tags) -> make build + twine-check (NOT published) -> final sign-off."
+  pass2_followons: "★ full-census G6 (headline) + real Tier-C + real-NUTS J + real Tier-3/MIA + query-aware DATA scorer + S6-04 ORCH/DATA seams + real OCR/DICOM/ASR + corpus per-modality benchmark + the corpus fairness number + the CANONICAL fairness wire-in [SDO close] + the G7 _safe_repr sweep + Papers 1 & 2."
+  milestone: "M4 (CODE v2) — the FEATURE SURFACE IS COMPLETE: every story on the SO-15 feature list (S5-02/03, S6-01/04, S7-01/03) is DONE. Only S7-05 [DOCS MUST] and the RC close remain. The SDO verdict is UNCHANGED."

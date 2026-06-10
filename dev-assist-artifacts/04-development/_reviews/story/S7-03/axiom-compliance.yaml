@@ -1,0 +1,42 @@
+reviewer: axiom-compliance
+story: S7-03
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 MAJOR/MINOR; 5 OBSERVATIONS — all upheld-with-evidence confirmations
+run: wf_bb94aa83-837 (2026-06-09); transcribed from the workflow structured result
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # synthetic fixtures only (CJK/AR sentences + synthetic spans)
+  - { id: AX-pii-anon-002, status: UPHELD }  # import-time-frozen sorted containment map; deterministic sorted group lists; dyadic-rational A7 boundary fixtures (float-EXACT); A5 5x replay
+  - { id: AX-pii-anon-003, status: UPHELD }  # ★ the containment pass is purely ADDITIVE + MONOTONIC: it runs only AFTER the token-set miss and can flip False->True, never True->False; the sole boost consumer (adjust_confidence) is monotonic non-decreasing; the ONE inverted-polarity caller (regex_adapter.py:674 — has_context_words('IBAN') True KEEPS a SWIFT/BIC span) is provably unaffected: IBAN carries only Latin keywords so it is absent from _NON_LATIN_CONTEXT_KW — that suppression gate is byte-identical. No detection path can be suppressed; entities(ensemble) ⊇ entities(shared) holds.
+  - { id: AX-pii-anon-005, status: UPHELD_ADJACENT }  # reasoning-visibility flavor: verdict + powered/unpowered partition + per-language recalls + named violators all surfaced on FairnessGateReport; fail-closed-with-evidence
+findings:
+  - id: axiom-compliance-story-01
+    severity: OBSERVATION
+    location: confidence.py precomputed map + fairness_gate sorting; tests A5/A7
+    description: AX-002 upheld (see axioms_in_scope); the runtime-mutation-of-CONTEXT_WORDS limitation is correctly disclosed.
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-02
+    severity: OBSERVATION
+    location: confidence.py:387-401 + regex_adapter.py:674
+    description: AX-003 upheld by construction — the monotonicity + IBAN inverted-polarity analysis (see axioms_in_scope).
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-03
+    severity: OBSERVATION
+    location: fairness_gate.py validation + fail-closed branches; tests A8/A9
+    description: >
+      The no-fabrication spirit holds at the gate boundary: an unpowered
+      cohort can never manufacture a fairness PASS; unpowered groups stay
+      visible, never silently dropped.
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-04
+    severity: OBSERVATION
+    location: fairness_gate.py:40 import; test A10
+    description: One-recall-definition consistency — the gate imports the identical _aligned_prf primitive used program-wide; A10 contract-pins exact equality.
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-05
+    severity: OBSERVATION
+    location: module docstrings + SWITCH-POINT seams
+    description: Pass-2 honesty well-stamped (CANONICAL wire-in explicitly SDO-close-gated; DATA corpus-scale named).
+    disposition: NO-ACTION.
+context_bounds_respected: true
+offlimits_md5_ok: true
