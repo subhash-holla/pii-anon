@@ -6,7 +6,9 @@ context types, confidence ranges, immutability, and registry size.
 
 from __future__ import annotations
 
-from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
+import pytest
+
+from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec, _FIELD_LABEL_NOUNS
 from pii_anon.engines.regex.confidence import CONTEXT_WORDS
 from pii_anon.engines.regex import validators
 from pii_anon.engines.regex_adapter import RegexEngineAdapter
@@ -397,7 +399,8 @@ class TestPersonNameFieldLabelExclusion:
     PERSON_NAME FP factory on the DATA corpus (6,670 FPs at N=10,000)."""
 
     FIELD_LABEL_PHRASES = [
-        "Swift Bic Code", "Medication Name", "Docket Number",
+        # "Swift Bic Code" still suppressed because Bic/Code are in the guard.
+        "Swift Bic Code", "Bic Code", "Medication Name", "Docket Number",
         "Notary License", "National Id Number", "Health Insurance",
         "Insurance Policy Number", "Bank Routing Number",
     ]
@@ -420,3 +423,91 @@ class TestPersonNameFieldLabelExclusion:
     def test_real_names_still_detected(self) -> None:
         for name in self.REAL_NAMES:
             assert len(self._names(f"Record for {name}, contact x@y.com")) >= 1, name
+
+
+class TestFieldLabelNounsMechanismGuard:
+    """Mechanism test: every noun in _FIELD_LABEL_NOUNS must suppress the
+    full-name pattern when it appears as the 2nd or 3rd capitalized token.
+
+    Parametrized over the constant itself — any future element addition or
+    removal is automatically covered.
+    """
+
+    def _names(self, text: str) -> list:
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "PERSON_NAME"
+        ]
+
+    @pytest.mark.parametrize("noun", _FIELD_LABEL_NOUNS)
+    def test_two_token_prefix_suppressed(self, noun: str) -> None:
+        """'Foo <noun> xyz' must not produce a PERSON_NAME."""
+        assert self._names(f"Foo {noun} xyz") == [], (
+            f"Expected no PERSON_NAME for 'Foo {noun} xyz'"
+        )
+
+    @pytest.mark.parametrize("noun", _FIELD_LABEL_NOUNS)
+    def test_three_token_prefix_suppressed(self, noun: str) -> None:
+        """'Foo Bar <noun> xyz' must not produce a PERSON_NAME."""
+        assert self._names(f"Foo Bar {noun} xyz") == [], (
+            f"Expected no PERSON_NAME for 'Foo Bar {noun} xyz'"
+        )
+
+    def test_positive_control_non_vocab_trigram(self) -> None:
+        """A genuine 3-word name not ending in a vocab noun still matches."""
+        # "Foo Barland xyz" — Barland is not a field-label noun.
+        found = self._names("Foo Barland attended the meeting")
+        assert len(found) >= 1, (
+            "Expected at least 1 PERSON_NAME for non-vocab trigram 'Foo Barland'"
+        )
+
+
+class TestPersonNameRescueRegression:
+    """Rescue-regression pins: names with medical/title context must survive.
+
+    These cases exercise the boundary between the field-label guard (which
+    suppresses bare 2-token caps that look like form labels) and the
+    keyword-context patterns (which actively promote genuine person names).
+    """
+
+    def _names(self, text: str) -> list:
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "PERSON_NAME"
+        ]
+
+    def test_patient_context_rescues_name(self) -> None:
+        """'patient Anna Swift was discharged' → ≥1 PERSON_NAME."""
+        found = self._names("patient Anna Swift was discharged")
+        assert len(found) >= 1, (
+            "Expected ≥1 PERSON_NAME from 'patient Anna Swift was discharged' "
+            f"— got {found}"
+        )
+
+    def test_title_prefix_rescues_name(self) -> None:
+        """'Ms. Taylor Swift' → ≥1 PERSON_NAME (title-prefix pattern fires)."""
+        found = self._names("Ms. Taylor Swift")
+        assert len(found) >= 1, (
+            "Expected ≥1 PERSON_NAME from 'Ms. Taylor Swift' "
+            f"— got {found}"
+        )
+
+    def test_bare_name_detected_after_swift_removal(self) -> None:
+        """Bare 'Anna Swift attended the meeting' → ≥1 PERSON_NAME.
+
+        BEHAVIOR NOTE (2026-06-11): 'Swift' was removed from _FIELD_LABEL_NOUNS
+        (measured 0 FP-delta at n=2000; Bic/Code cover SWIFT-BIC field labels).
+        As a result, 'Anna Swift' is now correctly detected as a PERSON_NAME by
+        the full-name pattern.  If this test starts failing it means the guard
+        logic changed in a way that re-suppresses bare 'Swift'-surname names —
+        review the _FIELD_LABEL_NOUNS tuple and the measured FP impact.
+        """
+        found = self._names("Anna Swift attended the meeting")
+        assert len(found) >= 1, (
+            "Expected ≥1 PERSON_NAME for 'Anna Swift attended the meeting' "
+            f"after Swift removal from the guard — got {found}"
+        )

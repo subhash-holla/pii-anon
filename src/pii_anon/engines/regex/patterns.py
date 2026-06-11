@@ -147,16 +147,67 @@ _PERSON_FR = re.compile(r"\b(?:M|Mme|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
 # Agent, etc.) that frequently cause false positives.
 #
 # Field-label nouns: a Title-Case candidate whose 2nd/3rd token is one of
-# these is a form-field label (e.g. "Swift Bic Code", "Medication Name"),
+# these is a form-field label (e.g. "Bic Code", "Medication Name"),
 # not a person name — the single largest PERSON_NAME FP factory on the DATA
 # corpus.  "Name" is included beyond the core vocabulary because "<X> Name"
 # is itself the most generic field label ("Medication Name", "Patient Name")
 # while "Name" as a surname is essentially nonexistent.
-_FIELD_LABEL_NOUNS = (
-    "Number|Code|License|Licence|Insurance|Account|Routing|Records|Record"
-    "|Medication|Docket|Case|Policy|Invoice|Member|Security|Registration"
-    "|Identifier|Id|Bic|Swift|Notary|Plate|Passport|Diagnosis|Procedure"
-    "|Condition|Salary|Username|Address|Status|Level|Type|Date|Time|Name"
+#
+# Tuple design (one word per element, joined at compile time): avoids
+# accidental implicit string concatenation fusing adjacent elements into
+# a single token (e.g. "Records""Record" → "RecordsRecord"). Longest-first
+# ordering is preserved where prefixes exist (Identifier before Id,
+# Records before Record, Licence/License both present).
+#
+# "Swift" measured 0 FP-delta at n=2000 (removed 2026-06-11): the Bic/Code
+# neighbors already cover SWIFT-BIC field labels, while keeping Swift was
+# blocking Taylor-Swift-class real names (production text).
+#
+# Adjacency trade: a real 2-token name immediately followed by a Title-Case
+# vocab noun ("John Smith Address: ...") is also suppressed — inherent to the
+# trailing-window design, F2-justified.
+#
+# Plural probe (s? suffix, measured 2026-06-11): FP drop = 3 at n=2000
+# (threshold ≥5 not met) — reverted per the decision rule; the guard still
+# catches the singular-plural cases present in the 2000-record draw.
+_FIELD_LABEL_NOUNS: tuple[str, ...] = (
+    "Number",
+    "Code",
+    "License",
+    "Licence",
+    "Insurance",
+    "Account",
+    "Routing",
+    "Records",   # longest first (before Record)
+    "Record",
+    "Medication",
+    "Docket",
+    "Case",
+    "Policy",
+    "Invoice",
+    "Member",
+    "Security",
+    "Registration",
+    "Identifier",  # longest first (before Id)
+    "Id",
+    "Bic",
+    # "Swift" removed: 0 FP-delta at n=2000; Bic/Code cover SWIFT-BIC labels;
+    # keeping it blocked Taylor-Swift-class real person names in production.
+    "Notary",
+    "Plate",
+    "Passport",
+    "Diagnosis",
+    "Procedure",
+    "Condition",
+    "Salary",
+    "Username",
+    "Address",
+    "Status",
+    "Level",
+    "Type",
+    "Date",
+    "Time",
+    "Name",
 )
 
 _PERSON_FULL_NAME = re.compile(
@@ -173,7 +224,7 @@ _PERSON_FULL_NAME = re.compile(
     # (An alternative followed-by-colon guard measured -964 FP but -54 TP at
     # n=2000 — a net micro-F2 loss vs this rule's -932 FP at zero TP loss.)
     r"(?![A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?[ \t]+"
-    r"(?:" + _FIELD_LABEL_NOUNS + r")(?![A-Za-z]))"
+    r"(?:" + "|".join(_FIELD_LABEL_NOUNS) + r")(?![A-Za-z]))"
     r"[A-Z][a-z]{2,}[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?"
     r"(?![A-Za-z])"
 )
