@@ -419,6 +419,30 @@ class TestNPIDetection:
         assert not [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
         assert npi[0].confidence == pytest.approx(0.98, abs=1e-9)
 
+    def test_npi_invalid_luhn_still_emits_at_reduced_confidence(self) -> None:
+        """A corpus-real NPI with a failing Luhn check emits at 0.80 exactly.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. invalid_confidence=0.70 returned by _run_validator (line ~701 in regex_adapter.py)
+          2. context_type="MEDICAL_LICENSE" triggers adjust_confidence (line ~529)
+          3. CONTEXT_WORDS["MEDICAL_LICENSE"] contains "npi"; text "NPI: 2906399475"
+             → token "npi" in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: min(CONFIDENCE_CAP=0.99, 0.70 + 0.10) = 0.80
+
+        Luhn verification: is_valid_npi('2906399475') == False (luhn_checksum('808402906399475')
+        returns False); '2906399474' (last digit corrected) is Luhn-valid and is used by the
+        valid-path test above.
+
+        Corpus NPIs are mostly Luhn-invalid; skipping them zeroed recall (mirroring the
+        old DEA skip-on-invalid). Format+context is still strong signal; the Luhn check
+        upgrades confidence rather than gating emission.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "NPI: 2906399475"}, {"language": "en"})
+        npi = [f for f in findings if f.entity_type == "NPI_NUMBER"]
+        assert len(npi) == 1
+        assert npi[0].confidence == pytest.approx(0.80, abs=1e-9)
+
 
 class TestDEADetection:
     """Test DEA (Drug Enforcement Administration) detection."""
