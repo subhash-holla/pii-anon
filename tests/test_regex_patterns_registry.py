@@ -322,8 +322,23 @@ class TestDriversLicenseCorpusForms:
 
     def test_existing_forms_still_match(self) -> None:
         assert len(self._detect("driver's license: D1234567")) == 1
-        assert len(self._detect("DL-A12345-678")) >= 1
+        # DL-prefix standalone: only _DRIVERS_LICENSE_DL fires (CTX keyword absent)
+        assert len(self._detect("DL-A12345-678")) == 1
 
     def test_bare_value_without_context_does_not_match(self) -> None:
         # The XX-NNNNNN shape is generic (order codes); context stays required.
         assert self._detect("Tracking ref QR-427697 shipped today") == []
+
+    def test_spdx_software_license_not_detected(self) -> None:
+        # Software/SPDX identifiers after a bare 'license' keyword must not match.
+        assert self._detect("license # MIT-12345 applies to this package") == []
+        assert self._detect("License Number: GPL-30000 (open source)") == []
+
+    def test_bare_license_keyword_still_matches_classic_forms(self) -> None:
+        assert len(self._detect("license number: A12345678")) == 1
+
+    def test_driver_phrase_single_emission(self) -> None:
+        # Both keyword paths overlap on this phrase; exactly one finding must emerge.
+        # The negative lookbehind in _DRIVERS_LICENSE_BARE_KW prevents it from
+        # firing inside the driver-specific phrase already handled by _DRIVERS_LICENSE_CTX.
+        assert len(self._detect("driver's license number: D1234567")) == 1

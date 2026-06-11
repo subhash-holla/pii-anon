@@ -239,12 +239,34 @@ _MAC_ADDRESS = re.compile(
     r"[0-9A-Fa-f]{2}[:\-][0-9A-Fa-f]{2}[:\-][0-9A-Fa-f]{2})\b"
 )
 
-# Driver's license with context keyword: "driver's license" / "license number" + ID.
+# Driver's license with driver-specific context keyword.
+# Covers: "driver's license", "drivers license", "permis de conduire",
+# "licencia de conducir", "führerschein" — all unambiguously driver-document
+# keywords.  Includes the hyphenated alpha form ([A-Z]{1,3}-\d{5,9}) because
+# these keywords are not shared with software/SPDX license identifiers.
 _DRIVERS_LICENSE_CTX = re.compile(
-    r"\b(?:driver'?s?\s*licen[cs]e(?:\s*(?:number|no|#))?|license\s*(?:number|no|#)|permis\s*(?:de\s+)?conduire"
+    r"\b(?:driver'?s?\s*licen[cs]e(?:\s*(?:number|no|#))?|permis\s*(?:de\s+)?conduire"
     r"|licencia\s*(?:de\s+)?conducir|f[üu]hrerschein)"
     r"\s*[:\-#]?\s*"
     r"(DL-[A-Z]\d{4,6}-\d{2,4}|[A-Z]{1,3}-\d{5,9}|[A-Z]\d{4,15}|\d{1,3}-\d{2,4}-\d{4,6})\b",
+    re.IGNORECASE,
+)
+# Bare "license number/no/#" keyword (no 'driver' prefix) — ambiguous with
+# software/SPDX license identifiers (e.g. "license # MIT-12345").  This path
+# deliberately EXCLUDES the hyphenated alpha value form ([A-Z]{1,3}-\d{5,9})
+# to prevent SPDX-shaped strings (MIT-12345, GPL-30000) from being tagged as
+# DRIVERS_LICENSE.
+#
+# Double-emission guard: a negative lookbehind prevents this pattern from
+# firing inside the driver-specific keyword phrases that _DRIVERS_LICENSE_CTX
+# already covers (e.g. "driver's license number: D1234567").  The three
+# variants cover driver'?s? (with re.IGNORECASE also applying to lookbehinds):
+#   "driver's " (9 chars), "drivers " (8 chars), "driver " (7 chars).
+# All are fixed-width, satisfying Python's lookbehind constraint.
+_DRIVERS_LICENSE_BARE_KW = re.compile(
+    r"(?<!driver's )(?<!drivers )(?<!driver )\blicense\s*(?:number|no|#)"
+    r"\s*[:\-#]?\s*"
+    r"(DL-[A-Z]\d{4,6}-\d{2,4}|[A-Z]\d{4,15}|\d{1,3}-\d{2,4}-\d{4,6})\b",
     re.IGNORECASE,
 )
 # Standalone DL-prefixed ID (e.g. "DL-G20640-40") — no keyword needed because
@@ -933,6 +955,13 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.80,
         group=1,
         explanation="regex drivers license (context)",
+    ),
+    PatternSpec(
+        entity_type="DRIVERS_LICENSE",
+        pattern=_DRIVERS_LICENSE_BARE_KW,
+        base_confidence=0.80,
+        group=1,
+        explanation="regex drivers license (bare keyword)",
     ),
     PatternSpec(
         entity_type="DRIVERS_LICENSE",
