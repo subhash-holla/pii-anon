@@ -14,6 +14,11 @@ SRC_PATH = _REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+# Repo root on sys.path so repo-level imports (e.g. ``scripts.*``) resolve
+# under bare ``pytest`` exactly as under ``python -m pytest`` (CWD on path).
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 # Set working directory to the repo root so tests that use relative paths
 # (e.g., "README.md", "scripts/...", "docs/...") resolve correctly.
 os.chdir(str(_REPO_ROOT))
