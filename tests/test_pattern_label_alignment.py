@@ -33,6 +33,8 @@ reachability from the authority map's RHS alone would falsely flag VIN.
 
 from __future__ import annotations
 
+import pytest
+
 from pii_anon.benchmarks.datasets import (
     _EVAL_DATA_ENTITY_TYPE_MAP as _BENCHMARKS_LOADER_MAP,
 )
@@ -148,7 +150,9 @@ def test_every_registered_label_is_reachable_as_eval_truth() -> None:
         f"the truth they should match scores FN forever. Fix by relabeling "
         f"the PatternSpec to a canonical in {sorted(reachable)} (the "
         f"DEA/NPI fix pattern), or add a documented entry to "
-        f"ALLOWED_NON_CORPUS_LABELS with the verified reason."
+        f"ALLOWED_NON_CORPUS_LABELS with the verified reason, or, if the "
+        f"pii_anon_datasets dependency revved, re-derive "
+        f"DATA_V2_CORPUS_ENTITY_TYPES per its provenance comment."
     )
 
 
@@ -253,4 +257,25 @@ def test_loader_map_agrees_with_census_authority() -> None:
         f"Loader RHS values are not authority fixed points: "
         f"{not_fixed_point} — loaded truth would be silently re-mapped at "
         f"eval time."
+    )
+
+
+def test_corpus_census_constant_matches_packaged_dataset_version() -> None:
+    """The frozen 63-type census is valid for pii_anon_datasets 2.0.0 ONLY.
+
+    If this fails after a dataset rev: re-derive DATA_V2_CORPUS_ENTITY_TYPES
+    from the new corpus per the constant's provenance comment, update the
+    constant AND this pin in the same change.
+    """
+    pytest.importorskip("pii_anon_datasets")
+    import importlib.metadata
+
+    import pii_anon_datasets
+
+    assert pii_anon_datasets.__version__ == "2.0.0", (
+        f"DATA_V2_CORPUS_ENTITY_TYPES was frozen for pii_anon_datasets 2.0.0 "
+        f"but the installed module reports {pii_anon_datasets.__version__!r}. "
+        f"Re-derive DATA_V2_CORPUS_ENTITY_TYPES from the new corpus per its "
+        f"provenance comment and update this pin in the same change. "
+        f"(pip metadata: {importlib.metadata.version('pii-anon-datasets')!r})"
     )

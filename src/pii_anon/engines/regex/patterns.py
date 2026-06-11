@@ -288,6 +288,8 @@ _LICENSE_PLATE_US = re.compile(
 # Requires "card" in the prefix to avoid matching non-CC contexts like
 # "ending in 2023" (year) or "last four characters".
 # (autoresearch: CREDIT_CARD_FRAGMENT precision 13.4% → 23.6%)
+# (Those figures are census-lens numbers; production precision of the fragment
+# template is higher — census 'card ending NNNN' mentions are often unannotated.)
 _CREDIT_CARD_FRAGMENT = re.compile(
     r"(?:"
     r"card\s+ending\s+(?:in\s+|with\s+)?"  # Card ending [in|with]

@@ -9,6 +9,8 @@ from __future__ import annotations
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex.confidence import CONTEXT_WORDS
 from pii_anon.engines.regex import validators
+from pii_anon.engines.regex_adapter import RegexEngineAdapter
+from pii_anon.types import Payload
 
 
 class TestPatternRegistryStructure:
@@ -257,3 +259,33 @@ class TestDenyCheckFlag:
         """LOCATION pattern should have deny_check=True."""
         loc_specs = [s for s in PATTERN_REGISTRY if s.entity_type == "LOCATION"]
         assert any(s.deny_check for s in loc_specs)
+
+
+class TestCreditCardFragmentBehavior:
+    """Behavioral tests for the credit card fragment pattern (context-free path)."""
+
+    def test_card_ending_in_emits_exactly_one_credit_card_at_flat_088(self) -> None:
+        """'card ending in 1234' emits exactly one CREDIT_CARD finding at 0.88.
+
+        The fragment PatternSpec sets context_type=None, so it never enters
+        adjust_confidence — the base_confidence of 0.88 is the final score
+        regardless of surrounding context.  There must be no context-boost or
+        context-penalty applied (the CREDIT_CARD_CONTEXT set in confidence.py
+        intentionally excludes CREDIT_CARD to avoid penalising Luhn-valid full
+        cards lacking context; the fragment spec's context_type=None means it
+        never reaches that branch at all).
+        """
+        adapter = RegexEngineAdapter()
+        payload = Payload(text="card ending in 1234")
+        findings = adapter.detect(payload, {})
+        assert len(findings) == 1, (
+            f"Expected exactly 1 finding, got {len(findings)}: {findings}"
+        )
+        finding = findings[0]
+        assert finding.entity_type == "CREDIT_CARD", (
+            f"Expected entity_type CREDIT_CARD, got {finding.entity_type!r}"
+        )
+        assert finding.confidence == 0.88, (
+            f"Expected confidence 0.88 (flat, no context adjustment), "
+            f"got {finding.confidence}"
+        )

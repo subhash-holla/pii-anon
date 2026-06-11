@@ -256,11 +256,9 @@ HIGH_FP_TYPES: frozenset[str] = frozenset({
     "EMPLOYEE_ID",
     "IP_ADDRESS",
     "EMAIL_ADDRESS",
-    # CREDIT_CARD_FRAGMENT removed: the fragment PatternSpec now emits
-    # CREDIT_CARD (eval-label alignment — tests/test_pattern_label_alignment
-    # .py), and CREDIT_CARD deliberately stays OUT of this set: the full-card
-    # pattern is Luhn-validated and the fragment regex requires the literal
-    # "card" prefix in-match, so a context-absence penalty can never apply.
+    # CREDIT_CARD stays OUT of this set: adding it would penalize Luhn-valid
+    # full cards lacking nearby context (-0.15), and the fragment spec sets no
+    # context_type so it never reaches adjust_confidence.
     "BANK_ACCOUNT",
     # ── Phase 3: structurally-ambiguous identifiers ────────────────
     # Added because their regex surface is permissive enough that the
