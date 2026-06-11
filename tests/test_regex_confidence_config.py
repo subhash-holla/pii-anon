@@ -1,7 +1,8 @@
 """Tests for regex confidence module configuration and adjustment logic.
 
-Covers configure_from_config function, module-level globals, and the
-context-aware confidence adjustment system.
+Covers configure_from_config function, module-level globals, the
+context-aware confidence adjustment system, and the negative-context
+demotion for cross-identifier digit false positives (SP1 Task 9).
 """
 
 from __future__ import annotations
@@ -355,3 +356,187 @@ def test_full_workflow_configure_then_adjust() -> None:
         confidence.CONTEXT_WINDOW = originals['CONTEXT_WINDOW']
         confidence.CONFIDENCE_CAP = originals['CONFIDENCE_CAP']
         confidence.CONFIDENCE_FLOOR = originals['CONFIDENCE_FLOOR']
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Negative-Context Demotion (SP1 Task 9)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestNegativeContextDemotion:
+    """A match whose ±50-char window names a DIFFERENT identifier's field
+    label is demoted below the emit floor. Kills the SSN-inside-NID-,
+    PHONE-after-NPI: FP classes (n=10000 baseline: 829 + 727 FPs).
+
+    Composition rule (pinned here and in confidence.py): the demotion
+    fires when a negative phrase is anywhere in the ±CONTEXT_WINDOW
+    window AND no OWN-type context keyword appears in the
+    NEGATIVE_ADJACENCY_WINDOW chars immediately before the span (the
+    field-label position). An adjacent own label ("Phone:", "SSN:")
+    protects the finding even with a negative word elsewhere in the
+    window; a DISTANT own-type word (the neighbouring field's
+    "contact:" label) does NOT protect.
+    """
+
+    def _findings(self, text: str, entity_type: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == entity_type
+        ]
+
+    # ── FP classes: demoted below the emit floor ─────────────────────
+
+    def test_ssn_not_emitted_inside_national_id(self) -> None:
+        # 9-digit run inside an NID- value: "national id" / "nid-" in the
+        # window, no SSN keyword adjacent -> 0.65 - 0.30 - 0.15 = 0.20
+        # -> floored 0.40 < 0.50 emit floor -> suppressed.
+        found = self._findings("National Id Number: NID-422736198", "US_SSN")
+        assert found == [], f"US_SSN must not be emitted inside NID- value; got {found}"
+
+    def test_ssn_not_emitted_after_routing_label(self) -> None:
+        # 9-digit run after "Bank Routing Number:" -> "routing" negative.
+        found = self._findings("Bank Routing Number: 827011129", "US_SSN")
+        assert found == [], f"US_SSN must not be emitted after routing label; got {found}"
+
+    def test_phone_not_emitted_after_npi_label(self) -> None:
+        # 10-digit run after "NPI:" -> "npi" negative, no phone keyword
+        # adjacent -> 0.80 - 0.30 - 0.15 = 0.35 -> floored 0.40 -> suppressed.
+        found = self._findings("NPI: 3803252675", "PHONE_NUMBER")
+        assert found == [], f"PHONE_NUMBER must not be emitted after NPI label; got {found}"
+
+    def test_phone_not_emitted_after_account_label(self) -> None:
+        # 10-digit run after "Bank Account Number:" -> "account number".
+        found = self._findings("Bank Account Number: 2746750189", "PHONE_NUMBER")
+        assert found == [], (
+            f"PHONE_NUMBER must not be emitted after account label; got {found}"
+        )
+
+    def test_org_health_insurance_not_emitted(self) -> None:
+        # Generic phrase "Health Insurance" (a field label, not an org):
+        # the span itself puts "health insurance" in the window; no ORG
+        # keyword adjacent -> 0.78 - 0.30 - 0.15 -> floored 0.40 -> suppressed.
+        text = "Record for Maria Garcia, Health Insurance: HI-12345"
+        spans = [
+            text[f.span_start : f.span_end]
+            for f in self._findings(text, "ORGANIZATION")
+            if f.span_start is not None and f.span_end is not None
+        ]
+        assert "Health Insurance" not in spans, (
+            f"'Health Insurance' must not be emitted as ORGANIZATION; got {spans!r}"
+        )
+
+    # ── Genuine forms: own label adjacent -> still emitted ───────────
+
+    def test_genuine_ssn_still_emitted(self) -> None:
+        found = self._findings("SSN: 536-90-4399", "US_SSN")
+        assert len(found) == 1, f"Expected exactly 1 US_SSN, got {found}"
+
+    def test_genuine_phone_still_emitted(self) -> None:
+        found = self._findings("Phone: (415) 555-0142", "PHONE_NUMBER")
+        assert len(found) == 1, f"Expected exactly 1 PHONE_NUMBER, got {found}"
+
+    def test_genuine_phone_with_distant_negative_word(self) -> None:
+        # Pins the composition rule end-to-end. The genuine phone has its
+        # own label adjacent ("Phone: " directly before the span) and a
+        # negative phrase ("account number") within the +-50 window -> the
+        # adjacent own label wins -> boost path -> emitted. The 10-digit
+        # account value in the SAME text has "phone" only DISTANTLY in its
+        # window (26+ chars back) and "account number" directly before it
+        # -> demoted -> NOT emitted. Net: exactly the genuine span remains.
+        text = "Phone: (415) 555-0142, account number 9855276428"
+        found = self._findings(text, "PHONE_NUMBER")
+        assert len(found) == 1, f"Expected exactly 1 PHONE_NUMBER, got {found}"
+        f = found[0]
+        assert text[f.span_start : f.span_end] == "(415) 555-0142", (
+            f"The genuine labelled phone must be the surviving finding; got "
+            f"{text[f.span_start:f.span_end]!r}"
+        )
+
+    # ── Unit level: exact arithmetic anchors ─────────────────────────
+
+    def test_demotion_unit_level(self) -> None:
+        """Pins exact demotion arithmetic at the adjust_confidence level.
+
+        Derivation: the demoted branch is
+        ``max(CONFIDENCE_FLOOR, base - NEGATIVE_CONTEXT_PENALTY - CONTEXT_PENALTY)``
+        for HIGH_FP_TYPES (the span is scored as context-ABSENT because the
+        adjacent foreign label owns the digits, so the absence penalty
+        stacks with the demotion), applied BEFORE the floor clamp.
+        """
+        # US_SSN nodash base 0.65 inside "National Id Number: NID-...":
+        # 0.65 - 0.30 - 0.15 = 0.20 -> clamped to CONFIDENCE_FLOOR = 0.40.
+        text = "National Id Number: NID-422736198"
+        result = confidence.adjust_confidence(
+            "US_SSN", base_confidence=0.65, text=text, start=24, end=33
+        )
+        assert result == 0.40, f"Expected exact floor 0.40, got {result}"
+
+        # PHONE_NUMBER +1-format base 0.92 after "NPI:": unclamped branch,
+        # 0.92 - 0.30 - 0.15 (exact float expression mirrors the
+        # implementation's left-to-right subtraction) = 0.47000...,
+        # strictly below the 0.50 adapter emit floor.
+        text = "NPI: 3803252675"
+        result = confidence.adjust_confidence(
+            "PHONE_NUMBER", base_confidence=0.92, text=text, start=5, end=15
+        )
+        expected = (
+            0.92
+            - confidence.NEGATIVE_CONTEXT_PENALTY
+            - confidence.CONTEXT_PENALTY
+        )
+        assert result == expected, f"Expected exact {expected}, got {result}"
+        assert result < 0.50, "Demoted +1-format phone must drop below the emit floor"
+
+        # Adjacent own label protects: identical negative word in window,
+        # but "Phone: " directly before the span -> boost path, no demotion.
+        text = "Phone: (415) 555-0142, account number 9855276428"
+        result = confidence.adjust_confidence(
+            "PHONE_NUMBER", base_confidence=0.80, text=text, start=7, end=21
+        )
+        expected = min(confidence.CONFIDENCE_CAP, 0.80 + confidence.CONTEXT_BOOST)
+        assert result == expected, f"Expected boosted {expected}, got {result}"
+
+    def test_negative_context_constants_shape(self) -> None:
+        # The mechanism's constants: per-type frozensets of lowercase
+        # substrings + the demotion penalty. BANK_ACCOUNT deliberately has
+        # NO entry (IBAN truth maps canonically to BANK_ACCOUNT — those
+        # detections are real census TPs; suppressing them regresses G6).
+        assert confidence.NEGATIVE_CONTEXT_PENALTY == 0.30
+        assert set(confidence.NEGATIVE_CONTEXT_WORDS) == {
+            "US_SSN", "PHONE_NUMBER", "ORGANIZATION",
+        }
+        assert "BANK_ACCOUNT" not in confidence.NEGATIVE_CONTEXT_WORDS
+        for words in confidence.NEGATIVE_CONTEXT_WORDS.values():
+            assert isinstance(words, frozenset)
+            assert all(w == w.lower() for w in words)
+
+    def test_apply_negative_context_org_unit_level(self) -> None:
+        """ORGANIZATION specs carry no context_type, so they reach the
+        demotion through ``apply_negative_context`` (the adapter's
+        no-context_type branch): same arbitration, no boost activation.
+        """
+        text = "Record for Maria Garcia, Health Insurance: HI-12345"
+        # span "Health Insurance" at [25, 41): 0.78 - 0.30 - 0.15 -> 0.40 floor.
+        result = confidence.apply_negative_context(
+            "ORGANIZATION", base_confidence=0.78, text=text, start=25, end=41
+        )
+        assert result == 0.40, f"Expected exact floor 0.40, got {result}"
+
+        # No negative phrase in window -> returned unchanged (identity).
+        text = "The meeting covered Acme Corporation results"
+        result = confidence.apply_negative_context(
+            "ORGANIZATION", base_confidence=0.78, text=text, start=20, end=36
+        )
+        assert result == 0.78, f"Expected unchanged 0.78, got {result}"
+
+        # Entity types without a NEGATIVE_CONTEXT_WORDS entry pass through
+        # untouched even when another type's negative word is present.
+        result = confidence.apply_negative_context(
+            "NATIONAL_ID", base_confidence=0.88,
+            text="National Id Number: NID-422736198", start=20, end=33,
+        )
+        assert result == 0.88, f"Expected unchanged 0.88, got {result}"

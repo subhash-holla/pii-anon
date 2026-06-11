@@ -29,9 +29,13 @@ from pii_anon.engines.regex.confidence import (
     CONTEXT_WINDOW,
     CONTEXT_WORDS,
     HIGH_FP_TYPES,
+    NEGATIVE_CONTEXT_PENALTY,
+    NEGATIVE_CONTEXT_WORDS,
     adjust_confidence,
+    apply_negative_context,
     extract_context,
     has_context_words,
+    has_negative_context,
 )
 from pii_anon.engines.regex.deny_list import (
     DEFAULT_DENY_LISTS,
@@ -79,9 +83,13 @@ __all__ = [
     "CONTEXT_WINDOW",
     "CONTEXT_WORDS",
     "HIGH_FP_TYPES",
+    "NEGATIVE_CONTEXT_PENALTY",
+    "NEGATIVE_CONTEXT_WORDS",
     "adjust_confidence",
+    "apply_negative_context",
     "extract_context",
     "has_context_words",
+    "has_negative_context",
     # deny_list
     "DEFAULT_DENY_LISTS",
     "DenyListManager",

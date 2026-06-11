@@ -9,12 +9,17 @@ types (US_SSN, PERSON_NAME), confidence is penalized.
 Algorithm
 ---------
 1. Extract a window of *±CONTEXT_WINDOW* characters around the matched span.
-2. Tokenize the window into lowercase words.
-3. Intersect tokens with the entity-type's keyword set.
-4. If intersection is non-empty → boost by *CONTEXT_BOOST* (capped at 0.99).
-5. If empty **and** the entity type is in *HIGH_FP_TYPES* → penalize by
-   *CONTEXT_PENALTY* (floored at 0.50).
-6. Otherwise → return the base confidence unchanged.
+2. If a *NEGATIVE_CONTEXT_WORDS* phrase for the entity type appears in the
+   window AND no own-type keyword appears in the
+   *NEGATIVE_ADJACENCY_WINDOW* chars immediately before the span →
+   demote by *NEGATIVE_CONTEXT_PENALTY* (plus *CONTEXT_PENALTY* for
+   *HIGH_FP_TYPES*), floored at *CONFIDENCE_FLOOR*.
+3. Tokenize the window into lowercase words.
+4. Intersect tokens with the entity-type's keyword set.
+5. If intersection is non-empty → boost by *CONTEXT_BOOST* (capped at 0.99).
+6. If empty **and** the entity type is in *HIGH_FP_TYPES* → penalize by
+   *CONTEXT_PENALTY* (floored at 0.40).
+7. Otherwise → return the base confidence unchanged.
 
 This approach avoids NLP dependencies (no lemmatization needed) while still
 providing meaningful confidence differentiation.
@@ -270,6 +275,74 @@ HIGH_FP_TYPES: frozenset[str] = frozenset({
     "NATIONAL_ID",        # generic alphanum — order/serial numbers fit
 })
 
+# ── Negative-context demotion (SP1 Task 9) ─────────────────────────────────
+# A window mentioning ANOTHER identifier's field label is strong evidence
+# the matched span belongs to that identifier, not to this entity type:
+# the 9-digit run inside "National Id Number: NID-422736198" is the
+# national-id value, not a US_SSN; the 10-digit run after "NPI:" is a
+# provider number, not a PHONE_NUMBER; "Health Insurance" before
+# ": HI-12345" is a field label, not an ORGANIZATION. Entries are
+# lowercase SUBSTRINGS matched against the lowercased ±CONTEXT_WINDOW
+# window (substring, not token, so multi-word labels like "account number"
+# and punctuated forms like "nid-" hit).
+#
+# COMPOSITION RULE (chosen by measurement on the n=2000 seed=8314 census
+# draw): the demotion fires when a negative phrase appears anywhere in
+# the window AND no own-type context keyword appears in the
+# NEGATIVE_ADJACENCY_WINDOW chars immediately BEFORE the span (the
+# field-label position). An own-type keyword elsewhere in the window does
+# NOT protect: the dominant FP class carries a DISTANT own-type word —
+# the neighbouring field's "contact:"/"phone:" label — while the foreign
+# label sits directly before the digits (any-window-hit protection would
+# rescue 62/85 of the measured phone FP class). A genuine
+# "Phone: (415) 555-0142" keeps its boost even with "account number"
+# later in the window because its own label is adjacent. Measured: 0
+# true positives demoted across all three types at any adjacency width
+# in {15, 20, 25, 30}.
+#
+# The demoted branch scores the span as context-ABSENT (distant own-type
+# evidence is attributed to the neighbouring field), so for
+# HIGH_FP_TYPES the absence penalty STACKS with the demotion:
+#   max(CONFIDENCE_FLOOR, base - NEGATIVE_CONTEXT_PENALTY - CONTEXT_PENALTY)
+# which lands every demotable base ≤ 0.94 below the adapter's 0.50 emit
+# floor (0.65 SSN-nodash → 0.40 clamped; 0.80 phone → 0.40 clamped;
+# 0.92 +1-format phone → 0.47; 0.78/0.80 ORGANIZATION → 0.40 clamped).
+#
+# BANK_ACCOUNT deliberately has NO entry: IBAN truth maps canonically to
+# BANK_ACCOUNT, so BANK_ACCOUNT detections inside IBANs are real census
+# true positives — suppressing them would regress G6.
+NEGATIVE_CONTEXT_WORDS: dict[str, frozenset[str]] = {
+    "US_SSN": frozenset({
+        "national id", "nid-", "routing", "insurance", "policy",
+        "npi", "member id", "account number", "invoice",
+    }),
+    "PHONE_NUMBER": frozenset({
+        "npi", "routing", "account number", "policy", "member id",
+        "iban", "invoice",
+    }),
+    "ORGANIZATION": frozenset({
+        "health insurance", "social security", "insurance policy",
+        # Measured additions (n=2000 seed=8314): field-label phrases of
+        # non-ORG record fields captured as ORGANIZATION spans
+        # ("Migraine Insurance" before "Insurance ID: INS-…"; "Social
+        # Media" from "Social Media Handle: @…"); 0 genuine-TP windows
+        # contain either phrase. Bare "insurance"/"insurance:" were
+        # REJECTED: they appear in genuine "Provider: Stark Industries …
+        # Insurance: …" windows whose "provider:" label is not an
+        # ORGANIZATION context word, so adjacency would not protect them.
+        "insurance id", "social media",
+    }),
+}
+
+NEGATIVE_CONTEXT_PENALTY: float = 0.30
+
+# Width of the label-position prefix consulted for own-type protection.
+# Sized to cover the longest own-type label form ("social security
+# number: " = 24 chars to the value) while excluding the PREVIOUS
+# field's label ("phone: +1 (XXX) XXX-XXXX " puts "phone" ≥ 26 chars
+# back from the next field's value).
+NEGATIVE_ADJACENCY_WINDOW: int = 25
+
 # Tuning constants — module-level defaults.
 # These are overridden at runtime when CoreConfig.confidence is provided
 # to the regex engine adapter via ``configure_from_config()``.
@@ -398,6 +471,67 @@ def has_context_words(entity_type: str, context_text: str) -> bool:
     return False
 
 
+def has_negative_context(entity_type: str, context_text: str) -> bool:
+    """Check if any negative-context phrase for *entity_type* appears in
+    *context_text*.
+
+    Matches by lowercase SUBSTRING containment (not tokenization) so that
+    multi-word field labels (``"account number"``) and punctuated forms
+    (``"nid-"``) hit. Returns ``False`` if the entity type has no
+    configured negative phrases.
+    """
+    words = NEGATIVE_CONTEXT_WORDS.get(entity_type)
+    if not words:
+        return False
+    return any(word in context_text for word in words)
+
+
+def _own_label_adjacent(entity_type: str, text: str, start: int) -> bool:
+    """Check if an own-type context keyword sits directly before the span.
+
+    Consults only the ``NEGATIVE_ADJACENCY_WINDOW`` chars immediately
+    preceding *start* — the field-label position. Reuses
+    ``has_context_words`` so the S7-03 non-Latin containment path applies
+    to the prefix exactly as it does to the full window.
+    """
+    prefix = text[max(0, start - NEGATIVE_ADJACENCY_WINDOW) : start].lower()
+    return has_context_words(entity_type, prefix)
+
+
+def _negative_context_demotion(entity_type: str, base_confidence: float) -> float:
+    """Demoted-branch arithmetic: demotion + (for HIGH_FP_TYPES) the
+    context-absence penalty, applied BEFORE the floor clamp."""
+    penalized = base_confidence - NEGATIVE_CONTEXT_PENALTY
+    if entity_type in HIGH_FP_TYPES:
+        penalized -= CONTEXT_PENALTY
+    return max(CONFIDENCE_FLOOR, penalized)
+
+
+def apply_negative_context(
+    entity_type: str,
+    base_confidence: float,
+    text: str,
+    start: int,
+    end: int,
+) -> float:
+    """Apply ONLY the negative-context demotion (no boost/penalty).
+
+    Entry point for pattern specs WITHOUT ``context_type`` (e.g. the
+    ORGANIZATION specs), which never reach :func:`adjust_confidence`.
+    Findings with no negative phrase in the window — or with an own-type
+    label adjacent — are returned unchanged, so behaviour for everything
+    outside the targeted FP classes is byte-identical.
+    """
+    if entity_type not in NEGATIVE_CONTEXT_WORDS:
+        return base_confidence
+    ctx = extract_context(text, start, end)
+    if has_negative_context(entity_type, ctx) and not _own_label_adjacent(
+        entity_type, text, start
+    ):
+        return _negative_context_demotion(entity_type, base_confidence)
+    return base_confidence
+
+
 def adjust_confidence(
     entity_type: str,
     base_confidence: float,
@@ -406,6 +540,13 @@ def adjust_confidence(
     end: int,
 ) -> float:
     """Boost or penalize *base_confidence* based on surrounding context.
+
+    The negative-context check runs FIRST: a window naming another
+    identifier's field label with no own-type label adjacent demotes the
+    finding (see ``NEGATIVE_CONTEXT_WORDS`` for the composition rule) and
+    the own-type boost is NOT applied — the adjacent foreign label owns
+    the span. Otherwise the pre-existing boost/penalty logic applies
+    unchanged.
 
     Parameters
     ----------
@@ -426,6 +567,10 @@ def adjust_confidence(
         Adjusted confidence in [0.40, 0.99].
     """
     ctx = extract_context(text, start, end)
+    if has_negative_context(entity_type, ctx) and not _own_label_adjacent(
+        entity_type, text, start
+    ):
+        return _negative_context_demotion(entity_type, base_confidence)
     if has_context_words(entity_type, ctx):
         return min(CONFIDENCE_CAP, base_confidence + CONTEXT_BOOST)
     if entity_type in HIGH_FP_TYPES:

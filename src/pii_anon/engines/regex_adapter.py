@@ -50,6 +50,7 @@ from pii_anon.engines.regex.confidence import (
     CONTEXT_WORDS,
     HIGH_FP_TYPES,
     adjust_confidence,
+    apply_negative_context,
     extract_context,
     has_context_words,
 )
@@ -528,6 +529,15 @@ class RegexEngineAdapter(EngineAdapter):
                     if spec.context_type:
                         confidence = adjust_confidence(
                             spec.context_type, confidence, value, span_start, span_end,
+                        )
+                    else:
+                        # Specs without context scoring (e.g. ORGANIZATION)
+                        # still get the negative-context demotion: a window
+                        # naming ANOTHER identifier's field label demotes
+                        # the finding below the emit floor. No-op for
+                        # entity types without NEGATIVE_CONTEXT_WORDS.
+                        confidence = apply_negative_context(
+                            spec.entity_type, confidence, value, span_start, span_end,
                         )
 
                     # ── Confidence threshold filter ────────────────

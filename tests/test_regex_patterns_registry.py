@@ -580,11 +580,22 @@ class TestNationalIdValueShape:
         )
 
     def test_pure_alpha_value_not_captured(self) -> None:
-        # Negative: a value with no digits must not be captured.
-        spans = self._span_texts("National Id Number: Pending")
-        assert all(
-            any(c.isdigit() for c in s) for s in spans
-        ), f"All captured spans must contain at least one digit; got {spans!r}"
+        # Negative: a value with no digits must not be captured. Exact
+        # count 0 — the previous any()-over-spans form was vacuously true
+        # on an empty list and pinned nothing (Task 8 review fold-in).
+        found = self._ids("National Id Number: Pending")
+        assert len(found) == 0, (
+            f"Expected 0 NATIONAL_ID findings for a digit-free value; got {found}"
+        )
+
+    def test_leading_hyphen_value_not_captured(self) -> None:
+        # Negative: a leading-hyphen "value" is not a national id — the
+        # hyphen is only valid BETWEEN alphanumeric runs (Task 8 review
+        # fold-in: leading-hyphen rejection pin).
+        found = self._ids("national id: -12345")
+        assert len(found) == 0, (
+            f"Expected 0 NATIONAL_ID findings for leading-hyphen value; got {found}"
+        )
 
     def test_number_qualifier_consumed_nid_value_captured(self) -> None:
         # 'Number' qualifier is consumed; the actual NID- value is the span.
