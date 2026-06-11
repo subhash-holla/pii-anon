@@ -679,3 +679,102 @@ class TestBarNumberCorpusForms:
         assert self._detect("tracking FL-530363 arrived today") == [], (
             "State-code-prefix value without bar-number keyword must not match"
         )
+
+
+class TestEmailUnicodeLocalPart:
+    """SP1 Task-11: EMAIL_ADDRESS covers Unicode local parts (ASCII domain).
+
+    Checkpoint at N=10000 shows EMAIL_ADDRESS [6927 TP, 56 FP, 2830 FN]
+    (R=0.71) — the biggest remaining recall row.  All 60 dumped FNs at
+    n=2000 are ONE class: the local part contains non-ASCII Unicode word
+    characters (Hangul/CJK/Arabic/Latin-diacritics, e.g.
+    ``예진.박86@outlook.com``, ``stefan.müller60@gmail.com``) while domain
+    and TLD stay ASCII.  The old local-part class ``[A-Za-z0-9._%+-]``
+    rejects them outright (no partial match either: ``\\b`` is blocked
+    inside a Unicode word run).
+
+    Fix: local part ``[\\w.%+-]`` (Python ``\\w`` is Unicode-aware);
+    domain + TLD remain ASCII-only so IDN domains stay out of scope.
+    """
+
+    def _detect(self, text: str):
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "EMAIL_ADDRESS"
+        ]
+
+    def _span(self, text: str, finding) -> str:
+        assert finding.span_start is not None
+        assert finding.span_end is not None
+        return text[finding.span_start : finding.span_end]
+
+    # ── positive: real corpus FN examples (n=2000 seed=8314 dump) ───────────
+    def test_hangul_local_part(self) -> None:
+        # Real corpus FN: "…contact 예진.박86@outlook.com."
+        text = "Swift Bic Code: WCHDDE5C, contact 예진.박86@outlook.com."
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 EMAIL_ADDRESS finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "예진.박86@outlook.com", (
+            f"Span was {self._span(text, found[0])!r}"
+        )
+
+    def test_latin_diacritic_local_part(self) -> None:
+        # Real corpus FN: "…contact stefan.müller60@gmail.com."
+        text = "Id Number: NID-422736198, contact stefan.müller60@gmail.com."
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 EMAIL_ADDRESS finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "stefan.müller60@gmail.com", (
+            f"Span was {self._span(text, found[0])!r}"
+        )
+
+    def test_arabic_local_part(self) -> None:
+        # Real corpus FN (no digits in local part): "…سمير.حسن@test.com…"
+        text = "اتصل بـ سمير حسن على سمير.حسن@test.com اليوم"
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 EMAIL_ADDRESS finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "سمير.حسن@test.com", (
+            f"Span was {self._span(text, found[0])!r}"
+        )
+
+    def test_cjk_local_part(self) -> None:
+        # Real corpus FN: "…contact 丽.孙47@hotmail.com."
+        text = "Record for 丽 孙, Username: dev_8924, contact 丽.孙47@hotmail.com."
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 EMAIL_ADDRESS finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "丽.孙47@hotmail.com", (
+            f"Span was {self._span(text, found[0])!r}"
+        )
+
+    # ── regression: ASCII emails must keep matching exactly ─────────────────
+    def test_ascii_email_still_matches(self) -> None:
+        text = "Contact j.doe_99+tag@example.co.uk for details."
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 EMAIL_ADDRESS finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "j.doe_99+tag@example.co.uk", (
+            f"Span was {self._span(text, found[0])!r}"
+        )
+
+    # ── negative: precision guards ───────────────────────────────────────────
+    def test_unicode_domain_stays_out_of_scope(self) -> None:
+        # IDN domain/TLD remain ASCII-only — no match on a fully-Unicode domain.
+        assert self._detect("メール: 名前@ドメイン.コム まで") == [], (
+            "Unicode domain/TLD must not match (domain class stays ASCII)"
+        )
+
+    def test_obfuscated_email_stays_out_of_scope(self) -> None:
+        # Known-out-of-scope adversarial form ("at"/"dot" obfuscation).
+        assert self._detect("reach me at john at example dot com") == [], (
+            "Obfuscated 'at/dot' form must not produce an EMAIL_ADDRESS finding"
+        )

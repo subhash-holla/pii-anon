@@ -89,8 +89,12 @@ class PatternSpec:
 # what the regex matches.
 
 # ── Core: Email ────────────────────────────────────────────────────────────
-# Standard email: local-part @ domain . TLD (2+ chars).
-_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Standard email: local-part @ domain . TLD (2+ chars).  The local part
+# accepts Unicode word characters (\w: any-script letters/digits/_ — corpus
+# emails carry Hangul/CJK/Arabic/diacritic local parts, e.g.
+# 예진.박86@outlook.com); domain and TLD stay ASCII-only, so IDN domains
+# remain out of scope.
+_EMAIL = re.compile(r"\b[\w.%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 # ── Core: SSN (3 formats) ─────────────────────────────────────────────────
 # Dash-separated: 123-45-6789.
