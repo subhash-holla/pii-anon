@@ -406,11 +406,17 @@ _BANK_ACCOUNT = re.compile(
 )
 
 # National ID with context keyword, or NID-/TAX- prefixed IDs.
+# SP1 Task 8 (2026-06-11): consume the optional "Number|No|#" qualifier so it
+# is never captured as the value span (FP class); expand the value sub-pattern
+# to allow internal hyphens and require ≥1 digit (FN class A: "37-3808704";
+# FN class C: "5T-243002S"; lookahead (?=[A-Za-z0-9\-]*\d) enforces the digit
+# requirement without anchoring the match to a specific prefix).
 _NATIONAL_ID = re.compile(
     r"\b(?:national\s*id|national\s*identification|citizen\s*id|ID\s*number"
     r"|(?:international\s+)?tax\s+id)"
+    r"(?:\s+(?:number|no|#))?"
     r"\s*[:\-#]?\s*"
-    r"((?:NID|TAX)-\d{6,15}|[A-Z0-9]{5,20})\b",
+    r"((?=[A-Za-z0-9\-]*\d)[A-Za-z0-9][A-Za-z0-9\-]{3,23})",
     re.IGNORECASE,
 )
 

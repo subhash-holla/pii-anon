@@ -511,3 +511,86 @@ class TestPersonNameRescueRegression:
             "Expected ≥1 PERSON_NAME for 'Anna Swift attended the meeting' "
             f"after Swift removal from the guard — got {found}"
         )
+
+
+class TestNationalIdValueShape:
+    """SP1 Task 8: NATIONAL_ID must require a digit, accept hyphenated values,
+    and not capture the literal qualifier word 'Number' as the value span.
+
+    FP class (observed n=2000): span='Number' from 'National Id Number: NID-…'
+    FN class A (dominant): Tax Id values like '37-3808704' (digit-hyphen-digit).
+    FN class B: NID-prefixed mixed-alnum values like 'NID-275ZI1979'.
+    FN class C: mixed-case Tax Id values like 'gG-674ZT4G', '5T-243002S'.
+    """
+
+    def _ids(self, text: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "NATIONAL_ID"
+        ]
+
+    def _span_texts(self, text: str) -> list[str]:
+        return [
+            text[f.span_start : f.span_end]
+            for f in self._ids(text)
+            if f.span_start is not None and f.span_end is not None
+        ]
+
+    def test_literal_word_number_is_not_a_national_id(self) -> None:
+        # FP class: the captured span was literally "Number".
+        # Both _NATIONAL_ID (context) and _NATIONAL_ID_NID (standalone) may
+        # fire on the same NID span — ≥1 finding is the contract; dedup upstream.
+        text = "Record for Stefan Müller, National Id Number: NID-114836089."
+        spans = self._span_texts(text)
+        assert "Number" not in spans, (
+            f"Span 'Number' must not be captured as NATIONAL_ID; got {spans!r}"
+        )
+        assert len(self._ids(text)) >= 1, (
+            f"Expected ≥1 NATIONAL_ID (the real value), got {self._ids(text)}"
+        )
+
+    def test_hyphenated_nid_value_matches(self) -> None:
+        # NID-prefixed hyphenated value with context keyword.
+        # Both _NATIONAL_ID (context) and _NATIONAL_ID_NID (standalone) may
+        # fire on the same span — ≥1 finding is the contract; dedup is upstream.
+        found = self._ids("National Id: NID-114836089")
+        assert len(found) >= 1, f"Expected ≥1 NATIONAL_ID, got {found}"
+
+    def test_tax_id_hyphenated_numeric_value_matches(self) -> None:
+        # FN class A: 'Tax Id: 37-3808704' — digit-hyphen-digits form.
+        found = self._ids("Record for John Smith, Tax Id: 37-3808704, contact john@x.com")
+        assert len(found) == 1, (
+            f"Expected 1 NATIONAL_ID for Tax Id hyphenated-numeric value, got {found}"
+        )
+        text = "Record for John Smith, Tax Id: 37-3808704, contact john@x.com"
+        spans = self._span_texts(text)
+        assert "37-3808704" in spans, (
+            f"Expected span '37-3808704', got {spans!r}"
+        )
+
+    def test_tax_id_mixed_case_alphanum_hyphen_matches(self) -> None:
+        # FN class C: mixed-case alphanumeric with hyphen, e.g. '5T-243002S'.
+        found = self._ids("Record for Emily Ramirez, Tax Id: 5T-243002S, contact emily@x.com")
+        assert len(found) == 1, (
+            f"Expected 1 NATIONAL_ID for Tax Id mixed-case value, got {found}"
+        )
+
+    def test_pure_alpha_value_not_captured(self) -> None:
+        # Negative: a value with no digits must not be captured.
+        spans = self._span_texts("National Id Number: Pending")
+        assert all(
+            any(c.isdigit() for c in s) for s in spans
+        ), f"All captured spans must contain at least one digit; got {spans!r}"
+
+    def test_number_qualifier_consumed_nid_value_captured(self) -> None:
+        # 'Number' qualifier is consumed; the actual NID- value is the span.
+        text = "National Id Number: NID-275ZI1979"
+        spans = self._span_texts(text)
+        assert "Number" not in spans, f"'Number' must not be a span; got {spans!r}"
+        assert any("NID" in s or s[0].isdigit() for s in spans), (
+            f"Expected the real ID value in spans; got {spans!r}"
+        )
