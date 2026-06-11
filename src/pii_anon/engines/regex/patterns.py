@@ -727,10 +727,18 @@ _DOCKET = re.compile(
 #   "SBN 123456" (California)
 #   "Bar ID: 987654"
 #   "Bar #12345"
+#   "Bar Number: BAR-866155"   (dominant corpus form; BAR-prefix + digits)
+#   "Bar No. FL-530363"        (deposition form; 2-letter state code + digits)
+# Value alternation (most-specific first):
+#   BAR-\d{4,7}         explicit BAR-prefix (unambiguous)
+#   [A-Z]{1,3}-\d{4,7}  state-code prefix (FL-, CA-, NY-, etc.); context-gated
+#   \d{4,8}             classic plain-digit form
+# The [A-Z]{1,3}-\d{4,7} shape is kept BEHIND specific bar-context keywords
+# (bar number/no./id, state bar, sbn) so generic XX-NNNNN refs cannot fire.
 _BAR_NUMBER = re.compile(
     r"\b(?:state\s+bar|sbn|bar\s*(?:id|no\.?|number|#))"
     r"\s*[:\-#]?\s*"
-    r"(\d{4,8})\b",
+    r"(BAR-\d{4,7}|[A-Z]{1,3}-\d{4,7}|\d{4,8})\b",
     re.IGNORECASE,
 )
 

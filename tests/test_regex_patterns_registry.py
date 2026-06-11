@@ -605,3 +605,77 @@ class TestNationalIdValueShape:
         assert any("NID" in s or s[0].isdigit() for s in spans), (
             f"Expected the real ID value in spans; got {spans!r}"
         )
+
+
+class TestBarNumberCorpusForms:
+    """SP1 Task-10: BAR_NUMBER covers corpus BAR-/XX-prefixed value forms.
+
+    Corpus has 12,033 spans; baseline shows [0 TP, 0 FP, 208 FN] at N=10000.
+    The existing pattern captures only pure-digit values (\\d{4,8}), missing:
+      - 'Bar Number: BAR-866155'   (dominant multilingual-record form)
+      - 'Bar No. FL-530363'        (deposition style, state-code prefix)
+    """
+
+    def _detect(self, text: str):
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "BAR_NUMBER"
+        ]
+
+    def _span(self, text: str, finding) -> str:
+        assert finding.span_start is not None
+        assert finding.span_end is not None
+        return text[finding.span_start : finding.span_end]
+
+    # ── positive: corpus form 1 ─────────────────────────────────────────────
+    def test_bar_prefix_six_digit_form(self) -> None:
+        # Dominant corpus form: "Bar Number: BAR-866155"
+        text = "Record for Maria Gonzalez, Bar Number: BAR-866155, DOB: 1978-04-12"
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 BAR_NUMBER finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "BAR-866155", (
+            f"Span was {self._span(text, found[0])!r}, expected 'BAR-866155'"
+        )
+
+    # ── positive: corpus form 2 ─────────────────────────────────────────────
+    def test_state_code_prefix_deposition_form(self) -> None:
+        # Deposition style: "EXAMINATION BY Robert Young (Bar No. FL-530363):"
+        text = "EXAMINATION BY Robert Young (Bar No. FL-530363): Q: State your name."
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 BAR_NUMBER finding, got {len(found)}: {found}"
+        )
+        assert self._span(text, found[0]) == "FL-530363", (
+            f"Span was {self._span(text, found[0])!r}, expected 'FL-530363'"
+        )
+
+    # ── positive: existing plain-digit form must still match ────────────────
+    def test_existing_plain_digit_form_still_matches(self) -> None:
+        # Pre-existing corpus form must not regress.
+        found = self._detect("State Bar No. 123456")
+        assert len(found) == 1, (
+            f"Expected 1 BAR_NUMBER for plain-digit form, got {len(found)}: {found}"
+        )
+
+    def test_sbn_plain_digit_still_matches(self) -> None:
+        found = self._detect("SBN 987654")
+        assert len(found) == 1, (
+            f"Expected 1 BAR_NUMBER for SBN plain-digit form, got {len(found)}: {found}"
+        )
+
+    # ── negative: bare XX-NNNNN without bar context must NOT match ──────────
+    def test_bare_xx_hyphen_digits_no_context_does_not_match(self) -> None:
+        # A generic reference code without a bar-number keyword must produce nothing.
+        assert self._detect("ref BAR-123456 shipped") == [], (
+            "BAR-NNNNNN without a bar-number keyword must not produce a finding"
+        )
+
+    def test_bare_state_code_hyphen_digits_no_context_does_not_match(self) -> None:
+        # A state-code prefix shape alone must not fire (too generic).
+        assert self._detect("tracking FL-530363 arrived today") == [], (
+            "State-code-prefix value without bar-number keyword must not match"
+        )
