@@ -145,6 +145,20 @@ _PERSON_FR = re.compile(r"\b(?:M|Mme|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
 # Uses ``[ \t]+`` (not ``\s+``) to avoid matching across line boundaries.
 # Negative lookahead at start excludes role/function prefixes (Employee,
 # Agent, etc.) that frequently cause false positives.
+#
+# Field-label nouns: a Title-Case candidate whose 2nd/3rd token is one of
+# these is a form-field label (e.g. "Swift Bic Code", "Medication Name"),
+# not a person name — the single largest PERSON_NAME FP factory on the DATA
+# corpus.  "Name" is included beyond the core vocabulary because "<X> Name"
+# is itself the most generic field label ("Medication Name", "Patient Name")
+# while "Name" as a surname is essentially nonexistent.
+_FIELD_LABEL_NOUNS = (
+    "Number|Code|License|Licence|Insurance|Account|Routing|Records|Record"
+    "|Medication|Docket|Case|Policy|Invoice|Member|Security|Registration"
+    "|Identifier|Id|Bic|Swift|Notary|Plate|Passport|Diagnosis|Procedure"
+    "|Condition|Salary|Username|Address|Status|Level|Type|Date|Time|Name"
+)
+
 _PERSON_FULL_NAME = re.compile(
     r"(?<![A-Za-z])"
     r"(?!(?:Employee|Agent|Support|Customer|Account|Project|Product|System|Technical"
@@ -154,6 +168,12 @@ _PERSON_FULL_NAME = re.compile(
     r"|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
     r"|January|February|March|April|June|July|August|September|October|November|December"
     r")[ \t])"
+    # Trailing-token guard: block candidates whose 2nd or 3rd capitalized
+    # word is a field-label noun ("Docket Number", "Health Insurance").
+    # (An alternative followed-by-colon guard measured -964 FP but -54 TP at
+    # n=2000 — a net micro-F2 loss vs this rule's -932 FP at zero TP loss.)
+    r"(?![A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?[ \t]+"
+    r"(?:" + _FIELD_LABEL_NOUNS + r")(?![A-Za-z]))"
     r"[A-Z][a-z]{2,}[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?"
     r"(?![A-Za-z])"
 )
@@ -294,6 +314,8 @@ _ROUTING_NUMBER = re.compile(
 # The optional parenthetical group (up to 24 chars, e.g. "(rental)") handles
 # corpus forms like "License Plate (rental): JBL-4117".  The 24-char cap
 # prevents bridging across unrelated asides.
+# Known FP surface: bare "tag" + parenthetical (e.g. "tag (v2): AB-123") can
+# over-trigger; accepted — LICENSE_PLATE is in HIGH_FP_TYPES (context penalty).
 _LICENSE_PLATE = re.compile(
     r"\b(?:plate|license\s*plate|tag|vehicle\s*(?:registration|reg)|registration\s*number)"
     r"\s*(?:\([^)\n]{1,24}\)\s*)?(?:number|no|#)?\s*[:\-#]?\s*"

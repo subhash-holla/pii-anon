@@ -385,3 +385,38 @@ class TestLicensePlateParenthetical:
             )
             == []
         )
+
+    def test_parenthetical_length_boundary_exact(self) -> None:
+        # Exact boundary of the {1,24} cap: a 24-char body bridges, 25 does not.
+        assert len(self._detect(f"License Plate ({'x' * 24}): JBL-4117")) == 1
+        assert self._detect(f"License Plate ({'x' * 25}): JBL-4117") == []
+
+
+class TestPersonNameFieldLabelExclusion:
+    """Field labels ('Medication Name', 'Docket Number') are the largest
+    PERSON_NAME FP factory on the DATA corpus (6,670 FPs at N=10,000)."""
+
+    FIELD_LABEL_PHRASES = [
+        "Swift Bic Code", "Medication Name", "Docket Number",
+        "Notary License", "National Id Number", "Health Insurance",
+        "Insurance Policy Number", "Bank Routing Number",
+    ]
+    REAL_NAMES = ["Kenneth Anderson", "Andrea Romano", "Sara Conti", "Heike Becker"]
+
+    def _names(self, text: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "PERSON_NAME"
+        ]
+
+    def test_field_labels_not_detected_as_names(self) -> None:
+        for phrase in self.FIELD_LABEL_PHRASES:
+            assert self._names(f"Record for X, {phrase}: ABC-123.") == [], phrase
+
+    def test_real_names_still_detected(self) -> None:
+        for name in self.REAL_NAMES:
+            assert len(self._names(f"Record for {name}, contact x@y.com")) >= 1, name
