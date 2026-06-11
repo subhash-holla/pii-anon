@@ -1,0 +1,282 @@
+{
+  "n": 2000,
+  "seed": 8314,
+  "micro": {
+    "precision": 0.789558,
+    "recall": 0.745455,
+    "f2": 0.753877
+  },
+  "latency_p50_ms": 0.2382,
+  "per_entity": {
+    "ADDRESS": [
+      250,
+      4,
+      4
+    ],
+    "AGE": [
+      0,
+      0,
+      1
+    ],
+    "API_KEY": [
+      0,
+      0,
+      68
+    ],
+    "AUTHENTICATION_TOKEN": [
+      0,
+      0,
+      8
+    ],
+    "BANK_ACCOUNT": [
+      113,
+      72,
+      11
+    ],
+    "BAR_NUMBER": [
+      0,
+      0,
+      37
+    ],
+    "BIOMETRIC_ID": [
+      0,
+      0,
+      4
+    ],
+    "COURT_CASE_NUMBER": [
+      0,
+      0,
+      41
+    ],
+    "CREDIT_CARD": [
+      90,
+      1,
+      19
+    ],
+    "CRYPTO_WALLET": [
+      0,
+      1,
+      13
+    ],
+    "CVV": [
+      72,
+      0,
+      10
+    ],
+    "DATE_OF_BIRTH": [
+      268,
+      0,
+      19
+    ],
+    "DEA_NUMBER": [
+      0,
+      0,
+      22
+    ],
+    "DOCKET_NUMBER": [
+      43,
+      0,
+      10
+    ],
+    "DRIVERS_LICENSE": [
+      3,
+      0,
+      73
+    ],
+    "EDUCATION_LEVEL": [
+      0,
+      0,
+      2
+    ],
+    "EMAIL_ADDRESS": [
+      1374,
+      8,
+      571
+    ],
+    "EMPLOYEE_ID": [
+      90,
+      0,
+      12
+    ],
+    "ETHNICITY": [
+      0,
+      0,
+      1
+    ],
+    "GENDER": [
+      0,
+      0,
+      3
+    ],
+    "HEALTH_CONDITION": [
+      0,
+      0,
+      56
+    ],
+    "HOUSEHOLD_SIZE": [
+      0,
+      0,
+      1
+    ],
+    "IBAN": [
+      0,
+      0,
+      79
+    ],
+    "INSURANCE_POLICY_NUMBER": [
+      0,
+      0,
+      81
+    ],
+    "INVOICE_NUMBER": [
+      0,
+      0,
+      68
+    ],
+    "IP_ADDRESS": [
+      106,
+      1,
+      0
+    ],
+    "JOB_TITLE": [
+      0,
+      0,
+      77
+    ],
+    "LICENSE_PLATE": [
+      36,
+      1,
+      9
+    ],
+    "LOCATION": [
+      5,
+      8,
+      30
+    ],
+    "MAC_ADDRESS": [
+      37,
+      26,
+      6
+    ],
+    "MARITAL_STATUS": [
+      0,
+      0,
+      2
+    ],
+    "MEDICAL_RECORD_NUMBER": [
+      85,
+      2,
+      50
+    ],
+    "MEDICATION_NAME": [
+      0,
+      0,
+      66
+    ],
+    "NATIONAL_ID": [
+      90,
+      61,
+      73
+    ],
+    "NPI_NUMBER": [
+      0,
+      0,
+      58
+    ],
+    "ORGANIZATION": [
+      264,
+      56,
+      71
+    ],
+    "PASSPORT": [
+      81,
+      2,
+      21
+    ],
+    "PASSWORD": [
+      0,
+      0,
+      69
+    ],
+    "PERSON_NAME": [
+      3076,
+      1329,
+      648
+    ],
+    "PHONE_NUMBER": [
+      845,
+      147,
+      0
+    ],
+    "PIN": [
+      55,
+      0,
+      3
+    ],
+    "POLITICAL_OPINION": [
+      0,
+      0,
+      1
+    ],
+    "PRESCRIPTION_NUMBER": [
+      0,
+      0,
+      5
+    ],
+    "PROCEDURE_NAME": [
+      0,
+      0,
+      37
+    ],
+    "RELIGIOUS_BELIEF": [
+      0,
+      0,
+      3
+    ],
+    "ROUTING_NUMBER": [
+      73,
+      0,
+      13
+    ],
+    "SALARY": [
+      0,
+      0,
+      46
+    ],
+    "SWIFT_BIC": [
+      0,
+      60,
+      0
+    ],
+    "URL": [
+      0,
+      0,
+      4
+    ],
+    "USERNAME": [
+      46,
+      21,
+      3
+    ],
+    "US_SSN": [
+      273,
+      166,
+      10
+    ],
+    "VEHICLE_MODEL": [
+      0,
+      0,
+      1
+    ],
+    "VIN": [
+      5,
+      0,
+      0
+    ],
+    "ZIP_CODE": [
+      0,
+      1,
+      0
+    ]
+  }
+}
