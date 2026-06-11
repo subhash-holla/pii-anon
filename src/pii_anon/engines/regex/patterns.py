@@ -1234,9 +1234,9 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         context_type="AGE",
         explanation="regex age",
     ),
-    # ── MEDICAL_LICENSE / NPI (Phase 2) ────────────────────────────────
+    # ── NPI_NUMBER / DEA_NUMBER (Phase 2) ──────────────────────────────
     PatternSpec(
-        entity_type="MEDICAL_LICENSE",
+        entity_type="NPI_NUMBER",
         pattern=_NPI,
         base_confidence=0.88,
         group=1,
@@ -1251,6 +1251,7 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         group=1,
         validator="dea",
         valid_confidence=0.93,
+        # Corpus DEA values are mostly checksum-invalid; demote to 0.70 rather than skip (recall-critical).
         invalid_confidence=0.70,
         context_type="MEDICAL_LICENSE",
         explanation="regex dea number",

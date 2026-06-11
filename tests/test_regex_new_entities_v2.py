@@ -1,4 +1,4 @@
-"""Tests for new PII entity types: IPv6, URL_WITH_PII, AGE, DATE_TIME, MEDICAL_LICENSE.
+"""Tests for new PII entity types: IPv6, URL_WITH_PII, AGE, DATE_TIME, NPI_NUMBER, DEA_NUMBER.
 
 Covers detection, validation, confidence scoring, and edge cases for each type.
 """
@@ -341,7 +341,7 @@ class TestDATETIMEDetection:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MEDICAL_LICENSE (NPI and DEA) Detection
+# NPI_NUMBER and DEA_NUMBER Detection
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -365,7 +365,7 @@ class TestNPIDetection:
             {"text": "NPI: 1234567893"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
         # May or may not pass validation depending on Luhn
         assert isinstance(npis, list)
 
@@ -377,7 +377,7 @@ class TestNPIDetection:
             {"text": "national provider identifier 1234567893"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
         assert len(npis) >= 1
 
     def test_npi_without_context(self) -> None:
@@ -387,8 +387,37 @@ class TestNPIDetection:
             {"text": "1234567890"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
         assert len(npis) == 0
+
+    def test_npi_emits_npi_number_label(self) -> None:
+        """NPI detections carry the NPI_NUMBER label the eval corpus uses.
+
+        Corpus truth labels NPIs as NPI_NUMBER (15,160 spans in DATA v2);
+        the eval map has no NPI_NUMBER->MEDICAL_LICENSE alias.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. base_confidence=0.88; is_valid_npi('2906399474')=True
+          2. valid_confidence is None → _run_validator returns spec.valid_confidence or
+             confidence = None or 0.88 = 0.88
+          3. context_type='MEDICAL_LICENSE' triggers adjust_confidence;
+             CONTEXT_WORDS['MEDICAL_LICENSE'] contains 'npi'; text 'NPI: 2906399474'
+             → token 'npi' in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: min(CONFIDENCE_CAP=0.99, 0.88 + 0.10) = min(0.99, 0.98) = 0.98
+
+        Note: NPI '2906399475' (corpus representative) is Luhn-invalid; without an
+        invalid_confidence fallback the validator suppresses it (skip=True → 0 emissions).
+        '2906399474' (corrected last digit) is Luhn-valid and exercises the label path.
+        The skip-on-invalid behaviour is a concern: many corpus NPIs may be Luhn-invalid
+        (mirroring the old DEA skip-on-invalid that zeroed recall); reported as a concern
+        but validator semantics are not changed in this task.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "NPI: 2906399474"}, {"language": "en"})
+        npi = [f for f in findings if f.entity_type == "NPI_NUMBER"]
+        assert len(npi) == 1
+        assert not [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        assert npi[0].confidence == pytest.approx(0.98, abs=1e-9)
 
 
 class TestDEADetection:

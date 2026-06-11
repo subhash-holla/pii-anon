@@ -175,12 +175,12 @@ class TestNewEntityTypes:
         date_specs = [s for s in PATTERN_REGISTRY if s.entity_type == "DATE_TIME"]
         assert len(date_specs) >= 1
 
-    def test_medical_license_in_registry(self) -> None:
-        """MEDICAL_LICENSE (NPI) and DEA_NUMBER patterns must be in registry."""
-        medical_specs = [
-            s for s in PATTERN_REGISTRY if s.entity_type == "MEDICAL_LICENSE"
+    def test_npi_number_in_registry(self) -> None:
+        """NPI_NUMBER and DEA_NUMBER patterns must be in registry."""
+        npi_specs = [
+            s for s in PATTERN_REGISTRY if s.entity_type == "NPI_NUMBER"
         ]
-        assert len(medical_specs) >= 1  # At least NPI
+        assert len(npi_specs) >= 1  # NPI emits NPI_NUMBER
         dea_specs = [
             s for s in PATTERN_REGISTRY if s.entity_type == "DEA_NUMBER"
         ]
