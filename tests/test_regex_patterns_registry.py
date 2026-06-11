@@ -176,11 +176,15 @@ class TestNewEntityTypes:
         assert len(date_specs) >= 1
 
     def test_medical_license_in_registry(self) -> None:
-        """MEDICAL_LICENSE patterns (NPI, DEA) must be in registry."""
+        """MEDICAL_LICENSE (NPI) and DEA_NUMBER patterns must be in registry."""
         medical_specs = [
             s for s in PATTERN_REGISTRY if s.entity_type == "MEDICAL_LICENSE"
         ]
-        assert len(medical_specs) >= 2  # At least NPI and DEA
+        assert len(medical_specs) >= 1  # At least NPI
+        dea_specs = [
+            s for s in PATTERN_REGISTRY if s.entity_type == "DEA_NUMBER"
+        ]
+        assert len(dea_specs) >= 1  # DEA now has its own label
 
 
 class TestValidConfidenceScores:
