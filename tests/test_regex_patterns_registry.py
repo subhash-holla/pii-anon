@@ -342,3 +342,46 @@ class TestDriversLicenseCorpusForms:
         # The negative lookbehind in _DRIVERS_LICENSE_BARE_KW prevents it from
         # firing inside the driver-specific phrase already handled by _DRIVERS_LICENSE_CTX.
         assert len(self._detect("driver's license number: D1234567")) == 1
+
+
+class TestLicensePlateParenthetical:
+    """Corpus miss: parenthetical qualifier between keyword and separator
+    (e.g. "License Plate (rental): JBL-4117")."""
+
+    def _detect(self, text: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "LICENSE_PLATE"
+        ]
+
+    def test_parenthetical_qualifier_form(self) -> None:
+        # Corpus miss: "License Plate (rental): JBL-4117"
+        text = "License Plate (rental): JBL-4117 DOB: 1982-01-01"
+        found = self._detect(text)
+        assert len(found) == 1, (
+            f"Expected 1 LICENSE_PLATE finding, got {len(found)}: {found}"
+        )
+        assert found[0].span_start is not None
+        assert found[0].span_end is not None
+        assert text[found[0].span_start : found[0].span_end] == "JBL-4117", (
+            f"Span text was {text[found[0].span_start:found[0].span_end]!r}, "
+            f"expected 'JBL-4117'"
+        )
+
+    def test_plain_form_still_matches(self) -> None:
+        # Both _LICENSE_PLATE and _LICENSE_PLATE_US may fire on the same span;
+        # at least one finding is the contract here (plain forms must not regress).
+        assert len(self._detect("License Plate: MOO-8530")) >= 1
+
+    def test_parenthetical_too_long_not_bridged(self) -> None:
+        # A >24-char parenthetical is not a qualifier; don't bridge it.
+        assert (
+            self._detect(
+                "License Plate (this is a long unrelated aside about rentals): JBL-4117"
+            )
+            == []
+        )

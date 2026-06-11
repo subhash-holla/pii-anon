@@ -291,9 +291,12 @@ _ROUTING_NUMBER = re.compile(
 )
 
 # License plate with context keyword.
+# The optional parenthetical group (up to 24 chars, e.g. "(rental)") handles
+# corpus forms like "License Plate (rental): JBL-4117".  The 24-char cap
+# prevents bridging across unrelated asides.
 _LICENSE_PLATE = re.compile(
     r"\b(?:plate|license\s*plate|tag|vehicle\s*(?:registration|reg)|registration\s*number)"
-    r"\s*(?:number|no|#)?\s*[:\-#]?\s*"
+    r"\s*(?:\([^)\n]{1,24}\)\s*)?(?:number|no|#)?\s*[:\-#]?\s*"
     r"([A-Z0-9]{1,4}[\s\-]?[A-Z0-9]{2,5})\b",
     re.IGNORECASE,
 )
