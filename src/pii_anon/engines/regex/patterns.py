@@ -241,10 +241,10 @@ _MAC_ADDRESS = re.compile(
 
 # Driver's license with context keyword: "driver's license" / "license number" + ID.
 _DRIVERS_LICENSE_CTX = re.compile(
-    r"\b(?:driver'?s?\s*licen[cs]e|license\s*(?:number|no|#)|permis\s*(?:de\s+)?conduire"
+    r"\b(?:driver'?s?\s*licen[cs]e(?:\s*(?:number|no|#))?|license\s*(?:number|no|#)|permis\s*(?:de\s+)?conduire"
     r"|licencia\s*(?:de\s+)?conducir|f[üu]hrerschein)"
     r"\s*[:\-#]?\s*"
-    r"(DL-[A-Z]\d{4,6}-\d{2,4}|[A-Z]\d{4,15}|\d{1,3}-\d{2,4}-\d{4,6})\b",
+    r"(DL-[A-Z]\d{4,6}-\d{2,4}|[A-Z]{1,3}-\d{5,9}|[A-Z]\d{4,15}|\d{1,3}-\d{2,4}-\d{4,6})\b",
     re.IGNORECASE,
 )
 # Standalone DL-prefixed ID (e.g. "DL-G20640-40") — no keyword needed because

@@ -289,3 +289,41 @@ class TestCreditCardFragmentBehavior:
             f"Expected confidence 0.88 (flat, no context adjustment), "
             f"got {finding.confidence}"
         )
+
+
+class TestDriversLicenseCorpusForms:
+    """DATA v2 corpus DL surface forms (23,461 spans) — formats the value
+    sub-pattern missed entirely (baseline R=0.06)."""
+
+    def _detect(self, text: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == "DRIVERS_LICENSE"
+        ]
+
+    def test_two_letter_hyphen_six_digit_form(self) -> None:
+        # Corpus-dominant: "Driver License Number: LC-908984"
+        found = self._detect(
+            "Record for Stefan Weber, Driver License Number: QR-427697, contact x@y.de"
+        )
+        assert len(found) == 1, f"Expected 1 DRIVERS_LICENSE finding, got {len(found)}: {found}"
+        # The captured span should cover the value "QR-427697" (not the keyword)
+        text = "Record for Stefan Weber, Driver License Number: QR-427697, contact x@y.de"
+        assert found[0].span_start is not None
+        assert found[0].span_end is not None
+        assert text[found[0].span_start:found[0].span_end] == "QR-427697", (
+            f"Span text was {text[found[0].span_start:found[0].span_end]!r}, "
+            f"expected 'QR-427697'"
+        )
+
+    def test_existing_forms_still_match(self) -> None:
+        assert len(self._detect("driver's license: D1234567")) == 1
+        assert len(self._detect("DL-A12345-678")) >= 1
+
+    def test_bare_value_without_context_does_not_match(self) -> None:
+        # The XX-NNNNNN shape is generic (order codes); context stays required.
+        assert self._detect("Tracking ref QR-427697 shipped today") == []
