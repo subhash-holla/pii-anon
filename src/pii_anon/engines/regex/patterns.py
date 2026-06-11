@@ -1243,6 +1243,7 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         validator="npi",
         # Corpus NPIs are mostly Luhn-invalid; demote to 0.70 rather than skip (recall-critical).
         invalid_confidence=0.70,
+        # context_type is a shared CONTEXT_WORDS vocabulary key (npi/dea/medical terms), not the emitted label.
         context_type="MEDICAL_LICENSE",
         explanation="regex npi",
     ),

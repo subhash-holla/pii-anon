@@ -366,8 +366,7 @@ class TestNPIDetection:
             {"language": "en"},
         )
         npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
-        # May or may not pass validation depending on Luhn
-        assert isinstance(npis, list)
+        assert len(npis) == 1
 
     def test_npi_format_detection(self) -> None:
         """10-digit Luhn-valid NPI with 'national provider' keyword should be detected."""
@@ -398,8 +397,9 @@ class TestNPIDetection:
 
         Confidence derivation (code path: regex_adapter._run_validator → context boost):
           1. base_confidence=0.88; is_valid_npi('2906399474')=True
-          2. valid_confidence is None → _run_validator returns spec.valid_confidence or
-             confidence = None or 0.88 = 0.88
+          2. valid_confidence is None, so the `or` short-circuits to base_confidence=0.88.
+             (Note: the `or` idiom means a hypothetical valid_confidence=0.0 would also be
+             ignored — use non-zero values.)
           3. context_type='MEDICAL_LICENSE' triggers adjust_confidence;
              CONTEXT_WORDS['MEDICAL_LICENSE'] contains 'npi'; text 'NPI: 2906399474'
              → token 'npi' in ±50-char window → CONTEXT_BOOST=+0.10 applies
@@ -423,7 +423,7 @@ class TestNPIDetection:
         """A corpus-real NPI with a failing Luhn check emits at 0.80 exactly.
 
         Confidence derivation (code path: regex_adapter._run_validator → context boost):
-          1. invalid_confidence=0.70 returned by _run_validator (line ~701 in regex_adapter.py)
+          1. invalid_confidence=0.70 returned by _run_validator (the generic-validator path in _run_validator)
           2. context_type="MEDICAL_LICENSE" triggers adjust_confidence (line ~529)
           3. CONTEXT_WORDS["MEDICAL_LICENSE"] contains "npi"; text "NPI: 2906399475"
              → token "npi" in ±50-char window → CONTEXT_BOOST=+0.10 applies
