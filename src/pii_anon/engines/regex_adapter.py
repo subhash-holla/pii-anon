@@ -355,6 +355,10 @@ class RegexEngineAdapter(EngineAdapter):
                     context_window=conf.get("context_window"),
                     confidence_cap=conf.get("confidence_cap"),
                     confidence_floor=conf.get("confidence_floor"),
+                    # Not (yet) a ConfidenceConfig schema field — forwarded
+                    # when present in dict-form config; absent -> None ->
+                    # the module default is preserved.
+                    negative_context_penalty=conf.get("negative_context_penalty"),
                 )
 
     def capabilities(self) -> EngineCapabilities:

@@ -364,18 +364,22 @@ def test_full_workflow_configure_then_adjust() -> None:
 
 
 class TestNegativeContextDemotion:
-    """A match whose ±50-char window names a DIFFERENT identifier's field
-    label is demoted below the emit floor. Kills the SSN-inside-NID-,
+    """A match evidenced as a DIFFERENT identifier's field/value is
+    demoted below the emit floor. Kills the SSN-inside-NID-,
     PHONE-after-NPI: FP classes (n=10000 baseline: 829 + 727 FPs).
 
-    Composition rule (pinned here and in confidence.py): the demotion
-    fires when a negative phrase is anywhere in the ±CONTEXT_WINDOW
-    window AND no OWN-type context keyword appears in the
-    NEGATIVE_ADJACENCY_WINDOW chars immediately before the span (the
-    field-label position). An adjacent own label ("Phone:", "SSN:")
-    protects the finding even with a negative word elsewhere in the
-    window; a DISTANT own-type word (the neighbouring field's
-    "contact:" label) does NOT protect.
+    Composition rules (pinned here, in TestNegativeContextLeakFixes, and
+    in confidence.py): RULE A (value-position: US_SSN, PHONE_NUMBER) —
+    the demotion fires when a negative phrase hits the pre/post window
+    segments (span text EXCLUDED) AND no OWN-type context keyword
+    appears in the NEGATIVE_ADJACENCY_WINDOW chars immediately before
+    the span (the field-label position; trailing whitespace stripped).
+    RULE B (label-position: ORGANIZATION) — the demotion fires when a
+    negative phrase starts INSIDE the span AND label-position evidence
+    (qualifier + separator + value) follows the span. An adjacent own
+    label ("Phone:", "SSN:") protects the finding either way; a DISTANT
+    own-type word (the neighbouring field's "contact:" label) does NOT
+    protect.
     """
 
     def _findings(self, text: str, entity_type: str):
@@ -417,8 +421,9 @@ class TestNegativeContextDemotion:
 
     def test_org_health_insurance_not_emitted(self) -> None:
         # Generic phrase "Health Insurance" (a field label, not an org):
-        # the span itself puts "health insurance" in the window; no ORG
-        # keyword adjacent -> 0.78 - 0.30 - 0.15 -> floored 0.40 -> suppressed.
+        # the span IS the negative phrase AND ": HI-12345" follows (RULE B
+        # label-position evidence); no ORG keyword adjacent
+        # -> 0.78 - 0.30 - 0.15 -> floored 0.40 -> suppressed.
         text = "Record for Maria Garcia, Health Insurance: HI-12345"
         spans = [
             text[f.span_start : f.span_end]
@@ -540,3 +545,283 @@ class TestNegativeContextDemotion:
             text="National Id Number: NID-422736198", start=20, end=33,
         )
         assert result == 0.88, f"Expected unchanged 0.88, got {result}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Leak-direction review fixes: span-exclusion + label-position rule +
+# word-boundary negatives (a suppressed TRUE detection = unredacted PII)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestNegativeContextLeakFixes:
+    """Pins the two leak-direction fixes to the demotion mechanism.
+
+    LEAK 1 (ORG self-trigger): the scan window included the span itself,
+    so a genuine org whose OWN NAME contains a negative phrase ("Social
+    Security Administration", "National Health Insurance Company")
+    self-triggered the demotion -> unredacted PII. Fixed by splitting the
+    mechanism into two rules:
+
+    - RULE A (value-position: US_SSN, PHONE_NUMBER): scan the pre/post
+      window segments EXCLUDING the span text (spans are digit runs, so
+      exclusion is safe and principled).
+    - RULE B (label-position: ORGANIZATION): the FP class and the genuine
+      mention are THE SAME TEXT SHAPE distinguished by what FOLLOWS.
+      Demote ONLY when a negative phrase starts inside the span AND the
+      span is followed by label-position evidence (optional qualifier +
+      separator + value token); otherwise keep.
+
+    LEAK 2 (substring-vs-token asymmetry): "policy" substring-hit
+    "Policyholder", suppressing a genuine phone. Fixed by word-boundary
+    anchoring SHORT BARE-WORD negative phrases; multi-word labels
+    ("account number") and prefix-shaped forms ("nid-") stay substrings.
+    """
+
+    def _findings(self, text: str, entity_type: str):
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        adapter = RegexEngineAdapter()
+        return [
+            f
+            for f in adapter.detect({"text": text}, {"language": "en"})
+            if f.entity_type == entity_type
+        ]
+
+    def _spans(self, text: str, entity_type: str) -> list[str]:
+        return sorted(
+            text[f.span_start : f.span_end] for f in self._findings(text, entity_type)
+        )
+
+    # ── The four-case ORGANIZATION matrix ─────────────────────────────
+
+    def test_org_case1_org_name_mention_emitted(self) -> None:
+        # The org's own name contains the negative phrase "social
+        # security" but is followed by " in Baltimore" — no separator +
+        # value, so no label evidence -> NOT demoted. NOTE: the engine
+        # legitimately emits TWO overlapping spans for this one genuine
+        # mention (_ORGANIZATION_INDUSTRY + _ORGANIZATION_CONTEXT both
+        # match — probe control: "Employer: Social Security
+        # Administration" also emits 2), so the nominal "exactly 1"
+        # review expectation is pinned as the exact two-span set; the
+        # leak fix is 0 -> the genuine mention covered.
+        text = "She works at the Social Security Administration in Baltimore"
+        assert self._spans(text, "ORGANIZATION") == [
+            "Social Security",
+            "the Social Security Administration in",
+        ]
+
+    def test_org_case2_sued_org_name_emitted(self) -> None:
+        # Genuine org mention containing "health insurance"; followed by
+        # end-of-string -> no label evidence -> emitted (was 0 = leak).
+        text = "He sued National Health Insurance Company"
+        spans = self._spans(text, "ORGANIZATION")
+        assert len(spans) >= 1, f"Expected >=1 ORGANIZATION, got {spans!r}"
+        assert spans == [
+            "National Health Insurance",
+            "National Health Insurance Company",
+        ]
+
+    def test_org_case3_label_with_value_stays_dead(self) -> None:
+        # The original FP class: "Health Insurance" here is a FIELD LABEL
+        # (followed by ": HI-12345" — separator + value), not an org.
+        # The negative phrase IS the span, so the label-position evidence
+        # is what keeps this dead under span-aware scanning.
+        text = "Record for Maria Garcia, Health Insurance: HI-12345"
+        assert self._findings(text, "ORGANIZATION") == []
+
+    def test_org_case4_ssn_inside_nid_stays_dead(self) -> None:
+        # RULE A regression guard: excluding the span from the window scan
+        # must not resurrect the SSN-inside-NID class — the negative
+        # phrases ("national id", "nid-") live in the PRE segment.
+        found = self._findings("National Id Number: NID-422736198", "US_SSN")
+        assert found == [], f"US_SSN must stay dead inside NID- value; got {found}"
+
+    # ── RULE B qualifier shapes (label evidence past a qualifier word) ─
+
+    def test_org_label_with_id_qualifier_stays_dead(self) -> None:
+        # "Migraine Insurance ID: INS-12345": the phrase "insurance id"
+        # STARTS inside the span and the evidence regex's qualifier
+        # absorbs " ID" before the separator -> still demoted.
+        assert self._findings("Migraine Insurance ID: INS-12345", "ORGANIZATION") == []
+
+    def test_org_label_with_handle_qualifier_stays_dead(self) -> None:
+        # "Social Media Handle: @maria_g": "handle" is a measured label
+        # qualifier (n=2000 seed=8314 FP class) -> still demoted.
+        assert self._findings("Social Media Handle: @maria_g", "ORGANIZATION") == []
+
+    def test_org_bare_qualifier_word_stays_dead(self) -> None:
+        # Evidence shape B2 (tuning iteration 2): the deposition-dialogue
+        # class names the FIELD without a separator + value ("…your Social
+        # Security Number, for the record?") — the bare qualifier word
+        # right after the span is label evidence; B1 alone resurrected 6
+        # of these as ORG FPs on the n=2000 seed=8314 draw. The genuine
+        # "Bluth Company" org in the same text must survive.
+        text = (
+            "worked at Bluth Company for approximately 8 years.  "
+            "Q: And your Social Security Number, for the record?"
+        )
+        spans = self._spans(text, "ORGANIZATION")
+        assert "Social Security" not in spans, (
+            f"field-name 'Social Security Number' must not resurrect; got {spans!r}"
+        )
+        assert "Bluth Company" in spans
+
+    def test_org_phrase_only_in_consumed_tail_not_demoted(self) -> None:
+        # The negative phrase must START INSIDE the span: a phrase living
+        # entirely in the consumed evidence tail (a parenthetical) must
+        # not demote the real org name before it.
+        text = "Acme Corp (Health Insurance): 22 Main St"
+        result = confidence.apply_negative_context(
+            "ORGANIZATION", base_confidence=0.80, text=text, start=0, end=9
+        )
+        assert result == 0.80, f"Expected unchanged 0.80, got {result}"
+
+    def test_org_label_position_unit_anchors(self) -> None:
+        # Org-name mention (no evidence tail) -> identity.
+        text = "She works at the Social Security Administration in Baltimore"
+        start = text.index("Social Security")
+        result = confidence.apply_negative_context(
+            "ORGANIZATION",
+            base_confidence=0.78,
+            text=text,
+            start=start,
+            end=start + len("Social Security"),
+        )
+        assert result == 0.78, f"Expected unchanged 0.78, got {result}"
+        # Label + qualifier + value -> exact demotion floor.
+        text = "Migraine Insurance ID: INS-12345"
+        result = confidence.apply_negative_context(
+            "ORGANIZATION", base_confidence=0.78, text=text, start=0, end=18
+        )
+        assert result == 0.40, f"Expected exact floor 0.40, got {result}"
+
+    # ── LEAK 2: word-boundary negatives (value-position types) ────────
+
+    def test_policyholder_phone_emitted(self) -> None:
+        # "policy" must NOT substring-hit "Policyholder": the genuine
+        # phone was suppressed (leak). Exactly 1 PHONE_NUMBER.
+        text = "Policyholder John Smith can be reached at (415) 555-0142"
+        found = self._findings(text, "PHONE_NUMBER")
+        assert len(found) == 1, f"Expected exactly 1 PHONE_NUMBER, got {found}"
+        assert text[found[0].span_start : found[0].span_end] == "(415) 555-0142"
+
+    def test_npi_phone_stays_dead(self) -> None:
+        # Keep-dead: "npi" still matches as a whole word.
+        assert self._findings("NPI: 3803252675", "PHONE_NUMBER") == []
+
+    def test_insurance_policy_ssn_stays_dead(self) -> None:
+        # Keep-dead: "insurance" and "policy" appear as WHOLE words in the
+        # pre-segment -> the valid-format 9-digit run is still demoted.
+        found = self._findings("Insurance Policy Number: 536904399", "US_SSN")
+        assert found == [], f"US_SSN must stay dead after policy label; got {found}"
+
+    def test_has_negative_context_word_boundary_unit(self) -> None:
+        # Bare-word negatives are word-boundary anchored...
+        assert not confidence.has_negative_context(
+            "PHONE_NUMBER", "policyholder john smith can be reached at "
+        )
+        assert not confidence.has_negative_context("US_SSN", "invoiced amounts: ")
+        assert confidence.has_negative_context("PHONE_NUMBER", "insurance policy number: ")
+        assert confidence.has_negative_context("US_SSN", "invoice #")
+        # ...multi-word and prefix-shaped negatives stay substrings.
+        assert confidence.has_negative_context("US_SSN", "national id number: nid-")
+        assert confidence.has_negative_context("PHONE_NUMBER", "the account number is")
+
+    # ── Own-label adjacency: trailing-whitespace strip ─────────────────
+
+    def test_own_label_padding_still_protects(self) -> None:
+        # Whitespace between the own label and the span is stripped before
+        # taking the 25-char prefix, so "Phone:" + padding still protects
+        # the genuine phone from the "account number" in its post-window;
+        # the account value itself stays demoted (exactly 1 finding).
+        text = "Phone:" + " " * 30 + "(415) 555-0142, account number 9855276428"
+        found = self._findings(text, "PHONE_NUMBER")
+        assert len(found) == 1, f"Expected exactly 1 PHONE_NUMBER, got {found}"
+        assert text[found[0].span_start : found[0].span_end] == "(415) 555-0142"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Negative-context hygiene: config wiring, reachability, export
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_configure_from_config_sets_negative_context_penalty() -> None:
+    """NEGATIVE_CONTEXT_PENALTY is wired into configure_from_config for
+    symmetry with the other runtime-tunable confidence constants."""
+    original = confidence.NEGATIVE_CONTEXT_PENALTY
+    try:
+        confidence.configure_from_config(negative_context_penalty=0.45)
+        assert confidence.NEGATIVE_CONTEXT_PENALTY == 0.45
+        confidence.configure_from_config(negative_context_penalty=None)
+        assert confidence.NEGATIVE_CONTEXT_PENALTY == 0.45
+    finally:
+        confidence.NEGATIVE_CONTEXT_PENALTY = original
+
+
+def test_demoted_finding_below_emit_floor_under_default_constants() -> None:
+    """COUPLING PIN: under DEFAULT constants, every spec that can reach the
+    negative-context demotion lands strictly below the adapter's 0.50 emit
+    floor when demoted (the mechanism SUPPRESSES) — with exactly ONE
+    measured exception: the dashed-SSN spec ('regex ssn', base 0.97),
+    whose strongest-format value survives demotion at exactly
+    0.97 - 0.30 - 0.15 = 0.52. That survival is pinned (not "fixed"):
+    forcing a validated XXX-XX-XXXX value below the floor would be a
+    suppression-strengthening change — the leak direction this task
+    guards against. Any constant/spec drift must update this partition
+    consciously."""
+    from pii_anon.engines.regex.patterns import PATTERN_REGISTRY
+    from pii_anon.engines.regex_adapter import _MIN_EMIT_CONFIDENCE
+
+    assert confidence.CONFIDENCE_FLOOR < _MIN_EMIT_CONFIDENCE
+    suppressed = 0
+    survivors: dict[str, float] = {}
+    for spec in PATTERN_REGISTRY:
+        neg_key = spec.context_type or spec.entity_type
+        if neg_key not in confidence.NEGATIVE_CONTEXT_WORDS:
+            continue
+        bases = [spec.base_confidence]
+        if spec.valid_confidence is not None:
+            bases.append(spec.valid_confidence)
+        for base in bases:
+            demoted = confidence._negative_context_demotion(neg_key, base)
+            if demoted < _MIN_EMIT_CONFIDENCE:
+                suppressed += 1
+            else:
+                survivors[spec.explanation] = demoted
+    assert suppressed > 0, "No demotable specs found — registry coupling broken"
+    assert set(survivors) == {"regex ssn"}, (
+        f"Demotion-survivor set drifted from the pinned dashed-SSN-only "
+        f"exception: {survivors!r}"
+    )
+    expected = 0.97 - confidence.NEGATIVE_CONTEXT_PENALTY - confidence.CONTEXT_PENALTY
+    assert survivors["regex ssn"] == expected
+
+
+def test_negative_context_keys_reachable_via_pattern_specs() -> None:
+    """REACHABILITY GUARD: every NEGATIVE_CONTEXT_WORDS key must be
+    reachable from the adapter's detect loop — via adjust_confidence
+    (some spec's context_type == key) or via apply_negative_context
+    (some spec with NO context_type has entity_type == key). A dead key
+    is a silent no-op that would mask a broken suppression."""
+    from pii_anon.engines.regex.patterns import PATTERN_REGISTRY
+
+    reachable: set[str] = set()
+    for spec in PATTERN_REGISTRY:
+        if spec.context_type:
+            reachable.add(spec.context_type)
+        else:
+            reachable.add(spec.entity_type)
+    unreachable = set(confidence.NEGATIVE_CONTEXT_WORDS) - reachable
+    assert unreachable == set(), (
+        f"NEGATIVE_CONTEXT_WORDS keys unreachable via any PatternSpec: "
+        f"{sorted(unreachable)}"
+    )
+
+
+def test_negative_adjacency_window_exported() -> None:
+    """NEGATIVE_ADJACENCY_WINDOW is part of the mechanism's public surface
+    alongside NEGATIVE_CONTEXT_WORDS / NEGATIVE_CONTEXT_PENALTY."""
+    from pii_anon.engines import regex
+
+    assert regex.NEGATIVE_ADJACENCY_WINDOW == confidence.NEGATIVE_ADJACENCY_WINDOW
+    assert "NEGATIVE_ADJACENCY_WINDOW" in regex.__all__
