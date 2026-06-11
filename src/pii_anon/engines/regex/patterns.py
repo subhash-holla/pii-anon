@@ -973,9 +973,15 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         group=1,
         explanation="regex license plate US",
     ),
-    # ── CREDIT_CARD_FRAGMENT ─────────────────────────────────────────
+    # ── CREDIT_CARD (fragment / masked last-4) ───────────────────────
+    # Emits CREDIT_CARD, not CREDIT_CARD_FRAGMENT: the census authority
+    # maps CREDIT_CARD_FRAGMENT detections to _BENCHMARK_IGNORE while the
+    # corpus loader maps fragment TRUTH to CREDIT_CARD — so the old label
+    # was eval-unreachable (the DEA_NUMBER/NPI_NUMBER incident class; see
+    # tests/test_pattern_label_alignment.py). No validator on purpose: a
+    # 4-digit fragment cannot pass the full-card Luhn check.
     PatternSpec(
-        entity_type="CREDIT_CARD_FRAGMENT",
+        entity_type="CREDIT_CARD",
         pattern=_CREDIT_CARD_FRAGMENT,
         base_confidence=0.88,
         group=1,

@@ -42,11 +42,6 @@ CONTEXT_WORDS: dict[str, set[str]] = {
         # ZH / JA
         "信用卡", "クレジット", "カード",
     },
-    "CREDIT_CARD_FRAGMENT": {
-        "credit", "card", "visa", "mastercard", "amex", "discover",
-        "payment", "debit", "charge", "cc", "cardnumber", "pan",
-        "account", "transaction", "purchase",
-    },
     "PHONE_NUMBER": {
         "call", "phone", "tel", "telephone", "mobile", "fax",
         "cell", "contact", "reach", "cellphone",
@@ -261,7 +256,11 @@ HIGH_FP_TYPES: frozenset[str] = frozenset({
     "EMPLOYEE_ID",
     "IP_ADDRESS",
     "EMAIL_ADDRESS",
-    "CREDIT_CARD_FRAGMENT",
+    # CREDIT_CARD_FRAGMENT removed: the fragment PatternSpec now emits
+    # CREDIT_CARD (eval-label alignment — tests/test_pattern_label_alignment
+    # .py), and CREDIT_CARD deliberately stays OUT of this set: the full-card
+    # pattern is Luhn-validated and the fragment regex requires the literal
+    # "card" prefix in-match, so a context-absence penalty can never apply.
     "BANK_ACCOUNT",
     # ── Phase 3: structurally-ambiguous identifiers ────────────────
     # Added because their regex surface is permissive enough that the
