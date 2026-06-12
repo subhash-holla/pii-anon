@@ -85,6 +85,50 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 # that receive context penalties.
 _MIN_EMIT_CONFIDENCE: float = 0.50
 
+
+def _drop_nested_same_type(findings: list[EngineFinding]) -> list[EngineFinding]:
+    """Drop same-type findings nested inside (or duplicating) a kept span.
+
+    Several patterns per entity type legitimately match one mention
+    ("Melissa" via surname-context inside "Melissa White" via full-name;
+    two phone patterns on the same number). Under multiset exact-span
+    scoring every nested or duplicate emission is a pure false positive.
+    Per ``(field_path, entity_type)`` group, keep maximal spans: longest
+    first, then earliest start, then highest confidence; a span equal to
+    or strictly contained in a kept span is dropped. Original list order
+    is preserved for the survivors (downstream fusion is order-sensitive).
+    """
+    if len(findings) < 2:
+        return findings
+    groups: dict[tuple[str | None, str], list[EngineFinding]] = {}
+    spanless: list[EngineFinding] = []
+    for finding in findings:
+        if isinstance(finding.span_start, int) and isinstance(finding.span_end, int):
+            groups.setdefault((finding.field_path, finding.entity_type), []).append(finding)
+        else:
+            spanless.append(finding)
+
+    keep: set[int] = {id(f) for f in spanless}
+    for group in groups.values():
+        kept: list[EngineFinding] = []
+        for finding in sorted(
+            group,
+            key=lambda f: (
+                -(f.span_end - f.span_start),  # type: ignore[operator]
+                f.span_start,
+                -f.confidence,
+            ),
+        ):
+            contained = any(
+                k.span_start <= finding.span_start and finding.span_end <= k.span_end  # type: ignore[operator]
+                for k in kept
+            )
+            if not contained:
+                kept.append(finding)
+                keep.add(id(finding))
+    return [f for f in findings if id(f) in keep]
+
+
 # ISO 3166-1 alpha-2 country codes — used by the ``swift_context``
 # validator to reject BIC-shaped strings whose country-code pair is
 # not a real jurisdiction (the regex surface is broad by design, so
@@ -565,7 +609,7 @@ class RegexEngineAdapter(EngineAdapter):
                         )
                     )
 
-        return findings
+        return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
 

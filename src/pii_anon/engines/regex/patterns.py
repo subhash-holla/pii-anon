@@ -140,10 +140,29 @@ _PHONE_ES = re.compile(r"(?<!\w)(?:\+34[-.\s]?)?(?:6|7|9)\d{2}[-.\s]?\d{3}[-.\s]
 _PHONE_FR = re.compile(r"(?<!\w)(?:\+33[-.\s]?)?(?:0?[1-9])(?:[-.\s]?\d{2}){4}(?!\w)")
 
 # ── Person: Title-prefix names (multilingual) ─────────────────────────────
-# "Dr. John Smith", "Mr. Garcia Lopez".
-_PERSON_EN = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
-_PERSON_ES = re.compile(r"\b(?:Sr|Sra|Srta|Dra)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
-_PERSON_FR = re.compile(r"\b(?:M|Mme|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b")
+# The annotation convention is SPLIT by mention shape (sp2 dev-iteration 2/3
+# evidence): a title + FULL name excludes the honorific ("Dr. ⟦Karen
+# Anderson⟧") while a title + bare SURNAME includes it ("⟦Ms. Davis⟧" — the
+# title+surname pair functions as the name unit). One pattern per shape;
+# the full-name tail carries the next-field-label guard.
+_PERSON_EN = re.compile(
+    r"\b(?:Dr|Mr|Mrs|Ms|Prof)\.?\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?![ \t]*[:=]))\b"
+)
+_PERSON_EN_SURNAME = re.compile(
+    r"\b((?:Dr|Mr|Mrs|Ms|Prof)\.?\s+[A-Z][a-z]+)\b(?!\s+[A-Z][a-z]+)"
+)
+_PERSON_ES = re.compile(
+    r"\b(?:Sr|Sra|Srta|Dra)\.?\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?![ \t]*[:=]))\b"
+)
+_PERSON_ES_SURNAME = re.compile(
+    r"\b((?:Sr|Sra|Srta|Dra)\.?\s+[A-Z][a-z]+)\b(?!\s+[A-Z][a-z]+)"
+)
+_PERSON_FR = re.compile(
+    r"\b(?:M|Mme|Dr)\.?\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?![ \t]*[:=]))\b"
+)
+_PERSON_FR_SURNAME = re.compile(
+    r"\b((?:M|Mme|Dr)\.?\s+[A-Z][a-z]+)\b(?!\s+[A-Z][a-z]+)"
+)
 
 # ── Person: Full name (2-3 capitalized words, no title) ───────────────────
 # Uses ``[ \t]+`` (not ``\s+``) to avoid matching across line boundaries.
@@ -216,10 +235,16 @@ _FIELD_LABEL_NOUNS: tuple[str, ...] = (
 
 _PERSON_FULL_NAME = re.compile(
     r"(?<![A-Za-z])"
-    r"(?!(?:Employee|Agent|Support|Customer|Account|Project|Product|System|Technical"
+    r"(?!(?:Employee|Agent|Support|Customer|Account|Project|Product|Systems?|Technical"
     r"|Hello|Dear|Case|Ticket|Record|Report|Table|Section|Chapter|Module"
     r"|Service|Server|Client|Device|Network|Database|Access|Error|Warning"
     r"|Request|Response|Status|Version|Update|Delete|Create|Default"
+    # Role nouns that precede a real name in the DATA corpus ("Patient
+    # Ronald Jackson", "Contact Robert Anderson"): excluding them here makes
+    # the match START at the name, fixing the strict-extent FN+FP pair
+    # (sp2 dev-iteration 1 evidence).
+    r"|Patient|Contact|Applicant|Resident|Attn|Insured|Claimant|Defendant"
+    r"|Plaintiff|Witness|Tenant|Beneficiary|Recipient|Sender|Doctor|Nurse"
     r"|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
     r"|January|February|March|April|June|July|August|September|October|November|December"
     r")[ \t])"
@@ -229,7 +254,11 @@ _PERSON_FULL_NAME = re.compile(
     # n=2000 — a net micro-F2 loss vs this rule's -932 FP at zero TP loss.)
     r"(?![A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?[ \t]+"
     r"(?:" + "|".join(_FIELD_LABEL_NOUNS) + r")(?![A-Za-z]))"
-    r"[A-Z][a-z]{2,}[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?"
+    # Tail tokens carry a label guard ``(?![ \t]*[:=])``: a Title-Case token
+    # directly followed by a colon is the NEXT form field's label
+    # ("Donald Rodriguez␉Email: ..."), not part of the name — absorbing it
+    # cost an FN+FP pair per occurrence under strict-extent scoring.
+    r"[A-Z][a-z]{2,}[ \t]+[A-Z][a-z]+(?![ \t]*[:=])(?:[ \t]+[A-Z][a-z]+(?![ \t]*[:=]))?"
     r"(?![A-Za-z])"
 )
 
@@ -268,12 +297,36 @@ _PERSON_ALIAS = re.compile(
 )
 
 # ── Person: Keyword context ("name is John", "patient Maria Lopez") ───────
+# The keyword block is case-insensitive (scoped ``(?i:...)``): corpus text
+# capitalizes role nouns at sentence/field starts ("Patient Ronald Jackson")
+# and the case-sensitive variant silently lost the correct-extent match
+# (sp2 dev-iteration 1 evidence). The CAPTURE stays case-sensitive — the
+# name shape itself must be Title-Case. The optional 2nd captured token
+# carries the same next-field-label guard as ``_PERSON_FULL_NAME``.
 _PERSON_KEYWORD = re.compile(
-    r"\b(?:name\s+is|patient|employee|client|resident|member|user|"
+    r"\b(?i:name\s+is|patient|employee|client|resident|member|user|"
     r"account\s+holder|beneficiary|author|sender|recipient|contact|"
     r"applicant|insured|claimant|defendant|plaintiff|witness|tenant|"
     r"signed\s+by|submitted\s+by|prepared\s+by|reviewed\s+by|assigned\s+to)"
-    r"\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b"
+    # An honorific between keyword and name is skipped, NOT captured
+    # ("signed by Dr. Robert Torres" must not emit the bare "Dr").
+    r"\s+(?:(?:Dr|Mr|Mrs|Ms|Prof)\.?\s+)?"
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+(?![ \t]*[:=]))?)\b"
+)
+
+# ── Person: field-label name ("Name: John Smith", "Full Name - Jane Doe") ──
+# The bare "<...> Name: <value>" form is the dominant shape in form-style
+# corpus records; no prior pattern covered it ("name is" required the verb).
+# ``\b`` keeps "Username:" safe (no boundary between "User" and "name");
+# tail tokens carry the next-field-label guard.
+_PERSON_LABELED = re.compile(
+    r"\b(?i:(?:full|legal|employee|patient|customer|client|account|user|contact)?"
+    r"[ \t]*name)[ \t]*[:\-=][ \t]*"
+    r"(?:(?:Dr|Mr|Mrs|Ms|Prof)\.?[ \t]+)?"
+    r"([A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+(?![ \t]*[:=])){0,2})"
+    # The trailing guard stops backtracking from shaving a rejected label
+    # token into a sub-token ("Email:" -> "Emai") to dodge the colon guard.
+    r"(?![A-Za-z])"
 )
 
 # ── Person: Possessive context ("John's account", "Maria's email") ────────
@@ -462,8 +515,14 @@ _MEDICAL_RECORD = re.compile(
 )
 
 # Organization name: multi-word + corporate suffix.
+# Org token atom: Title-Case/ALL-CAPS word, '&' and apostrophe allowed —
+# NO '.' inside the atom (a "Company." atom let matches swallow the sentence
+# period and continue into the next sentence) and separators are [ \t]+
+# (NOT \s+ — an org name never crosses a line break; sp2 dev-iteration 2).
+_ORG_ATOM = r"[A-Z][A-Za-z&']+"
+
 _ORGANIZATION = re.compile(
-    r"\b([A-Z][A-Za-z&'.]+(?:\s+[A-Z][A-Za-z&'.]+)*)\s+"
+    r"\b(" + _ORG_ATOM + r"(?:[ \t]+" + _ORG_ATOM + r")*)[ \t]+"
     r"(?:Inc|Corp|Corporation|LLC|Ltd|Limited|GmbH|AG|PLC|Co|Company|Group|Foundation|Association)"
     r"\.?\b"
 )
@@ -471,7 +530,7 @@ _ORGANIZATION = re.compile(
 # Organization name with industry suffix (no legal suffix required).
 # Catches "Weyland Industries", "Cyberdyne Systems", "Oscorp Technologies", etc.
 _ORGANIZATION_INDUSTRY = re.compile(
-    r"\b([A-Z][A-Za-z&'.]+(?:\s+[A-Z][A-Za-z&'.]+)*\s+"
+    r"\b(" + _ORG_ATOM + r"(?:[ \t]+" + _ORG_ATOM + r")*[ \t]+"
     r"(?:Industries|Systems|Technologies|Labs|Laboratories|Enterprises|Solutions|"
     r"Dynamic|Dynamics|Communications|Electronics|Pharmaceuticals|Consulting|Partners|"
     r"Robotics|Aerospace|Digital|Analytics|Software|Networks|Services|Media|"
@@ -483,14 +542,26 @@ _ORGANIZATION_INDUSTRY = re.compile(
 
 # Organization preceded by multilingual context keywords.
 # Covers "Company:", "Unternehmen:", "Empresa:", "Entreprise:", "Azienda:", etc.
+# Case-insensitivity is SCOPED to the keyword block — the capture stays
+# case-sensitive (full-pattern IGNORECASE let the capture accept arbitrary
+# case). Noun keywords REQUIRE a label colon/dash: bare "Employer Tax ID:"
+# captured the next field's label. Verb forms keep plain whitespace. The
+# capture's tail tokens carry the next-field-label guard ``(?![ \t]*[:=])``.
 _ORGANIZATION_CONTEXT = re.compile(
-    r"\b(?:Company|Organisation|Organization|Employer|Unternehmen|Empresa|Entreprise|"
-    r"Azienda|Bedrijf|Företag|Virksomhed|Firma|Yritys|Organisasjon|Organizacja|"
-    r"employed\s+(?:at|by)|works?\s+(?:at|for)|affiliated\s+with|belongs?\s+to)\s*"
-    r"[:\-]?\s*"
-    r"([A-Z][A-Za-z&'.]+(?:\s+[A-Z][A-Za-z&'.]+){0,4})"
-    r"\b",
-    re.IGNORECASE,
+    r"\b(?:(?i:Company|Organisation|Organization|Employer|Unternehmen|Empresa|Entreprise|"
+    r"Azienda|Bedrijf|Företag|Virksomhed|Firma|Yritys|Organisasjon|Organizacja)\s*[:\-]"
+    r"|(?i:employed\s+(?:at|by)|works?\s+(?:at|for)|working\s+(?:at|for)|"
+    r"position\s+at|role\s+at|affiliated\s+with|belongs?\s+to))"
+    r"[ \t]*"
+    r"(" + _ORG_ATOM + r"(?:[ \t]+" + _ORG_ATOM + r"(?![ \t]*[:=])){0,4})"
+    r"(?![A-Za-z])"
+)
+
+# Single-token CamelCase organization ("InnovateLabs", "OpenAI"): an internal
+# capital after a lowercase run is a strong org-name signal. Mc/Mac/O'
+# surname shapes are excluded (McDonald, MacArthur, O'Neill are people).
+_ORGANIZATION_CAMELCASE = re.compile(
+    r"\b(?!(?:Mc|Mac|O')[A-Z])([A-Z][a-z]+[A-Z][A-Za-z]+)\b"
 )
 
 # Street address: number + words + suffix, optionally followed by
@@ -884,11 +955,12 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         explanation="regex phone (fr)",
         language="fr",
     ),
-    # ── PERSON_NAME (title-prefix, multilingual) ───────────────────────
+    # ── PERSON_NAME (title-prefix, multilingual; group 1 = name sans title) ──
     PatternSpec(
         entity_type="PERSON_NAME",
         pattern=_PERSON_EN,
         base_confidence=0.86,
+        group=1,
         context_type="PERSON_NAME",
         explanation="regex person (en)",
         language="en",
@@ -898,6 +970,7 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         entity_type="PERSON_NAME",
         pattern=_PERSON_ES,
         base_confidence=0.86,
+        group=1,
         context_type="PERSON_NAME",
         explanation="regex person (es)",
         language="es",
@@ -907,8 +980,40 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         entity_type="PERSON_NAME",
         pattern=_PERSON_FR,
         base_confidence=0.86,
+        group=1,
         context_type="PERSON_NAME",
         explanation="regex person (fr)",
+        language="fr",
+        deny_check=True,
+    ),
+    # ── PERSON_NAME (title + bare surname: title INCLUDED per convention) ──
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_EN_SURNAME,
+        base_confidence=0.85,
+        group=1,
+        context_type="PERSON_NAME",
+        explanation="regex person title+surname (en)",
+        language="en",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_ES_SURNAME,
+        base_confidence=0.85,
+        group=1,
+        context_type="PERSON_NAME",
+        explanation="regex person title+surname (es)",
+        language="es",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_FR_SURNAME,
+        base_confidence=0.85,
+        group=1,
+        context_type="PERSON_NAME",
+        explanation="regex person title+surname (fr)",
         language="fr",
         deny_check=True,
     ),
@@ -953,6 +1058,15 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.83,
         group=1,
         explanation="regex person context",
+    ),
+    # ── PERSON_NAME (field label: "Name: John Smith") ──────────────────
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_LABELED,
+        base_confidence=0.86,
+        group=1,
+        explanation="regex person field label",
+        deny_check=True,
     ),
     # ── PERSON_NAME (possessive context) ───────────────────────────────
     PatternSpec(
@@ -1192,6 +1306,15 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.80,
         group=1,
         explanation="regex organization context",
+        deny_check=True,
+    ),
+    # ── ORGANIZATION (single-token CamelCase: "InnovateLabs") ──────────
+    PatternSpec(
+        entity_type="ORGANIZATION",
+        pattern=_ORGANIZATION_CAMELCASE,
+        base_confidence=0.72,
+        group=1,
+        explanation="regex organization camelcase",
         deny_check=True,
     ),
     # ── ADDRESS ────────────────────────────────────────────────────────
