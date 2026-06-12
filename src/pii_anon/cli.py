@@ -450,6 +450,58 @@ def create_app() -> Any:
             )
             LeaderboardExporter.export(leaderboard, out_dir, formats=["json", "md", "csv"])
 
+    @app.command("rate-elo-assessment")
+    def rate_elo_assessment_command(
+        assessment_results: str = typer.Option(
+            ...,
+            "--assessment-results",
+            "-a",
+            help="Path to a merged `pii-anon-baseline-results/v1` artifact (the "
+            "pii-anon-eval-data `pii-anon baselines` leaderboard output).",
+        ),
+        output: str = typer.Option("markdown", help="Output format: markdown|json"),
+        artifact_dir: str | None = typer.Option(
+            None,
+            help="If set, writes leaderboard.md + tournament.json to this directory.",
+        ),
+    ) -> None:
+        """Rate ALL detectors in an assessment artifact via per-entity Elo.
+
+        Each gold-supported entity type is a match field; every player pair
+        plays each field once through the PIIRateEloEngine. Detection axes
+        come from the artifact; axes the artifact does not carry (latency,
+        Tier-3) are disclosed as absent — never invented.
+        """
+        from pii_anon.eval_framework.rating.assessment_ingest import (
+            load_assessment,
+            render_assessment_report,
+            run_assessment_tournament,
+        )
+
+        try:
+            result = run_assessment_tournament(load_assessment(assessment_results))
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc))
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc))
+
+        if output == "markdown":
+            print(render_assessment_report(result))
+        elif output == "json":
+            print(json.dumps(result, indent=2))
+        else:
+            raise typer.BadParameter("output must be markdown | json")
+
+        if artifact_dir:
+            out_dir = Path(artifact_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "tournament.json").write_text(
+                json.dumps(result, indent=2), encoding="utf-8"
+            )
+            (out_dir / "leaderboard.md").write_text(
+                render_assessment_report(result), encoding="utf-8"
+            )
+
     @app.command("benchmark")
     def benchmark(
         mode: str = typer.Option("weighted_consensus", help="Fusion mode"),
