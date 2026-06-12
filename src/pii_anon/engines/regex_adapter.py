@@ -86,6 +86,53 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 _MIN_EMIT_CONFIDENCE: float = 0.50
 
 
+#: Specific types whose spans shadow a coinciding PERSON_NAME finding: the
+#: person patterns are generic Title-Case matchers, so a span that a
+#: specific-type pattern claimed (org, job title, condition, medication, ...)
+#: is near-certainly not a person — emitting both costs a guaranteed FP
+#: under exact-span scoring.
+_PERSON_SHADOWING_TYPES: frozenset[str] = frozenset({
+    "ORGANIZATION",
+    "JOB_TITLE",
+    "HEALTH_CONDITION",
+    "MEDICATION_NAME",
+    "PROCEDURE_NAME",
+    "EDUCATION_LEVEL",
+    "VEHICLE_MODEL",
+})
+
+
+def _drop_person_shadowed_by_specific(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop PERSON_NAME findings covered by a specific-type finding's span."""
+    shadow_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type in _PERSON_SHADOWING_TYPES
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not shadow_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "PERSON_NAME"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+            and any(
+                field == finding.field_path
+                and start <= finding.span_start
+                and finding.span_end <= end
+                for field, start, end in shadow_spans
+            )
+        ):
+            continue
+        out.append(finding)
+    return out
+
+
 def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
     """Drop generic ``DATE_TIME`` findings overlapping a ``DATE_OF_BIRTH``.
 
@@ -643,7 +690,9 @@ class RegexEngineAdapter(EngineAdapter):
                         )
                     )
 
-        return _drop_nested_same_type(_drop_dob_shadowed_dates(findings))
+        return _drop_nested_same_type(
+            _drop_person_shadowed_by_specific(_drop_dob_shadowed_dates(findings))
+        )
 
     # ── Custom validator handlers ──────────────────────────────────────
 

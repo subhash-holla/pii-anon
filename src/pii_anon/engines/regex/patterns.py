@@ -231,14 +231,28 @@ _FIELD_LABEL_NOUNS: tuple[str, ...] = (
     "Date",
     "Time",
     "Name",
+    "ID",          # uppercase sibling of Id ("Employer Tax ID:")
+    "Confirmation",  # document headers ("Wire Transfer Confirmation")
+    "Receipt",
+    "Statement",
+    "Summary",
+)
+
+# Field-label words that, directly before a colon, announce the NEXT form
+# field — a 2nd name token must not consume them ("Donald Rodriguez Email:").
+# Kept to KNOWN labels so the dialogue-speaker form ("Daniel Moore: No
+# further questions" — the surname IS gold) is not rejected.
+_NEXT_FIELD_LABEL_WORDS = (
+    "Email|Phone|Fax|Mobile|Website|Address|Username|Password|Title|Dept|"
+    "Department|Position|Manager|Supervisor"
 )
 
 _PERSON_FULL_NAME = re.compile(
     r"(?<![A-Za-z])"
-    r"(?!(?:Employee|Agent|Support|Customer|Account|Project|Product|Systems?|Technical"
+    r"(?!(?:Employee|Employer|Agent|Support|Customer|Account|Project|Product|Systems?|Technical"
     r"|Hello|Dear|Case|Ticket|Record|Report|Table|Section|Chapter|Module"
     r"|Service|Server|Client|Device|Network|Database|Access|Error|Warning"
-    r"|Request|Response|Status|Version|Update|Delete|Create|Default"
+    r"|Request|Response|Status|Version|Update|Delete|Create|Default|Wire"
     # Role nouns that precede a real name in the DATA corpus ("Patient
     # Ronald Jackson", "Contact Robert Anderson"): excluding them here makes
     # the match START at the name, fixing the strict-extent FN+FP pair
@@ -254,11 +268,14 @@ _PERSON_FULL_NAME = re.compile(
     # n=2000 — a net micro-F2 loss vs this rule's -932 FP at zero TP loss.)
     r"(?![A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?[ \t]+"
     r"(?:" + "|".join(_FIELD_LABEL_NOUNS) + r")(?![A-Za-z]))"
-    # Tail tokens carry a label guard ``(?![ \t]*[:=])``: a Title-Case token
-    # directly followed by a colon is the NEXT form field's label
-    # ("Donald Rodriguez␉Email: ..."), not part of the name — absorbing it
-    # cost an FN+FP pair per occurrence under strict-extent scoring.
-    r"[A-Z][a-z]{2,}[ \t]+[A-Z][a-z]+(?![ \t]*[:=])(?:[ \t]+[A-Z][a-z]+(?![ \t]*[:=]))?"
+    # Tail-token guards: the 2nd token must not be a KNOWN field-label word
+    # before a colon ("Donald Rodriguez␉Email: ..." — but "Daniel Moore: No
+    # further questions" keeps the surname, the dialogue-speaker gold form);
+    # the 3rd token must not directly precede a colon at all. A leading
+    # street number blocks the candidate ("9953 Dogwood Ct" is an address).
+    r"(?<![0-9][ \t])"
+    r"[A-Z][a-z]{2,}[ \t]+(?!(?:" + _NEXT_FIELD_LABEL_WORDS + r")[ \t]*[:=])"
+    r"[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+(?![ \t]*[:=]))?"
     r"(?![A-Za-z])"
 )
 
@@ -311,7 +328,7 @@ _PERSON_KEYWORD = re.compile(
     # An honorific between keyword and name is skipped, NOT captured
     # ("signed by Dr. Robert Torres" must not emit the bare "Dr").
     r"\s+(?:(?:Dr|Mr|Mrs|Ms|Prof)\.?\s+)?"
-    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+(?![ \t]*[:=]))?)\b"
+    r"([A-Z][a-z]+(?:\s+(?!(?:" + _NEXT_FIELD_LABEL_WORDS + r")[ \t]*[:=])[A-Z][a-z]+)?)\b"
 )
 
 # ── Person: field-label name ("Name: John Smith", "Full Name - Jane Doe") ──
