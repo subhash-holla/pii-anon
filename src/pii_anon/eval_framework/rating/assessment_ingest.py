@@ -303,10 +303,11 @@ def render_assessment_report(result: dict[str, Any]) -> str:
     lines: list[str] = []
     lines.append("# pii-rate-elo — assessment tournament")
     lines.append("")
+    languages = dataset.get("languages", dataset.get("language", "?"))
     lines.append(
         f"Source: `{result.get('source', '?')}` · matching policy "
         f"`{result.get('matching_policy', '?')}` · split "
-        f"`{dataset.get('split', '?')}` · languages `{dataset.get('languages', '?')}` · "
+        f"`{dataset.get('split', '?')}` · languages `{languages}` · "
         f"records {dataset.get('n_records', '?')} · gold spans {dataset.get('n_gold', '?')}"
     )
     lines.append("")
