@@ -339,10 +339,15 @@ def _pii_anon_factory() -> Predictor:
 
 
 #: (find_spec probe, adapter module, adapter class) per optional swarm engine.
+#: The pool mirrors the canonical pii-anon-swarm ensemble composition
+#: (``evaluation/competitor_compare._ensemble_detector``: presidio +
+#: scrubadub + gliner over the regex shared layer). Stanza is deliberately
+#: NOT pooled: it is not part of the canonical ensemble and its CPU
+#: inference (~300ms/record) dominates swarm latency for marginal recall.
 _SWARM_POOL_SPECS: tuple[tuple[str, str, str], ...] = (
     ("gliner", "pii_anon.engines.gliner_adapter", "GLiNERAdapter"),
     ("presidio_analyzer", "pii_anon.engines.presidio_adapter", "PresidioAdapter"),
-    ("stanza", "pii_anon.engines.stanza_adapter", "StanzaNERAdapter"),
+    ("scrubadub", "pii_anon.engines.scrubadub_adapter", "ScrubadubAdapter"),
 )
 
 
