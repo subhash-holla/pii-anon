@@ -113,6 +113,32 @@ ALLOWED_NON_CORPUS_LABELS: dict[str, str] = {
     "COURT_CASE_NUMBER": "corpus truth exists; authority maps it -> ignore "
                          "(BAR_NUMBER/DOCKET_NUMBER pass through and ARE "
                          "scoreable — only this sibling is ignored)",
+    # sp2 external-coverage tranche (2026-06-12): corpus truth exists for
+    # every one of these, but the PINNED authority maps each to ignore, so
+    # they are census-invisible internally. They earn EXTERNAL credit via
+    # the pii-anon-eval-data baselines harness (its adapter LABEL_MAP maps
+    # each native label to the same-named canonical-63 type, where it
+    # scores against real gold). Un-ignoring internally would require
+    # editing the pinned authority — out of scope, census-coverage
+    # opportunity noted.
+    "BIOMETRIC_ID": "corpus truth exists; authority maps it -> ignore",
+    "CREDIT_CARD_FRAGMENT": "corpus truth exists; authority maps it -> ignore",
+    "DEVICE_IDENTIFIER": "corpus truth exists; authority maps it -> ignore",
+    "EDUCATION_LEVEL": "corpus truth exists; authority maps it -> ignore",
+    "ETHNICITY": "corpus truth exists; authority maps it -> ignore",
+    "GENDER": "corpus truth exists; authority maps it -> ignore",
+    "HEALTH_CONDITION": "corpus truth exists; authority maps it -> ignore",
+    "HEALTH_INSURANCE_ID": "corpus truth exists; authority maps it -> ignore",
+    "HOUSEHOLD_SIZE": "corpus truth exists; authority maps it -> ignore",
+    "JOB_TITLE": "corpus truth exists; authority maps it -> ignore",
+    "MARITAL_STATUS": "corpus truth exists; authority maps it -> ignore",
+    "MEDICATION_NAME": "corpus truth exists; authority maps it -> ignore",
+    "NATIONALITY": "corpus truth exists; authority maps it -> ignore",
+    "POLITICAL_OPINION": "corpus truth exists; authority maps it -> ignore",
+    "PRESCRIPTION_NUMBER": "corpus truth exists; authority maps it -> ignore",
+    "PROCEDURE_NAME": "corpus truth exists; authority maps it -> ignore",
+    "RELIGIOUS_BELIEF": "corpus truth exists; authority maps it -> ignore",
+    "VEHICLE_MODEL": "corpus truth exists; authority maps it -> ignore",
 }
 
 

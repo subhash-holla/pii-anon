@@ -356,9 +356,20 @@ _DATE_GENERAL = re.compile(
     r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
     r"\s+\d{1,2},?\s+\d{4}"
     r"|"
-    r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}"
+    # The dotted/slashed numeric form must not fire on FRAGMENTS of dotted
+    # number runs (IP addresses: "208.⟦74.38.190⟧"): reject when preceded by
+    # a digit/dot or followed by (optionally a dot then) another digit.
+    r"(?<![\d.])\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}(?!\.?\d)"
     r")\b",
     re.IGNORECASE,
+)
+
+# ISO-8601 datetime ("2021-10-23T09:53:00Z", "2021-01-06T08:34:00+02:00") —
+# the dominant TIMESTAMP shape in log/report corpora. Seconds, fractional
+# seconds and timezone designators are optional.
+_DATETIME_ISO8601 = re.compile(
+    r"(?<![\d.])(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?"
+    r"(?:Z|[+-]\d{2}:?\d{2})?)(?![\d.])"
 )
 
 # MAC address: 6 colon-or-dash-separated hex pairs.
@@ -536,7 +547,9 @@ _ORGANIZATION_INDUSTRY = re.compile(
     r"Robotics|Aerospace|Digital|Analytics|Software|Networks|Services|Media|"
     r"Capital|Holdings|Ventures|International|Global|Medical|Health|Bio|Biotech|"
     r"Energy|Power|Financial|Insurance|Logistics|Transport|Motors|Aviation|"
-    r"Construction|Engineering|Security|Defense|Research))"
+    r"Construction|Engineering|Security|Defense|Research|"
+    r"Administration|Agency|Bureau|Authority|Commission|Institute|"
+    r"Center|Centre|University|Hospital|Clinic|Bank))"
     r"\b"
 )
 
@@ -850,6 +863,197 @@ _SALARY = re.compile(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# sp2 external-coverage tranche
+# ═══════════════════════════════════════════════════════════════════════════
+# Patterns grounded in sampled gold shapes from the pii-anon-eval-data dev
+# split (2026-06-12). Value classes tolerate zero-width characters
+# (U+200B/200C/200D): the corpus's adversarial records embed them INSIDE
+# values ("7​0-632129​2") and gold spans cover the full obfuscated string.
+# Most of these labels are census-ignored by the pinned internal authority
+# (documented in tests/test_pattern_label_alignment.py); they earn external
+# credit through the DATA harness's native->canonical-63 label map.
+
+_ZW = "​‌‍"  # ZWSP / ZWNJ / ZWJ — written as escapes on purpose
+
+_TAX_ID_LABELED = re.compile(
+    r"(?i:\b(?:tax[ \t]*id|ein|tin)\b)\s*[:\-]?\s*"
+    r"([A-Z0-9" + _ZW + r"]{2,4}-[A-Z0-9" + _ZW + r"]{5,10})(?![A-Za-z0-9])"
+)
+
+_JOB_TITLE_LABELED = re.compile(
+    r"(?i:\b(?:job|position|title|role|occupation)\b)\s*[:\-]\s*"
+    r"([A-Z][A-Za-z]+(?:[ \t][A-Z&][A-Za-z]*){0,3})(?![A-Za-z])"
+)
+_JOB_TITLE_LEXICON = re.compile(
+    r"\b((?:Senior[ \t]|Junior[ \t]|Lead[ \t]|Chief[ \t]|Principal[ \t])?"
+    r"(?:Legal[ \t]Counsel|Medical[ \t]Director|Systems?[ \t]Administrator|"
+    r"Security[ \t]Analyst|Financial[ \t]Analyst|Data[ \t](?:Scientist|Analyst|Engineer)|"
+    r"Software[ \t](?:Engineer|Developer)|Project[ \t]Manager|Product[ \t]Manager|"
+    r"Operations[ \t]Manager|Quality[ \t]Assurance[ \t]Lead|Registered[ \t]Nurse|"
+    r"Executive[ \t]Officer|Court[ \t]Reporter))\b"
+)
+
+_HEALTH_CONDITION_LABELED = re.compile(
+    r"(?i:diagnosis|diagnosed[ \t]with|presents[ \t]with|consistent[ \t]with|"
+    r"evaluation[ \t]of|consultation[ \t]regarding|history[ \t]of|"
+    r"treatment[ \t]for|suffers[ \t]from)\s*[:\-]?\s*"
+    r"([A-Z][A-Za-z0-9]*(?:[ \t][A-Z0-9][A-Za-z0-9]*){0,4})(?![A-Za-z])"
+)
+
+# Drug name + dose is distinctive without a label ("Gabapentin 300mg");
+# labeled list forms cover dose-less mentions ("... include Albuterol Inhaler").
+_MEDICATION_DOSE = re.compile(r"\b([A-Z][a-z]{3,}[ \t]\d{1,4}[ \t]?mg)\b")
+_MEDICATION_LABELED = re.compile(
+    r"(?i:medications?[ \t]+include|current[ \t]medications?[ \t]*[:\-]|"
+    r"still[ \t]taking|prescribed)\s*"
+    r"([A-Z][a-z]{3,}(?:[ \t](?:Inhaler|Cream|Injection|Tablets?|Capsules?|"
+    r"[A-Z][a-z]+))?(?:[ \t]\d{1,4}[ \t]?mg)?)(?![A-Za-z])"
+)
+
+_HEALTH_INSURANCE_INS = re.compile(r"\b(INS-[0-9" + _ZW + r"]{6,12})(?![A-Za-z0-9])")
+_HEALTH_INSURANCE_LABELED = re.compile(
+    r"(?i:insurance(?:[ \t]id)?)\s*(?:is[ \t]+|[:\-][ \t]*)"
+    r"([A-Z0-9+/=" + _ZW + r"-]{6,28})(?![A-Za-z0-9])"
+)
+
+_CC_FRAGMENT_ENDING = re.compile(r"(?i:card[ \t]+ending(?:[ \t]+in)?[ \t]+)(\d{4})\b")
+_CC_FRAGMENT_MASKED = re.compile(
+    r"([*" + _ZW + r"]{3,6}-[*" + _ZW + r"]{3,6}-[*" + _ZW + r"]{3,6}"
+    r"-[\d*" + _ZW + r"]{3,8})"
+)
+_CC_FRAGMENT_LABELED = re.compile(
+    r"(?i:credit[ \t]card[ \t]fragment)\s*[:\-]\s*"
+    r"([A-Za-z0-9+/=*" + _ZW + r"-]{8,40})(?![A-Za-z0-9=])"
+)
+
+_VISA_NUMBER_LABELED = re.compile(
+    r"(?i:visa[ \t]number)\s*[:\-]\s*([A-Za-z0-9+/=" + _ZW + r"]{7,20})(?![A-Za-z0-9=])"
+)
+
+_PRESCRIPTION_RX = re.compile(r"\b(RX-[0-9" + _ZW + r"]{6,10})(?![A-Za-z0-9])")
+_PRESCRIPTION_LABELED = re.compile(
+    r"(?i:prescription[ \t]number)\s*[:\-]\s*"
+    r"([A-Za-z0-9+/=" + _ZW + r"]{6,24})(?![A-Za-z0-9=])"
+)
+
+_DEVICE_ID_LABELED = re.compile(
+    r"(?i:device[ \t](?:identifier|id)|imei|udid)\s*[:\-]\s*"
+    r"([A-Za-z0-9" + _ZW + r"-]{10,40})(?![A-Za-z0-9])"
+)
+# Uppercase dashed UUID (corpus device IDs); lowercase hex session IDs must
+# NOT match, so the class is deliberately case-sensitive.
+_DEVICE_ID_UUID = re.compile(
+    r"\b([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b"
+)
+
+_SOCIAL_MEDIA_HANDLE = re.compile(r"(?<![\w@.])(@[A-Za-z][A-Za-z0-9_]{2,30})\b")
+
+_EDUCATION_LEVEL = re.compile(
+    r"\b((?:PhD|Ph\.D\.?|MBA|MSc|BSc|Doctorate|High[ \t]School[ \t]Diploma|"
+    r"(?:Master|Bachelor|Associate)(?:['’]s)?(?:[ \t]Degree)?"
+    r"(?:[ \t]in[ \t][A-Z][a-z]+(?:[ \t][A-Z][a-z]+){0,3})?))\b"
+)
+
+# Categorical demographics: own field label OR the corpus's generic
+# "Record shows" lead-in, then a closed value lexicon (bare lexicon words in
+# prose are FP bombs — context is required).
+def _categorical(label: str, values: str) -> re.Pattern[str]:
+    return re.compile(
+        r"(?i:\b(?:" + label + r")\b\s*[:\-]\s*|\brecord[ \t]shows[ \t]+)"
+        r"(" + values + r")\b"
+    )
+
+
+_GENDER = _categorical("gender", r"Male|Female|Non-?binary")
+_NATIONALITY = _categorical(
+    "nationality",
+    r"American|British|Canadian|Australian|German|French|Italian|Spanish|"
+    r"Mexican|Indian|Chinese|Japanese|Brazilian|Korean",
+)
+_ETHNICITY = _categorical(
+    "ethnicity", r"European|Hispanic|Asian|African|Caucasian|Latino|Latina"
+)
+_POLITICAL_OPINION = _categorical(
+    "political[ \t]opinion|political[ \t]affiliation",
+    r"Liberal|Conservative|Progressive|Libertarian|Moderate|Socialist|Centrist",
+)
+_RELIGIOUS_BELIEF = _categorical(
+    "religious[ \t]belief|religion",
+    r"Christian|Buddhist|Muslim|Jewish|Hindu|Atheist|Catholic|Protestant|Agnostic|Sikh",
+)
+_MARITAL_STATUS = _categorical(
+    "marital[ \t]status", r"Married|Single|Divorced|Widowed|Separated"
+)
+_HOUSEHOLD_SIZE = re.compile(r"(?i:\bhousehold[ \t]size\b)\s*[:\-]\s*(\d{1,2})\b")
+
+_VEHICLE_MODEL_LABELED = re.compile(
+    r"(?i:\bvehicle(?:[ \t]model)?\b)\s*[:\-]\s*"
+    r"([A-Z0-9][A-Za-z0-9]*(?:[ \t][A-Z][A-Za-z0-9-]+){0,3})(?![A-Za-z])"
+)
+_VEHICLE_MODEL_YEAR_MAKE = re.compile(
+    r"\b((?:19|20)\d{2}[ \t]"
+    r"(?:Toyota|Honda|Ford|Subaru|Chevrolet|Chevy|BMW|Mercedes|Nissan|Hyundai|"
+    r"Kia|Tesla|Volkswagen|Audi|Mazda|Jeep|Dodge|Lexus|Volvo)"
+    r"[ \t][A-Z][A-Za-z0-9-]+)\b"
+)
+
+_PROCEDURE_LABELED = re.compile(
+    r"(?i:\bprocedure\b)\s*[:\-]\s*"
+    r"([A-Z][A-Za-z0-9-]*(?:[ \t][A-Z][A-Za-z0-9-]+){0,4})(?![A-Za-z])"
+)
+_PROCEDURE_MODALITY = re.compile(
+    r"\b((?:MRI|CT|PET|EKG|ECG|EEG|Ultrasound)[ \t][A-Z][A-Za-z-]+"
+    r"|Chest[ \t]X-?[Rr]ay|Pulmonary[ \t]Function[ \t]Test)\b"
+)
+
+_BIOMETRIC_BIO = re.compile(
+    r"\b(B[" + _ZW + r"]?I[" + _ZW + r"]?O-[A-F0-9" + _ZW + r"]{8,24})(?![A-Za-z0-9])"
+)
+_BIOMETRIC_LABELED = re.compile(
+    r"(?i:biometric[ \t]id)\s*[:\-]\s*"
+    r"([A-Za-z0-9+/=" + _ZW + r"-]{8,32})(?![A-Za-z0-9=])"
+)
+
+_COURT_CASE_YEAR_FORM = re.compile(
+    r"\b(20\d{2}-(?:CIV|CV|CRIM|CR|FAM|PROB)-\d{3,6})\b"
+)
+_DOCKET_FEDERAL = re.compile(
+    r"\b(\d:\d{2}-(?:mj|cr|cv|md|mc)-\d{4,6}(?:-[A-Z]{2,4})?)\b"
+)
+_INVOICE_INV = re.compile(r"\b(INV-[A-Z0-9" + _ZW + r"]{4,12})(?![A-Za-z0-9])")
+_INVOICE_LABELED = re.compile(
+    r"(?i:invoice[ \t]number)\s*[:\-]\s*"
+    r"([A-Za-z0-9+/=" + _ZW + r"]{4,24})(?![A-Za-z0-9=])"
+)
+_SWIFT_LABELED = re.compile(
+    r"(?i:swift(?:[ \t]bic)?(?:[ \t]code)?)\s*[:\-]\s*"
+    r"([A-Z0-9" + _ZW + r"]{8,11})(?![A-Za-z0-9])"
+)
+_DL_PREFIXED = re.compile(
+    r"\b(DL-[A-Z0-9" + _ZW + r"]{4,10}(?:-\d{1,4})?)(?![A-Za-z0-9])"
+)
+_DL_LABELED = re.compile(
+    r"(?i:driver'?s?[ \t]licen[cs]e(?:[ \t]number)?)\s*[:\-]\s*"
+    r"([A-Za-z0-9+/=" + _ZW + r"-]{5,20})(?![A-Za-z0-9=])"
+)
+
+# Dollar-amount extents INCLUDE the "$" (gold convention); corpus labels are
+# Annual income / Wages / Amount / Total, which the legacy _SALARY keyword
+# set missed entirely (0 recall on the DATA dev split).
+_SALARY_LABELED = re.compile(
+    r"(?i:annual[ \t]income|salary|wages|total[ \t]compensation|amount|total)"
+    r"\s*[:\-]\s*"
+    r"(\$[\d," + _ZW + r"]{3,12}(?:\.\d{2})?)(?!\d)"
+)
+
+_API_KEY_SK = re.compile(r"\b(sk-[A-Za-z0-9]{16,48})\b")
+_API_KEY_LABELED = re.compile(
+    r"(?i:api[_ \t-]?key(?:[ \t]for[ \t][a-z]+)?)\s*[:=]\s*\"?"
+    r"([A-Za-z0-9+/=_-]{16,64})\"?(?![A-Za-z0-9])"
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Pattern Registry
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1147,6 +1351,56 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         group=1,
         explanation="regex date general",
     ),
+    # ── DATE_TIME (ISO-8601 datetime — the TIMESTAMP shape) ────────────
+    PatternSpec(
+        entity_type="DATE_TIME",
+        pattern=_DATETIME_ISO8601,
+        base_confidence=0.95,
+        group=1,
+        explanation="regex iso-8601 datetime",
+    ),
+    # ── sp2 external-coverage tranche ──────────────────────────────────
+    PatternSpec(entity_type="TAX_ID", pattern=_TAX_ID_LABELED, base_confidence=0.88, group=1, explanation="regex tax id (labeled)"),
+    PatternSpec(entity_type="JOB_TITLE", pattern=_JOB_TITLE_LABELED, base_confidence=0.84, group=1, explanation="regex job title (labeled)"),
+    PatternSpec(entity_type="JOB_TITLE", pattern=_JOB_TITLE_LEXICON, base_confidence=0.80, group=1, explanation="regex job title (lexicon)"),
+    PatternSpec(entity_type="HEALTH_CONDITION", pattern=_HEALTH_CONDITION_LABELED, base_confidence=0.84, group=1, explanation="regex health condition (labeled)"),
+    PatternSpec(entity_type="MEDICATION_NAME", pattern=_MEDICATION_DOSE, base_confidence=0.86, group=1, explanation="regex medication (name+dose)"),
+    PatternSpec(entity_type="MEDICATION_NAME", pattern=_MEDICATION_LABELED, base_confidence=0.82, group=1, explanation="regex medication (labeled)"),
+    PatternSpec(entity_type="HEALTH_INSURANCE_ID", pattern=_HEALTH_INSURANCE_INS, base_confidence=0.92, group=1, explanation="regex insurance id (INS-)"),
+    PatternSpec(entity_type="HEALTH_INSURANCE_ID", pattern=_HEALTH_INSURANCE_LABELED, base_confidence=0.84, group=1, explanation="regex insurance id (labeled)"),
+    PatternSpec(entity_type="CREDIT_CARD_FRAGMENT", pattern=_CC_FRAGMENT_ENDING, base_confidence=0.90, group=1, explanation="regex card fragment (ending)"),
+    PatternSpec(entity_type="CREDIT_CARD_FRAGMENT", pattern=_CC_FRAGMENT_MASKED, base_confidence=0.92, group=1, explanation="regex card fragment (masked)"),
+    PatternSpec(entity_type="CREDIT_CARD_FRAGMENT", pattern=_CC_FRAGMENT_LABELED, base_confidence=0.86, group=1, explanation="regex card fragment (labeled)"),
+    PatternSpec(entity_type="VISA_NUMBER", pattern=_VISA_NUMBER_LABELED, base_confidence=0.88, group=1, explanation="regex visa number (labeled)"),
+    PatternSpec(entity_type="PRESCRIPTION_NUMBER", pattern=_PRESCRIPTION_RX, base_confidence=0.92, group=1, explanation="regex prescription (RX-)"),
+    PatternSpec(entity_type="PRESCRIPTION_NUMBER", pattern=_PRESCRIPTION_LABELED, base_confidence=0.84, group=1, explanation="regex prescription (labeled)"),
+    PatternSpec(entity_type="DEVICE_IDENTIFIER", pattern=_DEVICE_ID_LABELED, base_confidence=0.86, group=1, explanation="regex device id (labeled)"),
+    PatternSpec(entity_type="DEVICE_IDENTIFIER", pattern=_DEVICE_ID_UUID, base_confidence=0.84, group=1, explanation="regex device id (uuid)"),
+    PatternSpec(entity_type="SOCIAL_MEDIA_HANDLE", pattern=_SOCIAL_MEDIA_HANDLE, base_confidence=0.86, group=1, explanation="regex social media handle"),
+    PatternSpec(entity_type="EDUCATION_LEVEL", pattern=_EDUCATION_LEVEL, base_confidence=0.82, group=1, explanation="regex education level"),
+    PatternSpec(entity_type="GENDER", pattern=_GENDER, base_confidence=0.86, group=1, explanation="regex gender (contextual)"),
+    PatternSpec(entity_type="NATIONALITY", pattern=_NATIONALITY, base_confidence=0.84, group=1, explanation="regex nationality (contextual)"),
+    PatternSpec(entity_type="ETHNICITY", pattern=_ETHNICITY, base_confidence=0.84, group=1, explanation="regex ethnicity (contextual)"),
+    PatternSpec(entity_type="POLITICAL_OPINION", pattern=_POLITICAL_OPINION, base_confidence=0.84, group=1, explanation="regex political opinion (contextual)"),
+    PatternSpec(entity_type="RELIGIOUS_BELIEF", pattern=_RELIGIOUS_BELIEF, base_confidence=0.84, group=1, explanation="regex religious belief (contextual)"),
+    PatternSpec(entity_type="MARITAL_STATUS", pattern=_MARITAL_STATUS, base_confidence=0.86, group=1, explanation="regex marital status (contextual)"),
+    PatternSpec(entity_type="HOUSEHOLD_SIZE", pattern=_HOUSEHOLD_SIZE, base_confidence=0.86, group=1, explanation="regex household size (labeled)"),
+    PatternSpec(entity_type="VEHICLE_MODEL", pattern=_VEHICLE_MODEL_LABELED, base_confidence=0.84, group=1, explanation="regex vehicle model (labeled)"),
+    PatternSpec(entity_type="VEHICLE_MODEL", pattern=_VEHICLE_MODEL_YEAR_MAKE, base_confidence=0.86, group=1, explanation="regex vehicle model (year+make)"),
+    PatternSpec(entity_type="PROCEDURE_NAME", pattern=_PROCEDURE_LABELED, base_confidence=0.84, group=1, explanation="regex procedure (labeled)"),
+    PatternSpec(entity_type="PROCEDURE_NAME", pattern=_PROCEDURE_MODALITY, base_confidence=0.84, group=1, explanation="regex procedure (modality)"),
+    PatternSpec(entity_type="BIOMETRIC_ID", pattern=_BIOMETRIC_BIO, base_confidence=0.92, group=1, explanation="regex biometric id (BIO-)"),
+    PatternSpec(entity_type="BIOMETRIC_ID", pattern=_BIOMETRIC_LABELED, base_confidence=0.84, group=1, explanation="regex biometric id (labeled)"),
+    PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_YEAR_FORM, base_confidence=0.88, group=1, explanation="regex court case (year form)"),
+    PatternSpec(entity_type="DOCKET_NUMBER", pattern=_DOCKET_FEDERAL, base_confidence=0.90, group=1, explanation="regex docket (federal form)"),
+    PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_INV, base_confidence=0.90, group=1, explanation="regex invoice (INV-)"),
+    PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_LABELED, base_confidence=0.84, group=1, explanation="regex invoice (labeled)"),
+    PatternSpec(entity_type="SWIFT_BIC", pattern=_SWIFT_LABELED, base_confidence=0.88, group=1, explanation="regex swift bic (labeled)"),
+    PatternSpec(entity_type="DRIVERS_LICENSE", pattern=_DL_PREFIXED, base_confidence=0.90, group=1, explanation="regex drivers license (DL-)"),
+    PatternSpec(entity_type="DRIVERS_LICENSE", pattern=_DL_LABELED, base_confidence=0.84, group=1, explanation="regex drivers license (labeled value)"),
+    PatternSpec(entity_type="SALARY", pattern=_SALARY_LABELED, base_confidence=0.88, group=1, explanation="regex salary (labeled, $-inclusive)"),
+    PatternSpec(entity_type="API_KEY", pattern=_API_KEY_SK, base_confidence=0.92, group=1, explanation="regex api key (sk-)"),
+    PatternSpec(entity_type="API_KEY", pattern=_API_KEY_LABELED, base_confidence=0.86, group=1, explanation="regex api key (labeled)"),
     # ── MAC_ADDRESS ────────────────────────────────────────────────────
     PatternSpec(
         entity_type="MAC_ADDRESS",

@@ -280,16 +280,21 @@ class TestCreditCardFragmentBehavior:
         adapter = RegexEngineAdapter()
         payload = Payload(text="card ending in 1234")
         findings = adapter.detect(payload, {})
-        assert len(findings) == 1, (
-            f"Expected exactly 1 finding, got {len(findings)}: {findings}"
+        # sp2: the span legitimately carries TWO labels for two scoring
+        # universes — legacy CREDIT_CARD (census-scoreable internally) and
+        # CREDIT_CARD_FRAGMENT (the DATA corpus's distinct gold type,
+        # census-ignored internally). The flat-confidence contract on the
+        # legacy spec is unchanged.
+        cc = [f for f in findings if f.entity_type == "CREDIT_CARD"]
+        fragment = [f for f in findings if f.entity_type == "CREDIT_CARD_FRAGMENT"]
+        assert len(cc) == 1, f"Expected exactly 1 CREDIT_CARD finding: {findings}"
+        assert len(fragment) == 1, (
+            f"Expected exactly 1 CREDIT_CARD_FRAGMENT finding: {findings}"
         )
-        finding = findings[0]
-        assert finding.entity_type == "CREDIT_CARD", (
-            f"Expected entity_type CREDIT_CARD, got {finding.entity_type!r}"
-        )
-        assert finding.confidence == 0.88, (
+        assert len(findings) == 2, f"Expected exactly 2 findings: {findings}"
+        assert cc[0].confidence == 0.88, (
             f"Expected confidence 0.88 (flat, no context adjustment), "
-            f"got {finding.confidence}"
+            f"got {cc[0].confidence}"
         )
 
 

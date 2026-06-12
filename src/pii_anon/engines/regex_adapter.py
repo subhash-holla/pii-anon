@@ -86,6 +86,40 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 _MIN_EMIT_CONFIDENCE: float = 0.50
 
 
+def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
+    """Drop generic ``DATE_TIME`` findings overlapping a ``DATE_OF_BIRTH``.
+
+    A date in DOB context is annotated DATE_OF_BIRTH, never ALSO a generic
+    date — under exact-span scoring the second typed span on the same text
+    is a pure false positive ("DOB: 12/28/1966" must yield one finding).
+    """
+    dob_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type == "DATE_OF_BIRTH"
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not dob_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "DATE_TIME"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+            and any(
+                field == finding.field_path
+                and finding.span_start < end
+                and start < finding.span_end
+                for field, start, end in dob_spans
+            )
+        ):
+            continue
+        out.append(finding)
+    return out
+
+
 def _drop_nested_same_type(findings: list[EngineFinding]) -> list[EngineFinding]:
     """Drop same-type findings nested inside (or duplicating) a kept span.
 
@@ -609,7 +643,7 @@ class RegexEngineAdapter(EngineAdapter):
                         )
                     )
 
-        return _drop_nested_same_type(findings)
+        return _drop_nested_same_type(_drop_dob_shadowed_dates(findings))
 
     # ── Custom validator handlers ──────────────────────────────────────
 

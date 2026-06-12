@@ -597,29 +597,24 @@ class TestNegativeContextLeakFixes:
     def test_org_case1_org_name_mention_emitted(self) -> None:
         # The org's own name contains the negative phrase "social
         # security" but is followed by " in Baltimore" — no separator +
-        # value, so no label evidence -> NOT demoted. NOTE: the engine
-        # legitimately emits TWO overlapping spans for this one genuine
-        # mention (_ORGANIZATION_INDUSTRY + _ORGANIZATION_CONTEXT both
-        # match — probe control: "Employer: Social Security
-        # Administration" also emits 2), so the nominal "exactly 1"
-        # review expectation is pinned as the exact two-span set; the
-        # leak fix is 0 -> the genuine mention covered.
+        # value, so no label evidence -> NOT demoted. sp2 extent hygiene:
+        # the old pin captured "the ... in" junk extents (full-pattern
+        # IGNORECASE let the capture start at lowercase "the"); the agency
+        # suffix list + case-sensitive capture + nested same-type dedup now
+        # yield the one clean maximal span. The leak fix stays covered:
+        # the genuine mention IS emitted.
         text = "She works at the Social Security Administration in Baltimore"
         assert self._spans(text, "ORGANIZATION") == [
-            "Social Security",
-            "the Social Security Administration in",
+            "Social Security Administration",
         ]
 
     def test_org_case2_sued_org_name_emitted(self) -> None:
         # Genuine org mention containing "health insurance"; followed by
         # end-of-string -> no label evidence -> emitted (was 0 = leak).
+        # sp2: nested same-type dedup keeps only the maximal span.
         text = "He sued National Health Insurance Company"
         spans = self._spans(text, "ORGANIZATION")
-        assert len(spans) >= 1, f"Expected >=1 ORGANIZATION, got {spans!r}"
-        assert spans == [
-            "National Health Insurance",
-            "National Health Insurance Company",
-        ]
+        assert spans == ["National Health Insurance Company"]
 
     def test_org_case3_label_with_value_stays_dead(self) -> None:
         # The original FP class: "Health Insurance" here is a FIELD LABEL
