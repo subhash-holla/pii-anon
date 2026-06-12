@@ -488,6 +488,55 @@ evaluation locally. See the
 
 ---
 
+## The external assessment (pii-anon-eval-data baselines)
+
+pii-anon and pii-anon-swarm are registered as ordinary detectors in the
+sibling [pii-anon-eval-data](../../pii-anon-eval-data) benchmark's
+`baselines` harness — the SAME strict-span evaluation that scores AWS
+Comprehend, GCP DLP, Azure, GLiNER, Presidio and the other public detectors.
+Nothing is special-cased: the adapters wrap the public
+`first_party_predictor()` seam (`pii_anon.eval_framework.byo_pipeline`) and
+project native labels onto the benchmark's canonical 63-type taxonomy.
+
+Reproduce the full leaderboard (from the eval-data repo; cloud detector
+results merge from stored artifacts — no API spend):
+
+```bash
+# 1. score the first-party systems on the official test split
+python -m pii_anon_datasets.cli baselines \
+  --detectors pii_anon,pii_anon_swarm --split test --languages en \
+  --out results/baselines/first-party
+
+# 2. merge with the stored 10-detector run into one ranked table
+python -m pii_anon_datasets.cli baselines \
+  --merge results/baselines/first-party/*/baseline_results.json \
+          results/baselines/_partial-all-10/baseline_results.json \
+  --out results/baselines/tier1-en-12
+```
+
+Tuning discipline: detection iteration happens on the **dev** split only;
+the test split is reserved for reported runs (eval-integrity AX).
+
+### Rating all players: `pii-anon rate-elo-assessment`
+
+The merged artifact feeds the pii-rate-elo tournament directly (from this
+repo):
+
+```bash
+pii-anon rate-elo-assessment \
+  --assessment-results ../pii-anon-eval-data/results/baselines/tier1-en-12/baseline_results.json \
+  --artifact-dir artifacts/ratings/tier1-en-12
+```
+
+Every gold-supported entity type is a match field; every player pair plays
+each field once through the `PIIRateEloEngine`. The report carries the Elo
+leaderboard with rating deviations and 95% CIs, the pairwise-significance
+matrix, per-system strongest/weakest entity types, and an explicit
+axis-disclosure block (detection + coverage come from the artifact; latency,
+throughput and Tier-3 are never invented for systems that lack them).
+
+---
+
 ## Next steps
 
 - **Understand the scoring** → [pii-rate-elo.md](./pii-rate-elo.md)

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — sp2: external assessment supremacy + 12-player pii-rate-elo
+
+### Added
+- **First-party BYO predictors** — `first_party_predictor("pii_anon" |
+  "pii_anon_swarm")` in `eval_framework/byo_pipeline.py`: pii-anon's own two
+  detection surfaces expressed as ordinary `Predictor` callables emitting
+  NATIVE labels, built on the engine seam (no orchestrator dependency —
+  resolves the SWITCH-POINT(ORCH)). The swarm variant pools regex +
+  GLiNER/Presidio/Stanza (when importable) through `build_fusion("swarm")`.
+- **`pii-anon rate-elo-assessment`** — rates EVERY detector in a merged
+  `pii-anon-baseline-results/v1` assessment artifact (the pii-anon-eval-data
+  `baselines` leaderboard output) via per-entity-type F2 matches through the
+  `PIIRateEloEngine`. Fail-loud no-fabrication ingestion validation; report
+  carries Elo±RD with 95% CIs, pairwise-significance matrix, per-system
+  strongest/weakest entity types, and an explicit axis-disclosure block.
+- **External-coverage tranche** — 21 new native detection labels grounded in
+  sampled eval-data gold shapes (TAX_ID, JOB_TITLE, HEALTH_CONDITION,
+  MEDICATION_NAME, HEALTH_INSURANCE_ID, CREDIT_CARD_FRAGMENT, VISA_NUMBER,
+  PRESCRIPTION_NUMBER, DEVICE_IDENTIFIER, SOCIAL_MEDIA_HANDLE,
+  EDUCATION_LEVEL, GENDER, NATIONALITY, ETHNICITY, POLITICAL_OPINION,
+  RELIGIOUS_BELIEF, MARITAL_STATUS, HOUSEHOLD_SIZE, VEHICLE_MODEL,
+  PROCEDURE_NAME, BIOMETRIC_ID), with zero-width-character-tolerant value
+  classes for the corpus's adversarial obfuscation; ISO-8601 datetime
+  pattern; corpus-form additions for SWIFT/DL/INVOICE/COURT_CASE/DOCKET/
+  SALARY/API_KEY.
+
+### Fixed
+- **Strict-extent detection hygiene** (dev-split-driven, eval-integrity
+  discipline — tuned on dev, reported on test): PERSON_NAME role-word
+  absorption, next-field-label absorption, title-prefix extent conventions
+  (name-only for title+full-name, title-kept for title+surname), dialogue-
+  speaker form; ORGANIZATION sentence/newline crossing and scoped-case
+  context captures; dotted-date IP-fragment false positives; nested/duplicate
+  same-type emission dedup; cross-type arbitration (specific-type spans
+  shadow generic PERSON/DATE matches). Dev-split (en, n=4000) micro-F2
+  0.767 → 0.890 at 63/63 type coverage; internal census guard n=10000
+  F2 0.853 → 0.889 with p50 0.37 ms (speed ceiling green).
+
+---
+
 ## [1.5.0-rc.1] — 2026-06-09
 
 **The PDLC SOTA program release candidate** (branch `pdlc/sota-program`; LOCAL-ONLY
