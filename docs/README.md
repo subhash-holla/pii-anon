@@ -25,7 +25,9 @@ For comprehensive documentation, PDLC artifacts, and research evidence, see the
 | Document | Description |
 |----------|-------------|
 | [pii-rate-elo.md](pii-rate-elo.md) | Algorithm reference — composite metric, Tier 1/2/3, Elo, floor gates, deployment profiles |
-| [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark — incl. the `pii_anon.byo_pipelines` SDK group, identical-incumbent scoring, and the `canonical-run` / `supremacy` certification CLI |
+| [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark — incl. the `pii_anon.byo_pipelines` SDK group, identical-incumbent scoring, the external `pii-anon-eval-data` assessment, the 12-player `rate-elo-assessment` report, and the `canonical-run` / `supremacy` certification CLI |
+| [pii-rate-elo-value.md](pii-rate-elo-value.md) | Why the pii-rate-elo composite picks a different (better) system than raw F1 — the rank-divergence walkthrough |
+| [powered-census-protocol.md](powered-census-protocol.md) | The powered-census measurement protocol — N=10000 sizing, runtime, the sp1 detection harness commands, and qualification |
 | [anonymization-vs-pseudonymization.md](anonymization-vs-pseudonymization.md) | The two distinct de-id scorer families (`AnonymizationScorer` / `PseudonymizationIntegrityScorer`), the no-merge invariant, and vanilla-vs-swarm positioning |
 
 ### Reference
