@@ -41,9 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speaker form; ORGANIZATION sentence/newline crossing and scoped-case
   context captures; dotted-date IP-fragment false positives; nested/duplicate
   same-type emission dedup; cross-type arbitration (specific-type spans
-  shadow generic PERSON/DATE matches). Dev-split (en, n=4000) micro-F2
-  0.767 → 0.890 at 63/63 type coverage; internal census guard n=10000
-  F2 0.853 → 0.889 with p50 0.37 ms (speed ceiling green).
+  shadow generic PERSON/DATE matches, **eval-only** — production over-masks).
+- **Adversarial-review remediation** (12 confirmed findings, multi-agent
+  close): a SHOWSTOPPER production PII-leak channel closed (cross-type
+  arbitration made eval-only so the masking path never drops a maskable
+  PERSON_NAME for a non-masked type); the `"Record shows"` generator-filler
+  anchor removed as benchmark gaming; over-capturing HEALTH_CONDITION /
+  MEDICATION / EDUCATION / ORG-CamelCase patterns tightened; ISO-8601
+  timezone-extent + rate-elo CLI DoV hardening; merge cross-split guard.
+
+### Results — external assessment (`pii-anon-eval-data`, en test split, strict-span)
+- **pii_anon_swarm F2 0.885 (#1)** and **pii_anon F2 0.884 (#2)** sweep the top
+  of the 12-detector leaderboard — best overall (cloud + OSS), ~0.15 F2 above
+  the strongest incumbent (aws 0.737, gliner 0.735), at **63/63** entity-type
+  coverage vs the field-best 24/63. The 12-player `rate-elo-assessment` rates
+  both first-party systems statistically distinguishable from every competitor.
+  Internal census guard n=10000: F2 0.884, p50 0.32 ms (speed ceiling green).
 
 ---
 
