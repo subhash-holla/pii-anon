@@ -109,23 +109,27 @@ def _rank_swap_insights(systems: list[dict[str, Any]]) -> list[str]:
                 f"pushes the composite to {composite:.3f}."
             )
         else:  # composite is harsher than F1 to this system
-            # What kept this system from turning F1 into composite?
+            # What kept this system from turning F1 into composite? Each `reason`
+            # is a noun phrase that reads as the subject of "drags the composite
+            # to ...", so the sentence stays grammatical for every branch —
+            # including the generic fallback — and never asserts a low F1 "looks
+            # strong".
             if latency > 50:
                 reason = (
-                    f"its **{latency:.1f}ms p50 latency** — {_format_throughput(throughput)} is "
-                    "three orders of magnitude below the reference throughput"
+                    f"its **{latency:.1f}ms p50 latency** "
+                    f"({_format_throughput(throughput)}, orders of magnitude "
+                    "below the reference throughput)"
                 )
             elif total and coverage_pct < 60:
                 reason = (
                     f"its **{coverage_pct:.0f}% entity-type coverage** "
-                    f"({detected}/{total} types) leaves audits incomplete"
+                    f"({detected}/{total} types, leaving audits incomplete)"
                 )
             else:
-                reason = "its operational profile"
+                reason = "its overall operational profile"
             insights.append(
                 f"**{name}** drops **#{f1_rank} → #{comp_rank}** (loses {-swing}) — "
-                f"F1 {f1:.3f} looks strong, but {reason}, "
-                f"so the composite lands at {composite:.3f}."
+                f"F1 {f1:.3f}, but {reason} drags the composite to {composite:.3f}."
             )
 
     return insights

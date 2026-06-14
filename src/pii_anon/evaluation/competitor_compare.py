@@ -1859,6 +1859,7 @@ def _evaluate_system(
             f"{label}: computing per-record F1 scores ({len(records)} records)"
         )
     per_record_f1_scores: list[float] = []
+    per_record_counts: list[tuple[int, int, int]] = []
     preds_by_record: dict[str, list[LabelSpan]] = {}
     labels_by_record: dict[str, list[LabelSpan]] = {}
     for span in all_predictions:
@@ -1872,16 +1873,21 @@ def _evaluate_system(
         rec_p = _safe_div(rec_tp, len(rec_preds))
         rec_r = _safe_div(rec_tp, len(rec_labels))
         per_record_f1_scores.append(_safe_div(2.0 * rec_p * rec_r, rec_p + rec_r))
+        per_record_counts.append((rec_tp, len(rec_preds), len(rec_labels)))
 
-    # Bootstrap 95% confidence interval for F1.
+    # Bootstrap 95% confidence interval for the *micro* F1 (the reported point
+    # estimate). Cluster-bootstraps whole records and recomputes the pooled micro
+    # F1 on each resample, so the interval is consistent with `f1` above. Using
+    # the per-record F1 mean would instead yield a macro CI that can exclude the
+    # micro point.
     if progress_hook:
         progress_hook(
             f"{label}: computing bootstrap 95% CI (2K iterations, "
-            f"{len(per_record_f1_scores)} samples)"
+            f"{len(per_record_counts)} records)"
         )
     from pii_anon.eval_framework.evaluation.aggregation import MetricAggregator
-    f1_ci_lower, f1_ci_upper = MetricAggregator.compute_confidence_intervals(
-        per_record_f1_scores,
+    f1_ci_lower, f1_ci_upper = MetricAggregator.compute_micro_f1_confidence_interval(
+        per_record_counts,
         confidence_level=0.95,
         n_bootstrap=2000,
     )
@@ -2822,35 +2828,24 @@ def _compute_statistical_tests(
         "confidence_level": 0.95,
     }
 
-    # Per-system CI summary.
+    # Per-system CI summary. Reuse the micro-F1 CI computed at evaluation time
+    # (compute_micro_f1_confidence_interval) so the interval is consistent with
+    # the micro f1 reported as the point estimate. Re-bootstrapping per_record_f1
+    # here would instead yield a *macro* (per-record-mean) CI that can exclude
+    # the micro point.
     if progress_hook:
         progress_hook(
-            f"statistical tests: computing bootstrap CIs for {len(available)} systems "
-            f"(2K iterations each)"
+            f"statistical tests: collecting micro-F1 CIs for {len(available)} systems"
         )
-    system_cis: dict[str, dict[str, float]] = {}
-    for idx, sys in enumerate(available, start=1):
-        if progress_hook:
-            progress_hook(
-                f"  bootstrap CI [{idx}/{len(available)}]: {sys.system} "
-                f"({len(sys.per_record_f1)} samples, 2K iterations)"
-            )
-        ci_lower, ci_upper = MetricAggregator.compute_confidence_intervals(
-            sys.per_record_f1,
-            confidence_level=0.95,
-            n_bootstrap=2000,
-        )
-        system_cis[sys.system] = {
+    system_cis: dict[str, dict[str, float]] = {
+        sys.system: {
             "f1": round(sys.f1, 6),
-            "f1_ci_lower": round(ci_lower, 6),
-            "f1_ci_upper": round(ci_upper, 6),
+            "f1_ci_lower": round(sys.f1_ci_lower, 6),
+            "f1_ci_upper": round(sys.f1_ci_upper, 6),
             "samples": sys.samples,
         }
-        if progress_hook:
-            progress_hook(
-                f"  bootstrap CI [{idx}/{len(available)}]: {sys.system} done — "
-                f"F1={sys.f1:.4f} [{ci_lower:.4f}, {ci_upper:.4f}]"
-            )
+        for sys in available
+    }
     result["system_confidence_intervals"] = system_cis
 
     # Pairwise significance tests — core vs. each competitor.

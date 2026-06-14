@@ -709,3 +709,56 @@ class TestComputeDiagnostics:
         assert "dead" not in diag.get("system_error_profiles", {})
         h2h = diag["entity_head_to_head"]
         assert h2h["A"]["best_system"] == "pii-anon"
+
+
+class TestStatisticalTestsCI:
+    """system_confidence_intervals must report a micro-F1 CI consistent with f1."""
+
+    def _sys(
+        self,
+        name: str,
+        *,
+        f1: float,
+        per_record_f1: list[float],
+        ci: tuple[float, float],
+        is_core: bool = False,
+    ) -> SystemBenchmarkResult:
+        return SystemBenchmarkResult(
+            system=name,
+            available=True,
+            skipped_reason=None,
+            qualification_status="core" if is_core else "qualified",
+            license_name="MIT",
+            license_source="https://example.com",
+            citation_url="https://example.com",
+            license_gate_passed=True,
+            license_gate_reason=None,
+            precision=f1,
+            recall=f1,
+            f1=f1,
+            latency_p50_ms=10.0,
+            docs_per_hour=10000.0,
+            per_entity_recall={},
+            samples=len(per_record_f1),
+            per_record_f1=per_record_f1,
+            f1_ci_lower=ci[0],
+            f1_ci_upper=ci[1],
+        )
+
+    def test_system_ci_contains_micro_f1(self) -> None:
+        # per_record_f1 is overwhelmingly 1.0 (macro mean ~0.995), but the micro
+        # f1 is 0.749 — a CI bootstrapped from per_record_f1 (the old behaviour)
+        # EXCLUDES it. The reported system CI must use the stored micro
+        # f1_ci_lower/upper so the point estimate sits inside its own interval.
+        core = self._sys(
+            "pii-anon", f1=0.749, per_record_f1=[0.5] + [1.0] * 99,
+            ci=(0.62, 1.0), is_core=True,
+        )
+        comp = self._sys(
+            "presidio", f1=0.90, per_record_f1=[1.0] * 50, ci=(0.85, 0.95),
+        )
+        stats = cc._compute_statistical_tests([core, comp])
+        cis = stats["system_confidence_intervals"]
+        for name in ("pii-anon", "presidio"):
+            row = cis[name]
+            assert row["f1_ci_lower"] <= row["f1"] <= row["f1_ci_upper"]
