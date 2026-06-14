@@ -279,19 +279,23 @@ class AsyncPIIOrchestrator:
             )
             self.registry.attach_moe_bridge(bridge)
 
-            # Apply offline calibration if available
+            # Apply offline calibration if present. CalibrationStore(path=None)
+            # resolves the default location (the PII_ANON_CALIBRATION_PATH env
+            # var or ~/.pii_anon/calibration.json), so the load is always
+            # attempted; a missing or unreadable file degrades gracefully below.
             cal_path = getattr(moe_config, "calibration_path", None)
-            if cal_path or True:  # Always try default path
-                try:
-                    from pii_anon.calibration.store import CalibrationStore
+            try:
+                from pii_anon.calibration.store import CalibrationStore
 
-                    store = CalibrationStore(path=cal_path)
-                    store.apply_to_registry(
-                        expert_registry,
-                        min_samples=getattr(moe_config, "calibration_min_samples", 10),
-                    )
-                except Exception:
-                    pass  # No calibration file is normal
+                store = CalibrationStore(path=cal_path)
+                store.apply_to_registry(
+                    expert_registry,
+                    min_samples=getattr(moe_config, "calibration_min_samples", 10),
+                )
+            except Exception:
+                # A missing file returns None (no error); this catches a
+                # corrupt/unreadable calibration file. Degrade gracefully.
+                self.logger.debug("calibration_apply_skipped", exc_info=True)
 
             return bridge
         except Exception:

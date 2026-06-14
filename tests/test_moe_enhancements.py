@@ -17,6 +17,7 @@ from pii_anon.errors import CalibrationError, ExpertManifestError
 from pii_anon.moe import ExpertRegistry, ExpertSpec
 from pii_anon.moe_similarity import ExpertSimilarityGuard
 from pii_anon.moe_sync import MoeSyncBridge, create_default_bridge
+from pii_anon.orchestrator import AsyncPIIOrchestrator
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -137,6 +138,32 @@ class TestCalibrationStore:
         assert store.path.exists()
         # No temp file left behind
         assert not store.path.with_suffix(".json.tmp").exists()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _setup_moe_bridge Calibration Wiring Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestSetupMoeBridgeCalibration:
+    """Orchestrator-level calibration wiring in _setup_moe_bridge()."""
+
+    def test_calibration_attempted_when_path_unconfigured(self) -> None:
+        # Default config leaves moe.calibration_path = None. Bridge setup must
+        # STILL attempt calibration so CalibrationStore can resolve the env/
+        # default path. Guards against reintroducing an `if cal_path:` gate.
+        with patch("pii_anon.calibration.store.CalibrationStore") as MockStore:
+            AsyncPIIOrchestrator(token_key="test-key-12345")
+        MockStore.assert_called_once_with(path=None)
+        MockStore.return_value.apply_to_registry.assert_called_once()
+
+    def test_calibration_failure_degrades_gracefully(self) -> None:
+        # A corrupt/unreadable calibration file must not break orchestrator
+        # construction; the bridge is still returned.
+        with patch("pii_anon.calibration.store.CalibrationStore") as MockStore:
+            MockStore.return_value.apply_to_registry.side_effect = CalibrationError("boom")
+            orch = AsyncPIIOrchestrator(token_key="test-key-12345")
+        assert orch._moe_bridge is not None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
