@@ -226,21 +226,23 @@ See [Benchmark Methodology](#benchmark-methodology) for details.
 
 ## Why `pii-rate-elo` over plain F1?
 
-**F1 alone picks the wrong system.**  By F1, `gliner` looks like the winner (0.766 vs 0.758). By `pii-rate-elo` composite — which folds in latency, throughput, entity-type coverage, and (when available) Tier 3 re-identification resistance — `pii-anon` leads instead (0.782 vs 0.680). 2 of 5 systems swap ranks between the two views.
+**F1 alone picks the wrong system.**  By F1, `gliner` looks like the winner (0.764 vs 0.756). By `pii-rate-elo` composite — which folds in latency, throughput, entity-type coverage, and (when available) Tier 3 re-identification resistance — `pii-anon` leads instead (0.785 vs 0.680). 4 of 5 systems swap ranks between the two views.
 
 | System | F1 | F1 Rank | Composite | Composite Rank | Δ Rank | p50 Latency | Throughput | Coverage |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| pii-anon | 0.758 | #2 | 0.782 | #1 | **+1** | 0.40 ms | 3.1M/hr | 22/29 |
-| gliner | 0.766 | #1 | 0.680 | #2 | **-1** | 86.24 ms | 34K/hr | 14/29 |
-| pii-anon-swarm | 0.611 | #3 | 0.555 | #3 | — | 98.58 ms | 29K/hr | 22/29 |
-| presidio | 0.496 | #4 | 0.513 | #4 | — | 14.76 ms | 119K/hr | 20/29 |
-| scrubadub | 0.333 | #5 | 0.509 | #5 | — | 0.25 ms | 4.8M/hr | 4/29 |
+| pii-anon | 0.756 | #2 | 0.785 | #1 | **+1** | 0.46 ms | 3.8M/hr | 24/29 |
+| gliner | 0.764 | #1 | 0.680 | #2 | **-1** | 81.93 ms | 35K/hr | 14/29 |
+| pii-anon-swarm | 0.610 | #3 | 0.558 | #3 | — | 91.53 ms | 31K/hr | 24/29 |
+| scrubadub | 0.333 | #5 | 0.515 | #4 | **+1** | 0.24 ms | 8.2M/hr | 4/29 |
+| presidio | 0.491 | #4 | 0.509 | #5 | **-1** | 14.99 ms | 119K/hr | 20/29 |
 
 
 ### Where the rankings diverge
 
-- **gliner** drops **#1 → #2** (loses 1) — F1 0.766 looks strong, but its **86.2ms p50 latency** — 34K/hr is three orders of magnitude below the reference throughput, so the composite lands at 0.680.
-- **pii-anon** moves **#2 → #1** (gains 1) — F1 0.758 is middling, but its **0.40ms p50 latency** (3.1M/hr) pushes the composite to 0.782.
+- **gliner** drops **#1 → #2** (loses 1) — F1 0.764, but its **81.9ms p50 latency** (35K/hr, orders of magnitude below the reference throughput) drags the composite to 0.680.
+- **pii-anon** moves **#2 → #1** (gains 1) — F1 0.756 is middling, but its **0.46ms p50 latency** (3.8M/hr) pushes the composite to 0.785.
+- **presidio** drops **#4 → #5** (loses 1) — F1 0.491, but its overall operational profile drags the composite to 0.509.
+- **scrubadub** moves **#5 → #4** (gains 1) — F1 0.333 is middling, but its **0.24ms p50 latency** (8.2M/hr) pushes the composite to 0.515.
 
 **Δ Rank** = F1 rank − Composite rank.  Positive means the composite view promotes the system (it's operationally stronger than F1 suggests); negative means the composite view demotes it (it's paying for F1 with latency, missing entity types, or Tier 3 leakage).  See [docs/pii-rate-elo.md](docs/pii-rate-elo.md) for the full algorithm.
 

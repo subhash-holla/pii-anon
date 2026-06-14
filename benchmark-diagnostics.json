@@ -12,14 +12,6 @@
       },
       {
         "avg_f1": 0.0,
-        "entity_type": "CVV",
-        "max_f1": 0.0,
-        "min_f1": 0.0,
-        "spread": 0.0,
-        "systems_evaluated": 5
-      },
-      {
-        "avg_f1": 0.0,
         "entity_type": "DEA_NUMBER",
         "max_f1": 0.0,
         "min_f1": 0.0,
@@ -43,19 +35,11 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.0,
-        "entity_type": "PIN",
-        "max_f1": 0.0,
-        "min_f1": 0.0,
-        "spread": 0.0,
-        "systems_evaluated": 5
-      },
-      {
-        "avg_f1": 0.039712,
+        "avg_f1": 0.038539,
         "entity_type": "_BENCHMARK_IGNORE",
-        "max_f1": 0.125659,
+        "max_f1": 0.120421,
         "min_f1": 0.0,
-        "spread": 0.125659,
+        "spread": 0.120421,
         "systems_evaluated": 5
       },
       {
@@ -67,11 +51,11 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.200263,
+        "avg_f1": 0.184183,
         "entity_type": "LOCATION",
-        "max_f1": 0.497218,
+        "max_f1": 0.457237,
         "min_f1": 0.0,
-        "spread": 0.497218,
+        "spread": 0.457237,
         "systems_evaluated": 5
       },
       {
@@ -91,7 +75,7 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.329818,
+        "avg_f1": 0.328203,
         "entity_type": "DRIVERS_LICENSE",
         "max_f1": 0.669898,
         "min_f1": 0.0,
@@ -99,11 +83,11 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.334076,
+        "avg_f1": 0.331201,
         "entity_type": "ORGANIZATION",
-        "max_f1": 0.763497,
+        "max_f1": 0.760482,
         "min_f1": 0.0,
-        "spread": 0.763497,
+        "spread": 0.760482,
         "systems_evaluated": 5
       },
       {
@@ -123,11 +107,35 @@
         "systems_evaluated": 5
       },
       {
+        "avg_f1": 0.378609,
+        "entity_type": "USERNAME",
+        "max_f1": 0.75532,
+        "min_f1": 0.041476,
+        "spread": 0.713844,
+        "systems_evaluated": 5
+      },
+      {
         "avg_f1": 0.385718,
         "entity_type": "EMPLOYEE_ID",
         "max_f1": 0.903124,
         "min_f1": 0.0,
         "spread": 0.903124,
+        "systems_evaluated": 5
+      },
+      {
+        "avg_f1": 0.4,
+        "entity_type": "CVV",
+        "max_f1": 1.0,
+        "min_f1": 0.0,
+        "spread": 1.0,
+        "systems_evaluated": 5
+      },
+      {
+        "avg_f1": 0.4,
+        "entity_type": "PIN",
+        "max_f1": 1.0,
+        "min_f1": 0.0,
+        "spread": 1.0,
         "systems_evaluated": 5
       },
       {
@@ -144,14 +152,6 @@
         "max_f1": 0.986526,
         "min_f1": 0.0,
         "spread": 0.986526,
-        "systems_evaluated": 5
-      },
-      {
-        "avg_f1": 0.44755,
-        "entity_type": "USERNAME",
-        "max_f1": 0.877237,
-        "min_f1": 0.04985,
-        "spread": 0.827387,
         "systems_evaluated": 5
       },
       {
@@ -187,23 +187,23 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.600842,
+        "avg_f1": 0.598731,
         "entity_type": "PERSON_NAME",
-        "max_f1": 0.851758,
+        "max_f1": 0.852712,
         "min_f1": 0.0,
-        "spread": 0.851758,
+        "spread": 0.852712,
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.633386,
+        "avg_f1": 0.631529,
         "entity_type": "ADDRESS",
-        "max_f1": 0.990066,
+        "max_f1": 0.990422,
         "min_f1": 0.0,
-        "spread": 0.990066,
+        "spread": 0.990422,
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.708104,
+        "avg_f1": 0.707996,
         "entity_type": "IP_ADDRESS",
         "max_f1": 0.990621,
         "min_f1": 0.0,
@@ -211,11 +211,11 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.728406,
+        "avg_f1": 0.729629,
         "entity_type": "PHONE_NUMBER",
-        "max_f1": 0.966041,
-        "min_f1": 0.565534,
-        "spread": 0.400507,
+        "max_f1": 0.966682,
+        "min_f1": 0.567167,
+        "spread": 0.399515,
         "systems_evaluated": 5
       },
       {
@@ -227,23 +227,23 @@
         "systems_evaluated": 5
       },
       {
-        "avg_f1": 0.87438,
+        "avg_f1": 0.87517,
         "entity_type": "EMAIL_ADDRESS",
-        "max_f1": 0.982171,
-        "min_f1": 0.634413,
-        "spread": 0.347758,
+        "max_f1": 0.981576,
+        "min_f1": 0.634556,
+        "spread": 0.34702,
         "systems_evaluated": 5
       }
     ],
     "entity_head_to_head": {
       "ADDRESS": {
-        "best_f1": 0.990066,
+        "best_f1": 0.990422,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.990066,
-          "pii-anon": 0.978833,
-          "pii-anon-swarm": 0.899633,
-          "presidio": 0.298397,
+          "gliner": 0.990422,
+          "pii-anon": 0.977105,
+          "pii-anon-swarm": 0.900836,
+          "presidio": 0.289282,
           "scrubadub": 0.0
         }
       },
@@ -292,12 +292,12 @@
         }
       },
       "CVV": {
-        "best_f1": 0.0,
-        "best_system": "gliner",
+        "best_f1": 1.0,
+        "best_system": "pii-anon",
         "scores": {
           "gliner": 0.0,
-          "pii-anon": 0.0,
-          "pii-anon-swarm": 0.0,
+          "pii-anon": 1.0,
+          "pii-anon-swarm": 1.0,
           "presidio": 0.0,
           "scrubadub": 0.0
         }
@@ -339,22 +339,22 @@
         "best_f1": 0.669898,
         "best_system": "pii-anon-swarm",
         "scores": {
-          "gliner": 0.342683,
+          "gliner": 0.334703,
           "pii-anon": 0.574083,
           "pii-anon-swarm": 0.669898,
-          "presidio": 0.062424,
+          "presidio": 0.062332,
           "scrubadub": 0.0
         }
       },
       "EMAIL_ADDRESS": {
-        "best_f1": 0.982171,
+        "best_f1": 0.981576,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.982171,
-          "pii-anon": 0.960224,
-          "pii-anon-swarm": 0.634413,
-          "presidio": 0.973215,
-          "scrubadub": 0.821875
+          "gliner": 0.981576,
+          "pii-anon": 0.960957,
+          "pii-anon-swarm": 0.634556,
+          "presidio": 0.9737,
+          "scrubadub": 0.825063
         }
       },
       "EMPLOYEE_ID": {
@@ -372,9 +372,9 @@
         "best_f1": 0.990621,
         "best_system": "pii-anon",
         "scores": {
-          "gliner": 0.92794,
+          "gliner": 0.927572,
           "pii-anon": 0.990621,
-          "pii-anon-swarm": 0.631338,
+          "pii-anon-swarm": 0.631168,
           "presidio": 0.990621,
           "scrubadub": 0.0
         }
@@ -391,13 +391,13 @@
         }
       },
       "LOCATION": {
-        "best_f1": 0.497218,
+        "best_f1": 0.457237,
         "best_system": "pii-anon",
         "scores": {
           "gliner": 0.0,
-          "pii-anon": 0.497218,
-          "pii-anon-swarm": 0.497218,
-          "presidio": 0.006879,
+          "pii-anon": 0.457237,
+          "pii-anon-swarm": 0.457237,
+          "presidio": 0.006442,
           "scrubadub": 0.0
         }
       },
@@ -446,13 +446,13 @@
         }
       },
       "ORGANIZATION": {
-        "best_f1": 0.763497,
+        "best_f1": 0.760482,
         "best_system": "pii-anon-swarm",
         "scores": {
           "gliner": 0.0,
-          "pii-anon": 0.668767,
-          "pii-anon-swarm": 0.763497,
-          "presidio": 0.238117,
+          "pii-anon": 0.669899,
+          "pii-anon-swarm": 0.760482,
+          "presidio": 0.225625,
           "scrubadub": 0.0
         }
       },
@@ -468,34 +468,34 @@
         }
       },
       "PERSON_NAME": {
-        "best_f1": 0.851758,
+        "best_f1": 0.852712,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.851758,
-          "pii-anon": 0.755736,
-          "pii-anon-swarm": 0.604202,
-          "presidio": 0.792512,
+          "gliner": 0.852712,
+          "pii-anon": 0.750561,
+          "pii-anon-swarm": 0.600488,
+          "presidio": 0.789893,
           "scrubadub": 0.0
         }
       },
       "PHONE_NUMBER": {
-        "best_f1": 0.966041,
+        "best_f1": 0.966682,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.966041,
-          "pii-anon": 0.714689,
-          "pii-anon-swarm": 0.565534,
-          "presidio": 0.782763,
-          "scrubadub": 0.613001
+          "gliner": 0.966682,
+          "pii-anon": 0.713758,
+          "pii-anon-swarm": 0.567167,
+          "presidio": 0.785764,
+          "scrubadub": 0.614774
         }
       },
       "PIN": {
-        "best_f1": 0.0,
-        "best_system": "gliner",
+        "best_f1": 1.0,
+        "best_system": "pii-anon",
         "scores": {
           "gliner": 0.0,
-          "pii-anon": 0.0,
-          "pii-anon-swarm": 0.0,
+          "pii-anon": 1.0,
+          "pii-anon-swarm": 1.0,
           "presidio": 0.0,
           "scrubadub": 0.0
         }
@@ -512,14 +512,14 @@
         }
       },
       "USERNAME": {
-        "best_f1": 0.877237,
+        "best_f1": 0.75532,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.877237,
-          "pii-anon": 0.668676,
-          "pii-anon-swarm": 0.590147,
+          "gliner": 0.75532,
+          "pii-anon": 0.566979,
+          "pii-anon-swarm": 0.479419,
           "presidio": 0.04985,
-          "scrubadub": 0.051842
+          "scrubadub": 0.041476
         }
       },
       "US_SSN": {
@@ -545,20 +545,20 @@
         }
       },
       "_BENCHMARK_IGNORE": {
-        "best_f1": 0.125659,
+        "best_f1": 0.120421,
         "best_system": "gliner",
         "scores": {
-          "gliner": 0.125659,
+          "gliner": 0.120421,
           "pii-anon": 0.0,
           "pii-anon-swarm": 0.0,
-          "presidio": 0.0729,
+          "presidio": 0.072276,
           "scrubadub": 0.0
         }
       }
     },
     "entity_type_wins": {
-      "gliner": 13,
-      "pii-anon": 10,
+      "gliner": 11,
+      "pii-anon": 12,
       "pii-anon-swarm": 5,
       "scrubadub": 1
     },
@@ -566,30 +566,30 @@
       "pii-anon": [
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.851758,
-          "core_f1": 0.755736,
-          "delta_f1": 0.096022,
+          "best_competitor_f1": 0.852712,
+          "core_f1": 0.750561,
+          "delta_f1": 0.102151,
           "entity_type": "PERSON_NAME",
-          "support": 1099008,
-          "weighted_impact": 105528.95
+          "support": 1106508,
+          "weighted_impact": 113030.9
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.966041,
-          "core_f1": 0.714689,
-          "delta_f1": 0.251352,
+          "best_competitor_f1": 0.966682,
+          "core_f1": 0.713758,
+          "delta_f1": 0.252924,
           "entity_type": "PHONE_NUMBER",
-          "support": 379125,
-          "weighted_impact": 95293.83
+          "support": 386625,
+          "weighted_impact": 97786.74
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.125659,
+          "best_competitor_f1": 0.120421,
           "core_f1": 0.0,
-          "delta_f1": 0.125659,
+          "delta_f1": 0.120421,
           "entity_type": "_BENCHMARK_IGNORE",
-          "support": 312450,
-          "weighted_impact": 39262.15
+          "support": 327450,
+          "weighted_impact": 39431.86
         },
         {
           "best_competitor": "gliner",
@@ -602,12 +602,12 @@
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.982171,
-          "core_f1": 0.960224,
-          "delta_f1": 0.021947,
+          "best_competitor_f1": 0.981576,
+          "core_f1": 0.960957,
+          "delta_f1": 0.020619,
           "entity_type": "EMAIL_ADDRESS",
-          "support": 405039,
-          "weighted_impact": 8889.39
+          "support": 412539,
+          "weighted_impact": 8506.14
         },
         {
           "best_competitor": "scrubadub",
@@ -620,50 +620,50 @@
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.877237,
-          "core_f1": 0.668676,
-          "delta_f1": 0.208561,
+          "best_competitor_f1": 0.75532,
+          "core_f1": 0.566979,
+          "delta_f1": 0.188341,
           "entity_type": "USERNAME",
           "support": 19365,
-          "weighted_impact": 4038.78
+          "weighted_impact": 3647.22
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.990066,
-          "core_f1": 0.978833,
-          "delta_f1": 0.011233,
+          "best_competitor_f1": 0.990422,
+          "core_f1": 0.977105,
+          "delta_f1": 0.013317,
           "entity_type": "ADDRESS",
-          "support": 202518,
-          "weighted_impact": 2274.88
+          "support": 210018,
+          "weighted_impact": 2796.81
         }
       ],
       "pii-anon-swarm": [
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.851758,
-          "core_f1": 0.604202,
-          "delta_f1": 0.247556,
+          "best_competitor_f1": 0.852712,
+          "core_f1": 0.600488,
+          "delta_f1": 0.252224,
           "entity_type": "PERSON_NAME",
-          "support": 1099008,
-          "weighted_impact": 272066.02
+          "support": 1106508,
+          "weighted_impact": 279087.87
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.966041,
-          "core_f1": 0.565534,
-          "delta_f1": 0.400507,
+          "best_competitor_f1": 0.966682,
+          "core_f1": 0.567167,
+          "delta_f1": 0.399515,
           "entity_type": "PHONE_NUMBER",
-          "support": 379125,
-          "weighted_impact": 151842.22
+          "support": 386625,
+          "weighted_impact": 154462.49
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.982171,
-          "core_f1": 0.634413,
-          "delta_f1": 0.347758,
+          "best_competitor_f1": 0.981576,
+          "core_f1": 0.634556,
+          "delta_f1": 0.34702,
           "entity_type": "EMAIL_ADDRESS",
-          "support": 405039,
-          "weighted_impact": 140855.55
+          "support": 412539,
+          "weighted_impact": 143159.28
         },
         {
           "best_competitor": "scrubadub",
@@ -676,12 +676,12 @@
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.125659,
+          "best_competitor_f1": 0.120421,
           "core_f1": 0.0,
-          "delta_f1": 0.125659,
+          "delta_f1": 0.120421,
           "entity_type": "_BENCHMARK_IGNORE",
-          "support": 312450,
-          "weighted_impact": 39262.15
+          "support": 327450,
+          "weighted_impact": 39431.86
         },
         {
           "best_competitor": "gliner",
@@ -695,20 +695,20 @@
         {
           "best_competitor": "presidio",
           "best_competitor_f1": 0.990621,
-          "core_f1": 0.631338,
-          "delta_f1": 0.359283,
+          "core_f1": 0.631168,
+          "delta_f1": 0.359453,
           "entity_type": "IP_ADDRESS",
           "support": 52914,
-          "weighted_impact": 19011.1
+          "weighted_impact": 19020.1
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.990066,
-          "core_f1": 0.899633,
-          "delta_f1": 0.090433,
+          "best_competitor_f1": 0.990422,
+          "core_f1": 0.900836,
+          "delta_f1": 0.089586,
           "entity_type": "ADDRESS",
-          "support": 202518,
-          "weighted_impact": 18314.31
+          "support": 210018,
+          "weighted_impact": 18814.67
         },
         {
           "best_competitor": "gliner",
@@ -721,21 +721,21 @@
         },
         {
           "best_competitor": "gliner",
-          "best_competitor_f1": 0.877237,
-          "core_f1": 0.590147,
-          "delta_f1": 0.28709,
-          "entity_type": "USERNAME",
-          "support": 19365,
-          "weighted_impact": 5559.5
-        },
-        {
-          "best_competitor": "gliner",
           "best_competitor_f1": 0.824543,
           "core_f1": 0.637962,
           "delta_f1": 0.186581,
           "entity_type": "CREDIT_CARD",
           "support": 29202,
           "weighted_impact": 5448.54
+        },
+        {
+          "best_competitor": "gliner",
+          "best_competitor_f1": 0.75532,
+          "core_f1": 0.479419,
+          "delta_f1": 0.275901,
+          "entity_type": "USERNAME",
+          "support": 19365,
+          "weighted_impact": 5342.82
         },
         {
           "best_competitor": "gliner",
@@ -752,57 +752,57 @@
       "gliner": {
         "breakdown": {
           "boundary_miss": 4302,
-          "complete_miss": 1059201,
-          "spurious_fp": 221715,
-          "true_positive": 2300406,
+          "complete_miss": 1089201,
+          "spurious_fp": 231720,
+          "true_positive": 2330406,
           "type_confusion": 117282
         },
-        "error_rate": 0.378757,
-        "total_errors": 1402500
+        "error_rate": 0.382332,
+        "total_errors": 1442505
       },
       "pii-anon": {
         "breakdown": {
-          "boundary_miss": 18327,
-          "complete_miss": 579168,
-          "spurious_fp": 1054950,
-          "true_positive": 2769363,
-          "type_confusion": 114333
+          "boundary_miss": 18693,
+          "complete_miss": 578556,
+          "spurious_fp": 1097811,
+          "true_positive": 2818110,
+          "type_confusion": 125832
         },
-        "error_rate": 0.389489,
-        "total_errors": 1766778
+        "error_rate": 0.392518,
+        "total_errors": 1820892
       },
       "pii-anon-swarm": {
         "breakdown": {
-          "boundary_miss": 17139,
-          "complete_miss": 475545,
-          "spurious_fp": 2992998,
-          "true_positive": 2847843,
-          "type_confusion": 140664
+          "boundary_miss": 17505,
+          "complete_miss": 474942,
+          "spurious_fp": 3058191,
+          "true_positive": 2896590,
+          "type_confusion": 152154
         },
-        "error_rate": 0.560124,
-        "total_errors": 3626346
+        "error_rate": 0.561082,
+        "total_errors": 3702792
       },
       "presidio": {
         "breakdown": {
-          "boundary_miss": 64506,
-          "complete_miss": 607143,
-          "spurious_fp": 3214083,
-          "true_positive": 2209098,
-          "type_confusion": 600444
+          "boundary_miss": 65349,
+          "complete_miss": 629901,
+          "spurious_fp": 3321858,
+          "true_positive": 2233794,
+          "type_confusion": 612147
         },
-        "error_rate": 0.670051,
-        "total_errors": 4486176
+        "error_rate": 0.674519,
+        "total_errors": 4629255
       },
       "scrubadub": {
         "breakdown": {
           "boundary_miss": 51837,
-          "complete_miss": 2649432,
-          "spurious_fp": 117216,
-          "true_positive": 719304,
+          "complete_miss": 2697822,
+          "spurious_fp": 122379,
+          "true_positive": 730914,
           "type_confusion": 60618
         },
-        "error_rate": 0.800105,
-        "total_errors": 2879103
+        "error_rate": 0.800491,
+        "total_errors": 2932656
       }
     }
   },
@@ -812,19 +812,19 @@
       "entity_types_total": 29,
       "error_counts": {
         "boundary_miss": 4302,
-        "complete_miss": 1059201,
-        "spurious_fp": 221715,
-        "true_positive": 2300406,
+        "complete_miss": 1089201,
+        "spurious_fp": 231720,
+        "true_positive": 2330406,
         "type_confusion": 117282
       },
-      "f1": 0.766379,
+      "f1": 0.763652,
       "per_entity_errors": {
         "ADDRESS": {
           "boundary_miss": 900,
           "complete_miss": 2199,
           "spurious_fp": 903,
-          "support": 202518,
-          "true_positive": 199419,
+          "support": 210018,
+          "true_positive": 206919,
           "type_confusion": 0
         },
         "BANK_ACCOUNT": {
@@ -894,7 +894,7 @@
         "DRIVERS_LICENSE": {
           "boundary_miss": 0,
           "complete_miss": 4356,
-          "spurious_fp": 27417,
+          "spurious_fp": 28590,
           "support": 13353,
           "true_positive": 8430,
           "type_confusion": 567
@@ -902,9 +902,9 @@
         "EMAIL_ADDRESS": {
           "boundary_miss": 96,
           "complete_miss": 3720,
-          "spurious_fp": 10710,
-          "support": 405039,
-          "true_positive": 401184,
+          "spurious_fp": 11487,
+          "support": 412539,
+          "true_positive": 408684,
           "type_confusion": 39
         },
         "EMPLOYEE_ID": {
@@ -918,7 +918,7 @@
         "IP_ADDRESS": {
           "boundary_miss": 0,
           "complete_miss": 78,
-          "spurious_fp": 7875,
+          "spurious_fp": 7920,
           "support": 52914,
           "true_positive": 52617,
           "type_confusion": 219
@@ -973,9 +973,9 @@
         },
         "ORGANIZATION": {
           "boundary_miss": 0,
-          "complete_miss": 214251,
+          "complete_miss": 229251,
           "spurious_fp": 0,
-          "support": 216477,
+          "support": 231477,
           "true_positive": 0,
           "type_confusion": 2226
         },
@@ -990,17 +990,17 @@
         "PERSON_NAME": {
           "boundary_miss": 1470,
           "complete_miss": 263727,
-          "spurious_fp": 18981,
-          "support": 1099008,
-          "true_positive": 829317,
+          "spurious_fp": 19392,
+          "support": 1106508,
+          "true_positive": 836817,
           "type_confusion": 4494
         },
         "PHONE_NUMBER": {
           "boundary_miss": 0,
           "complete_miss": 2253,
           "spurious_fp": 24243,
-          "support": 379125,
-          "true_positive": 376872,
+          "support": 386625,
+          "true_positive": 384372,
           "type_confusion": 0
         },
         "PIN": {
@@ -1022,7 +1022,7 @@
         "USERNAME": {
           "boundary_miss": 0,
           "complete_miss": 711,
-          "spurious_fp": 3600,
+          "spurious_fp": 10203,
           "support": 19365,
           "true_positive": 17943,
           "type_confusion": 711
@@ -1045,15 +1045,15 @@
         },
         "_BENCHMARK_IGNORE": {
           "boundary_miss": 0,
-          "complete_miss": 262041,
-          "spurious_fp": 32154,
-          "support": 312450,
+          "complete_miss": 277041,
+          "spurious_fp": 33150,
+          "support": 327450,
           "true_positive": 23103,
           "type_confusion": 27306
         }
       },
       "per_entity_f1": {
-        "ADDRESS": 0.990066,
+        "ADDRESS": 0.990422,
         "BANK_ACCOUNT": 0.727989,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.824543,
@@ -1062,10 +1062,10 @@
         "DATE_OF_BIRTH": 0.92513,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
-        "DRIVERS_LICENSE": 0.342683,
-        "EMAIL_ADDRESS": 0.982171,
+        "DRIVERS_LICENSE": 0.334703,
+        "EMAIL_ADDRESS": 0.981576,
         "EMPLOYEE_ID": 0.0,
-        "IP_ADDRESS": 0.92794,
+        "IP_ADDRESS": 0.927572,
         "LICENSE_PLATE": 0.0,
         "LOCATION": 0.0,
         "MAC_ADDRESS": 0.0,
@@ -1074,33 +1074,33 @@
         "NPI_NUMBER": 0.0,
         "ORGANIZATION": 0.0,
         "PASSPORT": 0.869606,
-        "PERSON_NAME": 0.851758,
-        "PHONE_NUMBER": 0.966041,
+        "PERSON_NAME": 0.852712,
+        "PHONE_NUMBER": 0.966682,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.0,
-        "USERNAME": 0.877237,
+        "USERNAME": 0.75532,
         "US_SSN": 0.845444,
         "VIN": 0.0,
-        "_BENCHMARK_IGNORE": 0.125659
+        "_BENCHMARK_IGNORE": 0.120421
       },
       "per_entity_precision": {
-        "ADDRESS": 0.995492,
+        "ADDRESS": 0.995655,
         "BANK_ACCOUNT": 0.891583,
         "CREDIT_CARD": 0.828391,
         "DATE_OF_BIRTH": 0.895448,
-        "DRIVERS_LICENSE": 0.235166,
-        "EMAIL_ADDRESS": 0.973998,
-        "IP_ADDRESS": 0.869817,
+        "DRIVERS_LICENSE": 0.227715,
+        "EMAIL_ADDRESS": 0.972661,
+        "IP_ADDRESS": 0.869171,
         "NATIONAL_ID": 0.059144,
         "PASSPORT": 0.998007,
-        "PERSON_NAME": 0.977625,
-        "PHONE_NUMBER": 0.939561,
-        "USERNAME": 0.832892,
+        "PERSON_NAME": 0.977351,
+        "PHONE_NUMBER": 0.94067,
+        "USERNAME": 0.637497,
         "US_SSN": 0.952623,
-        "_BENCHMARK_IGNORE": 0.418101
+        "_BENCHMARK_IGNORE": 0.410698
       },
       "per_entity_recall": {
-        "ADDRESS": 0.984698,
+        "ADDRESS": 0.985244,
         "BANK_ACCOUNT": 0.615122,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.820731,
@@ -1110,7 +1110,7 @@
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.631319,
-        "EMAIL_ADDRESS": 0.990482,
+        "EMAIL_ADDRESS": 0.990655,
         "EMPLOYEE_ID": 0.0,
         "IP_ADDRESS": 0.994387,
         "LICENSE_PLATE": 0.0,
@@ -1121,36 +1121,36 @@
         "NPI_NUMBER": 0.0,
         "ORGANIZATION": 0.0,
         "PASSPORT": 0.770478,
-        "PERSON_NAME": 0.754605,
-        "PHONE_NUMBER": 0.994057,
+        "PERSON_NAME": 0.756268,
+        "PHONE_NUMBER": 0.994173,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.0,
         "USERNAME": 0.926569,
         "US_SSN": 0.759943,
         "VIN": 0.0,
-        "_BENCHMARK_IGNORE": 0.073941
+        "_BENCHMARK_IGNORE": 0.070554
       },
-      "precision": 0.912092,
-      "recall": 0.66081
+      "precision": 0.909559,
+      "recall": 0.658085
     },
     "pii-anon": {
-      "entity_types_detected": 22,
+      "entity_types_detected": 24,
       "entity_types_total": 29,
       "error_counts": {
-        "boundary_miss": 18327,
-        "complete_miss": 579168,
-        "spurious_fp": 1054950,
-        "true_positive": 2769363,
-        "type_confusion": 114333
+        "boundary_miss": 18693,
+        "complete_miss": 578556,
+        "spurious_fp": 1097811,
+        "true_positive": 2818110,
+        "type_confusion": 125832
       },
-      "f1": 0.758158,
+      "f1": 0.755818,
       "per_entity_errors": {
         "ADDRESS": {
           "boundary_miss": 3435,
           "complete_miss": 1668,
-          "spurious_fp": 3435,
-          "support": 202518,
-          "true_positive": 197415,
+          "spurious_fp": 4500,
+          "support": 210018,
+          "true_positive": 204915,
           "type_confusion": 0
         },
         "BANK_ACCOUNT": {
@@ -1187,10 +1187,10 @@
         },
         "CVV": {
           "boundary_miss": 0,
-          "complete_miss": 4500,
+          "complete_miss": 0,
           "spurious_fp": 0,
           "support": 4500,
-          "true_positive": 0,
+          "true_positive": 4500,
           "type_confusion": 0
         },
         "DATE_OF_BIRTH": {
@@ -1229,8 +1229,8 @@
           "boundary_miss": 15,
           "complete_miss": 20952,
           "spurious_fp": 10482,
-          "support": 405039,
-          "true_positive": 383730,
+          "support": 412539,
+          "true_positive": 391230,
           "type_confusion": 342
         },
         "EMPLOYEE_ID": {
@@ -1260,7 +1260,7 @@
         "LOCATION": {
           "boundary_miss": 0,
           "complete_miss": 0,
-          "spurious_fp": 7590,
+          "spurious_fp": 8910,
           "support": 3753,
           "true_positive": 3753,
           "type_confusion": 0
@@ -1298,12 +1298,12 @@
           "type_confusion": 14823
         },
         "ORGANIZATION": {
-          "boundary_miss": 4071,
-          "complete_miss": 30393,
-          "spurious_fp": 114351,
-          "support": 216477,
-          "true_positive": 166197,
-          "type_confusion": 15816
+          "boundary_miss": 4437,
+          "complete_miss": 33693,
+          "spurious_fp": 117864,
+          "support": 231477,
+          "true_positive": 175944,
+          "type_confusion": 17403
         },
         "PASSPORT": {
           "boundary_miss": 0,
@@ -1316,25 +1316,25 @@
         "PERSON_NAME": {
           "boundary_miss": 10806,
           "complete_miss": 149820,
-          "spurious_fp": 442059,
-          "support": 1099008,
-          "true_positive": 936006,
+          "spurious_fp": 464121,
+          "support": 1106508,
+          "true_positive": 943506,
           "type_confusion": 2376
         },
         "PHONE_NUMBER": {
           "boundary_miss": 0,
           "complete_miss": 0,
-          "spurious_fp": 302700,
-          "support": 379125,
-          "true_positive": 379125,
+          "spurious_fp": 310101,
+          "support": 386625,
+          "true_positive": 386625,
           "type_confusion": 0
         },
         "PIN": {
           "boundary_miss": 0,
-          "complete_miss": 4500,
+          "complete_miss": 0,
           "spurious_fp": 0,
           "support": 4500,
-          "true_positive": 0,
+          "true_positive": 4500,
           "type_confusion": 0
         },
         "ROUTING_NUMBER": {
@@ -1348,7 +1348,7 @@
         "USERNAME": {
           "boundary_miss": 0,
           "complete_miss": 5385,
-          "spurious_fp": 8469,
+          "spurious_fp": 15969,
           "support": 19365,
           "true_positive": 13980,
           "type_confusion": 0
@@ -1371,80 +1371,82 @@
         },
         "_BENCHMARK_IGNORE": {
           "boundary_miss": 0,
-          "complete_miss": 253488,
+          "complete_miss": 258576,
           "spurious_fp": 0,
-          "support": 312450,
+          "support": 327450,
           "true_positive": 0,
-          "type_confusion": 58962
+          "type_confusion": 68874
         }
       },
       "per_entity_f1": {
-        "ADDRESS": 0.978833,
+        "ADDRESS": 0.977105,
         "BANK_ACCOUNT": 0.950502,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.923784,
         "CRYPTO_WALLET": 0.785087,
-        "CVV": 0.0,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.633563,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.574083,
-        "EMAIL_ADDRESS": 0.960224,
+        "EMAIL_ADDRESS": 0.960957,
         "EMPLOYEE_ID": 0.87469,
         "IP_ADDRESS": 0.990621,
         "LICENSE_PLATE": 0.165065,
-        "LOCATION": 0.497218,
+        "LOCATION": 0.457237,
         "MAC_ADDRESS": 0.784989,
         "MEDICAL_RECORD_NUMBER": 0.855478,
         "NATIONAL_ID": 0.63607,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.668767,
+        "ORGANIZATION": 0.669899,
         "PASSPORT": 0.870362,
-        "PERSON_NAME": 0.755736,
-        "PHONE_NUMBER": 0.714689,
-        "PIN": 0.0,
+        "PERSON_NAME": 0.750561,
+        "PHONE_NUMBER": 0.713758,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 0.986526,
-        "USERNAME": 0.668676,
+        "USERNAME": 0.566979,
         "US_SSN": 0.910361,
         "VIN": 1.0,
         "_BENCHMARK_IGNORE": 0.0
       },
       "per_entity_precision": {
-        "ADDRESS": 0.982898,
+        "ADDRESS": 0.978512,
         "BANK_ACCOUNT": 0.988924,
         "CREDIT_CARD": 0.96279,
         "CRYPTO_WALLET": 0.646209,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.518637,
         "DRIVERS_LICENSE": 1.0,
-        "EMAIL_ADDRESS": 0.97341,
+        "EMAIL_ADDRESS": 0.973907,
         "EMPLOYEE_ID": 0.859439,
         "IP_ADDRESS": 0.981416,
         "LICENSE_PLATE": 0.5,
-        "LOCATION": 0.330865,
+        "LOCATION": 0.296375,
         "MAC_ADDRESS": 0.655625,
         "MEDICAL_RECORD_NUMBER": 0.976457,
         "NATIONAL_ID": 0.686673,
-        "ORGANIZATION": 0.592401,
+        "ORGANIZATION": 0.59884,
         "PASSPORT": 1.0,
-        "PERSON_NAME": 0.679218,
-        "PHONE_NUMBER": 0.556044,
+        "PERSON_NAME": 0.670281,
+        "PHONE_NUMBER": 0.554917,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 1.0,
-        "USERNAME": 0.622745,
+        "USERNAME": 0.466794,
         "US_SSN": 0.848066,
         "VIN": 1.0
       },
       "per_entity_recall": {
-        "ADDRESS": 0.974802,
+        "ADDRESS": 0.975702,
         "BANK_ACCOUNT": 0.914953,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.887816,
         "CRYPTO_WALLET": 1.0,
-        "CVV": 0.0,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.813921,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.402606,
-        "EMAIL_ADDRESS": 0.94739,
+        "EMAIL_ADDRESS": 0.948347,
         "EMPLOYEE_ID": 0.890492,
         "IP_ADDRESS": 1.0,
         "LICENSE_PLATE": 0.098849,
@@ -1453,38 +1455,38 @@
         "MEDICAL_RECORD_NUMBER": 0.761172,
         "NATIONAL_ID": 0.592413,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.767735,
+        "ORGANIZATION": 0.760093,
         "PASSPORT": 0.770478,
-        "PERSON_NAME": 0.851683,
+        "PERSON_NAME": 0.852688,
         "PHONE_NUMBER": 1.0,
-        "PIN": 0.0,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 0.97341,
         "USERNAME": 0.721921,
         "US_SSN": 0.982534,
         "VIN": 1.0,
         "_BENCHMARK_IGNORE": 0.0
       },
-      "precision": 0.724147,
-      "recall": 0.795522
+      "precision": 0.719654,
+      "recall": 0.795809
     },
     "pii-anon-swarm": {
-      "entity_types_detected": 22,
+      "entity_types_detected": 24,
       "entity_types_total": 29,
       "error_counts": {
-        "boundary_miss": 17139,
-        "complete_miss": 475545,
-        "spurious_fp": 2992998,
-        "true_positive": 2847843,
-        "type_confusion": 140664
+        "boundary_miss": 17505,
+        "complete_miss": 474942,
+        "spurious_fp": 3058191,
+        "true_positive": 2896590,
+        "type_confusion": 152154
       },
-      "f1": 0.610992,
+      "f1": 0.610067,
       "per_entity_errors": {
         "ADDRESS": {
           "boundary_miss": 3435,
           "complete_miss": 1662,
-          "spurious_fp": 38946,
-          "support": 202518,
-          "true_positive": 197415,
+          "spurious_fp": 40011,
+          "support": 210018,
+          "true_positive": 204915,
           "type_confusion": 6
         },
         "BANK_ACCOUNT": {
@@ -1521,10 +1523,10 @@
         },
         "CVV": {
           "boundary_miss": 0,
-          "complete_miss": 4500,
+          "complete_miss": 0,
           "spurious_fp": 0,
           "support": 4500,
-          "true_positive": 0,
+          "true_positive": 4500,
           "type_confusion": 0
         },
         "DATE_OF_BIRTH": {
@@ -1562,9 +1564,9 @@
         "EMAIL_ADDRESS": {
           "boundary_miss": 42,
           "complete_miss": 18,
-          "spurious_fp": 466674,
-          "support": 405039,
-          "true_positive": 404973,
+          "spurious_fp": 475023,
+          "support": 412539,
+          "true_positive": 412473,
           "type_confusion": 6
         },
         "EMPLOYEE_ID": {
@@ -1578,7 +1580,7 @@
         "IP_ADDRESS": {
           "boundary_miss": 0,
           "complete_miss": 0,
-          "spurious_fp": 61797,
+          "spurious_fp": 61842,
           "support": 52914,
           "true_positive": 52914,
           "type_confusion": 0
@@ -1594,7 +1596,7 @@
         "LOCATION": {
           "boundary_miss": 0,
           "complete_miss": 0,
-          "spurious_fp": 7590,
+          "spurious_fp": 8910,
           "support": 3753,
           "true_positive": 3753,
           "type_confusion": 0
@@ -1632,12 +1634,12 @@
           "type_confusion": 21090
         },
         "ORGANIZATION": {
-          "boundary_miss": 3240,
-          "complete_miss": 28671,
-          "spurious_fp": 52683,
-          "support": 216477,
-          "true_positive": 166197,
-          "type_confusion": 18369
+          "boundary_miss": 3606,
+          "complete_miss": 31971,
+          "spurious_fp": 55296,
+          "support": 231477,
+          "true_positive": 175944,
+          "type_confusion": 19956
         },
         "PASSPORT": {
           "boundary_miss": 0,
@@ -1650,26 +1652,26 @@
         "PERSON_NAME": {
           "boundary_miss": 8595,
           "complete_miss": 135165,
-          "spurious_fp": 1094112,
-          "support": 1099008,
-          "true_positive": 949341,
+          "spurious_fp": 1123530,
+          "support": 1106508,
+          "true_positive": 956841,
           "type_confusion": 5907
         },
         "PHONE_NUMBER": {
           "boundary_miss": 0,
           "complete_miss": 0,
-          "spurious_fp": 582519,
-          "support": 379125,
-          "true_positive": 379125,
+          "spurious_fp": 590106,
+          "support": 386625,
+          "true_positive": 386625,
           "type_confusion": 0
         },
         "PIN": {
           "boundary_miss": 0,
-          "complete_miss": 4491,
+          "complete_miss": 0,
           "spurious_fp": 0,
           "support": 4500,
-          "true_positive": 0,
-          "type_confusion": 9
+          "true_positive": 4500,
+          "type_confusion": 0
         },
         "ROUTING_NUMBER": {
           "boundary_miss": 0,
@@ -1682,7 +1684,7 @@
         "USERNAME": {
           "boundary_miss": 0,
           "complete_miss": 462,
-          "spurious_fp": 25794,
+          "spurious_fp": 40590,
           "support": 19365,
           "true_positive": 18903,
           "type_confusion": 0
@@ -1705,80 +1707,82 @@
         },
         "_BENCHMARK_IGNORE": {
           "boundary_miss": 0,
-          "complete_miss": 241830,
+          "complete_miss": 246918,
           "spurious_fp": 0,
-          "support": 312450,
+          "support": 327450,
           "true_positive": 0,
-          "type_confusion": 70620
+          "type_confusion": 80532
         }
       },
       "per_entity_f1": {
-        "ADDRESS": 0.899633,
+        "ADDRESS": 0.900836,
         "BANK_ACCOUNT": 0.537749,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.637962,
         "CRYPTO_WALLET": 0.756871,
-        "CVV": 0.0,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.690836,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.669898,
-        "EMAIL_ADDRESS": 0.634413,
+        "EMAIL_ADDRESS": 0.634556,
         "EMPLOYEE_ID": 0.903124,
-        "IP_ADDRESS": 0.631338,
+        "IP_ADDRESS": 0.631168,
         "LICENSE_PLATE": 0.179914,
-        "LOCATION": 0.497218,
+        "LOCATION": 0.457237,
         "MAC_ADDRESS": 0.71645,
         "MEDICAL_RECORD_NUMBER": 0.821816,
         "NATIONAL_ID": 0.725461,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.763497,
+        "ORGANIZATION": 0.760482,
         "PASSPORT": 0.738066,
-        "PERSON_NAME": 0.604202,
-        "PHONE_NUMBER": 0.565534,
-        "PIN": 0.0,
+        "PERSON_NAME": 0.600488,
+        "PHONE_NUMBER": 0.567167,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 0.954571,
-        "USERNAME": 0.590147,
+        "USERNAME": 0.479419,
         "US_SSN": 0.580268,
         "VIN": 1.0,
         "_BENCHMARK_IGNORE": 0.0
       },
       "per_entity_precision": {
-        "ADDRESS": 0.835227,
+        "ADDRESS": 0.83664,
         "BANK_ACCOUNT": 0.3686,
         "CREDIT_CARD": 0.483447,
         "CRYPTO_WALLET": 0.608844,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.528908,
         "DRIVERS_LICENSE": 0.533333,
-        "EMAIL_ADDRESS": 0.464607,
+        "EMAIL_ADDRESS": 0.46476,
         "EMPLOYEE_ID": 0.916119,
-        "IP_ADDRESS": 0.461281,
+        "IP_ADDRESS": 0.4611,
         "LICENSE_PLATE": 1.0,
-        "LOCATION": 0.330865,
+        "LOCATION": 0.296375,
         "MAC_ADDRESS": 0.565292,
         "MEDICAL_RECORD_NUMBER": 0.89296,
         "NATIONAL_ID": 0.935581,
-        "ORGANIZATION": 0.759306,
+        "ORGANIZATION": 0.760872,
         "PASSPORT": 0.70827,
-        "PERSON_NAME": 0.464577,
-        "PHONE_NUMBER": 0.394247,
+        "PERSON_NAME": 0.459938,
+        "PHONE_NUMBER": 0.395836,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 0.936447,
-        "USERNAME": 0.422914,
+        "USERNAME": 0.317735,
         "US_SSN": 0.410187,
         "VIN": 1.0
       },
       "per_entity_recall": {
-        "ADDRESS": 0.974802,
+        "ADDRESS": 0.975702,
         "BANK_ACCOUNT": 0.993802,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.937641,
         "CRYPTO_WALLET": 1.0,
-        "CVV": 0.0,
+        "CVV": 1.0,
         "DATE_OF_BIRTH": 0.995665,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.900472,
-        "EMAIL_ADDRESS": 0.999837,
+        "EMAIL_ADDRESS": 0.99984,
         "EMPLOYEE_ID": 0.890492,
         "IP_ADDRESS": 1.0,
         "LICENSE_PLATE": 0.098849,
@@ -1787,39 +1791,39 @@
         "MEDICAL_RECORD_NUMBER": 0.761172,
         "NATIONAL_ID": 0.592413,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.767735,
+        "ORGANIZATION": 0.760093,
         "PASSPORT": 0.770478,
-        "PERSON_NAME": 0.863816,
+        "PERSON_NAME": 0.864739,
         "PHONE_NUMBER": 1.0,
-        "PIN": 0.0,
+        "PIN": 1.0,
         "ROUTING_NUMBER": 0.97341,
         "USERNAME": 0.976143,
         "US_SSN": 0.991306,
         "VIN": 1.0,
         "_BENCHMARK_IGNORE": 0.0
       },
-      "precision": 0.487574,
-      "recall": 0.818066
+      "precision": 0.486431,
+      "recall": 0.817971
     },
     "presidio": {
       "entity_types_detected": 20,
       "entity_types_total": 29,
       "error_counts": {
-        "boundary_miss": 64506,
-        "complete_miss": 607143,
-        "spurious_fp": 3214083,
-        "true_positive": 2209098,
-        "type_confusion": 600444
+        "boundary_miss": 65349,
+        "complete_miss": 629901,
+        "spurious_fp": 3321858,
+        "true_positive": 2233794,
+        "type_confusion": 612147
       },
-      "f1": 0.496183,
+      "f1": 0.491114,
       "per_entity_errors": {
         "ADDRESS": {
           "boundary_miss": 0,
-          "complete_miss": 13194,
+          "complete_miss": 13722,
           "spurious_fp": 0,
-          "support": 202518,
+          "support": 210018,
           "true_positive": 35514,
-          "type_confusion": 153810
+          "type_confusion": 160782
         },
         "BANK_ACCOUNT": {
           "boundary_miss": 0,
@@ -1888,7 +1892,7 @@
         "DRIVERS_LICENSE": {
           "boundary_miss": 0,
           "complete_miss": 762,
-          "spurious_fp": 360042,
+          "spurious_fp": 360612,
           "support": 13353,
           "true_positive": 12030,
           "type_confusion": 561
@@ -1897,8 +1901,8 @@
           "boundary_miss": 1575,
           "complete_miss": 5079,
           "spurious_fp": 12645,
-          "support": 405039,
-          "true_positive": 395892,
+          "support": 412539,
+          "true_positive": 403392,
           "type_confusion": 2493
         },
         "EMPLOYEE_ID": {
@@ -1928,7 +1932,7 @@
         "LOCATION": {
           "boundary_miss": 0,
           "complete_miss": 1866,
-          "spurious_fp": 170097,
+          "spurious_fp": 181959,
           "support": 3753,
           "true_positive": 600,
           "type_confusion": 1287
@@ -1967,11 +1971,11 @@
         },
         "ORGANIZATION": {
           "boundary_miss": 1200,
-          "complete_miss": 133311,
+          "complete_miss": 143739,
           "spurious_fp": 22170,
-          "support": 216477,
+          "support": 231477,
           "true_positive": 32253,
-          "type_confusion": 49713
+          "type_confusion": 54285
         },
         "PASSPORT": {
           "boundary_miss": 0,
@@ -1982,20 +1986,20 @@
           "type_confusion": 1341
         },
         "PERSON_NAME": {
-          "boundary_miss": 27708,
-          "complete_miss": 118293,
-          "spurious_fp": 336891,
-          "support": 1099008,
-          "true_positive": 942426,
+          "boundary_miss": 27774,
+          "complete_miss": 118371,
+          "spurious_fp": 348549,
+          "support": 1106508,
+          "true_positive": 949782,
           "type_confusion": 10581
         },
         "PHONE_NUMBER": {
           "boundary_miss": 24,
-          "complete_miss": 55086,
-          "spurious_fp": 115614,
-          "support": 379125,
-          "true_positive": 318150,
-          "type_confusion": 5865
+          "complete_miss": 55641,
+          "spurious_fp": 115701,
+          "support": 386625,
+          "true_positive": 325068,
+          "type_confusion": 5892
         },
         "PIN": {
           "boundary_miss": 0,
@@ -2038,16 +2042,16 @@
           "type_confusion": 0
         },
         "_BENCHMARK_IGNORE": {
-          "boundary_miss": 33999,
-          "complete_miss": 163503,
-          "spurious_fp": 1994685,
-          "support": 312450,
-          "true_positive": 87276,
-          "type_confusion": 27672
+          "boundary_miss": 34776,
+          "complete_miss": 174672,
+          "spurious_fp": 2078283,
+          "support": 327450,
+          "true_positive": 90198,
+          "type_confusion": 27804
         }
       },
       "per_entity_f1": {
-        "ADDRESS": 0.298397,
+        "ADDRESS": 0.289282,
         "BANK_ACCOUNT": 0.579354,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.222424,
@@ -2056,26 +2060,26 @@
         "DATE_OF_BIRTH": 0.086037,
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
-        "DRIVERS_LICENSE": 0.062424,
-        "EMAIL_ADDRESS": 0.973215,
+        "DRIVERS_LICENSE": 0.062332,
+        "EMAIL_ADDRESS": 0.9737,
         "EMPLOYEE_ID": 0.150775,
         "IP_ADDRESS": 0.990621,
         "LICENSE_PLATE": 0.0,
-        "LOCATION": 0.006879,
+        "LOCATION": 0.006442,
         "MAC_ADDRESS": 0.198764,
         "MEDICAL_RECORD_NUMBER": 0.135876,
         "NATIONAL_ID": 0.128393,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.238117,
+        "ORGANIZATION": 0.225625,
         "PASSPORT": 0.267918,
-        "PERSON_NAME": 0.792512,
-        "PHONE_NUMBER": 0.782763,
+        "PERSON_NAME": 0.789893,
+        "PHONE_NUMBER": 0.785764,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.123935,
         "USERNAME": 0.04985,
         "US_SSN": 0.889162,
         "VIN": 0.0,
-        "_BENCHMARK_IGNORE": 0.0729
+        "_BENCHMARK_IGNORE": 0.072276
       },
       "per_entity_precision": {
         "ADDRESS": 1.0,
@@ -2083,25 +2087,25 @@
         "CREDIT_CARD": 1.0,
         "CRYPTO_WALLET": 0.0,
         "DATE_OF_BIRTH": 0.5,
-        "DRIVERS_LICENSE": 0.032332,
-        "EMAIL_ADDRESS": 0.969048,
+        "DRIVERS_LICENSE": 0.032283,
+        "EMAIL_ADDRESS": 0.969606,
         "EMPLOYEE_ID": 1.0,
         "IP_ADDRESS": 0.981416,
-        "LOCATION": 0.003515,
+        "LOCATION": 0.003287,
         "MAC_ADDRESS": 0.516322,
         "MEDICAL_RECORD_NUMBER": 1.0,
         "NATIONAL_ID": 0.179405,
         "ORGANIZATION": 0.592635,
         "PASSPORT": 0.187693,
-        "PERSON_NAME": 0.736663,
-        "PHONE_NUMBER": 0.733463,
+        "PERSON_NAME": 0.731541,
+        "PHONE_NUMBER": 0.737502,
         "ROUTING_NUMBER": 1.0,
         "USERNAME": 1.0,
         "US_SSN": 0.813513,
-        "_BENCHMARK_IGNORE": 0.04192
+        "_BENCHMARK_IGNORE": 0.041595
       },
       "per_entity_recall": {
-        "ADDRESS": 0.175362,
+        "ADDRESS": 0.1691,
         "BANK_ACCOUNT": 0.773454,
         "BAR_NUMBER": 0.0,
         "CREDIT_CARD": 0.125128,
@@ -2111,7 +2115,7 @@
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.900921,
-        "EMAIL_ADDRESS": 0.977417,
+        "EMAIL_ADDRESS": 0.977828,
         "EMPLOYEE_ID": 0.081534,
         "IP_ADDRESS": 1.0,
         "LICENSE_PLATE": 0.0,
@@ -2120,37 +2124,37 @@
         "MEDICAL_RECORD_NUMBER": 0.07289,
         "NATIONAL_ID": 0.099968,
         "NPI_NUMBER": 0.0,
-        "ORGANIZATION": 0.14899,
+        "ORGANIZATION": 0.139336,
         "PASSPORT": 0.467921,
-        "PERSON_NAME": 0.857524,
-        "PHONE_NUMBER": 0.839169,
+        "PERSON_NAME": 0.85836,
+        "PHONE_NUMBER": 0.840784,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.066061,
         "USERNAME": 0.025562,
         "US_SSN": 0.980322,
         "VIN": 0.0,
-        "_BENCHMARK_IGNORE": 0.279328
+        "_BENCHMARK_IGNORE": 0.275456
       },
-      "precision": 0.407344,
-      "recall": 0.634581
+      "precision": 0.402076,
+      "recall": 0.630803
     },
     "scrubadub": {
       "entity_types_detected": 4,
       "entity_types_total": 29,
       "error_counts": {
         "boundary_miss": 51837,
-        "complete_miss": 2649432,
-        "spurious_fp": 117216,
-        "true_positive": 719304,
+        "complete_miss": 2697822,
+        "spurious_fp": 122379,
+        "true_positive": 730914,
         "type_confusion": 60618
       },
-      "f1": 0.333188,
+      "f1": 0.332651,
       "per_entity_errors": {
         "ADDRESS": {
           "boundary_miss": 0,
-          "complete_miss": 202518,
+          "complete_miss": 210018,
           "spurious_fp": 0,
-          "support": 202518,
+          "support": 210018,
           "true_positive": 0,
           "type_confusion": 0
         },
@@ -2229,9 +2233,9 @@
         "EMAIL_ADDRESS": {
           "boundary_miss": 51750,
           "complete_miss": 22398,
-          "spurious_fp": 68790,
-          "support": 405039,
-          "true_positive": 330549,
+          "spurious_fp": 68862,
+          "support": 412539,
+          "true_positive": 338049,
           "type_confusion": 342
         },
         "EMPLOYEE_ID": {
@@ -2300,9 +2304,9 @@
         },
         "ORGANIZATION": {
           "boundary_miss": 0,
-          "complete_miss": 213729,
+          "complete_miss": 228729,
           "spurious_fp": 0,
-          "support": 216477,
+          "support": 231477,
           "true_positive": 0,
           "type_confusion": 2748
         },
@@ -2316,18 +2320,18 @@
         },
         "PERSON_NAME": {
           "boundary_miss": 0,
-          "complete_miss": 1076175,
+          "complete_miss": 1083675,
           "spurious_fp": 0,
-          "support": 1099008,
+          "support": 1106508,
           "true_positive": 0,
           "type_confusion": 22833
         },
         "PHONE_NUMBER": {
           "boundary_miss": 87,
-          "complete_miss": 191451,
+          "complete_miss": 194841,
           "spurious_fp": 44298,
-          "support": 379125,
-          "true_positive": 187137,
+          "support": 386625,
+          "true_positive": 191247,
           "type_confusion": 450
         },
         "PIN": {
@@ -2349,7 +2353,7 @@
         "USERNAME": {
           "boundary_miss": 0,
           "complete_miss": 18837,
-          "spurious_fp": 477,
+          "spurious_fp": 5568,
           "support": 19365,
           "true_positive": 528,
           "type_confusion": 0
@@ -2372,9 +2376,9 @@
         },
         "_BENCHMARK_IGNORE": {
           "boundary_miss": 0,
-          "complete_miss": 308916,
+          "complete_miss": 323916,
           "spurious_fp": 2649,
-          "support": 312450,
+          "support": 327450,
           "true_positive": 0,
           "type_confusion": 3534
         }
@@ -2390,7 +2394,7 @@
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.0,
-        "EMAIL_ADDRESS": 0.821875,
+        "EMAIL_ADDRESS": 0.825063,
         "EMPLOYEE_ID": 0.0,
         "IP_ADDRESS": 0.0,
         "LICENSE_PLATE": 0.0,
@@ -2402,18 +2406,18 @@
         "ORGANIZATION": 0.0,
         "PASSPORT": 0.0,
         "PERSON_NAME": 0.0,
-        "PHONE_NUMBER": 0.613001,
+        "PHONE_NUMBER": 0.614774,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.0,
-        "USERNAME": 0.051842,
+        "USERNAME": 0.041476,
         "US_SSN": 0.929681,
         "VIN": 0.0,
         "_BENCHMARK_IGNORE": 0.0
       },
       "per_entity_precision": {
-        "EMAIL_ADDRESS": 0.82774,
-        "PHONE_NUMBER": 0.808594,
-        "USERNAME": 0.525373,
+        "EMAIL_ADDRESS": 0.830769,
+        "PHONE_NUMBER": 0.811934,
+        "USERNAME": 0.086614,
         "US_SSN": 0.995042,
         "_BENCHMARK_IGNORE": 0.0
       },
@@ -2428,7 +2432,7 @@
         "DEA_NUMBER": 0.0,
         "DOCKET_NUMBER": 0.0,
         "DRIVERS_LICENSE": 0.0,
-        "EMAIL_ADDRESS": 0.816092,
+        "EMAIL_ADDRESS": 0.819435,
         "EMPLOYEE_ID": 0.0,
         "IP_ADDRESS": 0.0,
         "LICENSE_PLATE": 0.0,
@@ -2440,7 +2444,7 @@
         "ORGANIZATION": 0.0,
         "PASSPORT": 0.0,
         "PERSON_NAME": 0.0,
-        "PHONE_NUMBER": 0.493602,
+        "PHONE_NUMBER": 0.494658,
         "PIN": 0.0,
         "ROUTING_NUMBER": 0.0,
         "USERNAME": 0.027266,
@@ -2448,10 +2452,10 @@
         "VIN": 0.0,
         "_BENCHMARK_IGNORE": 0.0
       },
-      "precision": 0.859877,
-      "recall": 0.206626
+      "precision": 0.85658,
+      "recall": 0.206403
     }
   },
   "report_schema_version": "2026-02-19.v3",
-  "timestamp_utc": "2026-04-02T04:09:44Z"
+  "timestamp_utc": "2026-04-27T06:18:04Z"
 }
