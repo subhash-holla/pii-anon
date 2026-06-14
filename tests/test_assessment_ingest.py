@@ -278,3 +278,18 @@ class TestRateEloAssessmentCLI:
         )
         assert result.exit_code != 0
         assert "alpha" in result.output
+
+    def test_directory_path_is_clean_error_not_traceback(self, tmp_path: Path) -> None:
+        # IsADirectoryError is an OSError SIBLING of FileNotFoundError — the
+        # S7-02 close-10 DoV class. Must surface as a clean error, no traceback.
+        with pytest.raises(ValueError, match="not a readable file"):
+            load_assessment(tmp_path)
+
+    def test_deeply_nested_json_is_clean_error_not_recursionerror(
+        self, tmp_path: Path
+    ) -> None:
+        # RecursionError is NOT a JSONDecodeError — the S7-02 CLI DoV class.
+        path = tmp_path / "deep.json"
+        path.write_text("[" * 60000 + "]" * 60000, encoding="utf-8")
+        with pytest.raises(ValueError, match="could not parse"):
+            load_assessment(path)

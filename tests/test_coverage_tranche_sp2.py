@@ -54,9 +54,12 @@ def _spans(text: str, entity_type: str) -> list[str]:
         ("EDUCATION_LEVEL", "DOB: 1984-05-09. Education: PhD. Job: Welder.", "PhD"),
         ("EDUCATION_LEVEL", "Record shows Bachelor's Degree in Computer Science.", "Bachelor's Degree in Computer Science"),
         ("GENDER", "Resident: Timothy Harris, 27529. Gender: Male. DOB: 1984-05-09.", "Male"),
-        ("NATIONALITY", "Works for Acme Corp. Record shows American.", "American"),
-        ("ETHNICITY", "Record shows AB1234567. Record shows European.", "European"),
-        ("POLITICAL_OPINION", "Record shows Male. Record shows Liberal.", "Liberal"),
+        # NB: the generator-filler "Record shows X" anchor was removed as
+        # benchmark gaming (sp2 remediation); these types are detected only on
+        # a real field label now.
+        ("NATIONALITY", "Applicant profile — Nationality: American", "American"),
+        ("ETHNICITY", "Ethnicity: European", "European"),
+        ("POLITICAL_OPINION", "Political Opinion: Liberal", "Liberal"),
         ("RELIGIOUS_BELIEF", "Paul Gonzalez, Religious Belief: Buddhist", "Buddhist"),
         ("MARITAL_STATUS", "Systems Administrator. Marital Status: Married.", "Married"),
         ("HOUSEHOLD_SIZE", "Kimberly Rodriguez, Household Size: 8", "8"),

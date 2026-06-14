@@ -13,10 +13,10 @@ import pytest
 
 from pii_anon.eval_framework.byo_pipeline import (
     FIRST_PARTY_SYSTEMS,
-    _swarm_predictor_from_engines,
     first_party_predictor,
     pii_anon_predictor,
 )
+from pii_anon.eval_framework.first_party import _swarm_predictor_from_engines
 from pii_anon.engines.regex_adapter import RegexEngineAdapter
 
 

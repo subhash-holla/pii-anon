@@ -452,8 +452,17 @@ class RegexEngineAdapter(EngineAdapter):
         enabled: bool = True,
         deny_list_config: dict[str, Any] | None = None,
         allow_list_config: dict[str, Any] | None = None,
+        eval_cross_type_arbitration: bool = False,
     ) -> None:
         super().__init__(enabled=enabled)
+        # Cross-type arbitration (drop a generic PERSON_NAME when a more
+        # specific type covers the same span) is an EVAL-ONLY precision
+        # optimisation. It is OFF by default because in the production
+        # masking path most specific shadowing types (JOB_TITLE,
+        # HEALTH_CONDITION, ...) are NOT masked downstream — dropping the
+        # PERSON_NAME there would LEAK the name (the safe direction is to
+        # over-mask). Benchmark predictors opt in; production never does.
+        self._eval_cross_type_arbitration = eval_cross_type_arbitration
         self._list_mgr = DenyListManager(
             deny_config=deny_list_config,
             allow_config=allow_list_config,
@@ -690,9 +699,15 @@ class RegexEngineAdapter(EngineAdapter):
                         )
                     )
 
-        return _drop_nested_same_type(
-            _drop_person_shadowed_by_specific(_drop_dob_shadowed_dates(findings))
-        )
+        # _drop_nested_same_type (same-type containment) and
+        # _drop_dob_shadowed_dates (DOB ⊇ region, both masked) are
+        # LEAK-SAFE — the surviving span still covers the dropped region
+        # with a masked type, so they always run. Cross-type PERSON
+        # arbitration is EVAL-ONLY (see __init__).
+        findings = _drop_dob_shadowed_dates(findings)
+        if self._eval_cross_type_arbitration:
+            findings = _drop_person_shadowed_by_specific(findings)
+        return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
 

@@ -165,11 +165,26 @@ def _parse_player(name: str, raw: dict[str, Any]) -> AssessmentPlayer:
 
 
 def load_assessment(path: str | Path) -> AssessmentReport:
-    """Load + validate a merged assessment artifact (fail-loud on malformation)."""
+    """Load + validate a merged assessment artifact (fail-loud on malformation).
+
+    Hostile/operator-error inputs are turned into a domain :class:`ValueError`,
+    never a raw traceback: a directory path (``IsADirectoryError``, an
+    ``OSError`` SIBLING of ``FileNotFoundError``) and a pathologically deep
+    JSON value (``RecursionError``, NOT a ``JSONDecodeError``) are the two DoV
+    classes the S7-02 CLI close already pinned — re-closed here for this entry.
+    """
     source = Path(path)
-    artifact = _require_mapping(
-        json.loads(source.read_text(encoding="utf-8")), ctx="top level"
-    )
+    if not source.is_file():
+        raise _fail("path", f"not a readable file: {source}")
+    try:
+        text = source.read_text(encoding="utf-8")
+    except OSError as exc:  # e.g. IsADirectoryError on a racing path
+        raise _fail("path", f"could not read {source}: {exc}") from exc
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, RecursionError) as exc:
+        raise _fail("json", f"could not parse {source}: {exc}") from exc
+    artifact = _require_mapping(parsed, ctx="top level")
 
     schema = artifact.get("schema")
     if schema != _EXPECTED_SCHEMA:

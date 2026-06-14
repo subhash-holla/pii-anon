@@ -386,7 +386,10 @@ _DATE_GENERAL = re.compile(
 # seconds and timezone designators are optional.
 _DATETIME_ISO8601 = re.compile(
     r"(?<![\d.])(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?"
-    r"(?:Z|[+-]\d{2}:?\d{2})?)(?![\d.])"
+    # Trailing guard rejects only a continuing DIGIT (a longer number), NOT a
+    # sentence-ending period — `(?![\d.])` made the engine backtrack and shave
+    # the timezone designator off "…00Z." (Z then '.') to satisfy the lookahead.
+    r"(?:Z|[+-]\d{2}:?\d{2})?)(?!\d)"
 )
 
 # MAC address: 6 colon-or-dash-separated hex pairs.
@@ -587,11 +590,15 @@ _ORGANIZATION_CONTEXT = re.compile(
     r"(?![A-Za-z])"
 )
 
-# Single-token CamelCase organization ("InnovateLabs", "OpenAI"): an internal
-# capital after a lowercase run is a strong org-name signal. Mc/Mac/O'
-# surname shapes are excluded (McDonald, MacArthur, O'Neill are people).
+# CONTEXT-ANCHORED CamelCase organization ("from InnovateLabs", "at OpenAI"):
+# a bare internal-capital token is NOT a reliable org signal — it fires on
+# tech terms (WiFi, JavaScript, PowerPoint, GitHub) and on CamelCase surnames
+# (DeAndre, LaToya, DiCaprio). Requiring a preceding affiliation word keeps
+# the corpus form ("Daniel Moore from InnovateLabs") while dropping those FPs.
+# Mc/Mac/O' surname shapes stay excluded.
 _ORGANIZATION_CAMELCASE = re.compile(
-    r"\b(?!(?:Mc|Mac|O')[A-Z])([A-Z][a-z]+[A-Z][A-Za-z]+)\b"
+    r"\b(?i:at|from|with|for|by|joined|employer|vendor|client)[ \t]+"
+    r"(?!(?:Mc|Mac|O')[A-Z])([A-Z][a-z]+[A-Z][A-Za-z]+)\b"
 )
 
 # Street address: number + words + suffix, optionally followed by
@@ -890,7 +897,7 @@ _SALARY = re.compile(
 # (documented in tests/test_pattern_label_alignment.py); they earn external
 # credit through the DATA harness's native->canonical-63 label map.
 
-_ZW = "​‌‍"  # ZWSP / ZWNJ / ZWJ — written as escapes on purpose
+_ZW = "\u200b\u200c\u200d"  # ZWSP / ZWNJ / ZWJ as escapes (NOT raw invisibles)
 
 _TAX_ID_LABELED = re.compile(
     r"(?i:\b(?:tax[ \t]*id|ein|tin)\b)\s*[:\-]?\s*"
@@ -910,21 +917,40 @@ _JOB_TITLE_LEXICON = re.compile(
     r"Executive[ \t]Officer|Court[ \t]Reporter))\b"
 )
 
-_HEALTH_CONDITION_LABELED = re.compile(
-    r"(?i:diagnosis|diagnosed[ \t]with|presents[ \t]with|consistent[ \t]with|"
+# Health condition, TWO disambiguated forms (the bare prose lead-ins below
+# precede a PERSON just as often as a condition — "Evaluation of Mark Thompson"
+# — so capturing freely there mislabels names; sp2 remediation):
+#  (1) the "Diagnosis:" LABEL is unambiguous → free value.
+_HEALTH_CONDITION_DIAGNOSIS = re.compile(
+    r"(?i:diagnosis)\s*[:\-]\s*"
+    r"([A-Z][A-Za-z0-9]*(?:[ \t][A-Z0-9][A-Za-z0-9]*){0,4})(?![A-Za-z])"
+)
+#  (2) a prose lead-in REQUIRES the value to carry a medical marker (a
+#      condition word or a clinical suffix) — "Mark Thompson" carries none.
+_CONDITION_MARKER = (
+    r"Disease|Syndrome|Disorder|Diabetes|Cancer|Infection|Failure|Hypertension|"
+    r"Asthma|Arthritis|Bronchitis|Pneumonia|Mellitus|Lupus|Erythematosus|"
+    r"Sclerosis|An[ae]mia|Migraine|Depression|Anxiety|Insufficiency|"
+    r"itis|osis|emia|opathy|algia"
+)
+_HEALTH_CONDITION_LEADIN = re.compile(
+    r"(?i:diagnosed[ \t]with|presents[ \t]with|consistent[ \t]with|"
     r"evaluation[ \t]of|consultation[ \t]regarding|history[ \t]of|"
     r"treatment[ \t]for|suffers[ \t]from)\s*[:\-]?\s*"
+    r"(?=[A-Za-z0-9 \t]{0,45}(?:" + _CONDITION_MARKER + r"))"
     r"([A-Z][A-Za-z0-9]*(?:[ \t][A-Z0-9][A-Za-z0-9]*){0,4})(?![A-Za-z])"
 )
 
-# Drug name + dose is distinctive without a label ("Gabapentin 300mg");
-# labeled list forms cover dose-less mentions ("... include Albuterol Inhaler").
+# Drug name + dose is distinctive without a label ("Gabapentin 300mg"). The
+# labeled list form REQUIRES the value to end in a dose or a medication-form
+# word — a bare "still taking Robert Williams" carries neither (sp2 fix).
 _MEDICATION_DOSE = re.compile(r"\b([A-Z][a-z]{3,}[ \t]\d{1,4}[ \t]?mg)\b")
 _MEDICATION_LABELED = re.compile(
     r"(?i:medications?[ \t]+include|current[ \t]medications?[ \t]*[:\-]|"
     r"still[ \t]taking|prescribed)\s*"
-    r"([A-Z][a-z]{3,}(?:[ \t](?:Inhaler|Cream|Injection|Tablets?|Capsules?|"
-    r"[A-Z][a-z]+))?(?:[ \t]\d{1,4}[ \t]?mg)?)(?![A-Za-z])"
+    r"([A-Z][a-z]{3,}(?:"
+    r"[ \t](?:Inhaler|Cream|Injection|Tablets?|Capsules?|Spray|Patch|Solution|Drops)"
+    r"|[ \t]\d{1,4}[ \t]?mg))(?![A-Za-z])"
 )
 
 _HEALTH_INSURANCE_INS = re.compile(r"\b(INS-[0-9" + _ZW + r"]{6,12})(?![A-Za-z0-9])")
@@ -965,18 +991,28 @@ _DEVICE_ID_UUID = re.compile(
 
 _SOCIAL_MEDIA_HANDLE = re.compile(r"(?<![\w@.])(@[A-Za-z][A-Za-z0-9_]{2,30})\b")
 
+# Unambiguous credentials (PhD/MBA/...) match bare; the common nouns
+# Master/Bachelor/Associate REQUIRE an "'s" or "Degree" qualifier, else they
+# false-fire on "Master Service Agreement", "Senior Associate", "The Bachelor"
+# (sp2 fix).
 _EDUCATION_LEVEL = re.compile(
     r"\b((?:PhD|Ph\.D\.?|MBA|MSc|BSc|Doctorate|High[ \t]School[ \t]Diploma|"
-    r"(?:Master|Bachelor|Associate)(?:['’]s)?(?:[ \t]Degree)?"
+    r"(?:Master|Bachelor|Associate)(?:['’]s(?:[ \t]Degree)?|[ \t]Degree)"
     r"(?:[ \t]in[ \t][A-Z][a-z]+(?:[ \t][A-Z][a-z]+){0,3})?))\b"
 )
 
-# Categorical demographics: own field label OR the corpus's generic
-# "Record shows" lead-in, then a closed value lexicon (bare lexicon words in
-# prose are FP bombs — context is required).
+# Categorical demographics: own field label THEN a closed value lexicon (bare
+# lexicon words in prose are FP bombs — a field label is required). The
+# generator's "Record shows <value>" filler is DELIBERATELY NOT an anchor: it
+# is the eval-data template's universal filler (it embeds values of EVERY
+# type), so keying on it would memorise the generator, not recognise the
+# entity — a benchmark-gaming pattern the eval-integrity axiom forbids. Types
+# whose corpus form is ONLY "Record shows X" (nationality / ethnicity /
+# political-opinion) therefore score near-zero recall here; that is the honest
+# cost of not gaming — the recogniser still fires on a real "Nationality:" label.
 def _categorical(label: str, values: str) -> re.Pattern[str]:
     return re.compile(
-        r"(?i:\b(?:" + label + r")\b\s*[:\-]\s*|\brecord[ \t]shows[ \t]+)"
+        r"(?i:\b(?:" + label + r")\b)\s*[:\-]\s*"
         r"(" + values + r")\b"
     )
 
@@ -1380,7 +1416,8 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
     PatternSpec(entity_type="TAX_ID", pattern=_TAX_ID_LABELED, base_confidence=0.88, group=1, explanation="regex tax id (labeled)"),
     PatternSpec(entity_type="JOB_TITLE", pattern=_JOB_TITLE_LABELED, base_confidence=0.84, group=1, explanation="regex job title (labeled)"),
     PatternSpec(entity_type="JOB_TITLE", pattern=_JOB_TITLE_LEXICON, base_confidence=0.80, group=1, explanation="regex job title (lexicon)"),
-    PatternSpec(entity_type="HEALTH_CONDITION", pattern=_HEALTH_CONDITION_LABELED, base_confidence=0.84, group=1, explanation="regex health condition (labeled)"),
+    PatternSpec(entity_type="HEALTH_CONDITION", pattern=_HEALTH_CONDITION_DIAGNOSIS, base_confidence=0.86, group=1, explanation="regex health condition (diagnosis label)"),
+    PatternSpec(entity_type="HEALTH_CONDITION", pattern=_HEALTH_CONDITION_LEADIN, base_confidence=0.82, group=1, explanation="regex health condition (lead-in + marker)"),
     PatternSpec(entity_type="MEDICATION_NAME", pattern=_MEDICATION_DOSE, base_confidence=0.86, group=1, explanation="regex medication (name+dose)"),
     PatternSpec(entity_type="MEDICATION_NAME", pattern=_MEDICATION_LABELED, base_confidence=0.82, group=1, explanation="regex medication (labeled)"),
     PatternSpec(entity_type="HEALTH_INSURANCE_ID", pattern=_HEALTH_INSURANCE_INS, base_confidence=0.92, group=1, explanation="regex insurance id (INS-)"),
@@ -1408,14 +1445,14 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
     PatternSpec(entity_type="PROCEDURE_NAME", pattern=_PROCEDURE_MODALITY, base_confidence=0.84, group=1, explanation="regex procedure (modality)"),
     PatternSpec(entity_type="BIOMETRIC_ID", pattern=_BIOMETRIC_BIO, base_confidence=0.92, group=1, explanation="regex biometric id (BIO-)"),
     PatternSpec(entity_type="BIOMETRIC_ID", pattern=_BIOMETRIC_LABELED, base_confidence=0.84, group=1, explanation="regex biometric id (labeled)"),
-    PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_YEAR_FORM, base_confidence=0.88, group=1, explanation="regex court case (year form)"),
+    PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_YEAR_FORM, base_confidence=0.90, group=1, explanation="regex court case (year form)"),
     PatternSpec(entity_type="DOCKET_NUMBER", pattern=_DOCKET_FEDERAL, base_confidence=0.90, group=1, explanation="regex docket (federal form)"),
     PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_INV, base_confidence=0.90, group=1, explanation="regex invoice (INV-)"),
-    PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_LABELED, base_confidence=0.84, group=1, explanation="regex invoice (labeled)"),
+    PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_LABELED, base_confidence=0.90, group=1, explanation="regex invoice (labeled)"),
     PatternSpec(entity_type="SWIFT_BIC", pattern=_SWIFT_LABELED, base_confidence=0.88, group=1, explanation="regex swift bic (labeled)"),
     PatternSpec(entity_type="DRIVERS_LICENSE", pattern=_DL_PREFIXED, base_confidence=0.90, group=1, explanation="regex drivers license (DL-)"),
     PatternSpec(entity_type="DRIVERS_LICENSE", pattern=_DL_LABELED, base_confidence=0.84, group=1, explanation="regex drivers license (labeled value)"),
-    PatternSpec(entity_type="SALARY", pattern=_SALARY_LABELED, base_confidence=0.88, group=1, explanation="regex salary (labeled, $-inclusive)"),
+    PatternSpec(entity_type="SALARY", pattern=_SALARY_LABELED, base_confidence=0.90, group=1, explanation="regex salary (labeled, $-inclusive)"),
     PatternSpec(entity_type="API_KEY", pattern=_API_KEY_SK, base_confidence=0.92, group=1, explanation="regex api key (sk-)"),
     PatternSpec(entity_type="API_KEY", pattern=_API_KEY_LABELED, base_confidence=0.86, group=1, explanation="regex api key (labeled)"),
     # ── MAC_ADDRESS ────────────────────────────────────────────────────
