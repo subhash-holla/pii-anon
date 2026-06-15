@@ -1349,3 +1349,16 @@ def test_gate_validate_huge_int_scope_never_crashes() -> None:
     ok, missing = CanonicalRunGate().validate(payload)
     assert ok is False
     assert any("scope" in m for m in missing), missing
+
+
+def test_g5_latency_subject_is_canonical_swarm() -> None:
+    """G5 latency must time the canonical swarm (build_fusion('swarm')), not the
+    retired MoE _ensemble_detector — consistent with the swapped detection path
+    (docs/superpowers/specs/2026-06-14-swarm-precision-v2-design.md)."""
+    import inspect
+
+    from pii_anon.evaluation import canonical_run as cr
+
+    src = inspect.getsource(cr._measure_swarm_latency)
+    assert "_canonical_swarm_detector(" in src
+    assert "_ensemble_detector(" not in src

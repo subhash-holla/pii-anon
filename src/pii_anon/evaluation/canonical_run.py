@@ -116,7 +116,7 @@ from pii_anon.eval_framework.metrics.selective_risk import (
 from pii_anon.eval_framework.metrics.span_metrics import _aligned_prf
 from pii_anon.evaluation.competitor_compare import (
     _COMPETITOR_META,
-    _ensemble_detector,
+    _canonical_swarm_detector,
     compare_competitors,
 )
 from pii_anon.fusion import build_fusion
@@ -780,9 +780,11 @@ def _measure_swarm_latency(
     """Measure the REAL full-swarm per-record latency (the NFR-009 subject).
 
     Times the EXACT detect path ``compare_competitors`` benchmarks for
-    ``pii-anon-swarm`` (the ``_ensemble_detector`` — objective ``ensemble``;
-    the off-limits module is imported read-only, never modified) over the same
-    record draw the detection run used, capped at :data:`_LATENCY_TIMING_CAP`.
+    ``pii-anon-swarm`` — the canonical ``_canonical_swarm_detector``
+    (``build_fusion("swarm")`` over the native ``_swarm_pool``), so the G5
+    latency subject matches the swapped detection pipeline (previously this
+    timed the retired MoE ``_ensemble_detector``) — over the same record draw
+    the detection run used, capped at :data:`_LATENCY_TIMING_CAP`.
     Each record is timed :data:`_LATENCY_REPEATS` times and its latency is the
     MIN over the repeats (the timeit-style contention-robust cost estimator —
     a single-shot timing on a saturated host measures the scheduler, not the
@@ -798,11 +800,7 @@ def _measure_swarm_latency(
         records = records[:max_samples]
     timing_records = records[:_LATENCY_TIMING_CAP]
 
-    detector = _ensemble_detector(
-        use_case="default",
-        allow_fallback_detectors=True,
-        require_native_competitors=False,
-    )
+    detector = _canonical_swarm_detector()
     for record in timing_records[:_LATENCY_WARMUP_RECORDS]:
         detector(record)
 
