@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED (2026-06-14) by [2026-06-14-swarm-precision-v2-design.md](2026-06-14-swarm-precision-v2-design.md).** An SME panel (unanimous MAJOR_REVISION) + a measured A/B re-grounding found this version rests on fabricated mechanisms (EMAIL≠MAC, single-engine override unreachable), targets the wrong fusion module (the benchmark runs MoEFusionStrategy, not SwarmFusionStrategy), and mis-frames a precision problem as a recall regression. Kept for history only.
+
 # Swarm Precision — Approach A: Authoritative Regex + Tightened Gates
 
 - **Status:** Approved design (pending spec review) — 2026-06-14
