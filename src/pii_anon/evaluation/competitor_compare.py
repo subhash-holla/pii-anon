@@ -880,6 +880,61 @@ def _core_detector(
     return detect
 
 
+def _canonical_swarm_detector(
+    *,
+    engines: list[Any] | None = None,
+    **_ignored: Any,
+) -> Callable[[BenchmarkRecord], list[LabelSpan]]:
+    """Benchmark detector for ``pii-anon-swarm`` using the CANONICAL production
+    swarm wiring — ``build_fusion("swarm")`` (FloorProjectingFusion + the 4-layer
+    SwarmFusionStrategy) over the native ``_swarm_pool`` (regex-oss with
+    ``eval_cross_type_arbitration`` + native gliner/presidio/scrubadub at their
+    real per-finding confidences).
+
+    Replaces the prior ``_ensemble_detector`` (MoEFusionStrategy + flat-0.85
+    competitor confidence) routing, which was a measurement bug: scoring THAT path
+    as ``pii-anon-swarm`` reported F1 ~0.610 instead of the canonical swarm's
+    ~0.875 — the value the tournament/production path (``build_fusion("swarm")``)
+    actually achieves. See docs/superpowers/specs/2026-06-14-swarm-precision-v2-design.md.
+
+    The pool self-manages engine availability (a missing/broken optional engine is
+    skipped, never fatal), so this does not need ``_ensemble_detector``'s
+    fallback/native-competitor kwargs; they are accepted and ignored for call-site
+    compatibility. ``engines`` is injectable for fast/deterministic tests.
+    """
+    from pii_anon.eval_framework.first_party import _swarm_pool
+    from pii_anon.fusion import build_fusion
+    from pii_anon.types import EngineFinding
+
+    pool = list(engines) if engines is not None else _swarm_pool()
+    fusion = build_fusion("swarm", weights={}, min_consensus=1)
+    default_language = "en"
+
+    def detect(record: BenchmarkRecord) -> list[LabelSpan]:
+        language = record.language or default_language
+        pooled: list[EngineFinding] = []
+        for engine in pool:
+            try:
+                pooled.extend(engine.detect({"text": record.text}, {"language": language}))
+            except Exception:
+                _log.debug("canonical swarm: an engine failed on record %s", record.record_id)
+        rows: list[LabelSpan] = []
+        for f in fusion.merge(pooled):
+            start, end = f.span_start, f.span_end
+            # bool is an int subclass — reject explicitly (mirror first_party guard).
+            if isinstance(start, bool) or isinstance(end, bool):
+                continue
+            if not isinstance(start, int) or not isinstance(end, int):
+                continue
+            etype = _normalize_entity_type(str(f.entity_type))
+            if etype == "_BENCHMARK_IGNORE":
+                continue
+            rows.append((record.record_id, etype, start, end))
+        return rows
+
+    return detect
+
+
 def _ensemble_detector(
     *,
     use_case: str,
@@ -1586,12 +1641,10 @@ def _core_system_worker(spec: _CoreEvalSpec) -> SystemBenchmarkResult:
     _silence_worker_noise()
     system_name = spec.system_name
     if system_name == "pii-anon-swarm" and spec.evaluation_track == "detect_only":
-        # Ensemble path: run each competitor natively, fuse via MoE
-        detector: Callable[[BenchmarkRecord], list[LabelSpan]] | None = _ensemble_detector(
-            use_case=spec.use_case,
-            allow_fallback_detectors=spec.allow_fallback_detectors,
-            require_native_competitors=spec.require_native_competitors,
-        )
+        # Canonical swarm path: native _swarm_pool fused via build_fusion("swarm").
+        # (Was the MoE _ensemble_detector — a measurement bug that scored the swarm
+        # at F1 ~0.610 instead of its true ~0.875; see the v2 design spec.)
+        detector: Callable[[BenchmarkRecord], list[LabelSpan]] | None = _canonical_swarm_detector()
     elif spec.evaluation_track == "detect_only":
         detector = _core_detector(
             use_case=spec.use_case,
@@ -2354,17 +2407,14 @@ def _evaluate_profile(
             )
         )
 
-        # Ensemble core evaluation — runs each competitor detector natively
-        # then fuses ALL findings through MoE.  This guarantees the ensemble
-        # never misses a detection any individual engine found (union + weighted vote).
+        # Canonical swarm evaluation — the native _swarm_pool fused via
+        # build_fusion("swarm") (the production/tournament path). Replaces the prior
+        # MoE _ensemble_detector wiring, which mis-scored the swarm (F1 ~0.610 vs
+        # its true ~0.875). See docs/superpowers/specs/2026-06-14-swarm-precision-v2-design.md.
         systems.append(
             _evaluate_system(
                 "pii-anon-swarm",
-                _ensemble_detector(
-                    use_case=profile,
-                    allow_fallback_detectors=allow_fallback_detectors,
-                    require_native_competitors=require_native_competitors,
-                ),
+                _canonical_swarm_detector(),
                 reason=None,
                 records=records,
                 warmup_samples=warmup_samples,

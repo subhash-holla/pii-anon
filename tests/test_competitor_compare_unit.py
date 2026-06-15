@@ -762,3 +762,36 @@ class TestStatisticalTestsCI:
         for name in ("pii-anon", "presidio"):
             row = cis[name]
             assert row["f1_ci_lower"] <= row["f1"] <= row["f1_ci_upper"]
+
+
+class TestSwarmCanonicalRouting:
+    """pii-anon-swarm must be scored via the canonical build_fusion('swarm')
+    (SwarmFusionStrategy), not the MoE _ensemble_detector wiring — the latter
+    was a measurement bug that reported the swarm at F1 0.610 instead of ~0.875.
+    """
+
+    def test_canonical_swarm_detector_routes_through_swarm_fusion(self) -> None:
+        from pii_anon.benchmarks.datasets import BenchmarkRecord
+        from pii_anon.engines.regex_adapter import RegexEngineAdapter
+
+        # Inject a regex-only pool so the test is fast + deterministic (no GLiNER
+        # load); the canonical detector must still fuse via build_fusion("swarm").
+        det = cc._canonical_swarm_detector(
+            engines=[RegexEngineAdapter(enabled=True, eval_cross_type_arbitration=True)]
+        )
+        rec = BenchmarkRecord(
+            record_id="r1",
+            text="Contact alice@example.com please.",
+            labels=[{"entity_type": "EMAIL_ADDRESS", "start": 8, "end": 25}],
+            language="en",
+        )
+        spans = det(rec)
+        assert any(rid == "r1" and et == "EMAIL_ADDRESS" for (rid, et, _s, _e) in spans)
+
+    def test_swarm_routing_uses_canonical_not_moe(self) -> None:
+        import inspect
+
+        src = inspect.getsource(cc)
+        # Both pii-anon-swarm routing sites (parallel _core_system_worker + the
+        # serial profile builder) must call the canonical helper.
+        assert src.count("_canonical_swarm_detector(") >= 2
