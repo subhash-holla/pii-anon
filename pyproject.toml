@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-anon"
-version = "1.5.0rc1"
+version = "1.6.0rc1"
 description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -7,9 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — sp2: external assessment supremacy + 12-player pii-rate-elo
+## [1.6.0rc1] — 2026-07-10 — sp2 + sp3: external-assessment supremacy, Art-9 coverage, v2.2.0 re-baseline
 
-### Added
+> Release candidate, LOCAL-ONLY tag. Publication remains gated on the external-validity
+> program (FR-027): performance against non-home datasets must be measured and disclosed
+> before any "best-in-class" broadcast. Home-benchmark result (pii-anon-eval-data v2.2.0,
+> 66-type strict-v1 test split, 31,048 records): pii_anon_swarm F2 0.893 / pii_anon F2
+> 0.892 — #1/#2 of 13 detectors at full 66/66 coverage (best external: aws 0.736 at
+> 24/66). Synthetic-data, home-team-tuned; NOT an external-validity claim.
+
+### Added (sp3 — v2.2.0 re-baseline, 2026-07-10)
+- **GDPR Article-9 special-category detection (FR-040)** — `SEXUAL_ORIENTATION`
+  (label-gated closed lexicon), `TRADE_UNION_MEMBERSHIP` (label-gated
+  proper-noun value), `GENETIC_DATA` (label-gated value + intrinsic
+  gene-symbol / dbSNP rs-ID structure, Greek-block-aware). pii-anon is the
+  first non-LLM detector on the eval-data harness to reach the Art-9
+  categories (previously 0/3 for every off-the-shelf detector and pii-anon
+  itself). Never anchors on generator filler (eval-integrity axiom).
+- **Value-class recall recovery** — CVV / PIN / PASSWORD /
+  INSURANCE_POLICY_NUMBER / AUTHENTICATION_TOKEN now reach the v2.2.0
+  corpus's obfuscated secret forms: base64 values, zero-width-embedded
+  keywords, OCR variants (`8earer`, `P0L`), quoted code/config/JSON
+  passwords, truncated-JWT placeholders. AUTHENTICATION_TOKEN went from a
+  complete miss (recall 0.00) to 1.00 on the dev split; CVV/PIN 0.40→1.00;
+  INSURANCE 0.52→1.00 with precision UP.
+- **Census re-derivation 63→66** — `DATA_V2_CORPUS_ENTITY_TYPES` + version
+  pin re-derived for `pii_anon_datasets` 2.2.0; the standing
+  pattern-label-alignment gate keeps every registry label honest.
+
+### Added (sp2 — external assessment)
 - **First-party BYO predictors** — `first_party_predictor("pii_anon" |
   "pii_anon_swarm")` in `eval_framework/byo_pipeline.py`: pii-anon's own two
   detection surfaces expressed as ordinary `Predictor` callables emitting
