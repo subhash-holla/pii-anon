@@ -49,9 +49,10 @@ from pii_anon.evaluation.competitor_compare import _normalize_entity_type
 _BENCHMARK_IGNORE = "_BENCHMARK_IGNORE"
 
 # ── The DATA v2 corpus annotation-type universe ────────────────────────────
-# Provenance: pii_anon_datasets 2.0.0, data/pii_anon.jsonl.gz — census frozen
-# 2026-06-10 by exhaustive scan of every annotation's entity_type (63 types,
-# re-derived and confirmed exact against the shipped corpus on freeze day).
+# Provenance: pii_anon_datasets 2.2.0, packaged splits/*.jsonl.gz — census
+# re-derived 2026-07-10 (sp3 v2.2.0 re-baseline) by exhaustive scan of every
+# annotation's entity_type across all splits (66 types = the prior 63 + the 3
+# GDPR Article-9 special-category additions; nothing removed).
 # If the dataset package revs, re-derive and update this constant in the same
 # change that bumps the dataset dependency.
 DATA_V2_CORPUS_ENTITY_TYPES: frozenset[str] = frozenset({
@@ -72,6 +73,10 @@ DATA_V2_CORPUS_ENTITY_TYPES: frozenset[str] = frozenset({
     "LATITUDE_LONGITUDE", "GENDER", "EDUCATION_LEVEL", "MARITAL_STATUS",
     "ETHNICITY", "POLITICAL_OPINION", "RELIGIOUS_BELIEF", "NATIONALITY",
     "AGE", "HOUSEHOLD_SIZE", "VEHICLE_MODEL",
+    # sp3 v2.2.0 rev: the 3 GDPR Article-9 special-category additions
+    # (taxonomy 63 -> 66). Re-derived by an exhaustive scan of every
+    # annotation entity_type across all packaged 2.2.0 splits (2026-07-10).
+    "GENETIC_DATA", "SEXUAL_ORIENTATION", "TRADE_UNION_MEMBERSHIP",
 })
 
 # ── Documented allowlist: registry labels allowed to be census-unreachable ─
@@ -121,6 +126,10 @@ ALLOWED_NON_CORPUS_LABELS: dict[str, str] = {
     # scores against real gold). Un-ignoring internally would require
     # editing the pinned authority — out of scope, census-coverage
     # opportunity noted.
+    "AUTHENTICATION_TOKEN": "sp3: corpus AUTHENTICATION_TOKEN truth exists "
+                            "(bearer/base64/JWT auth tokens); authority maps "
+                            "it -> ignore. Earns external credit via the DATA "
+                            "harness LABEL_MAP identity entry",
     "BIOMETRIC_ID": "corpus truth exists; authority maps it -> ignore",
     "CREDIT_CARD_FRAGMENT": "corpus truth exists; authority maps it -> ignore",
     "DEVICE_IDENTIFIER": "corpus truth exists; authority maps it -> ignore",
@@ -139,6 +148,10 @@ ALLOWED_NON_CORPUS_LABELS: dict[str, str] = {
     "PROCEDURE_NAME": "corpus truth exists; authority maps it -> ignore",
     "RELIGIOUS_BELIEF": "corpus truth exists; authority maps it -> ignore",
     "VEHICLE_MODEL": "corpus truth exists; authority maps it -> ignore",
+    # sp3 NOTE: the 3 GDPR Article-9 additions (SEXUAL_ORIENTATION /
+    # TRADE_UNION_MEMBERSHIP / GENETIC_DATA) are NOT allowlisted — the 2.2.0
+    # census authority scores them, so they are census-REACHABLE and the
+    # reachability contract guards them directly (internal + external credit).
 }
 
 
@@ -287,7 +300,7 @@ def test_loader_map_agrees_with_census_authority() -> None:
 
 
 def test_corpus_census_constant_matches_packaged_dataset_version() -> None:
-    """The frozen 63-type census is valid for pii_anon_datasets 2.0.0 ONLY.
+    """The frozen 66-type census is valid for pii_anon_datasets 2.2.0 ONLY.
 
     If this fails after a dataset rev: re-derive DATA_V2_CORPUS_ENTITY_TYPES
     from the new corpus per the constant's provenance comment, update the
@@ -298,8 +311,8 @@ def test_corpus_census_constant_matches_packaged_dataset_version() -> None:
 
     import pii_anon_datasets
 
-    assert pii_anon_datasets.__version__ == "2.0.0", (
-        f"DATA_V2_CORPUS_ENTITY_TYPES was frozen for pii_anon_datasets 2.0.0 "
+    assert pii_anon_datasets.__version__ == "2.2.0", (
+        f"DATA_V2_CORPUS_ENTITY_TYPES was frozen for pii_anon_datasets 2.2.0 "
         f"but the installed module reports {pii_anon_datasets.__version__!r}. "
         f"Re-derive DATA_V2_CORPUS_ENTITY_TYPES from the new corpus per its "
         f"provenance comment and update this pin in the same change. "

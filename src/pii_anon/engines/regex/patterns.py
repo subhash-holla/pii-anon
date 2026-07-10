@@ -1107,6 +1107,138 @@ _API_KEY_LABELED = re.compile(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# sp3 v2.2.0 re-baseline tranche
+# ═══════════════════════════════════════════════════════════════════════════
+# The v2.2.0 corpus obfuscates several secret-like values as base64, short
+# alphanumerics, or zero-width-embedded strings BEHIND their specific field
+# label ("CVV: MzIx", "PIN: ODQzNw==", "Policy: P0L-2694750"). The legacy
+# digit-only value classes could not reach them, so recall on these
+# census-external types collapsed on the rebuilt substrate. Each pattern here
+# gates on the SAME specific label (leak-safe, additive — never the universal
+# "Record shows X" generator filler) and widens the value class to admit
+# base64 / _ZW / OCR-style P0L. Values carry no interior space/comma, so a
+# maximal value-char run captures the exact obfuscated extent.
+
+# CVV / PIN encoded values: a base64 or short-alnum secret after the field
+# label + an explicit ':'/'=' (stricter than the legacy verbal separator, so
+# prose like "cvv is fine" cannot fire).
+_CVV_ENCODED = re.compile(
+    r"(?i:cvv|cvv2|cvc|cvc2|cid|security[ \t]code|card[ \t]verification(?:[ \t]value)?)"
+    r"\s*[:=]\s*([A-Za-z0-9+/=" + _ZW + r"]{3,8})(?![A-Za-z0-9+/=])"
+)
+_PIN_ENCODED = re.compile(
+    r"(?i:pin(?:[ \t](?:number|code))?|passcode|atm[ \t]pin|pin[ \t]?#)"
+    r"\s*[:=]\s*([A-Za-z0-9+/=" + _ZW + r"]{3,16})(?![A-Za-z0-9+/=])"
+)
+
+# PASSWORD in code/config/JSON form: pass := "value" or "password": "value".
+# The value is DELIMITED by the surrounding quotes, so special chars
+# ($ # ! @ %) that the bare-token _PASSWORD form stops on are captured intact.
+_PASSWORD_QUOTED = re.compile(
+    r"\b(?i:password|passwd|pwd|pass)\b\"?\s*(?::=|[:=])\s*"
+    r"\"([^\"\n" + _ZW + r"]{6,64}|[^\"\n]{6,64})\""
+)
+
+# INSURANCE_POLICY_NUMBER obfuscated forms: OCR P0L (zero-for-O), zero-width
+# embedded, base64, or an alphanumeric suffix (POL-48BS84B). The value
+# lookahead REQUIRES a digit so a prose "Policy: standard terms" cannot fire.
+_INSURANCE_POLICY_ENCODED = re.compile(
+    r"(?i:policy|policyholder|insurance[ \t]policy(?:[ \t]number)?)"
+    r"\s*(?:no\.?|number|#)?\s*[:\-#]?\s*"
+    r"(?=[A-Za-z0-9+/=" + _ZW + r"-]*\d)"
+    r"([A-Za-z0-9+/=" + _ZW + r"][A-Za-z0-9+/=" + _ZW + r"-]{3,40})(?![A-Za-z0-9+/=])"
+)
+
+# AUTHENTICATION_TOKEN: bearer tokens, base64 "Bearer …" (QmVhcmVy = b64
+# "Bearer"), truncated-JWT placeholders (eyJ…), and any value behind the
+# "Authentication Token:" label. Real 3-segment JWTs stay JWT_TOKEN (_JWT);
+# the eyJ form here requires the literal "…" truncation, so the two never
+# double-emit on one span. All fold to AUTHENTICATION_TOKEN externally.
+#
+# The corpus obfuscates the "Bearer" keyword adversarially: B->8 OCR ("8earer")
+# and zero-width chars embedded between letters ("Bea<ZWSP>rer") / after it
+# ("Bearer<ZWSP> "). _BEARER_KW tolerates both while keeping the keyword in the
+# captured gold span. The eyJ placeholder captures EXACTLY three trailing dots
+# ('.' is OUT of the value class, so the ellipsis matches and stops; a trailing
+# sentence period stays outside the span).
+_BEARER_KW = (
+    r"[B8][" + _ZW + r"]?e[" + _ZW + r"]?a[" + _ZW + r"]?r[" + _ZW + r"]?e[" + _ZW + r"]?r"
+)
+_AUTH_TOKEN_LABELED = re.compile(
+    r"(?i:authentication[ \t]token|auth[ \t]token|bearer[ \t]token)"
+    r"\s*[:\-]\s*"
+    r"(" + _BEARER_KW + r"[ \t" + _ZW + r"]+[A-Za-z0-9+/=" + _ZW + r"]{8,}"
+    r"|eyJ[A-Za-z0-9_" + _ZW + r"-]{2,}\.\.\."
+    r"|[A-Za-z0-9+/=" + _ZW + r"]{12,})(?![A-Za-z0-9+/=])"
+)
+_AUTH_TOKEN_BEARER = re.compile(
+    r"\b(" + _BEARER_KW + r"[ \t" + _ZW + r"]+[A-Za-z0-9+/=" + _ZW + r"]{16,})"
+    r"(?![A-Za-z0-9+/=])"
+)
+_AUTH_TOKEN_B64_BEARER = re.compile(
+    r"\b(QmVhcmVy[A-Za-z0-9+/" + _ZW + r"]{4,}={0,2})(?![A-Za-z0-9+/=])"
+)
+_AUTH_TOKEN_JWT_TRUNC = re.compile(
+    r"\b(eyJ[A-Za-z0-9_" + _ZW + r"-]{2,}\.\.\.)"
+)
+
+# ── GDPR Article-9 special categories (taxonomy 63 -> 66) ──────────────────
+# SEXUAL_ORIENTATION / TRADE_UNION_MEMBERSHIP / GENETIC_DATA. Detection keys on
+# a SPECIFIC field label (the blessed _categorical shape) or, for genetic
+# data, on intrinsic value structure (gene symbols / dbSNP rs-IDs) — NEVER the
+# universal "Record shows X" generator filler (the eval-integrity line at
+# ~line 1005). These earn EXTERNAL credit via the DATA LABEL_MAP; internally
+# they are census-unreachable (documented in test_pattern_label_alignment.py).
+
+# Sexual orientation: label-gated closed lexicon (a bare orientation word in
+# prose is an FP bomb, so the specific "Sexual Orientation:" label is required
+# — exactly the _categorical discipline).
+_SEXUAL_ORIENTATION = re.compile(
+    r"(?i:sexual[ \t]orientation)\s*[:\-]\s*"
+    r"(gay|lesbian|bisexual|pansexual|asexual|queer|heterosexual|homosexual|"
+    r"straight|questioning|demisexual|omnisexual|polysexual)\b"
+)
+
+# Trade-union membership: label + proper-noun value capture (union names are
+# open-vocabulary — "IG Metall", "Teamsters Local 25", "NUT member"). The
+# corpus form is comma/field terminated; the value class excludes '.'/',' so
+# it stops cleanly at the field boundary. Label-gated (FP-safe: a bare "CGT"
+# in prose never fires).
+_TRADE_UNION = re.compile(
+    r"(?i:trade[ \t]union(?:[ \t]membership)?|union[ \t]membership)"
+    r"\s*[:\-]\s*"
+    r"([A-Za-z0-9](?:[A-Za-z0-9&' -]*[A-Za-z0-9])?)"
+    r"(?=\s*(?:[,.|/\n]|contact\b|$))"
+)
+
+# Genetic data — TWO honest routes.
+#  (1) label + value capture (comma/field terminated; catches STR-profile /
+#      karyotype forms without a canonical gene symbol).
+_GENETIC_LABELED = re.compile(
+    r"(?i:genetic[ \t]data|genetic[ \t]marker)\s*[:\-]\s*"
+    r"([^\n,]*?[A-Za-z0-9)])(?=[,\n]|\s+contact\b)"
+)
+#  (2) intrinsic structural: a canonical gene symbol or dbSNP rs-ID, extended
+#      through one-or-more trailing genetic qualifiers (so the FULL gold
+#      extent "BRCA1 c.68_69delAG pathogenic variant" is captured, not just to
+#      the first qualifier). Self-identifying PII, low-FP, generalizes beyond
+#      the template.
+_GENETIC_QUAL = (
+    r"homozygous|heterozygous|carrier|positive|negative|genotype|variant"
+    r"|expansion|pathogenic|benign|mutation|allele|repeat|deletion|duplication"
+    r"|profile|haplotype"
+)
+_GENETIC_INTRINSIC = re.compile(
+    r"\b((?:BRCA[12]|CFTR|APOE|HLA-[A-Z0-9*:]+|MTHFR|HTT|Factor[ \t]V[ \t]Leiden"
+    r"|rs\d{3,})"
+    r"[ \tA-Za-z0-9Ͱ-Ͽ*:()/._#+-]*?"
+    r"[ \t](?:" + _GENETIC_QUAL + r")"
+    r"(?:[ \t](?:" + _GENETIC_QUAL + r"))*"
+    r"(?:[ \t]\(\d+\))?)"
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Pattern Registry
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1949,5 +2081,91 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.90,
         group=1,
         explanation="regex salary/compensation amount",
+    ),
+    # ── sp3 v2.2.0 re-baseline tranche ─────────────────────────────────
+    PatternSpec(
+        entity_type="CVV",
+        pattern=_CVV_ENCODED,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex CVV (base64/alnum value behind CVV label)",
+    ),
+    PatternSpec(
+        entity_type="PIN",
+        pattern=_PIN_ENCODED,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex PIN (base64/alnum value behind PIN label)",
+    ),
+    PatternSpec(
+        entity_type="PASSWORD",
+        pattern=_PASSWORD_QUOTED,
+        base_confidence=0.92,
+        group=1,
+        explanation="regex password (quoted code/config/JSON value)",
+    ),
+    PatternSpec(
+        entity_type="INSURANCE_POLICY_NUMBER",
+        pattern=_INSURANCE_POLICY_ENCODED,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex insurance policy (OCR/base64/zero-width value)",
+    ),
+    PatternSpec(
+        entity_type="AUTHENTICATION_TOKEN",
+        pattern=_AUTH_TOKEN_LABELED,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex auth token (value behind authentication-token label)",
+    ),
+    PatternSpec(
+        entity_type="AUTHENTICATION_TOKEN",
+        pattern=_AUTH_TOKEN_BEARER,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex auth token (intrinsic Bearer <token>)",
+    ),
+    PatternSpec(
+        entity_type="AUTHENTICATION_TOKEN",
+        pattern=_AUTH_TOKEN_B64_BEARER,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex auth token (base64-encoded Bearer token)",
+    ),
+    PatternSpec(
+        entity_type="AUTHENTICATION_TOKEN",
+        pattern=_AUTH_TOKEN_JWT_TRUNC,
+        base_confidence=0.88,
+        group=1,
+        explanation="regex auth token (truncated JWT placeholder eyJ...)",
+    ),
+    # ── GDPR Article-9 special categories (63 -> 66) ────────────────────
+    PatternSpec(
+        entity_type="SEXUAL_ORIENTATION",
+        pattern=_SEXUAL_ORIENTATION,
+        base_confidence=0.86,
+        group=1,
+        explanation="regex sexual orientation (labeled lexicon)",
+    ),
+    PatternSpec(
+        entity_type="TRADE_UNION_MEMBERSHIP",
+        pattern=_TRADE_UNION,
+        base_confidence=0.84,
+        group=1,
+        explanation="regex trade-union membership (labeled value)",
+    ),
+    PatternSpec(
+        entity_type="GENETIC_DATA",
+        pattern=_GENETIC_LABELED,
+        base_confidence=0.84,
+        group=1,
+        explanation="regex genetic data (labeled value)",
+    ),
+    PatternSpec(
+        entity_type="GENETIC_DATA",
+        pattern=_GENETIC_INTRINSIC,
+        base_confidence=0.86,
+        group=1,
+        explanation="regex genetic data (intrinsic gene/rs-ID + qualifier)",
     ),
 )
