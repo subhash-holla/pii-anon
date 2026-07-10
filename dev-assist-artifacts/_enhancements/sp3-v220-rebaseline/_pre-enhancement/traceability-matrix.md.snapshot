@@ -92,7 +92,6 @@ Every FR carries a boolean-testable Given/When/Then + a negative test; every NFR
 | FR-037 | DC-14 | — (Pass-2 / unclaimed) | — | SHOULD. OS-matrix portability — CI-matrix concern, never storied. |
 | FR-038 | DC-15 | S7-03 (DONE, SO-22) | `tests/test_multilingual_fairness.py` | Non-EN context feature active in detection. |
 | FR-039 | DC-15 | S7-03 (DONE, SO-22) | `tests/test_multilingual_fairness.py` | Per-language fairness gap bounded + gated (fail-closed power semantics). |
-| FR-040 | DC-01 | sp3-v220-rebaseline enhancement (DONE, 2026-07-10) | `tests/test_coverage_tranche_sp3.py` | GDPR Art-9 special-category detection (label-gated + intrinsic gene/rs-ID); census 63→66; 100% recall / 0 FP on train-en gold. Additive, leak-safe, no generator-filler anchor. |
 
 ### Non-functional requirements
 

@@ -51,17 +51,6 @@ Each FR has a boolean-testable Given/When/Then + a negative test in the workflow
 | FR-037 | OS-matrix portability (byte-identical across OS × local/cloud) | UC-27 | swarm | SHOULD |
 | FR-038 | Multilingual non-EN context feature active in detection | UC-28 | swarm | SHOULD |
 | FR-039 | Per-language fairness gap bounded + gated | UC-28 | both | SHOULD |
-| FR-040 | Detect GDPR Article-9 special-category PII (sexual orientation, trade-union membership, genetic data) via specific-field-label / intrinsic-structure recognition — never generator-filler anchors | UC-13 | swarm | SHOULD |
-
-> **FR-040 (grafted 2026-07-10, `/dev-assist-enhance sp3-v220-rebaseline`).** The eval substrate
-> `pii-anon-eval-data` expanded 63→66 canonical types, adding the 3 GDPR Art-9 special categories
-> (each powered ≥400 spans). This FR records the detection-coverage capability closing that gap:
-> label-gated recognition (SEXUAL_ORIENTATION lexicon; TRADE_UNION_MEMBERSHIP / GENETIC_DATA
-> labeled-value) plus intrinsic gene-symbol / dbSNP-rs-ID structure for GENETIC_DATA. Bound by the
-> eval-integrity axiom (no "Record shows X" generator-filler anchor) and the leak-direction
-> invariant (additive detections only; over-mask is the safe direction). Verified 100% recall / 0 FP
-> on the train-en Art-9 gold + 600 negatives; census-reachable so it earns internal + external
-> credit. Impl: `engines/regex/patterns.py`; tests: `tests/test_coverage_tranche_sp3.py`.
 
 ## Non-Functional Requirements (26, quantified)
 
