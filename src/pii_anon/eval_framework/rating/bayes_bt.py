@@ -29,11 +29,12 @@ Model (Bayesian Bradley-Terry, claim-grade)
 Latent per-system strengths ``θ_i``::
 
     σ      ~ HalfNormal(1.0)                         # hierarchical scale
-    θ_raw  ~ Normal(0, σ)                            # per system
+    z      ~ Normal(0, 1)                            # per system (non-centered)
+    θ_raw  = σ · z                                   # same law, no funnel (sp5)
     θ      = θ_raw − mean(θ_raw)                     # sum-to-zero (identifiable)
     wins_i ~ Binomial(n_ij, logits = θ_i − θ_j)     # per comparison record
 
-Sampler: ``NUTS(model, target_accept_prob=0.9)``;
+Sampler: ``NUTS(model, target_accept_prob=0.99)``;
 ``MCMC(num_warmup, num_samples, num_chains>=4, chain_method='sequential')``
 (sequential avoids jax pmap device issues in CI); seeded ``random.PRNGKey``.
 
@@ -183,7 +184,8 @@ class BayesBTEngine:
         Number of chains (default 4 — the NFR-001 split-R̂ needs ≥ 2; ≥ 4 is the
         claim-grade convention).
     target_accept_prob:
-        NUTS target acceptance probability (default 0.9).
+        NUTS target acceptance probability (default 0.99 — sp5: with the
+        non-centered model, lower values leave divergences on tied designs).
     seed:
         PRNG seed → ``jax.random.PRNGKey(seed)`` (AX-002 determinism).
     n_synthetic_per_pair:
@@ -197,7 +199,11 @@ class BayesBTEngine:
         num_warmup: int = 1000,
         num_samples: int = 1000,
         num_chains: int = 4,
-        target_accept_prob: float = 0.9,
+        # 0.99 (was 0.9): with the non-centered model, 0.9-0.95 still leaves
+        # a handful of divergences on 2-system tied/near-tied designs (the
+        # 0-divergence NFR-001 veto is absolute); 0.99 clears them. The cost
+        # is a smaller step size — negligible at tournament scale (sp5).
+        target_accept_prob: float = 0.99,
         seed: int = 0,
         n_synthetic_per_pair: int = 100,
     ) -> None:
@@ -403,9 +409,17 @@ class BayesBTEngine:
         import numpyro
         import numpyro.distributions as dist
 
+        # NON-CENTERED parameterization (sp5 hardening). The centered form
+        # (theta_raw ~ Normal(0, sigma)) funnels as sigma -> 0, which is
+        # EXACTLY the tied/near-tied design (50/50 tie -> 80 divergences,
+        # tie-heavy Davidson -> 158 at default config) — the ONLY claim-grade
+        # tier was structurally unavailable on the program's core-vs-swarm
+        # near-tie shape. theta_raw = sigma * z with z ~ Normal(0, 1) samples
+        # the same joint law without the funnel (measured: -> ~0 divergences).
         sigma = numpyro.sample("sigma", dist.HalfNormal(1.0))  # pragma: no cover
         with numpyro.plate("systems", n_systems):  # pragma: no cover
-            theta_raw = numpyro.sample("theta_raw", dist.Normal(0.0, sigma))
+            z = numpyro.sample("z", dist.Normal(0.0, 1.0))
+        theta_raw = numpyro.deterministic("theta_raw", sigma * z)  # pragma: no cover
         # Sum-to-zero anchor → identifiable strengths on the Elo scale.
         theta = numpyro.deterministic(  # pragma: no cover
             "theta", theta_raw - jnp.mean(theta_raw)

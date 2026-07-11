@@ -130,6 +130,15 @@ def _validate_samples(
     columns in the order of ``names`` (sorted system list). A mismatch between
     the column count and ``len(names)`` — e.g. a transposed array — raises
     loudly, so an orientation bug can never pass silently.
+
+    Non-finite draws are REJECTED fail-loud (sp5 close remediation): a single
+    NaN in any column made the tie-split ``rank_one_distribution`` emit
+    all-NaN shares, and downstream ``NaN < J_BAR`` is False — one poisoned
+    draw silently VACATED the J bar and forged a claim-grade verdict. Every
+    statistic in this module is meaningless over non-finite draws, so the
+    shared validator refuses them (same fail-loud doctrine as the KeyError
+    on an unknown system name and the NFR-001 convergence gate's non-finite
+    binding constraint).
     """
     arr = np.asarray(theta_samples, dtype=np.float64)
     if arr.ndim != 2:
@@ -146,6 +155,13 @@ def _validate_samples(
         )
     if n_draws < 1:
         raise ValueError("theta_samples must have at least one draw")
+    n_nonfinite = int(arr.size - np.count_nonzero(np.isfinite(arr)))
+    if n_nonfinite:
+        raise ValueError(
+            f"theta_samples contains {n_nonfinite} non-finite draw value(s) "
+            "(NaN/inf); no rank/significance statistic over a poisoned "
+            "posterior is trustworthy — refuse loudly rather than emit NaN"
+        )
     return arr
 
 
@@ -198,16 +214,24 @@ def rank_one_distribution(
 ) -> dict[str, float]:
     """Distribution over "who is #1": ``P(rank(name) = 1 | joint posterior)``.
 
-    For each joint draw, the system with the maximum θ scores a "win"; the
-    returned fractions are the per-system win shares and sum to 1.0 (every draw
-    has exactly one argmax). This is the proper distribution the SDO J-meter
-    reads :func:`rank_one_probability` from. Pure-numpy, deterministic.
+    For each joint draw, the system(s) with the maximum θ share that draw's
+    unit of rank-1 mass: an untied draw credits its single argmax 1.0; a draw
+    where k systems tie exactly at the max credits each 1/k (sp5 hardening —
+    ``np.argmax`` previously awarded ALL tie mass to the first column, so the
+    distribution was not invariant under system relabeling, and 'pii-anon'
+    sorting before its family siblings biased the SDO J race in the
+    fabrication direction). Ties at float equality have measure zero for
+    continuous posteriors, so untied inputs are byte-identical to the
+    pre-split behavior. Shares sum to 1.0. This is the proper distribution
+    the SDO J-meter reads :func:`rank_one_probability` from. Pure-numpy,
+    deterministic.
     """
     arr = _validate_samples(theta_samples, names)
-    winners = np.argmax(arr, axis=1)  # (n_draws,) winning column per draw
-    counts = np.bincount(winners, minlength=len(names))
-    total = float(arr.shape[0])
-    return {name: float(counts[k]) / total for k, name in enumerate(names)}
+    row_max = arr.max(axis=1, keepdims=True)
+    at_max = arr == row_max  # (n_draws, n_systems); >=1 True per row
+    credit = at_max / at_max.sum(axis=1, keepdims=True)
+    shares = credit.sum(axis=0) / float(arr.shape[0])
+    return {name: float(shares[k]) for k, name in enumerate(names)}
 
 
 def rank_one_probability(

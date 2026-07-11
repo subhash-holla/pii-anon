@@ -163,7 +163,16 @@ def split_rhat(samples: NDArray[np.floating[Any]]) -> NDArray[np.float64]:
         w = within[p]
         vp = var_plus[p]
         if w <= 0.0:
-            rhat[p] = 1.0 if vp <= 0.0 else np.inf
+            if vp <= 0.0:
+                # Both variances read 0. Genuinely-identical constant chains
+                # → R̂ = 1; but at subnormal scale the BETWEEN-chain squares
+                # underflow to 0 too, so chains parked at DIFFERENT constant
+                # locations would masquerade as converged (sp5 close
+                # remediation). Compare the chain means directly: any spread
+                # in exact float terms means the chains never mixed → +inf.
+                rhat[p] = 1.0 if np.unique(chain_means[:, p]).size == 1 else np.inf
+            else:
+                rhat[p] = np.inf
         else:
             rhat[p] = float(np.sqrt(vp / w))
     return rhat
@@ -289,7 +298,16 @@ def count_divergences(
     if isinstance(divergences, (bool, np.bool_)):
         return int(bool(divergences))
     if isinstance(divergences, (int, np.integer)):
-        return int(divergences)
+        count = int(divergences)
+        if count < 0:
+            # A negative count is garbage-in that would neutralize the
+            # divergence veto (-5 > MAX_DIVERGENCES is False) — refuse loud
+            # (sp5 close remediation).
+            raise ValueError(
+                f"n_divergences must be >= 0, got {count} — a negative "
+                f"divergence count is not a NUTS output"
+            )
+        return count
     return int(np.sum(np.asarray(divergences) != 0))
 
 
@@ -334,14 +352,70 @@ class ConvergenceReport:
 
         ``samples`` is shaped ``(n_chains, n_draws, n_params)``; ``n_divergences``
         is the NUTS divergence count (array or pre-summed int).
+
+        Non-finite draws are a FIRST-CLASS binding constraint (sp5 hardening):
+        a NaN/inf anywhere in ``samples`` makes ``max_rhat``/``min_bulk_ess``
+        NaN, and ``NaN > RHAT_MAX`` / ``NaN < ESS_MIN`` are both ``False`` —
+        pre-fix, a non-finite posterior sailed through as claim-grade, and a
+        gate-passing all-NaN posterior fabricated a perfect downstream J
+        (``argmax`` over NaN rows picks index 0). The gate's own docstring
+        promise ("fails loud when it is not") is restored by checking
+        finiteness BEFORE any statistic is trusted.
         """
+        divergences = count_divergences(n_divergences)
+        samples_arr = np.asarray(samples, dtype=float)
+        # n_params via the SAME shape normalization the diagnostics use, so
+        # the failure report agrees with the healthy report on 1-D/2-D input
+        # (close remediation: the early return previously read shape[-1] raw).
+        try:
+            normalized = _as_chains_draws_params(samples_arr)
+            n_params_norm = int(normalized.shape[-1])
+        except Exception:
+            n_params_norm = 0
+        n_nonfinite = int(
+            np.size(samples_arr) - np.count_nonzero(np.isfinite(samples_arr))
+        )
+        if n_nonfinite:
+            return cls(
+                max_rhat=float("nan"),
+                min_bulk_ess=float("nan"),
+                n_divergences=divergences,
+                n_params=n_params_norm,
+                claim_grade=False,
+                binding_constraint=(
+                    f"non-finite draws={n_nonfinite} (posterior contains "
+                    f"NaN/inf; no statistic computed from it is trustworthy)"
+                ),
+            )
+
         rhat = split_rhat(samples)
         ess = bulk_ess(samples)
-        divergences = count_divergences(n_divergences)
 
         max_rhat = float(np.max(rhat)) if rhat.size else 1.0
         min_ess = float(np.min(ess)) if ess.size else 0.0
         n_params = int(rhat.size)
+
+        # NaN DIAGNOSTICS are a binding constraint too (close remediation):
+        # all-FINITE draws of magnitude >= ~1e153 overflow the within-chain
+        # variance to inf, making rhat/ESS NaN — and ``NaN > RHAT_MAX`` /
+        # ``NaN < ESS_MIN`` are both False, the exact comparison bypass the
+        # draw-level check above was added to kill. A statistic the gate
+        # cannot evaluate is a FAIL, never a pass. (+inf rhat stays on the
+        # ordinary comparison path — it is evaluable and correctly FAILS.)
+        if np.isnan(max_rhat) or np.isnan(min_ess):
+            return cls(
+                max_rhat=max_rhat,
+                min_bulk_ess=min_ess,
+                n_divergences=divergences,
+                n_params=n_params,
+                claim_grade=False,
+                binding_constraint=(
+                    f"non-finite diagnostics (max_rhat={max_rhat}, "
+                    f"min_bulk_ess={min_ess}): the chain statistics "
+                    f"overflowed or degenerated; the gate cannot certify "
+                    f"what it cannot evaluate"
+                ),
+            )
 
         binding = _binding_constraint(max_rhat, min_ess, divergences)
         return cls(

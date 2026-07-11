@@ -101,6 +101,10 @@ class AssessmentPlayer:
     n_pred: int
     #: micro F2 per entity type, ONLY for types with gold support (tp+fn > 0).
     per_entity_f2: dict[str, float]
+    #: gold span count (tp+fn) per gold-supported type — the shared-gold
+    #: reconciliation input (sp5): every scored player in one artifact was
+    #: scored against the SAME gold, so these must agree across players.
+    per_entity_gold: dict[str, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +129,7 @@ def _parse_player(name: str, raw: dict[str, Any]) -> AssessmentPlayer:
     )
 
     per_entity_f2: dict[str, float] = {}
+    per_entity_gold: dict[str, int] = {}
     for etype_raw, row_raw in by_entity.items():
         etype = _require_str(etype_raw, ctx=f"detectors[{name}].by_entity_type key")
         row = _require_mapping(row_raw, ctx=f"detectors[{name}].by_entity_type[{etype}]")
@@ -133,12 +138,32 @@ def _parse_player(name: str, raw: dict[str, Any]) -> AssessmentPlayer:
         )
         tp = _require_int(counts.get("tp"), ctx=f"detectors[{name}].{etype}.counts.tp")
         fn = _require_int(counts.get("fn"), ctx=f"detectors[{name}].{etype}.counts.fn")
-        if tp < 0 or fn < 0:
+        fp = _require_int(counts.get("fp"), ctx=f"detectors[{name}].{etype}.counts.fp")
+        if tp < 0 or fn < 0 or fp < 0:
             raise _fail(f"detectors[{name}].{etype}.counts", "negative count")
         if tp + fn > 0:  # gold-supported type: its F2 is a real match score
-            per_entity_f2[etype] = _require_unit(
+            reported_f2 = _require_unit(
                 row.get("f2"), ctx=f"detectors[{name}].by_entity_type[{etype}].f2"
             )
+            # Counts-consistency (sp5 close remediation): a gold-consistent
+            # but F2-forged row moved rankings. The reported F2 must equal
+            # the F2 its OWN counts imply (verified exact — diff 0.0 — on
+            # every real artifact row; tolerance covers float round-trip).
+            precision = tp / (tp + fp) if tp + fp else 0.0
+            recall = tp / (tp + fn) if tp + fn else 0.0
+            implied_f2 = (
+                5.0 * precision * recall / (4.0 * precision + recall)
+                if (4.0 * precision + recall) > 0.0
+                else 0.0
+            )
+            if abs(reported_f2 - implied_f2) > 1e-6:
+                raise _fail(
+                    f"detectors[{name}].by_entity_type[{etype}]",
+                    f"counts-impossible f2: reported {reported_f2!r} but "
+                    f"tp={tp}/fp={fp}/fn={fn} imply {implied_f2:.6f}",
+                )
+            per_entity_f2[etype] = reported_f2
+            per_entity_gold[etype] = tp + fn
 
     reachable = _require_int(
         coverage.get("reachable"), ctx=f"detectors[{name}].coverage.reachable"
@@ -161,7 +186,110 @@ def _parse_player(name: str, raw: dict[str, Any]) -> AssessmentPlayer:
         n_gold=_require_int(raw.get("n_gold"), ctx=f"detectors[{name}].n_gold"),
         n_pred=_require_int(raw.get("n_pred"), ctx=f"detectors[{name}].n_pred"),
         per_entity_f2=per_entity_f2,
+        per_entity_gold=per_entity_gold,
     )
+
+
+def _reconcile_shared_gold(players: list[AssessmentPlayer]) -> None:
+    """Enforce the shared-gold invariant across scored players (sp5, F4/F5).
+
+    Every scored player in one artifact was scored against the SAME gold, so:
+    (a) a scored player must carry at least one gold-supported type — an
+    empty ``by_entity_type`` player would win every match field 0.0-vs-0.0
+    tie or lose silently, moving rankings on zero evidence; (b) every
+    gold-supported type must be asserted by EVERY player with the SAME gold
+    count (tp+fn) — pre-fix, a player claiming EMAIL gold=1 while another
+    claimed gold=20, or a phantom type only one player asserted, was admitted
+    and moved rankings. Fail-loud names the type and the disagreeing players.
+    """
+    for player in players:
+        if not player.per_entity_gold:
+            raise _fail(
+                f"detectors[{player.name}]",
+                "scored player has NO gold-supported entity types "
+                "(empty/zero-gold by_entity_type) — it cannot play matches",
+            )
+        # f2/gold key-set + value coherence (round-2 close remediation): a
+        # hand-built report whose per_entity_f2 carries a phantom key (or a
+        # NaN value, which the elo sigmoid clamp silently converts into
+        # guaranteed wins) passed the gold-only reconciliation and moved
+        # rankings. load_assessment populates both dicts together, so on the
+        # artifact path this is a no-op; the check exists for the hand-built
+        # AssessmentReport seam run_assessment_tournament re-validates.
+        if set(player.per_entity_f2) != set(player.per_entity_gold):
+            extra = sorted(set(player.per_entity_f2) - set(player.per_entity_gold))
+            missing = sorted(set(player.per_entity_gold) - set(player.per_entity_f2))
+            raise _fail(
+                f"detectors[{player.name}]",
+                f"per_entity_f2 keys must equal per_entity_gold keys "
+                f"(phantom f2 fields: {extra}; gold fields without f2: {missing})",
+            )
+        for etype, f2_value in player.per_entity_f2.items():
+            if (
+                isinstance(f2_value, bool)
+                or not isinstance(f2_value, (int, float))
+                or not math.isfinite(float(f2_value))
+                or not 0.0 <= float(f2_value) <= 1.0
+            ):
+                raise _fail(
+                    f"detectors[{player.name}].per_entity_f2[{etype}]",
+                    f"expected a finite match score in [0, 1], got {f2_value!r}",
+                )
+        # Gold VALUES must be genuine (round-3 close remediation): gold=0 (or
+        # a negative/totals-preserving redistribution) colluded into BOTH
+        # dicts of ALL players dodged the n_gold totals cross-check and moved
+        # rankings ±75 Elo at the hand-built seam. The load-path definition of
+        # gold-supported is tp+fn >= 1 with a non-blank type key — enforce it
+        # here too.
+        for etype, gold_value in player.per_entity_gold.items():
+            if not isinstance(etype, str) or not etype.strip():
+                raise _fail(
+                    f"detectors[{player.name}].per_entity_gold",
+                    f"blank entity-type key {etype!r}",
+                )
+            if (
+                isinstance(gold_value, bool)
+                or not isinstance(gold_value, int)
+                or gold_value < 1
+            ):
+                raise _fail(
+                    f"detectors[{player.name}].per_entity_gold[{etype}]",
+                    f"gold-supported means tp+fn >= 1; got {gold_value!r}",
+                )
+        # Totals cross-check (sp5 close remediation, defense-in-depth): the
+        # artifact's OWN n_gold refutes colluding phantom types — the per-type
+        # gold must sum to it exactly (verified exact on every real artifact).
+        gold_sum = sum(player.per_entity_gold.values())
+        if gold_sum != player.n_gold:
+            raise _fail(
+                f"detectors[{player.name}]",
+                f"per-type gold sums to {gold_sum} but n_gold={player.n_gold} "
+                f"— phantom or truncated entity types",
+            )
+    gold_views: dict[str, dict[str, int]] = {}
+    for player in players:
+        for etype, gold in player.per_entity_gold.items():
+            gold_views.setdefault(etype, {})[player.name] = gold
+    n_players = len(players)
+    for etype in sorted(gold_views):
+        views = gold_views[etype]
+        if len(views) != n_players:
+            missing = sorted({p.name for p in players} - set(views))
+            raise _fail(
+                f"by_entity_type[{etype}]",
+                f"shared-gold violation: type asserted by {sorted(views)} but "
+                f"absent from {missing} — all scored players were scored "
+                f"against the same gold, so a partially-asserted type is "
+                f"either a phantom type or a truncated artifact",
+            )
+        counts = sorted(set(views.values()))
+        if len(counts) > 1:
+            detail = ", ".join(f"{n}={views[n]}" for n in sorted(views))
+            raise _fail(
+                f"by_entity_type[{etype}]",
+                f"shared-gold violation: players disagree on the gold span "
+                f"count (tp+fn): {detail}",
+            )
 
 
 def load_assessment(path: str | Path) -> AssessmentReport:
@@ -204,6 +332,8 @@ def load_assessment(path: str | Path) -> AssessmentReport:
             continue
         players.append(_parse_player(name, raw))
 
+    _reconcile_shared_gold(players)
+
     dataset = _require_mapping(artifact.get("dataset"), ctx="dataset")
     matching_policy = _require_str(
         artifact.get("matching_policy"), ctx="matching_policy"
@@ -231,12 +361,16 @@ def run_assessment_tournament(
     Deterministic: match order is field-major (sorted entity types), then
     sorted player pairs within each field. Elo updates are path-dependent, so
     this fixed order makes repeated runs byte-identical.
+
+    Re-runs the shared-gold reconciliation at entry (sp5 close: the invariant
+    was load-path-only, so a hand-built ``AssessmentReport`` bypassed it).
     """
     if len(report.players) < 2:
         raise ValueError(
             f"assessment tournament needs at least 2 scored players, "
             f"got {len(report.players)}"
         )
+    _reconcile_shared_gold(list(report.players))
     rating_engine = engine if engine is not None else PIIRateEloEngine()
 
     fields: set[str] = set()
