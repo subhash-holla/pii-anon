@@ -139,6 +139,39 @@ class GLiNERAdapter(EngineAdapter):
                 )
         return findings
 
+    # Long-document windowing (sp4 external-validity fix). Measured on real
+    # ECHR judgments: the model's effective detection COLLAPSES with input
+    # length (3 findings on the first 500 chars, 1 at 1,000, ZERO at >=2,000),
+    # so an unwindowed call silently loses every finding in a long document.
+    # Window size swept on the TAB DEV split (tuning-legal; test untouched):
+    # gold-PERSON overlap 50/56 at 400 chars vs 43/56 @600 / 35/56 @800 /
+    # 18/56 @1200 — monotone, so 400 it is. Windows are whitespace-aligned,
+    # overlap so a span straddling a boundary is seen whole by the next
+    # window, and offsets are re-based to the full text. Additive-only
+    # (leak-safe); texts under one window keep the single unwindowed call.
+    _WINDOW_CHARS = 400
+    _OVERLAP_CHARS = 100
+
+    def _windows(self, text: str) -> list[tuple[int, str]]:
+        """Whitespace-aligned (offset, chunk) windows covering ``text``."""
+        if len(text) <= self._WINDOW_CHARS:
+            return [(0, text)]
+        windows: list[tuple[int, str]] = []
+        start = 0
+        while start < len(text):
+            end = min(start + self._WINDOW_CHARS, len(text))
+            if end < len(text):
+                # Retreat to the last whitespace so no token is split; a
+                # pathological whitespace-free run falls back to the hard cut.
+                cut = text.rfind(" ", start + self._OVERLAP_CHARS, end)
+                if cut > start:
+                    end = cut
+            windows.append((start, text[start:end]))
+            if end >= len(text):
+                break
+            start = max(end - self._OVERLAP_CHARS, start + 1)
+        return windows
+
     def detect(self, payload: Payload, context: dict[str, Any]) -> list[EngineFinding]:
         if not self.enabled:
             return []
@@ -152,25 +185,39 @@ class GLiNERAdapter(EngineAdapter):
         for key, value in payload.items():
             if not isinstance(value, str):
                 continue
-            try:
-                entities = model.predict_entities(value, self._PII_LABELS, threshold=0.5)
-            except Exception:
-                findings.extend(self._fallback_detect({key: value}, language))
-                continue
-
-            for entity in entities:
-                label = str(entity.get("label", "UNKNOWN")).lower()
-                mapped_type = self._LABEL_MAP.get(label, label.upper())
-                findings.append(
-                    EngineFinding(
+            # (start, end, type) -> best finding; dedupes overlap-region
+            # echoes keeping the higher-confidence emission.
+            best: dict[tuple[int, int, str], EngineFinding] = {}
+            failed = False
+            for offset, chunk in self._windows(value):
+                try:
+                    entities = model.predict_entities(
+                        chunk, self._PII_LABELS, threshold=0.5
+                    )
+                except Exception:
+                    failed = True
+                    break
+                for entity in entities:
+                    label = str(entity.get("label", "UNKNOWN")).lower()
+                    mapped_type = self._LABEL_MAP.get(label, label.upper())
+                    span_start = offset + int(entity.get("start", 0))
+                    span_end = offset + int(entity.get("end", 0))
+                    finding = EngineFinding(
                         entity_type=mapped_type,
                         confidence=float(entity.get("score", 0.75)),
                         field_path=key,
-                        span_start=int(entity.get("start", 0)),
-                        span_end=int(entity.get("end", 0)),
+                        span_start=span_start,
+                        span_end=span_end,
                         engine_id=self.adapter_id,
                         explanation="gliner native ner",
                         language=language,
                     )
-                )
+                    dedupe_key = (span_start, span_end, mapped_type)
+                    prior = best.get(dedupe_key)
+                    if prior is None or finding.confidence > prior.confidence:
+                        best[dedupe_key] = finding
+            if failed:
+                findings.extend(self._fallback_detect({key: value}, language))
+                continue
+            findings.extend(best[k] for k in sorted(best))
         return findings
