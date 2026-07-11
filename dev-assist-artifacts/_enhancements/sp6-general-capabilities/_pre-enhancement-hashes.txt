@@ -1,0 +1,3 @@
+1866f753ffd1746c4e016b7e87326c4c240e2ed0  dev-assist-artifacts/_enhancements/sp6-general-capabilities/_pre-enhancement/gliner_adapter.py.snapshot
+334375bc2c2e48939e8563db8213b92c6ecbd58e  dev-assist-artifacts/_enhancements/sp6-general-capabilities/_pre-enhancement/presidio_adapter.py.snapshot
+39e663a2b19b76de1df921ce8049e8784bba4eca  dev-assist-artifacts/_enhancements/sp6-general-capabilities/_pre-enhancement/swarm.py.snapshot
