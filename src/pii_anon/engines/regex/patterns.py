@@ -647,7 +647,16 @@ _CRYPTO_BECH32 = re.compile(r"\b(bc1[a-z0-9]{39,59})\b")
 # Ethereum (0x prefix + 40 hex chars).
 _CRYPTO_ETHEREUM = re.compile(r"\b(0x[a-fA-F0-9]{40})\b")
 
-# GPS coordinates: decimal lat/lon pair.
+# GPS coordinates: decimal lat/lon pair. The PATTERN deliberately keeps the
+# permissive pre-sp6 form (integer halves admitted): narrowing it here was a
+# PRODUCTION LEAK the sp6 close caught — regex-oss is the AX-003 floor
+# source, so a pair like "41, -87" that the narrowed pattern dropped reached
+# production UNMASKED with no downstream layer able to restore it (the sp2
+# showstopper class: an eval precision optimization executing as a drop on
+# the masking path). The eval-side precision fix (the "15/09" date-fragment
+# FP class; Nemotron P=0.072, home P=0.157) lives in
+# regex_adapter._drop_undecimaled_gps under eval_cross_type_arbitration —
+# eval-only, never on the masking path.
 _GPS = re.compile(
     r"(?<![0-9.])"
     r"(-?(?:90(?:\.0+)?|[0-8]?\d(?:\.\d+)?))"

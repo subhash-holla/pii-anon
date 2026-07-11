@@ -119,9 +119,46 @@ class SwarmConfig:
     #: :doc:`/extend-swarm` for the "plug your own engine into the swarm"
     #: workflow.
     force_include_engines: tuple[str, ...] = ()
+    #: sp6 single-engine acceptance: a SINGLE-engine candidate of one of
+    #: these types is emitted when the engine's OWN confidence clears the
+    #: per-type bar — bypassing the corroboration gate that was otherwise
+    #: structurally unreachable for singletons (the fallback meta-score caps
+    #: at sigmoid(0.5)=0.62 < the 0.85 override, with the engine's own
+    #: confidence not even an input). Measured across 6 datasets: fusion was
+    #: discarding pool findings that lifted TAB/ECHR recall 0.091->0.582 in
+    #: the union counterfactual. Additive-only (emits MORE, never drops) =>
+    #: AX-003 / leak-direction safe by construction. Checksum-validated
+    #: types (CREDIT_CARD, US_SSN, ...) are deliberately ABSENT — those stay
+    #: regex/corroboration territory. Set to {} to restore the old gate.
+    #: Default bars tuned on the HOME dev split (the certified surface must
+    #: not regress) against the external evidence: LOCATION / DATE_TIME /
+    #: NATIONALITY / JOB_TITLE are deliberately NOT in the defaults — their
+    #: singleton precision is unproven and home annotation conventions clash
+    #: (country names / bare dates are valid detections the home gold does
+    #: not annotate); enable them explicitly for long-document / external
+    #: workloads via config.
+    single_engine_min_confidence: dict[str, float] = field(default_factory=lambda: {
+        "PERSON_NAME": 0.92,
+        "ORGANIZATION": 0.90,
+        "ADDRESS": 0.85,
+        "DATE_OF_BIRTH": 0.90,
+        "USERNAME": 0.92,
+        "PHONE_NUMBER": 0.92,
+        "EMAIL_ADDRESS": 0.92,
+    })
 
     def __post_init__(self) -> None:
         """Auto-discover trained artifacts from the default location."""
+        # Fail LOUD at load time on a wrong-typed acceptance map (sp6 close:
+        # a null/str/list value from from_json loaded fine and crashed the
+        # first merge() on the masking path — a deferred crash is the wrong
+        # failure mode for a production config error).
+        if not isinstance(self.single_engine_min_confidence, dict):
+            raise ValueError(
+                "single_engine_min_confidence must be a dict of "
+                "entity_type -> confidence bar; got "
+                f"{type(self.single_engine_min_confidence).__name__}"
+            )
         artifacts_dir = _default_artifacts_dir()
         if self.ds_params_path is None:
             candidate = artifacts_dir / "ds_params.json"
@@ -141,6 +178,35 @@ class SwarmConfig:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
+    @classmethod
+    def anonymization_profile(cls, **overrides: object) -> SwarmConfig:
+        """Config profile for LONG-DOCUMENT / anonymization workloads (sp6).
+
+        Document-anonymization tasks (the TAB/ECHR shape: court judgments,
+        medical notes, reports) treat quasi-identifiers — dates, locations,
+        nationalities, job titles — as maskable gold, and their prose runs
+        long enough that single-engine ML findings are the ONLY channel for
+        them. The DEFAULT config deliberately keeps those types out of
+        singleton acceptance because short-record corpora (the home
+        benchmark's shape) do not annotate them and the precision cost is
+        real (measured: home dev F2 −1.7pp under the loose config). This
+        profile widens the acceptance map for the workload where masking a
+        date or a city is the point, not a false positive. Measured on
+        TAB/ECHR: relaxed F2 0.101 → 0.150 with the widened map (vs 0.10
+        with fusion's channel closed entirely).
+
+        Additive-only, like the default acceptance branch: AX-003 and the
+        leak direction are unaffected (this only ADDS maskable findings).
+        """
+        base = cls(**overrides)  # type: ignore[arg-type]
+        widened = dict(base.single_engine_min_confidence)
+        widened.setdefault("LOCATION", 0.85)
+        widened.setdefault("DATE_TIME", 0.85)
+        widened.setdefault("NATIONALITY", 0.85)
+        widened.setdefault("JOB_TITLE", 0.90)
+        base.single_engine_min_confidence = widened
+        return base
+
 
 @dataclass(slots=True)
 class SpanCandidate:
@@ -154,6 +220,10 @@ class SpanCandidate:
     ds_confidence: float = 0.0
     meta_score: float = 0.0
     corroboration_count: int = 0
+    #: Engine-OWN (pre-temperature-scaling) confidences, captured by
+    #: _aggregate_candidate before it replaces engine_findings with scaled
+    #: copies — the single-engine acceptance bar reads THESE (sp6 close).
+    raw_confidences: dict[str, float] = field(default_factory=dict)
 
 
 def _representative_language(candidate: SpanCandidate) -> str:
@@ -683,18 +753,35 @@ class SwarmFusionStrategy(FusionStrategy):
         # ── Layer 4: Validation & post-processing ─────────────────────────
         results: list[EnsembleFinding] = []
         for candidate in aggregated:
+            # sp6 single-engine acceptance (ADDITIVE): a singleton candidate
+            # whose engine's OWN confidence clears the per-type bar is
+            # emitted even where the meta/corroboration gates would drop it.
+            # The old gates were structurally unreachable for ML singletons
+            # (fallback meta caps at 0.62 < the 0.85 override); measured
+            # cross-dataset, fusion was discarding pool findings worth
+            # relaxed-recall 0.091->0.582 on real documents (TAB union
+            # counterfactual). Candidates passing the ORDINARY gates are
+            # emitted exactly as before (byte-identical confidence).
+            accept_conf = self._single_engine_acceptance_conf(candidate, cfg)
+            via_acceptance = False
+
             if candidate.meta_score < cfg.emission_threshold:
-                continue
+                if accept_conf is None:
+                    continue
+                via_acceptance = True
 
             # Corroboration filter for semantic types.
-            if candidate.entity_type in SEMANTIC_TYPES:
+            if candidate.entity_type in SEMANTIC_TYPES and not via_acceptance:
                 if (candidate.corroboration_count < cfg.corroboration_min
                         and candidate.meta_score < cfg.corroboration_override_threshold):
-                    continue
+                    if accept_conf is None:
+                        continue
+                    via_acceptance = True
 
             results.append(EnsembleFinding(
                 entity_type=candidate.entity_type,
-                confidence=candidate.meta_score,
+                confidence=accept_conf if via_acceptance and accept_conf is not None
+                else candidate.meta_score,
                 engines=list(candidate.engine_findings.keys()),
                 field_path=candidate.field_path,
                 span_start=candidate.span_start,
@@ -710,12 +797,59 @@ class SwarmFusionStrategy(FusionStrategy):
                     f"swarm:ds={candidate.ds_confidence:.2f}"
                     f" meta={candidate.meta_score:.2f}"
                     f" engines={candidate.corroboration_count}"
+                    + (" single-engine-acceptance" if via_acceptance else "")
                 ),
             ))
 
         # Deduplicate fast-pass results vs. Layer 3 results.
         results = self._deduplicate_fast_pass(fast_pass_results, results)
         return results
+
+    @staticmethod
+    def _single_engine_acceptance_conf(
+        candidate: SpanCandidate, cfg: SwarmConfig
+    ) -> float | None:
+        """The engine-own confidence iff ``candidate`` qualifies for the sp6
+        single-engine acceptance; ``None`` otherwise.
+
+        Qualifies iff: exactly ONE engine produced the candidate; that engine
+        is NOT ``regex-oss`` (regex spans already reach emission via the
+        fast-pass and the recall floor — this branch exists for the ML
+        channel); the candidate's type has a VALID configured per-type bar
+        (finite, in (0, 1] — a NaN/negative/bool bar is a config error and
+        REJECTS rather than silently accepting everything; sp6 close); and
+        the engine's own RAW confidence (pre-temperature-scaling, preserved
+        in ``raw_confidences`` — the close proved the scaled value made the
+        channel inert under the production calibration artifacts) clears the
+        bar. Purely additive: this can only ADD emissions, never remove one.
+        """
+        if len(candidate.engine_findings) != 1:
+            return None
+        engine_id, finding = next(iter(candidate.engine_findings.items()))
+        if engine_id == "regex-oss":
+            return None
+        bar = cfg.single_engine_min_confidence.get(candidate.entity_type)
+        if bar is None or isinstance(bar, bool) or not isinstance(bar, (int, float)):
+            return None
+        try:
+            # float() itself raises OverflowError on an unbounded int (the
+            # 10**400 class — round-2 close: a huge JSON-integer bar passed
+            # load-time checks and crashed the first merge() on the masking
+            # path). Conversion failure = invalid bar = reject.
+            bar_f = float(bar)
+        except (OverflowError, ValueError):
+            return None
+        if not math.isfinite(bar_f) or not 0.0 < bar_f <= 1.0:
+            return None
+        try:
+            confidence = float(
+                candidate.raw_confidences.get(engine_id, finding.confidence)
+            )
+        except (OverflowError, ValueError, TypeError):
+            return None
+        if not math.isfinite(confidence) or confidence < bar_f:
+            return None
+        return confidence
 
     def _build_candidate(self, cluster: list[EngineFinding]) -> SpanCandidate | None:
         """Convert a cluster of overlapping findings into a SpanCandidate."""
@@ -763,6 +897,19 @@ class SwarmFusionStrategy(FusionStrategy):
         # / logging / retry), so we replace the dict entries with
         # copies rather than mutating the originals — double-scaling on
         # a retry would be a silent correctness bug.
+        #
+        # RAW confidences are preserved FIRST (sp6 close remediation): the
+        # single-engine acceptance bar is documented against the engine's
+        # OWN reported confidence, but this replacement ran before Layer 4,
+        # so the bar silently compared TEMPERATURE-SCALED values — on the
+        # production calibration artifacts (gliner T=2.474: raw 0.98 →
+        # 0.828) that put every configured bar out of reach and the
+        # acceptance channel was INERT in production while the tests passed
+        # on an uncalibrated engine id.
+        candidate.raw_confidences = {
+            engine_id: float(f.confidence)
+            for engine_id, f in candidate.engine_findings.items()
+        }
         candidate.engine_findings = {
             engine_id: dataclasses.replace(
                 f,

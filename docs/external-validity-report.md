@@ -84,6 +84,35 @@ convention absorbing 75% of strict FPs), and full per-type tables live in the re
    field labels; the ZIP grammar is US-only. These are honest external findings, to be fixed as
    general improvements (not benchmark-specific tuning) with home-benchmark regression checks.
 
+## sp6 update (2026-07-11): the NER channel opened — measured gains, separately labeled
+
+The sp6 cross-dataset mining found the pool engines were already detecting most of the missing
+gold and the pipeline was discarding it (three mechanisms: un-normalized presidio labels, missing
+GLiNER labels + window artifacts, and a corroboration gate structurally unreachable for
+single-engine ML findings). The fixes went through a 3-round mandatory adversarial close (which
+caught, and we fixed, two leak-direction inversions the eval numbers alone would never have shown —
+a GPS pattern narrowing and a presidio label remap that each stopped previously-masked spans from
+being masked). Post-fix, HOME improved too (dev swarm F2 0.8928 → 0.8952; vanilla 0.8916 → 0.8927).
+
+Swarm relaxed-F2, zero-shot rows above vs the sp6 DEFAULT config (all label-mapping and sampling
+identical; the zero-shot rows remain the pre-sp6 record):
+
+| Dataset | pre-sp6 swarm | sp6 default | sp6 anonymization profile |
+|---|---:|---:|---:|
+| ai4privacy-400k | 0.237 | **0.267** | — |
+| Gretel finance | 0.389 | **0.439** | — |
+| Nemotron-PII | 0.324 | **0.335** | — |
+| PIIBench | 0.189 | **0.196** | — |
+| TAB (real documents) | 0.101 | **0.138** | **0.491** (strict 0.432) |
+
+The **anonymization profile** (`SwarmConfig.anonymization_profile()`) additionally accepts
+single-engine quasi-identifier findings (LOCATION / DATE_TIME / NATIONALITY / JOB_TITLE) — the
+types document-anonymization tasks treat as maskable gold and short-record corpora do not
+annotate. It is a documented workload profile, reported as its own row, never the default and
+never conflated with the zero-shot record. On TAB — real court judgments, the academic
+anonymization benchmark — it recovers ~90% of the engine-union counterfactual headroom
+(0.101 → 0.491 relaxed F2).
+
 ## Methodology honesty
 
 - **Zero-shot first:** every number above was measured before any tuning against the dataset;

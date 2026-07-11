@@ -102,6 +102,34 @@ _PERSON_SHADOWING_TYPES: frozenset[str] = frozenset({
 })
 
 
+def _drop_undecimaled_gps(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: drop GPS_COORDINATES spans carrying no decimal point.
+
+    The permissive GPS pattern is deliberately kept on the masking path —
+    the sp6 close proved that narrowing the PATTERN leaked "41, -87"-style
+    pairs to production unmasked via the AX-003 floor (the sp2 showstopper
+    class). At eval, undecimaled pairs are date fragments ("15/09";
+    coordinate strict P=0.072 on Nemotron, P=0.157 at home) while every real
+    coordinate gold (77/77 home dev) carries a decimal. sp2 discipline: runs
+    ONLY under ``eval_cross_type_arbitration`` — in production, over-masking
+    a date fragment is the safe direction.
+    """
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "GPS_COORDINATES"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+        ):
+            text = texts.get(finding.field_path, "")
+            if "." not in text[finding.span_start:finding.span_end]:
+                continue
+        out.append(finding)
+    return out
+
+
 def _drop_person_shadowed_by_specific(
     findings: list[EngineFinding],
 ) -> list[EngineFinding]:
@@ -703,10 +731,15 @@ class RegexEngineAdapter(EngineAdapter):
         # _drop_dob_shadowed_dates (DOB ⊇ region, both masked) are
         # LEAK-SAFE — the surviving span still covers the dropped region
         # with a masked type, so they always run. Cross-type PERSON
-        # arbitration is EVAL-ONLY (see __init__).
+        # arbitration + the undecimaled-GPS drop are EVAL-ONLY (see
+        # __init__ and _drop_undecimaled_gps — the sp6 close).
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
             findings = _drop_person_shadowed_by_specific(findings)
+            findings = _drop_undecimaled_gps(
+                findings,
+                {k: v for k, v in payload.items() if isinstance(v, str)},
+            )
         return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────

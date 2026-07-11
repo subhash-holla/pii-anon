@@ -32,6 +32,50 @@ if TYPE_CHECKING:
     from pii_anon.engines.manifest import ExpertProfileData
 
 
+def passes_ner_span_hygiene(
+    text: str,
+    span_start: int,
+    span_end: int,
+    mapped_type: str,
+    confidence: float,
+) -> bool:
+    """General NER emission hygiene for name/org spans (sp6, mined 5/5 datasets).
+
+    Two hostile shapes account for the bulk of ML-engine name false
+    positives across every measured corpus:
+
+    1. **Field-label position** — a Title-Case span immediately followed by
+       ``:``/``|`` or ``**``-wrapped is a document label ("Biometric Id:",
+       "**Investor Information**"), not an entity mention.
+    2. **Single-token person spans** — the ambiguous shape shared by bare
+       given names and capitalized common words ("Biometric", "Maintainer");
+       require near-certain model confidence for it.
+
+    Applied at the ADAPTER (the only layer that owns the text) by every
+    NER engine, so a junk span dies engine-side and two engines agreeing on
+    the same junk can never corroborate each other past the fusion gate
+    (measured: presidio+gliner junk pairs cost 2,713 PERSON_NAME false
+    positives on the home dev split once presidio's labels normalized).
+    """
+    if mapped_type not in ("PERSON_NAME", "ORGANIZATION"):
+        return True
+    tail = text[span_end:span_end + 2]
+    head = text[max(0, span_start - 2):span_start]
+    if (
+        tail[:1] in (":", "|")
+        or tail.startswith(" :")
+        or (head.endswith("**") and tail == "**")
+    ):
+        return False
+    if (
+        mapped_type == "PERSON_NAME"
+        and " " not in text[span_start:span_end].strip()
+        and confidence < 0.95
+    ):
+        return False
+    return True
+
+
 class EngineAdapter(ABC):
     """Abstract base class defining the engine adapter contract.
 
