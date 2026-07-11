@@ -63,10 +63,12 @@ Test split, en, 31,048 records / 201,880 gold, strict-v1. Combined 13-detector F
 | 5–13 | gcp / azure / presidio / regex / piiranha / stanza / flair / spacy / scrubadub | — | — | — | 0.704 … 0.201 | ≤20/66 |
 
 Both first-party detectors rank #1/#2 with the best coverage (66/66 vs best external 24/66).
-**Provenance note:** the external rows (`tier1-en-all`) carry a stale `dataset_version` stamp (1.3.0)
-so the CLI `--merge` guard refused an automatic merge; both runs are verified on the **identical**
-test set (same 31,048 records + 201,880 gold), so this leaderboard was composed directly and the
-version-string mismatch is cosmetic.
+**Provenance note (corrected 2026-07-10, sp5):** the stale `dataset_version` stamp (1.3.0) is on the
+**first-party** run — the code venv's pip dist-info for the editable `pii_anon_datasets` install was
+outdated (module `__version__` = 2.2.0; the actual splits read were 2.2.0) — while `tier1-en-all` is
+correctly stamped 2.2.0. The CLI `--merge` guard refused on that string; both runs are verified on
+the **identical** test set (same 31,048 records + 201,880 gold), so this leaderboard was composed
+directly. Fixed going forward by refreshing the editable install metadata.
 
 **★ Honesty caveat (AX-001 / FR-027 external-validity).** These are **synthetic-data, strict-v1**
 scores, and the first-party detectors are the "home team" — their rule patterns are tuned to this
