@@ -55,6 +55,7 @@ from pii_anon.engines.regex.confidence import (
     has_context_words,
 )
 from pii_anon.engines.regex.deny_list import DenyListManager
+from pii_anon.engines.regex.labeled_fields import extract_labeled_fields
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex import validators
 from pii_anon.engines.regex.validators import _extract_digits
@@ -205,6 +206,68 @@ def _drop_undecimaled_gps(
                 continue
         out.append(finding)
     return out
+
+
+def _apply_label_wins(
+    findings: list[EngineFinding], labeled: list[EngineFinding]
+) -> list[EngineFinding]:
+    """Merge A2 labeled-field findings with the pattern findings under a
+    leak-SAFE ``label-wins`` rule.
+
+    Two leak-safe moves, both preserving coverage:
+
+    1. **Defer to same-type pattern coverage.** A labeled finding is dropped
+       when a pattern finding of the SAME type already overlaps it — the
+       pattern already ruled on that span with its own validator/confidence
+       (checksum, length), so A2 must not override it (e.g. an invalid-ABA
+       routing number keeps the pattern's lower confidence, not A2's 0.90).
+    2. **Different-type label-wins relabel.** A pattern finding wholly
+       contained in a DIFFERENT-type surviving labeled span is dropped in
+       favour of the label's type — the value span stays covered by the
+       labeled finding, so masking is preserved (the sp6 "changes labels,
+       not coverage" invariant).
+
+    Runs on ALL paths: the merge is additive and every drop keeps the span
+    masked, so it is leak-safe by construction.
+    """
+    if not labeled:
+        return findings
+
+    def _spanned(a: EngineFinding, b: EngineFinding) -> bool:
+        return (
+            a.field_path == b.field_path
+            and a.span_start is not None
+            and a.span_end is not None
+            and b.span_start is not None
+            and b.span_end is not None
+        )
+
+    # 1) drop A2 findings the patterns already cover with the same type.
+    surviving: list[EngineFinding] = [
+        lab
+        for lab in labeled
+        if not any(
+            f.entity_type == lab.entity_type
+            and _spanned(f, lab)
+            and f.span_start < lab.span_end  # type: ignore[operator]
+            and lab.span_start < f.span_end  # type: ignore[operator]
+            for f in findings
+        )
+    ]
+
+    # 2) relabel: drop pattern findings contained in a different-type label.
+    kept: list[EngineFinding] = []
+    for f in findings:
+        shadowed = any(
+            lab.entity_type != f.entity_type
+            and _spanned(lab, f)
+            and lab.span_start <= f.span_start  # type: ignore[operator]
+            and f.span_end <= lab.span_end  # type: ignore[operator]
+            for lab in surviving
+        )
+        if not shadowed:
+            kept.append(f)
+    return kept + surviving
 
 
 def _drop_person_shadowed_by_specific(
@@ -691,6 +754,7 @@ class RegexEngineAdapter(EngineAdapter):
             Detected PII findings with confidence scores.
         """
         findings: list[EngineFinding] = []
+        labeled: list[EngineFinding] = []
         if not self.enabled:
             return findings
 
@@ -699,6 +763,24 @@ class RegexEngineAdapter(EngineAdapter):
         for key, value in payload.items():
             if not isinstance(value, str):
                 continue
+
+            # ── A2 labeled-field value bridge (additive, all paths) ─
+            # A value behind an unambiguous field-label cue ("SSN:",
+            # "Date of Birth:") typed FROM THE LABEL. Additive recall +
+            # leak-safe relabel via _apply_label_wins below.
+            for etype, l_start, l_end, l_conf in extract_labeled_fields(value):
+                labeled.append(
+                    EngineFinding(
+                        entity_type=etype,
+                        confidence=l_conf,
+                        field_path=key,
+                        span_start=l_start,
+                        span_end=l_end,
+                        engine_id=self.adapter_id,
+                        explanation="labeled-field cue->value bridge (sp7 A2)",
+                        language=language,
+                    )
+                )
 
             # ── Performance pre-filter signals ─────────────────────
             # Computed once per field to skip patterns that cannot match.
@@ -810,6 +892,10 @@ class RegexEngineAdapter(EngineAdapter):
         # with a masked type, so they always run. Cross-type PERSON
         # arbitration + the undecimaled-GPS drop are EVAL-ONLY (see
         # __init__ and _drop_undecimaled_gps — the sp6 close).
+        # A2: merge labeled-field findings (additive) with the leak-safe
+        # label-wins relabel, BEFORE the drop pipeline so downstream dedup
+        # sees the final type assignment. Runs on all paths.
+        findings = _apply_label_wins(findings, labeled)
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
             text_map: dict[str | None, str] = {
