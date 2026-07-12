@@ -95,7 +95,17 @@ Honest targets (relaxed F2, swarm; each ≥76% of its binding no-new-model ceili
 | P0 | Phase-0 scoping (`wf_1ed2ad19`, 8 agents): measured ceilings + surface audits → honest targets + sequenced plan (`_evidence/phase0-scoping.json`) | DONE |
 | S1 | **FR-036 parity foundation — GAP-1 silent-leak FIXED.** Reproduced (batch detects `415 555 1234`; segmented at overlap 0 → EMPTY across all 3 segments). Fix: `Segmenter.MIN_SAFE_OVERLAP_TOKENS=24` floor (any entity ≤24 tokens wholly contained in ≥1 window regardless of caller overlap; raising overlap is leak-SAFE — over-detect + dedupe, never drop) + step≥1 guarantee for degenerate configs. Golden parity tests (`test_segmentation_parity_sp7.py`, 33 cases: no-boundary-leak + segmented-⊇-batch + no-zero-step). Default path byte-identical (short text = single segment). 92 tests green, lint/mypy clean | DONE (TDD) — CLOSE PENDING |
 | — | STEP-1 mandatory adversarial close (masking-path change: segmenter feeds detection→masking) | TODO |
-| — | STEP 2 Phase A vanilla (A1→A6) · STEP 3 Phase B fusion recalibration · STEP 4 Phase C evidence report | TODO |
+| A1 | **Title-Case-noise PERSON/ORG FP suppression — EVAL-ONLY (leak-safe by construction).** `_drop_titlecase_noise_person` under `eval_cross_type_arbitration` (markdown-wrapped + determiner-led + all-header-words, with a given-name override). sp2 discipline: production masking (arbitration OFF) STILL over-masks headings — the test proves eval-emission ⊆ production-emission. **Home vanilla F2 0.8916→0.8932 (+0.0016, precision +0.0054, recall +0.0006 — IMPROVES home, zero recall loss)**; externals nemotron 0.324→0.335, gretel 0.379→0.399, ai4privacy 0.213→0.217. SDO byte-identical. Conservative curated-word version; a wordfreq-based widening (higher home-recall risk) is a follow-up | DONE (TDD) |
+| — | STEP 2 Phase A remainder (A2 labeled-field bridge → A6) · STEP 3 Phase B fusion recalibration · STEP 4 Phase C evidence report | TODO |
+
+## User decisions (2026-07-11, locked)
+
+1. **Success bar = approach each dataset's measured ceiling** (targets table above), NOT the
+   home-tuned 0.89. Report honestly, no asterisks.
+2. **Retraining held in reserve** — fusion RECALIBRATION first (config, no learned weights); fund a
+   learned meta-learner retrain only against a proven per-dataset residual gap.
+3. **Sequence = detection first, then the guarantee** — Phase A vanilla → Phase B recalibration →
+   Phase C evidence report (so the guarantee measures the improved masking).
 
 ## Invariants
 

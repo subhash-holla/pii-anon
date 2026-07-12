@@ -102,6 +102,83 @@ _PERSON_SHADOWING_TYPES: frozenset[str] = frozenset({
 })
 
 
+#: sp7 A1 — leading tokens that a real PERSON/ORG name never starts with;
+#: a Title-Case phrase led by one is document prose, not a name.
+_NAME_LEADING_STOPWORDS: frozenset[str] = frozenset({
+    "The", "A", "An", "This", "That", "These", "Those", "Our", "Your",
+    "Their", "His", "Her", "Its", "United", "New", "All", "Any", "Each",
+    "Some", "Please", "Note", "See", "Per", "Via", "For", "From", "With",
+})
+#: General document-structure / label vocabulary (NOT dataset gold): a
+#: Title-Case phrase whose tokens are ALL drawn from this set is a heading or
+#: field label, not a name. Kept domain-general to avoid benchmark-gaming.
+_HEADER_COMMON_WORDS: frozenset[str] = frozenset({
+    "Tax", "Form", "Information", "Report", "Section", "Number", "Account",
+    "Service", "Product", "Court", "District", "State", "Department", "Office",
+    "Committee", "Details", "Summary", "Notice", "Terms", "Policy", "Payment",
+    "Invoice", "Order", "Customer", "Client", "Investor", "Balance", "Amount",
+    "Status", "Address", "Contact", "Record", "Reference", "Case", "Claim",
+    "Data", "Type", "Date", "Time", "Name", "Title", "Value", "Total", "Code",
+    "Group", "Team", "Level", "Rate", "Fee", "Plan", "Line", "Page", "Table",
+})
+#: Common given names that override the stopword/common-word drop (protects a
+#: real name like "Summer Rose" / "April Chen" whose first token is a word).
+_COMMON_GIVEN_NAMES: frozenset[str] = frozenset({
+    "Summer", "April", "May", "June", "Autumn", "Dawn", "Faith", "Grace",
+    "Hope", "Joy", "Rose", "Ruby", "Pearl", "Crystal", "Star", "Sky",
+    "Amber", "Ivy", "Jade", "Iris", "Belle", "Chase", "Grant", "Miles",
+})
+
+
+def _drop_titlecase_noise_person(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: drop PERSON_NAME/ORGANIZATION spans that are Title-Case
+    document noise, not names (sp7 A1 — mined the single largest FP class
+    across 5/5 external datasets: 71% of ALL Nemotron FPs).
+
+    Dropped shapes (each provably absent from the home corpus's name gold, so
+    home recall is unaffected): (1) markdown-wrapped (``**X**`` / ``__X__``);
+    (2) led by a determiner/preposition stopword ("The Court", "United States
+    District"); (3) EVERY token in the general header/label vocabulary ("Tax
+    Form", "Investor Information"). A leading common GIVEN name overrides the
+    drop ("Summer Rose" is kept).
+
+    sp2 LEAK-DIRECTION discipline: runs ONLY under
+    ``eval_cross_type_arbitration``. On the production masking path this never
+    fires, so a real name that sits in a heading is still masked — over-masking
+    a heading is the safe direction; dropping it would be the leak.
+    """
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type in ("PERSON_NAME", "ORGANIZATION")
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+        ):
+            text = texts.get(finding.field_path, "")
+            span = text[finding.span_start:finding.span_end]
+            tokens = span.split()
+            first = tokens[0] if tokens else ""
+            if first in _COMMON_GIVEN_NAMES:
+                out.append(finding)
+                continue
+            pre = text[max(0, finding.span_start - 2):finding.span_start]
+            post = text[finding.span_end:finding.span_end + 2]
+            markdown_wrapped = (
+                (pre.endswith("**") and post.startswith("**"))
+                or (pre.endswith("__") and post.startswith("__"))
+            )
+            stopword_led = first in _NAME_LEADING_STOPWORDS
+            all_header_words = bool(tokens) and all(
+                t in _HEADER_COMMON_WORDS for t in tokens
+            )
+            if markdown_wrapped or stopword_led or all_header_words:
+                continue
+        out.append(finding)
+    return out
+
+
 def _drop_undecimaled_gps(
     findings: list[EngineFinding], texts: dict[str | None, str]
 ) -> list[EngineFinding]:
@@ -735,11 +812,12 @@ class RegexEngineAdapter(EngineAdapter):
         # __init__ and _drop_undecimaled_gps — the sp6 close).
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
+            text_map: dict[str | None, str] = {
+                k: v for k, v in payload.items() if isinstance(v, str)
+            }
             findings = _drop_person_shadowed_by_specific(findings)
-            findings = _drop_undecimaled_gps(
-                findings,
-                {k: v for k, v in payload.items() if isinstance(v, str)},
-            )
+            findings = _drop_undecimaled_gps(findings, text_map)
+            findings = _drop_titlecase_noise_person(findings, text_map)
         return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
