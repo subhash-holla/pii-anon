@@ -55,6 +55,7 @@ from pii_anon.engines.regex.confidence import (
     has_context_words,
 )
 from pii_anon.engines.regex.deny_list import DenyListManager
+from pii_anon.engines.regex.geo_lexicon import extract_locations
 from pii_anon.engines.regex.labeled_fields import extract_labeled_fields
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex import validators
@@ -438,6 +439,37 @@ def _promote_dob_by_cue(
             if _BIRTH_CUE_RE.search(window):
                 f.entity_type = "DATE_OF_BIRTH"
     return findings
+
+
+def _drop_location_nested_in_address(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop a gazetteer LOCATION wholly contained in an ADDRESS/GPS span (sp7
+    #9). Leak-SAFE: the covering ADDRESS/GPS still masks those characters, so
+    the nested duplicate is a pure false positive under one-to-one scoring."""
+    cover = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type in ("ADDRESS", "GPS_COORDINATES")
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not cover:
+        return findings
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "LOCATION"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+            and any(
+                field == f.field_path and s <= f.span_start and f.span_end <= e
+                for field, s, e in cover
+            )
+        ):
+            continue
+        out.append(f)
+    return out
 
 
 def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
@@ -921,6 +953,21 @@ class RegexEngineAdapter(EngineAdapter):
                     )
                 )
 
+            # ── #9 geo gazetteer (additive LOCATION, all paths) ────
+            for etype, g_start, g_end, g_conf in extract_locations(value):
+                labeled.append(
+                    EngineFinding(
+                        entity_type=etype,
+                        confidence=g_conf,
+                        field_path=key,
+                        span_start=g_start,
+                        span_end=g_end,
+                        engine_id=self.adapter_id,
+                        explanation="geo gazetteer location (sp7 #9)",
+                        language=language,
+                    )
+                )
+
             # ── Performance pre-filter signals ─────────────────────
             # Computed once per field to skip patterns that cannot match.
             _has_at = "@" in value
@@ -1041,6 +1088,7 @@ class RegexEngineAdapter(EngineAdapter):
             k: v for k, v in payload.items() if isinstance(v, str)
         }
         findings = _promote_dob_by_cue(findings, text_all)
+        findings = _drop_location_nested_in_address(findings)
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
             text_map: dict[str | None, str] = {
