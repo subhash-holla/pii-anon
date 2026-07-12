@@ -627,6 +627,68 @@ _ORGANIZATION_CONTEXT = re.compile(
     r"(?![A-Za-z])"
 )
 
+# sp7 #8 — institution / firm ORGANIZATION grammar (mining candidate #8).
+# TAB/ECHR court prose is dense with institution names the grammar above
+# misses, and the person heuristic simultaneously eats them. ADDITIVE
+# (ORGANIZATION is supported + person-shadowing, so the eval-only person drop
+# cleans the FP face for free). Diacritic-aware ATOM so İzmir/Kraków/Będzin
+# capture in full (Latin-1 + Latin Extended-A).
+_ORG_ATOM_UC = r"[A-ZÀ-ÝĀ-Ž][A-Za-zÀ-ÿĀ-ſ'.\-]+"
+_ORG_CONN = r"(?:of|and|for|the|de|del|van|von|und|di)"
+# A capitalized function word that a real institution/firm name never STARTS
+# with (sentence-initial "The"/"Before"/"After"/…). Vetoing it at the run head
+# keeps the leading determiner/preposition out of the captured span.
+_ORG_LEAD_STOP = (
+    r"(?!(?:The|A|An|This|That|These|Those|Before|After|At|In|On|By|For|From|"
+    r"With|To|Of|And|Or|But|If|As|Its|Their|Our|Your|His|Her|Which|When|Where|"
+    r"While|Also|However|Therefore|Thus|Since|Until|Upon|Under|Over|Between|"
+    r"During|Although|Because|Both|Each|Every|Such|Said)\b)"
+)
+# A trailing run unit that always ends on an ATOM (an optional internal
+# connective + a Title-Case token) — prevents a trailing connective from being
+# absorbed ("Ministry of Justice for" -> "Ministry of Justice").
+_ORG_TRAIL = r"(?:[ \t]+(?:" + _ORG_CONN + r"[ \t]+)?" + _ORG_ATOM_UC + r")"
+# Tail-keyword form: Title-Case run (1-5 tokens, connectives allowed) + an
+# institution keyword as the TAIL token. Keyword set is the GAP not already
+# covered by _ORGANIZATION_INDUSTRY (which has University/Hospital/Commission/
+# Authority/Agency/Bureau/Institute). NOTE: "Court" is deliberately EXCLUDED
+# here — it doubles as a residential street suffix ("Birch Court") — and is
+# handled by the descriptor-gated _ORGANIZATION_COURT below.
+_ORGANIZATION_INSTITUTION = re.compile(
+    r"\b(" + _ORG_LEAD_STOP + _ORG_ATOM_UC + _ORG_TRAIL + r"{0,4}[ \t]+"
+    r"(?:Ministry|Directorate|Tribunal|Prosecutor|Parliament|Government|"
+    r"Council|Board|Committee|Chamber|Prison|Assembly|Constabulary|"
+    r"Municipality|Secretariat|Penitentiary|Inspectorate|Ombudsman|Presidency))\b"
+)
+# Court form: a court name is institutional ONLY when a court-type DESCRIPTOR
+# sits immediately before "Court" — this fires on "Sinop Assize Court" /
+# "Supreme Administrative Court" but NOT on the residential address "Birch
+# Court" (which was 100% of the home ORG false positives). The head form
+# "Court of X" is handled by _ORGANIZATION_INSTITUTION_OF.
+_COURT_DESC = (
+    r"(?:Assize|Regional|District|Supreme|Appeal|Appeals|High|Crown|Magistrates?|"
+    r"Security|Administrative|Constitutional|Circuit|County|Federal|Superior|"
+    r"Juvenile|Family|Criminal|Civil|Commercial|Labour|Labor|Cassation|Justice|"
+    r"Martial|Provincial|Municipal|Metropolitan|Central|National|International|"
+    r"Special|Military|Revolutionary|State|Peace|Sharia|Ecclesiastical|Arbitration)"
+)
+_ORGANIZATION_COURT = re.compile(
+    r"\b(" + _ORG_LEAD_STOP + r"(?:" + _ORG_ATOM_UC + r"[ \t]+){0,3}"
+    + _COURT_DESC + r"[ \t]+Court)\b"
+)
+# Head-of form: keyword + literal "of" + Title-Case run. Keyword set RESTRICTED
+# (Department/Office/Bureau excluded — "Department of Cardiology" is home
+# clinical prose, not a PII org).
+_ORGANIZATION_INSTITUTION_OF = re.compile(
+    r"\b((?:Court|Ministry|Directorate|Tribunal|Council|Board)[ \t]+of[ \t]+"
+    + _ORG_ATOM_UC + _ORG_TRAIL + r"{0,3})\b"
+)
+# Firm form: 1-3 Title-Case tokens + (&|and) + firm-suffix token.
+_ORGANIZATION_FIRM = re.compile(
+    r"\b(" + _ORG_LEAD_STOP + _ORG_ATOM_UC + r"(?:[ \t]+" + _ORG_ATOM_UC + r"){0,2}[ \t]*(?:&|and)[ \t]*"
+    r"(?:Sons|Associates|Partners|Brothers|Bros|Co)\b(?:[ \t]+" + _ORG_ATOM_UC + r"){0,2})"
+)
+
 # CONTEXT-ANCHORED CamelCase organization ("from InnovateLabs", "at OpenAI"):
 # a bare internal-capital token is NOT a reliable org signal — it fires on
 # tech terms (WiFi, JavaScript, PowerPoint, GitHub) and on CamelCase surnames
@@ -1808,6 +1870,39 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.80,
         group=1,
         explanation="regex organization context",
+        deny_check=True,
+    ),
+    # ── ORGANIZATION (sp7 #8: institution / firm grammar) ──────────────
+    PatternSpec(
+        entity_type="ORGANIZATION",
+        pattern=_ORGANIZATION_INSTITUTION,
+        base_confidence=0.62,
+        group=1,
+        explanation="regex organization institution (sp7 #8)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="ORGANIZATION",
+        pattern=_ORGANIZATION_COURT,
+        base_confidence=0.62,
+        group=1,
+        explanation="regex organization court (sp7 #8)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="ORGANIZATION",
+        pattern=_ORGANIZATION_INSTITUTION_OF,
+        base_confidence=0.62,
+        group=1,
+        explanation="regex organization institution-of (sp7 #8)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="ORGANIZATION",
+        pattern=_ORGANIZATION_FIRM,
+        base_confidence=0.72,
+        group=1,
+        explanation="regex organization firm (sp7 #8)",
         deny_check=True,
     ),
     # ── ORGANIZATION (single-token CamelCase: "InnovateLabs") ──────────
