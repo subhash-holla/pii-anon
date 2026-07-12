@@ -208,6 +208,70 @@ def _drop_undecimaled_gps(
     return out
 
 
+# ── sp7 #7 numeric-identifier guards (ALL SCORING-ONLY suppressors) ─────────
+_GPS_MONEY = re.compile(r"^\$?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$")
+_GPS_RATING = re.compile(r"^\d{1,3}(?:\.\d+)?/\d{1,2}$")
+_SSN_POS = re.compile(
+    r"(?i)\b(?:ssn|social\s+security|social\s+insurance|taxpayer|tin)\b"
+)
+_SSN_SEQ = re.compile(
+    r"^(?:123456789|987654321|012345678|876543210|123123123|111111111|000000000)$"
+)
+_SSN_GLUE = frozenset({"=", "|", "&", ":"})
+
+
+def _drop_nongeo_gps(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """SCORING-ONLY: drop GPS spans whose FULL text is a money or rating shape
+    ("$1,125.00", "4.5/5") — real coordinate pairs never match these anchors.
+    The masking-path GPS pattern is untouched (sp6 leak lesson); paired with the
+    additive hemisphere pattern so GPS coverage never shrinks."""
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "GPS_COORDINATES"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            span = texts.get(f.field_path, "")[f.span_start:f.span_end]
+            if _GPS_MONEY.match(span) or _GPS_RATING.match(span):
+                continue
+        out.append(f)
+    return out
+
+
+def _drop_bare9_ssn_noncontext(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """SCORING-ONLY: drop a bare 9-digit US_SSN span that is a sequential
+    placeholder OR glued to a FIX/tag delimiter (=|&:), UNLESS a positive SSN
+    cue sits in the ±40-char window. Masking path keeps every candidate."""
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "US_SSN"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            text = texts.get(f.field_path, "")
+            span = text[f.span_start:f.span_end]
+            if span.isdigit() and len(span) == 9:
+                glued = f.span_start > 0 and text[f.span_start - 1] in _SSN_GLUE
+                window = text[max(0, f.span_start - 40):f.span_end + 40]
+                if (_SSN_SEQ.match(span) or glued) and not _SSN_POS.search(window):
+                    continue
+        out.append(f)
+    return out
+
+
+# NOTE: an IBAN mod-97 scoring-drop was prototyped and REJECTED — it removed
+# 225 home gold IBANs (home synthetic IBANs are checksum-invalid by
+# construction), a home-recall regression for negligible external gain. The
+# mining flag ("home-floor sign-off") was correct; the home floor moved, so the
+# guard is not shipped.
+
+
 def _apply_label_wins(
     findings: list[EngineFinding], labeled: list[EngineFinding]
 ) -> list[EngineFinding]:
@@ -943,6 +1007,8 @@ class RegexEngineAdapter(EngineAdapter):
             }
             findings = _drop_person_shadowed_by_specific(findings)
             findings = _drop_undecimaled_gps(findings, text_map)
+            findings = _drop_nongeo_gps(findings, text_map)
+            findings = _drop_bare9_ssn_noncontext(findings, text_map)
             findings = _drop_titlecase_noise_person(findings, text_map)
         return _drop_nested_same_type(findings)
 

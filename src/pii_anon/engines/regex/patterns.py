@@ -764,6 +764,15 @@ _GPS = re.compile(
     r"(?![0-9.])"
 )
 
+# sp7 #7 — hemisphere-suffixed coordinates ("40.7234 N, 123.1235 W"). ADDITIVE:
+# the N/S + E/W markers are themselves the disambiguator, so this pairs with the
+# scoring-only non-geo GPS drop to keep GPS coverage non-shrinking. group=0 so
+# the span includes the hemisphere markers (exact-match the gold).
+_GPS_HEMISPHERE = re.compile(
+    r"(?<![0-9A-Za-z.])(-?\d{1,3}(?:\.\d+)?)\s*[°]?\s*[NSns]\s*[,/ ]\s*"
+    r"(-?\d{1,3}(?:\.\d+)?)\s*[°]?\s*[EWew](?![A-Za-z0-9])"
+)
+
 # SWIFT/BIC: 8 or 11 character bank identifier.
 _SWIFT_BIC = re.compile(r"\b([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b")
 
@@ -1985,6 +1994,13 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.88,
         validator="gps",
         explanation="regex gps coordinates",
+    ),
+    PatternSpec(
+        entity_type="GPS_COORDINATES",
+        pattern=_GPS_HEMISPHERE,
+        base_confidence=0.88,
+        group=0,
+        explanation="regex gps hemisphere (sp7 #7)",
     ),
     # ── SWIFT_BIC ──────────────────────────────────────────────────────
     PatternSpec(
