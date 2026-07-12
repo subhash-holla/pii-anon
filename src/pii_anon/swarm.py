@@ -148,6 +148,26 @@ class SwarmConfig:
         "PHONE_NUMBER": 0.92,
         "EMAIL_ADDRESS": 0.92,
     })
+    #: sp7 panel #9/#4 — PER-(engine,type) acceptance bars, checked BEFORE the
+    #: per-type map above. A single per-type bar cannot fit both engines:
+    #: GLiNER's raw confidence caps ~0.87 for semantic types (measured
+    #: ORGANIZATION [0.51,0.87], ADDRESS [0.52,0.87], LOCATION [0.51,0.83],
+    #: DATE_TIME), so a 0.90 per-type bar is structurally INERT for GLiNER
+    #: while being right for Presidio's fixed ~0.85-0.90 recognizer scores.
+    #: These GLiNER-scale bars open the semantic single-engine ML channel that
+    #: the per-type map left closed. Additive-only (emits MORE, never drops) =>
+    #: leak-safe by construction. Bars are home-floor-gated (the heavily
+    #: annotated home ORGANIZATION/ADDRESS golds bound how low they can go).
+    single_engine_min_confidence_by_engine: dict[str, dict[str, float]] = field(
+        default_factory=lambda: {
+            "gliner-compatible": {
+                "ORGANIZATION": 0.82,
+                "ADDRESS": 0.80,
+                "LOCATION": 0.80,
+                "DATE_TIME": 0.82,
+            },
+        }
+    )
 
     def __post_init__(self) -> None:
         """Auto-discover trained artifacts from the default location."""
@@ -160,6 +180,16 @@ class SwarmConfig:
                 "single_engine_min_confidence must be a dict of "
                 "entity_type -> confidence bar; got "
                 f"{type(self.single_engine_min_confidence).__name__}"
+            )
+        # sp7 panel #9: same fail-loud discipline for the per-engine overlay —
+        # a wrong-typed by-engine map must not defer a crash to the first
+        # merge() on the masking path (the sp6 close lesson).
+        if not isinstance(self.single_engine_min_confidence_by_engine, dict) or not all(
+            isinstance(v, dict) for v in self.single_engine_min_confidence_by_engine.values()
+        ):
+            raise ValueError(
+                "single_engine_min_confidence_by_engine must be a dict of "
+                "engine_id -> {entity_type -> confidence bar}"
             )
         artifacts_dir = _default_artifacts_dir()
         if self.ds_params_path is None:
@@ -830,7 +860,12 @@ class SwarmFusionStrategy(FusionStrategy):
         engine_id, finding = next(iter(candidate.engine_findings.items()))
         if engine_id == "regex-oss":
             return None
-        bar = cfg.single_engine_min_confidence.get(candidate.entity_type)
+        # sp7 panel #9: per-(engine,type) bar wins over the per-type fallback.
+        bar = cfg.single_engine_min_confidence_by_engine.get(engine_id, {}).get(
+            candidate.entity_type
+        )
+        if bar is None:
+            bar = cfg.single_engine_min_confidence.get(candidate.entity_type)
         if bar is None or isinstance(bar, bool) or not isinstance(bar, (int, float)):
             return None
         try:
