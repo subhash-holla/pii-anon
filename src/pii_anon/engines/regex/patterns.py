@@ -381,6 +381,43 @@ _DATE_GENERAL = re.compile(
     re.IGNORECASE,
 )
 
+# sp7 A3 — natural-language / locale prose date grammar (mining candidate #5).
+# Covers the day-first, ordinal, legal and Month-year forms the ASCII
+# "Month d, yyyy" + numeric grammar above misses. Dominant in TAB/ECHR court
+# prose ("27 May 1994", "1st day of January, 2023", "May 1994"). ADDITIVE
+# (emits DATE_TIME, benchmark-ignored on home scoring, masked in production).
+# Boundary hygiene: the match starts at the day/month token, never a leading
+# determiner ("no later than March 20, 2023" -> "March 20, 2023").
+_MONTH_NAME = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|"
+    r"Dec(?:ember)?)"
+)
+_ORD = r"(?:st|nd|rd|th)"
+_DATE_PROSE = re.compile(
+    r"(?<![\w.])("
+    # legal: "1st day of January, 2023"
+    r"\d{1,2}" + _ORD + r"\s+day\s+of\s+" + _MONTH_NAME + r",?\s+\d{4}"
+    r"|"
+    # day-(of-)Month-(year): "27 May 1994", "27th May 1994", "3rd of April 1980"
+    r"\d{1,2}" + _ORD + r"?\s+(?:of\s+)?" + _MONTH_NAME + r"(?:,?\s+\d{2,4})?"
+    r"|"
+    # Month-day-(year): "May 27, 1994", "Jan 15 2025", "May 27th 1994"
+    + _MONTH_NAME + r"\s+\d{1,2}" + _ORD + r"?,?\s+\d{2,4}"
+    r"|"
+    # Month-year: "May 1994", "January 2023"
+    + _MONTH_NAME + r"\s+\d{4}"
+    r")(?![\w])",
+    re.IGNORECASE,
+)
+
+# Space-separated datetime "2021-10-23 09:53:00 UTC" — the log/report shape the
+# T-separated ISO pattern below misses.
+_DATETIME_SPACE = re.compile(
+    r"(?<![\d.])(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?"
+    r"(?:\s*(?:[+-]\d{2}:?\d{2}|Z|[A-Z]{2,4}))?)(?!\d)"
+)
+
 # ISO-8601 datetime ("2021-10-23T09:53:00Z", "2021-01-06T08:34:00+02:00") —
 # the dominant TIMESTAMP shape in log/report corpora. Seconds, fractional
 # seconds and timezone designators are optional.
@@ -1552,6 +1589,22 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.95,
         group=1,
         explanation="regex iso-8601 datetime",
+    ),
+    # ── DATE_TIME (sp7 A3: natural-language / locale prose date grammar) ─
+    PatternSpec(
+        entity_type="DATE_TIME",
+        pattern=_DATE_PROSE,
+        base_confidence=0.80,
+        group=1,
+        explanation="regex prose date (sp7 A3)",
+    ),
+    # ── DATE_TIME (sp7 A3: space-separated datetime) ───────────────────
+    PatternSpec(
+        entity_type="DATE_TIME",
+        pattern=_DATETIME_SPACE,
+        base_confidence=0.92,
+        group=1,
+        explanation="regex space datetime (sp7 A3)",
     ),
     # ── sp2 external-coverage tranche ──────────────────────────────────
     PatternSpec(entity_type="TAX_ID", pattern=_TAX_ID_LABELED, base_confidence=0.88, group=1, explanation="regex tax id (labeled)"),

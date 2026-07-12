@@ -301,6 +301,40 @@ def _drop_person_shadowed_by_specific(
     return out
 
 
+#: birth cue for sp7 A3 DOB promotion (word-bounded so "reborn" never fires).
+_BIRTH_CUE_RE = re.compile(
+    r"(?i)\b(?:born|d\.?o\.?b\.?|date\s+of\s+birth|birth\s*date|birthday|bday)\b"
+)
+_PROMOTABLE_DATE_TYPES = frozenset({"DATE_TIME", "DATE_ISO"})
+
+
+def _promote_dob_by_cue(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """Re-type a general date to ``DATE_OF_BIRTH`` when a birth cue precedes it
+    within ~30 chars (sp7 A3, mining candidate #5).
+
+    Leak-SAFE relabel: the span stays covered/masked either way; only the type
+    changes. Cue-gated (``born``/``DOB``/``date of birth`` word-bounded) for
+    precision. Runs on ALL paths — masking is preserved and DOB is the more
+    specific, more-protective type. The A2 labeled-field bridge already handles
+    the clean ``Date of Birth: <value>`` form; this catches prose cues
+    ("was born on 27 May 1994") the bridge does not.
+    """
+    for f in findings:
+        if (
+            f.entity_type in _PROMOTABLE_DATE_TYPES
+            and isinstance(f.span_start, int)
+        ):
+            text = texts.get(f.field_path)
+            if not text:
+                continue
+            window = text[max(0, f.span_start - 30) : f.span_start]
+            if _BIRTH_CUE_RE.search(window):
+                f.entity_type = "DATE_OF_BIRTH"
+    return findings
+
+
 def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
     """Drop generic ``DATE_TIME`` findings overlapping a ``DATE_OF_BIRTH``.
 
@@ -896,6 +930,12 @@ class RegexEngineAdapter(EngineAdapter):
         # label-wins relabel, BEFORE the drop pipeline so downstream dedup
         # sees the final type assignment. Runs on all paths.
         findings = _apply_label_wins(findings, labeled)
+        # A3: promote general dates behind a birth cue to DATE_OF_BIRTH
+        # (leak-safe relabel, all paths), then drop the now-shadowed dates.
+        text_all: dict[str | None, str] = {
+            k: v for k, v in payload.items() if isinstance(v, str)
+        }
+        findings = _promote_dob_by_cue(findings, text_all)
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
             text_map: dict[str | None, str] = {
