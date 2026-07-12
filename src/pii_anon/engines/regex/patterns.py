@@ -274,9 +274,47 @@ _PERSON_FULL_NAME = re.compile(
     # the 3rd token must not directly precede a colon at all. A leading
     # street number blocks the candidate ("9953 Dogwood Ct" is an address).
     r"(?<![0-9][ \t])"
-    r"[A-Z][a-z]{2,}[ \t]+(?!(?:" + _NEXT_FIELD_LABEL_WORDS + r")[ \t]*[:=])"
-    r"[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+(?![ \t]*[:=]))?"
+    # P4 (sp7 #6): capturing atoms widened to Latin diacritics ("Fabián
+    # Montalbán", "François Gilbert"); the guard lookaheads above stay ASCII.
+    r"[A-ZÀ-ÖØ-ÞĀ-ſ][a-zß-öø-ÿĀ-ſ]{2,}[ \t]+(?!(?:" + _NEXT_FIELD_LABEL_WORDS + r")[ \t]*[:=])"
+    r"[A-ZÀ-ÖØ-ÞĀ-ſ][a-zß-öø-ÿĀ-ſ]+(?:[ \t]+[A-ZÀ-ÖØ-ÞĀ-ſ][a-zß-öø-ÿĀ-ſ]+(?![ \t]*[:=]))?"
     r"(?![A-Za-z])"
+)
+
+# ── sp7 #6 — name grammar & span hygiene (SAFE subset, additive) ──────────
+# Latin letter classes incl. diacritics (Latin-1 + Latin Extended-A) so
+# Çağlayan / Sarısoy / Montalbán / Treves-Torlonia capture in full.
+_NAME_U = "A-ZÀ-ÖØ-ÞĀ-ſ"
+_NAME_LO = "a-zß-öø-ÿĀ-ſ"
+_TOK_TITLED = rf"[{_NAME_U}][{_NAME_U}{_NAME_LO}]+(?:[-'’][{_NAME_U}{_NAME_LO}]+)*"
+_HONORIFIC = (
+    r"(?:Dr|Mr|Mrs|Ms|Miss|Mx|Prof|Sir|Lord|Lady|Mme|Mlle|Sr|Sra|Srta|Dra|Hon)"
+)
+# P1 — honorific + Unicode full name (captures the name sans title, group=1).
+_PERSON_TITLE_FULL_U = re.compile(
+    rf"\b{_HONORIFIC}\.?[ \t]+({_TOK_TITLED}"
+    rf"(?:[ \t]+(?!(?:{_NEXT_FIELD_LABEL_WORDS})[ \t]*[:=]){_TOK_TITLED}){{1,2}})"
+)
+# P2 — honorific + initial(s) + surname ("Mr S. Esmer" -> "S. Esmer").
+_PERSON_TITLE_INITIALS = re.compile(
+    rf"\b{_HONORIFIC}\.?[ \t]+((?:[{_NAME_U}]\.){{1,3}}[ \t]*{_TOK_TITLED})"
+)
+# P3 — untitled First + middle-initial + Surname, with a document-structure
+# negative guard ("Section A. Overview" is not a person).
+_NAME_SECTION_WORDS = (
+    r"Section|Chapter|Part|Article|Exhibit|Appendix|Figure|Table|Item|Note|"
+    r"Schedule|Annex|Clause|Paragraph|Volume|Page|Line|Step|Phase|Level|Class|"
+    r"Type|Form"
+)
+_PERSON_FIRST_MIDINITIAL_LAST = re.compile(
+    rf"(?<![{_NAME_U}])(?!(?:{_NAME_SECTION_WORDS})[ \t])"
+    rf"([{_NAME_U}][{_NAME_LO}]{{2,}}[ \t]+[{_NAME_U}]\.[ \t]+[{_NAME_U}][{_NAME_LO}]+)\b"
+)
+# P3C — ALL-CAPS variant. The middle-initial dot is REQUIRED (this is the only
+# anchor that keeps ALL-CAPS from re-opening the A1 header FP flood).
+_PERSON_FIRST_MIDINITIAL_LAST_CAPS = re.compile(
+    rf"(?<![A-Z])(?!(?:{_NAME_SECTION_WORDS.upper()})[ \t])"
+    rf"([{_NAME_U}]{{3,}}[ \t]+[{_NAME_U}]\.[ \t]+[{_NAME_U}]{{3,}})\b"
 )
 
 # ── Person: First name + initial ("John D.") ──────────────────────────────
@@ -1584,6 +1622,39 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.68,
         context_type="PERSON_NAME",
         explanation="regex full name",
+        deny_check=True,
+    ),
+    # ── PERSON_NAME (sp7 #6: honorific / initial / diacritic grammar) ──
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_TITLE_FULL_U,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex person title full unicode (sp7 #6)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_TITLE_INITIALS,
+        base_confidence=0.90,
+        group=1,
+        explanation="regex person title initials (sp7 #6)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_FIRST_MIDINITIAL_LAST,
+        base_confidence=0.85,
+        group=1,
+        explanation="regex person first midinitial last (sp7 #6)",
+        deny_check=True,
+    ),
+    PatternSpec(
+        entity_type="PERSON_NAME",
+        pattern=_PERSON_FIRST_MIDINITIAL_LAST_CAPS,
+        base_confidence=0.85,
+        group=1,
+        explanation="regex person first midinitial last caps (sp7 #6)",
         deny_check=True,
     ),
     # ── PERSON_NAME (first + initial) ──────────────────────────────────

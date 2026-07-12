@@ -109,6 +109,12 @@ _NAME_LEADING_STOPWORDS: frozenset[str] = frozenset({
     "The", "A", "An", "This", "That", "These", "Those", "Our", "Your",
     "Their", "His", "Her", "Its", "United", "New", "All", "Any", "Each",
     "Some", "Please", "Note", "See", "Per", "Via", "For", "From", "With",
+    # sp7 #6 — public DE/FR/IT/ES definite/indefinite articles + possessives
+    # (foreign prose that a Title-Case run leads with, not a name).
+    "Die", "Der", "Das", "Den", "Dem", "Ein", "Eine", "Ihre", "Ihr",
+    "Ihren", "Unsere", "Unser", "Le", "La", "Les", "Un", "Une", "Des",
+    "Du", "Votre", "Vos", "Notre", "Nos", "El", "Los", "Las", "Una",
+    "Su", "Sus", "Il", "Lo", "Gli", "Vostro",
 })
 #: General document-structure / label vocabulary (NOT dataset gold): a
 #: Title-Case phrase whose tokens are ALL drawn from this set is a heading or
@@ -129,6 +135,41 @@ _COMMON_GIVEN_NAMES: frozenset[str] = frozenset({
     "Hope", "Joy", "Rose", "Ruby", "Pearl", "Crystal", "Star", "Sky",
     "Amber", "Ivy", "Jade", "Iris", "Belle", "Chase", "Grant", "Miles",
 })
+
+
+#: sp7 #6 — leading greeting/role tokens a real name span never starts with;
+#: trimmed (not dropped) on the eval path so "Ciao Nalda" scores as "Nalda".
+_SALUTATION_TOKENS: frozenset[str] = frozenset({
+    "Ciao", "Hallo", "Hey", "Hi", "Hello", "Dear", "Estimado", "Estimada",
+    "Gentile", "Bonjour", "Salut", "Hola", "Buongiorno", "Cher", "Chère",
+    "Querido", "Querida", "Caro", "Cara", "Hallo", "Hej", "Ola",
+})
+
+
+def _trim_salutation_led_person(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: strip a leading greeting token from a PERSON_NAME span so the
+    scored span starts at the actual name ("Ciao Nalda" -> "Nalda"). Boundary
+    hygiene on the scoring path only — the production masking span is unchanged
+    (over-masking the greeting is harmless; the sp2 discipline)."""
+    for f in findings:
+        if (
+            f.entity_type == "PERSON_NAME"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            text = texts.get(f.field_path, "")
+            span = text[f.span_start:f.span_end]
+            toks = span.split()
+            while len(toks) >= 2 and toks[0].rstrip(".,").capitalize() in _SALUTATION_TOKENS:
+                advance = len(toks[0])
+                rest = span[advance:]
+                stripped = len(rest) - len(rest.lstrip())
+                f.span_start += advance + stripped
+                span = text[f.span_start:f.span_end]
+                toks = span.split()
+    return findings
 
 
 def _drop_titlecase_noise_person(
@@ -1010,6 +1051,7 @@ class RegexEngineAdapter(EngineAdapter):
             findings = _drop_nongeo_gps(findings, text_map)
             findings = _drop_bare9_ssn_noncontext(findings, text_map)
             findings = _drop_titlecase_noise_person(findings, text_map)
+            findings = _trim_salutation_led_person(findings, text_map)
         return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
