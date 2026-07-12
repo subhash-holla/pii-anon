@@ -14,6 +14,7 @@ from pii_anon.assurance.reconstruction_resistance import (
     measure_verbatim_leakage,
     reconstruction_resistance_report,
 )
+from pii_anon.assurance.reconstruction_resistance_cli import build_regex_masker
 
 _CORPUS = [
     CorpusRecord("r1", "Patient Maria Garcia, SSN 123-45-6789, lives in Denver.",
@@ -100,3 +101,23 @@ class TestReport:
         assert mia["provisional_status"] == "AGENT_SIMULATED"
         assert 0.0 <= mia["tpr_at_1e_2"] <= 1.0
         assert "wilson95_tpr" in mia
+
+
+class TestValueConsistentMasking:
+    def test_coreference_masks_repeated_name(self) -> None:
+        # a name detected once but repeated verbatim must be masked at BOTH
+        # occurrences by the coreference masker (panel #2) — closing the
+        # reconstruction leak the detector's single-mention span leaves open.
+        text = "Contact Alexander Petrov. Alexander Petrov signed the form."
+        coref = build_regex_masker(coreference=True)(text)
+        plain = build_regex_masker(coreference=False)(text)
+        # value-consistent redaction never leaves MORE of the name than plain
+        assert coref.count("Alexander Petrov") <= plain.count("Alexander Petrov")
+        assert "Alexander Petrov" not in coref
+
+    def test_coreference_leak_subset_of_plain(self) -> None:
+        # value-consistent masking is ADDITIVE — it can only reduce verbatim
+        # leakage, never increase it.
+        c = measure_verbatim_leakage(_CORPUS, build_regex_masker(coreference=True))
+        p = measure_verbatim_leakage(_CORPUS, build_regex_masker(coreference=False))
+        assert c["leaked_verbatim"] <= p["leaked_verbatim"]

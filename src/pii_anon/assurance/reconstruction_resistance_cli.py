@@ -29,9 +29,31 @@ from pii_anon.engines.regex_adapter import RegexEngineAdapter
 from pii_anon.segmentation.segmenter import Segmenter
 
 
-def build_regex_masker(*, eval_arbitration: bool = False) -> Callable[[str], str]:
+#: panel #2 — types where redacting EVERY verbatim occurrence of a detected
+#: value (coreference / value-consistent masking) is safe. Restricted to
+#: "sticky", distinctive PII (a repeated name/org/account is the same entity);
+#: short/common types are excluded to bound over-masking of benign substrings.
+_COREF_TYPES = frozenset({
+    "PERSON_NAME", "ORGANIZATION", "BANK_ACCOUNT", "PASSPORT", "CUSTOMER_ID",
+    "EMPLOYEE_ID", "MEDICAL_RECORD_NUMBER", "IBAN", "CREDIT_CARD", "NATIONAL_ID",
+    "US_SSN", "DRIVERS_LICENSE", "EMAIL_ADDRESS",
+})
+_COREF_MIN_LEN = 4
+
+
+def build_regex_masker(
+    *, eval_arbitration: bool = False, coreference: bool = True
+) -> Callable[[str], str]:
     """A deterministic masker: detect PII spans with the regex engine and
-    replace each (right-to-left, non-overlapping) with ``[TYPE]``."""
+    replace each (right-to-left, non-overlapping) with ``[TYPE]``.
+
+    When ``coreference`` (panel #2, default on), it ALSO redacts every remaining
+    VERBATIM occurrence of each detected value of a sticky, distinctive type
+    (``_COREF_TYPES``, length >= ``_COREF_MIN_LEN``) — closing the reconstruction
+    leak where the detector caught one mention of a name/account but missed a
+    second verbatim occurrence. ADDITIVE (redacts MORE) => leak-safe; the
+    type-allowlist + min-length bound over-masking. Detection spans are
+    UNCHANGED, so scored detection metrics are byte-identical."""
     engine = RegexEngineAdapter(enabled=True, eval_cross_type_arbitration=eval_arbitration)
 
     def mask(text: str) -> str:
@@ -42,16 +64,25 @@ def build_regex_masker(*, eval_arbitration: bool = False) -> Callable[[str], str
                 if f.span_start is not None and f.span_end is not None
             }
         )
-        # keep the longest non-overlapping cover, replace right-to-left
         kept: list[tuple[int, int, str]] = []
         last = -1
         for s, e, t in spans:
             if s >= last:
                 kept.append((s, e, t))
                 last = e
+        coref_vals: list[tuple[str, str]] = []
+        if coreference:
+            for s, e, t in kept:
+                val = text[s:e]
+                if t in _COREF_TYPES and len(val) >= _COREF_MIN_LEN:
+                    coref_vals.append((val, t))
         out = text
         for s, e, t in reversed(kept):
             out = out[:s] + f"[{t}]" + out[e:]
+        # value-consistent redaction of the remaining verbatim occurrences,
+        # longest value first so a longer name is masked before a substring.
+        for val, t in sorted(coref_vals, key=lambda kv: -len(kv[0])):
+            out = out.replace(val, f"[{t}]")
         return out
 
     return mask
