@@ -17,13 +17,17 @@ from pii_anon.assurance.reconstruction_resistance import (
 
 _CORPUS = [
     CorpusRecord("r1", "Patient Maria Garcia, SSN 123-45-6789, lives in Denver.",
-                 ("Maria Garcia", "123-45-6789", "Denver")),
+                 ("Maria Garcia", "123-45-6789", "Denver"),
+                 ("PERSON_NAME", "US_SSN", "LOCATION")),
     CorpusRecord("r2", "Contact John Smith at john@acme.com, phone 415-555-0198.",
-                 ("John Smith", "john@acme.com", "415-555-0198")),
+                 ("John Smith", "john@acme.com", "415-555-0198"),
+                 ("PERSON_NAME", "EMAIL_ADDRESS", "PHONE_NUMBER")),
     CorpusRecord("r3", "Ms Aisha Khan, account GB29NWBK60161331926819, London office.",
-                 ("Aisha Khan", "GB29NWBK60161331926819", "London")),
+                 ("Aisha Khan", "GB29NWBK60161331926819", "London"),
+                 ("PERSON_NAME", "IBAN", "LOCATION")),
     CorpusRecord("r4", "Dr Ivan Petrov, DOB 1980-04-12, employee E-4471.",
-                 ("Ivan Petrov", "1980-04-12", "E-4471")),
+                 ("Ivan Petrov", "1980-04-12", "E-4471"),
+                 ("PERSON_NAME", "DATE_OF_BIRTH", "EMPLOYEE_ID")),
 ]
 
 
@@ -50,6 +54,17 @@ class TestVerbatimLeakage:
         m = measure_verbatim_leakage(_CORPUS, _null_mask)
         assert m["leaked_verbatim"] == m["total_pii_values"] == 12
         assert m["leak_rate"] == 1.0
+
+    def test_per_type_breakdown(self) -> None:
+        # null masker: every type leaks 100%; PERSON_NAME has 4 values.
+        m = measure_verbatim_leakage(_CORPUS, _null_mask)
+        pt = m["per_type"]
+        assert pt["PERSON_NAME"]["total"] == 4
+        assert pt["PERSON_NAME"]["leaked"] == 4
+        assert pt["PERSON_NAME"]["leak_rate"] == 1.0
+        # perfect masker: every type at 0%.
+        m2 = measure_verbatim_leakage(_CORPUS, _perfect_mask)
+        assert all(d["leaked"] == 0 for d in m2["per_type"].values())
 
 
 class TestReport:

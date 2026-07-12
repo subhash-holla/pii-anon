@@ -72,11 +72,13 @@ _SIGNAL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'@._-]{2,}")
 @dataclass(frozen=True)
 class CorpusRecord:
     """One corpus record with its ground-truth PII values (the quasi-identifiers
-    an adversary would link against)."""
+    an adversary would link against). ``pii_types``, when supplied, is a
+    parallel tuple of entity types enabling the per-type leakage breakdown."""
 
     record_id: str
     text: str
     pii_values: tuple[str, ...]
+    pii_types: tuple[str, ...] = ()
 
 
 def default_signals(text: str) -> tuple[str, ...]:
@@ -108,23 +110,39 @@ def measure_verbatim_leakage(
     total = 0
     leaked = 0
     examples: list[dict[str, str]] = []
+    per_type: dict[str, list[int]] = {}  # type -> [total, leaked]
     for rec in records:
         masked = mask_fn(rec.text)
-        for val in rec.pii_values:
+        types = rec.pii_types if len(rec.pii_types) == len(rec.pii_values) else ()
+        for i, val in enumerate(rec.pii_values):
             if not val or len(val) < 2:
                 continue
             total += 1
+            etype = types[i] if types else "UNKNOWN"
+            bucket = per_type.setdefault(etype, [0, 0])
+            bucket[0] += 1
             if val in masked:
                 leaked += 1
+                bucket[1] += 1
                 if len(examples) < 25:
-                    examples.append({"record_id": rec.record_id, "value": val})
+                    examples.append({"record_id": rec.record_id, "value": val, "type": etype})
     rate = leaked / total if total else 0.0
     lo, hi = wilson_interval(leaked, total) if total else (0.0, 0.0)
+    per_type_out = {
+        t: {
+            "total": c[0],
+            "leaked": c[1],
+            "leak_rate": (c[1] / c[0] if c[0] else 0.0),
+            "wilson95": list(wilson_interval(c[1], c[0])) if c[0] else [0.0, 0.0],
+        }
+        for t, c in sorted(per_type.items(), key=lambda kv: -kv[1][1])
+    }
     return {
         "total_pii_values": total,
         "leaked_verbatim": leaked,
         "leak_rate": rate,
         "wilson95": [lo, hi],
+        "per_type": per_type_out,
         "examples": examples,
     }
 
@@ -289,9 +307,22 @@ def render_html(report: dict[str, Any]) -> str:
     mi = report["membership_inference"]
     rd_m, rd_b = rd["masked"], rd["unmasked_baseline"]
     rows = "".join(
-        f"<tr><td>{r['record_id']}</td><td><code>{r['value']}</code></td></tr>"
+        f"<tr><td>{r['record_id']}</td><td>{r.get('type', '')}</td><td><code>{r['value']}</code></td></tr>"
         for r in vl["examples"]
-    ) or "<tr><td colspan=2><em>none — zero verbatim leakage in this sample</em></td></tr>"
+    ) or "<tr><td colspan=3><em>none — zero verbatim leakage in this sample</em></td></tr>"
+    pt = vl.get("per_type", {})
+    pt_rows = "".join(
+        f"<tr><td>{t}</td><td>{d['leaked']}/{d['total']}</td>"
+        f"<td class=\"{'bad' if d['leak_rate'] > 0 else 'good'}\">{_pct(d['leak_rate'])}</td>"
+        f"<td class=ci>[{_pct(d['wilson95'][0])}, {_pct(d['wilson95'][1])}]</td></tr>"
+        for t, d in pt.items()
+    )
+    pt_table = (
+        f"<details open><summary>Per-type leakage breakdown ({len(pt)} types)</summary>"
+        f"<table><tr><th>type</th><th>leaked/total</th><th>rate</th><th>Wilson 95%</th></tr>"
+        f"{pt_rows}</table></details>"
+        if pt else ""
+    )
     return f"""<!doctype html><meta charset=utf-8>
 <title>LLM-Reconstruction-Resistance Report — {report['mask_label']}</title>
 <style>
@@ -313,8 +344,9 @@ def render_html(report: dict[str, Any]) -> str:
 <div class=metric><div class="big {'good' if vl['leaked_verbatim']==0 else 'bad'}">{_pct(vl['leak_rate'])}</div>
  of {vl['total_pii_values']} PII values survive verbatim
  <div class=ci>{vl['leaked_verbatim']} leaked &middot; Wilson 95% [{_pct(vl['wilson95'][0])}, {_pct(vl['wilson95'][1])}]</div></div>
+{pt_table}
 <details><summary>Leaked examples ({len(vl['examples'])})</summary>
- <table><tr><th>record</th><th>value surviving verbatim</th></tr>{rows}</table></details>
+ <table><tr><th>record</th><th>type</th><th>value surviving verbatim</th></tr>{rows}</table></details>
 
 <h2>2. Tier-3 re-identification <span class=ci>(RRS/QIC/BSL — {rd['provisional_status']})</span></h2>
 <div class=metric><div class="big {'good' if rd_m['reid_recall']<0.1 else 'bad'}">{_pct(rd_m['reid_recall'])}</div>

@@ -104,12 +104,12 @@ def records_from_benchmark(path: str, *, n: int, seed: int) -> list[CorpusRecord
     out: list[CorpusRecord] = []
     for r in sample:
         text = r["text"]
-        vals = tuple(
-            text[lab["start"]:lab["end"]]
-            for lab in r.get("labels", [])
-            if lab.get("end", 0) > lab.get("start", 0)
+        labs = [lab for lab in r.get("labels", []) if lab.get("end", 0) > lab.get("start", 0)]
+        vals = tuple(text[lab["start"]:lab["end"]] for lab in labs)
+        types = tuple(str(lab.get("entity_type", "UNKNOWN")) for lab in labs)
+        out.append(
+            CorpusRecord(record_id=str(r.get("id", len(out))), text=text, pii_values=vals, pii_types=types)
         )
-        out.append(CorpusRecord(record_id=str(r.get("id", len(out))), text=text, pii_values=vals))
     return out
 
 
