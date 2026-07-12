@@ -57,6 +57,8 @@ STRUCTURED_TYPES = frozenset({
     "CVV", "PIN", "PASSWORD",
     "COURT_CASE_NUMBER", "DOCKET_NUMBER", "BAR_NUMBER",
     "INVOICE_NUMBER", "INSURANCE_POLICY_NUMBER", "SALARY",
+    # sp7 panel #1: labeled-field customer/client/member identifier
+    "CUSTOMER_ID",
 })
 
 # Entity types that benefit from multi-engine corroboration in Layer 4.

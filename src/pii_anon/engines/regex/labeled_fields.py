@@ -50,6 +50,8 @@ _CUE_SPEC: tuple[tuple[tuple[str, ...], str, str], ...] = (
     (("medical record number", "medical record no", "medical record", "mrn",
       "patient id"), "MEDICAL_RECORD_NUMBER", "alnum_id"),
     (("employee number", "employee id", "staff id", "badge number", "emp id"), "EMPLOYEE_ID", "alnum_id"),
+    (("customer id", "customer number", "customer no", "client id", "client number",
+      "account holder id", "member id", "subscriber id"), "CUSTOMER_ID", "alnum_id"),
     (("invoice number", "invoice no"), "INVOICE_NUMBER", "alnum_id"),
     (("insurance policy number", "policy number", "insurance number", "policy no"),
      "INSURANCE_POLICY_NUMBER", "alnum_id"),

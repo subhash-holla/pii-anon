@@ -143,6 +143,8 @@ SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
         "INVOICE_NUMBER",
         "INSURANCE_POLICY_NUMBER",
         "SALARY",
+        # sp7 panel #1: customer/client/member identifier (labeled-field bridge)
+        "CUSTOMER_ID",
     }
 )
 
