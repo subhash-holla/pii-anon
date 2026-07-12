@@ -702,14 +702,68 @@ _ORGANIZATION_CAMELCASE = re.compile(
 
 # Street address: number + words + suffix, optionally followed by
 # ", City, ST ZIP" so the captured span matches full mailing addresses.
+# sp7 A4 — two-tier evidence-gated address grammar (mining candidate #10).
+# Global re.IGNORECASE is DROPPED (it made the street-token class slurp
+# lowercase prose "1997 the ... Court"); case-insensitivity is re-applied ONLY
+# to the suffix via (?i:...). A first-token function-word guard rejects
+# prose-led matches. Interior tokens are [A-Za-z]-led so lowercase particles
+# (de la / van der) and ALL-CAPS street names ("JULIE SQUARES") are preserved.
+_ADDR_FUNC = r"the|of|a|an|and|by|at|to|in|on|for|with|was|were|is|are|from"
+# Tier-1: unambiguous topographic/road suffixes (full USPS Pub-28 C1 set) —
+# matches freely (ADDITIVE recall; the largest gretel FN class).
+_USPS_UNAMBIG = (
+    r"Alley|Arcade|Avenue|Ave|Boulevard|Blvd|Bypass|Causeway|Circle|Cir|Court|Ct|"
+    r"Courts|Crescent|Crossing|Xing|Crossroad|Drive|Dr|Drives|Expressway|Freeway|"
+    r"Highway|Hwy|Lane|Ln|Motorway|Overpass|Parkway|Pkwy|Parkways|Place|Pl|Plaza|"
+    r"Roads|Road|Rd|Route|Skyway|Squares|Square|Sq|Station|Streets|Street|St|"
+    r"Terrace|Ter|Throughway|Trafficway|Trail|Trl|Turnpike|Underpass|Viaduct|"
+    r"Harbors|Harbor|Manors|Manor|Estates|Estate|Villages|Village|Vistas|Vista|"
+    r"Heights|Mountains|Mountain|Ways|Way"
+)
+# Tier-2: suffixes that are ALSO common English nouns — accepted ONLY with a
+# following unit or postcode token (the evidence gate that resolves the
+# gretel-loosen vs prose-tighten tension).
+_USPS_AMBIG = (
+    r"Bend|Bluffs|Bluff|Branch|Bridge|Brooks|Brook|Camp|Canyon|Cape|Centers|"
+    r"Center|Cliffs|Cliff|Club|Commons|Common|Corners|Corner|Course|Coves|Cove|"
+    r"Creek|Crest|Curve|Dale|Dam|Divide|Falls|Fall|Ferry|Fields|Field|Flats|Flat|"
+    r"Fords|Ford|Forest|Forge|Forks|Fork|Fort|Gardens|Garden|Gateway|Glens|Glen|"
+    r"Greens|Green|Groves|Grove|Haven|Hills|Hill|Hollow|Inlet|Islands|Island|Isle|"
+    r"Junction|Keys|Key|Knolls|Knoll|Lakes|Lake|Landing|Lights|Light|Loaf|Locks|"
+    r"Lock|Lodge|Loop|Mall|Meadows|Meadow|Mews|Mills|Mill|Mission|Mount|Neck|"
+    r"Orchard|Oval|Parks|Park|Passage|Pass|Path|Pike|Pines|Pine|Plains|Plain|"
+    r"Points|Point|Ports|Port|Prairie|Radial|Ramp|Ranch|Rapids|Rapid|Rest|Ridges|"
+    r"Ridge|River|Row|Rue|Run|Shoals|Shoal|Shores|Shore|Springs|Spring|Spur|Spurs|"
+    r"Stream|Summit|Trace|Track|Trailer|Tunnel|Unions|Union|Valleys|Valley|Views|"
+    r"View|Walks|Walk|Wall|Wells|Well"
+)
+# Evidence tails for the tier-2 lookahead (unit or postcode adjacent to the
+# suffix). Separators are [ \t] — an address never crosses a line break, and
+# allowing \n let "9902\nLicense pl" match "…License pl(ace)" as an address.
+_ADDR_UNIT = (
+    r"(?:,?[ \t]+(?:Apt|Apartment|Suite|Ste|Unit|Floor|Fl|Rm|Room|Building|Bldg|Box|#)"
+    r"\.?[ \t]*#?[ \t]*\w+)"
+)
+_ADDR_ZIP = r"(?:,?[ \t]+\d{4,5}(?:[ \t]*[A-Z]{2})?\b)"
+# Tier-1 captured tail: all-or-nothing ", City …, ST 12345" (matches the home
+# gold span boundary exactly — independent unit/zip captures over-extended the
+# span and broke strict-span scoring).
+_ADDR_TAIL = (
+    r"(?:,?[ \t]+[A-Za-z][A-Za-z'.\-]+(?:[ \t]+[A-Za-z][A-Za-z'.\-]+)*,?"
+    r"[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?"
+)
+_ADDR_HEAD = (
+    r"\b(\d{1,6}[ \t]+(?!(?i:" + _ADDR_FUNC + r")\b)"
+    r"(?:[A-Za-z][A-Za-z'.\-]*[ \t]+){1,4}"
+)
 _ADDRESS = re.compile(
-    r"\b(\d{1,6}\s+(?:[A-Z][a-z]+\s+){1,4}"
-    r"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|"
-    r"Place|Pl|Circle|Cir|Terrace|Ter|Trail|Trl|Highway|Hwy|Parkway|Pkwy)"
-    r"\.?"
-    r"(?:,?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)?)"
-    r"\b",
-    re.IGNORECASE,
+    _ADDR_HEAD + r"(?i:" + _USPS_UNAMBIG + r")\.?" + _ADDR_TAIL + r")"
+)
+# Tier-2 requires evidence (unit or postcode) via lookahead right after the
+# ambiguous suffix — the evidence is NOT captured, so it never extends the span.
+_ADDRESS_AMBIGUOUS = re.compile(
+    _ADDR_HEAD + r"(?i:" + _USPS_AMBIG + r")\.?"
+    + r"(?=" + _ADDR_UNIT + r"|" + _ADDR_ZIP + r"))"
 )
 
 # Location with context keyword.
@@ -1930,6 +1984,13 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
         base_confidence=0.82,
         group=1,
         explanation="regex address",
+    ),
+    PatternSpec(
+        entity_type="ADDRESS",
+        pattern=_ADDRESS_AMBIGUOUS,
+        base_confidence=0.80,
+        group=1,
+        explanation="regex address ambiguous evidence-gated (sp7 A4)",
     ),
     # ── LOCATION ───────────────────────────────────────────────────────
     PatternSpec(
