@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -399,10 +400,10 @@ def test_same_seed_byte_identical_modulo_timestamp(
 def test_in_tree_run_never_stamps_data_v2_scope(produced: dict[str, Any]) -> None:
     """[AUDIT] A19: scope honesty — when the run resolves to the in-tree
     representative fixture (or the DATA corpus), the scope reflects the ACTUAL
-    sampler. It is NEVER ``data-v2.0.0`` for an in-tree run, and a DATA-v2 run is
-    stamped honestly."""
+    sampler. It is NEVER ``data-v*`` for an in-tree run, and a DATA run is
+    stamped with its RESOLVED version (no cross-version laundering)."""
     scope = produced["run_metadata"]["canonical_provenance"]["scope"]
-    assert scope in {"representative-in-tree", "data-v2.0.0"}
+    assert scope == "representative-in-tree" or re.fullmatch(r"data-v\d+\.\d+\.\d+", scope)
     # If the DATA package is unavailable the scope must be the in-tree fixture.
     import importlib.util
 
@@ -414,15 +415,16 @@ def test_provenance_scope_matches_actual_sampler_used(
     produced: dict[str, Any],
 ) -> None:
     """[AUDIT] A20: ``scope`` is consistent with ``dataset_version`` — a
-    ``data-v2.0.0`` scope iff a v2.0.0 DATA corpus was resolved; otherwise an
-    in-tree fixture version. No scope-laundering."""
+    ``data-v<X>`` scope iff the vX DATA corpus was actually resolved (the stamp
+    must NAME the resolved version — stamping a v2.2.0 corpus ``data-v2.0.0``
+    is the laundering this audit exists to catch); otherwise the in-tree
+    fixture. No scope-laundering."""
     prov = produced["run_metadata"]["canonical_provenance"]
-    if prov["scope"] == "data-v2.0.0":
-        assert prov["dataset_version"] == "2.0.0"
-        assert prov["power_cells"].get("source") == "data-v2.0.0"
+    if str(prov["scope"]).startswith("data-v"):
+        assert prov["scope"] == f"data-v{prov['dataset_version']}"
+        assert prov["power_cells"].get("source") == prov["scope"]
     else:
         assert prov["scope"] == "representative-in-tree"
-        assert prov["dataset_version"] != "2.0.0"
         assert prov["power_cells"].get("verdict") == "n/a-in-tree"
 
 
@@ -657,8 +659,8 @@ def test_detection_scope_labels_fresh_run_honestly(produced: dict[str, Any]) -> 
     block = produced["representative_in_tree_detection"]
     assert block["measurement"] == "fresh-in-tree-detection"
     assert block["detection_scope"].startswith("in-tree-fresh-")
-    # The fresh small-sample block is NOT labelled with the corpus scope data-v2.0.0.
-    assert block["detection_scope"] != "data-v2.0.0"
+    # The fresh small-sample block is NOT labelled with ANY corpus scope.
+    assert not str(block["detection_scope"]).startswith("data-v")
 
 
 def test_gate_rejects_non_finite_per_language_eps_nan() -> None:

@@ -264,16 +264,18 @@ class _InTreeFixtureSampler(_Sampler):
 
 @dataclass(frozen=True)
 class _DataV2Sampler(_Sampler):
-    """The frozen DATA v2.0.0 corpus (drawn lazily when importable).
+    """A frozen DATA v2.x corpus (drawn lazily when importable).
 
-    A representative draw from the v2.0.0 corpus; ``scope`` is ``data-v2.0.0`` only
-    when this sampler actually resolved (honest scope stamping).
+    A representative draw from the resolved corpus; ``scope`` is
+    ``data-v<version>`` stamped from the ACTUAL resolved package version.
+    Stamping the v2.2.0 corpus ``data-v2.0.0`` was the scope-LAUNDERING bug
+    the A20 audit test caught — the stamp must name what was actually used.
     """
 
     def power_cells(self, *, sample_size: int) -> dict[str, Any]:
         return {
             "verdict": "representative-draw",
-            "source": "data-v2.0.0",
+            "source": f"data-v{self.dataset_version}",
             "sample_size": sample_size,
         }
 
@@ -285,7 +287,9 @@ def _resolve_sampler() -> tuple[str, _Sampler]:
     Tries to import the DATA ``pii_anon_datasets`` corpus INSIDE this function; on
     ANY failure (ImportError or a transitive failure) falls back to the in-tree
     representative benchmark fixture. ``scope`` is recorded from the ACTUAL sampler
-    used — an in-tree run can NEVER be stamped ``data-v2.0.0``.
+    used — an in-tree run can NEVER be stamped ``data-v*``, and a DATA run is
+    stamped with the RESOLVED version (``data-v2.2.0`` for the v2.2.0 corpus —
+    never laundered to ``data-v2.0.0``).
     """
     try:
         import importlib
@@ -298,10 +302,10 @@ def _resolve_sampler() -> tuple[str, _Sampler]:
         if not corpus_file.exists():
             raise FileNotFoundError(corpus_file)
         if not version.startswith("2."):
-            # A non-v2 DATA package: do not stamp data-v2.0.0; fall back honestly.
+            # A non-v2 DATA package: fall back honestly to the in-tree fixture.
             raise RuntimeError(f"DATA package version {version!r} is not v2.x")
         corpus_bytes = corpus_file.read_bytes()
-        return "data-v2.0.0", _DataV2Sampler(
+        return f"data-v{version}", _DataV2Sampler(
             dataset="pii_anon",
             dataset_source="package-only",
             corpus_bytes=corpus_bytes,
@@ -977,7 +981,18 @@ class CanonicalRunGate:
             # ``_safe_repr``: a >4300-digit int scope crashed this very detail f-string
             # (the int→str conversion limit — the S7-04 DoV class); honest str scopes
             # render identically.
-            if not (isinstance(scope, str) and scope in {"data-v2.0.0", "representative-in-tree"}):
+            # An honest scope is either the in-tree fixture, or ``data-v<version>``
+            # where <version> is EXACTLY the resolved dataset_version — a
+            # data-v2.0.0 stamp over a v2.2.0 corpus is scope LAUNDERING (the
+            # A20 class this validator now rejects outright).
+            _scope_ok = isinstance(scope, str) and (
+                scope == "representative-in-tree"
+                or (
+                    scope.startswith("data-v")
+                    and scope == f"data-v{prov.get('dataset_version')}"
+                )
+            )
+            if not _scope_ok:
                 missing.append(
                     f"canonical_provenance.scope: {_safe_repr(scope)} not an honest scope"
                 )
