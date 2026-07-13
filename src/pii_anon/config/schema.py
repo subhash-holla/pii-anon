@@ -152,6 +152,12 @@ class TransformConfig(BaseModel):
     compliance_template: str | None = None
     entity_strategies: dict[str, str] = Field(default_factory=dict)
     strategy_params: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # sp7 panel #2 production wire-in: after the primary transform, mask any
+    # remaining VERBATIM occurrence of a detected sticky-type value (a name/
+    # account repeated but not individually detected) with the SAME replacement.
+    # Additive on the masking path (redacts more) => leak-safe; closes the
+    # dominant residual reconstruction leak (PERSON_NAME coreference).
+    value_consistent_masking: bool = True
 
 
 class TrackingConfig(BaseModel):

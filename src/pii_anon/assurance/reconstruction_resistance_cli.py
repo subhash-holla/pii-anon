@@ -27,18 +27,17 @@ from pii_anon.assurance.reconstruction_resistance import (
 )
 from pii_anon.engines.regex_adapter import RegexEngineAdapter
 from pii_anon.segmentation.segmenter import Segmenter
+from pii_anon.transforms.value_consistency import (
+    VALUE_CONSISTENT_MIN_LEN as _COREF_MIN_LEN,
+)
+from pii_anon.transforms.value_consistency import (
+    VALUE_CONSISTENT_TYPES as _COREF_TYPES,
+)
 
-
-#: panel #2 — types where redacting EVERY verbatim occurrence of a detected
-#: value (coreference / value-consistent masking) is safe. Restricted to
-#: "sticky", distinctive PII (a repeated name/org/account is the same entity);
-#: short/common types are excluded to bound over-masking of benign substrings.
-_COREF_TYPES = frozenset({
-    "PERSON_NAME", "ORGANIZATION", "BANK_ACCOUNT", "PASSPORT", "CUSTOMER_ID",
-    "EMPLOYEE_ID", "MEDICAL_RECORD_NUMBER", "IBAN", "CREDIT_CARD", "NATIONAL_ID",
-    "US_SSN", "DRIVERS_LICENSE", "EMAIL_ADDRESS",
-})
-_COREF_MIN_LEN = 4
+#: panel #2 — the sticky, distinctive types where redacting EVERY verbatim
+#: occurrence of a detected value (coreference / value-consistent masking) is
+#: safe, shared with the production orchestrator wire-in so the report's masker
+#: and the library's runtime path stay in lock-step.
 
 
 def build_regex_masker(

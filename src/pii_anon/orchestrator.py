@@ -79,6 +79,10 @@ from pii_anon.transforms import (
     TransformContext,
     TransformStrategy,
 )
+from pii_anon.transforms.value_consistency import (
+    build_surfaces,
+    sweep_residual_occurrences,
+)
 from pii_anon.types import (
     ConfidenceEnvelope,
     EngineFinding,
@@ -516,6 +520,16 @@ class AsyncPIIOrchestrator:
             for item in field_audit:
                 item["field_path"] = field
             link_audit.extend(field_audit)
+
+        # sp7 panel #2 — value-consistent (coreference) masking pass-2: redact
+        # any REMAINING verbatim occurrence of a detected sticky-type value
+        # (a name/account repeated but not individually detected, incl.
+        # cross-field) with the SAME replacement. Additive on the masking path.
+        if getattr(self.config.transform, "value_consistent_masking", False):
+            self._apply_value_consistent_masking(
+                payload, transformed_payload, link_audit
+            )
+
         return {
             "transformed_payload": transformed_payload,
             "ensemble_findings": detect["ensemble_findings"],
@@ -1228,6 +1242,97 @@ class AsyncPIIOrchestrator:
             parts.append(text[cursor:])
 
         return "".join(parts), link_audit
+
+    def _apply_value_consistent_masking(
+        self,
+        payload: Payload,
+        transformed_payload: Payload,
+        link_audit: list[dict[str, Any]],
+    ) -> None:
+        """sp7 panel #2 — pass-2 value-consistent (coreference) masking.
+
+        Redacts every REMAINING verbatim occurrence of a detected sticky-type
+        value with the SAME replacement it already received, sweeping the
+        ORIGINAL field text (never the transformed text — an inserted HMAC
+        token can itself contain a run equal to a short surface, so replacing
+        in output space could corrupt a token). Only fields with an ACTUAL
+        residual occurrence are re-assembled, so a payload with no coreference
+        leak keeps its pass-1 output and link_audit byte-identical.
+
+        Additive on the masking path: it can only ever redact MORE text, with a
+        replacement already deemed safe for that value; it never narrows a
+        pattern, drops a finding, or touches detection.
+        """
+        surfaces = build_surfaces(link_audit)
+        if not surfaces:
+            return
+        # pass-1 replacements grouped by field (original-offset spans), used to
+        # both exclude already-covered regions from the sweep and to re-assemble
+        # an affected field from its ORIGINAL text.
+        pass1_by_field: dict[str, list[tuple[int, int, str]]] = {}
+        for entry in link_audit:
+            field = entry.get("field_path")
+            span = entry.get("span") or {}
+            start = span.get("start")
+            end = span.get("end")
+            if not isinstance(field, str) or start is None or end is None:
+                continue
+            pass1_by_field.setdefault(field, []).append(
+                (int(start), int(end), str(entry.get("replacement", "")))
+            )
+
+        pass2_audit: list[dict[str, Any]] = []
+        for field, value in payload.items():
+            text = _scannable_text(value)
+            if text is None:
+                continue
+            field_pass1 = pass1_by_field.get(field, [])
+            covered = [(s, e) for s, e, _ in field_pass1]
+            residuals = sweep_residual_occurrences(text, surfaces, covered)
+            if not residuals:
+                continue  # byte-identical: leave transformed_payload[field] as-is
+            merged: list[tuple[int, int, str]] = list(field_pass1)
+            merged.extend((s, e, repl) for s, e, repl, _et, _cid in residuals)
+            merged.sort(key=lambda r: (r[0], r[1]))
+            transformed_payload[field] = self._assemble_with_replacements(text, merged)
+            for s, e, repl, etype, cluster_id in residuals:
+                pass2_audit.append(
+                    {
+                        "entity_type": etype,
+                        "span": {"start": s, "end": e},
+                        "mention_text": text[s:e],
+                        "canonical_text": text[s:e],
+                        "replacement": repl,
+                        # attribute the redaction to the same identity cluster as
+                        # the value it mirrors (keeps cluster-precision metrics
+                        # consistent — a residual of "Jack" IS in Jack's cluster).
+                        "cluster_id": cluster_id,
+                        "field_path": field,
+                        "rule": "value-consistent-coreference",
+                        "strategy_id": "value-consistent",
+                    }
+                )
+        link_audit.extend(pass2_audit)
+
+    @staticmethod
+    def _assemble_with_replacements(
+        text: str, spans: list[tuple[int, int, str]]
+    ) -> str:
+        """Rebuild ``text`` inserting each ``(start, end, replacement)`` at its
+        span. ``spans`` must be sorted and non-overlapping; any residual overlap
+        is skipped defensively (never double-emits)."""
+        parts: list[str] = []
+        cursor = 0
+        for start, end, repl in spans:
+            if start < cursor:
+                continue
+            if start > cursor:
+                parts.append(text[cursor:start])
+            parts.append(repl)
+            cursor = end
+        if cursor < len(text):
+            parts.append(text[cursor:])
+        return "".join(parts)
 
     @staticmethod
     def _cluster_entity_type(cluster_id: str, fallback_entity_type: str) -> str:
