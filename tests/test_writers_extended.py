@@ -76,12 +76,8 @@ class TestCSVFlatten:
 class TestParquetWriter:
     """Test Parquet writer functionality."""
 
-    @pytest.mark.skipif(
-        True,  # Skip if pyarrow not available - covered by existing tests
-        reason="pyarrow may not be installed"
-    )
     def test_write_parquet(self, tmp_path: Path) -> None:
-        """Test writing Parquet format."""
+        """Test writing Parquet format (skips only when pyarrow is absent)."""
         pytest.importorskip("pyarrow")
         from pii_anon.ingestion import FileFormat
 

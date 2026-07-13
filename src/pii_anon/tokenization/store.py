@@ -200,6 +200,12 @@ class SQLiteTokenStore(TokenStore):
                 )
                 """
             )
+            # Migrate existing (old-schema) tables to add created_at/expires_at
+            # BEFORE any index references those columns — opening a pre-existing
+            # old-schema DB otherwise crashes on the expires_at index below
+            # ("no such column: expires_at") since CREATE TABLE IF NOT EXISTS is
+            # a no-op on the existing old table.
+            self._migrate_schema()
             # Index for expiration cleanup
             self._conn.execute(
                 """
@@ -222,8 +228,6 @@ class SQLiteTokenStore(TokenStore):
                 ON token_mappings(token)
                 """
             )
-            # Migrate existing tables that lack the new columns
-            self._migrate_schema()
 
     def _migrate_schema(self) -> None:
         """Add created_at/expires_at columns if missing (backward compat)."""

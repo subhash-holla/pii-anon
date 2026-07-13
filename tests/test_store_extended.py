@@ -399,9 +399,10 @@ class TestSQLiteTokenStore:
         assert result is not None
         store.close()
 
-    @pytest.mark.skip(reason="Migration test relies on old schema creation")
     def test_sqlite_migration_schema(self, cleanup_db: Path) -> None:
-        """Test schema migration for backward compatibility."""
+        """Backward-compat: opening a pre-existing OLD-schema DB (no
+        created_at/expires_at) migrates it in place via _migrate_schema so
+        existing mappings remain readable (store.py ADD COLUMN branch)."""
         # Create old schema without created_at/expires_at
         conn = sqlite3.connect(str(cleanup_db))
         conn.execute(
