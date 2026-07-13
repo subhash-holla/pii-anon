@@ -57,6 +57,7 @@ from pii_anon.engines.regex.confidence import (
 from pii_anon.engines.regex.deny_list import DenyListManager
 from pii_anon.engines.regex.geo_lexicon import extract_locations
 from pii_anon.engines.regex.labeled_fields import extract_labeled_fields
+from pii_anon.engines.regex.unicode_norm import normalize_for_detection, remap_span
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex import validators
 from pii_anon.engines.regex.validators import _extract_digits
@@ -827,8 +828,14 @@ class RegexEngineAdapter(EngineAdapter):
         deny_list_config: dict[str, Any] | None = None,
         allow_list_config: dict[str, Any] | None = None,
         eval_cross_type_arbitration: bool = False,
+        unicode_normalize_detection: bool = True,
     ) -> None:
         super().__init__(enabled=enabled)
+        # sp7 panel: strip zero-width / fold fullwidth chars for DETECTION so
+        # obfuscated PII ("SSN: 123<ZWSP>-45-6789", fullwidth phones) cannot
+        # evade the masking path. ASCII text takes a C-speed identity fast path
+        # (byte-identical behaviour); spans are remapped to ORIGINAL offsets.
+        self._unicode_normalize = unicode_normalize_detection
         # Cross-type arbitration (drop a generic PERSON_NAME when a more
         # specific type covers the same span) is an EVAL-ONLY precision
         # optimisation. It is OFF by default because in the production
@@ -970,6 +977,16 @@ class RegexEngineAdapter(EngineAdapter):
             if not isinstance(value, str):
                 continue
 
+            # sp7 panel: normalize for detection (strip zero-width, fold
+            # fullwidth). Rebind ``value`` to the normalized scan-text so the
+            # whole loop body runs against it; the field's new spans are
+            # remapped back to ORIGINAL offsets at the loop bottom. ASCII text
+            # returns (value, None) — identity, byte-identical behaviour.
+            _f0, _l0 = len(findings), len(labeled)
+            _norm_map: list[int] | None = None
+            if self._unicode_normalize:
+                value, _norm_map = normalize_for_detection(value)
+
             # ── A2 labeled-field value bridge (additive, all paths) ─
             # A value behind an unambiguous field-label cue ("SSN:",
             # "Date of Birth:") typed FROM THE LABEL. Additive recall +
@@ -1106,6 +1123,22 @@ class RegexEngineAdapter(EngineAdapter):
                             language=language,
                         )
                     )
+
+            # sp7 panel: remap THIS field's new spans from normalized coords
+            # back to the ORIGINAL text, so masking replaces the exact original
+            # region (incl. any interior obfuscation chars). No-op on the ASCII
+            # fast path (_norm_map is None).
+            if _norm_map is not None:
+                for _fnd in findings[_f0:]:
+                    if isinstance(_fnd.span_start, int) and isinstance(_fnd.span_end, int):
+                        _fnd.span_start, _fnd.span_end = remap_span(
+                            _norm_map, _fnd.span_start, _fnd.span_end
+                        )
+                for _lbl in labeled[_l0:]:
+                    if isinstance(_lbl.span_start, int) and isinstance(_lbl.span_end, int):
+                        _lbl.span_start, _lbl.span_end = remap_span(
+                            _norm_map, _lbl.span_start, _lbl.span_end
+                        )
 
         # _drop_nested_same_type (same-type containment) and
         # _drop_dob_shadowed_dates (DOB ⊇ region, both masked) are
