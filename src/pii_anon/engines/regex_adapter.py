@@ -40,6 +40,7 @@ are re-exported as class attributes so that existing code referencing
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 from pii_anon.engines.base import EngineAdapter
@@ -146,6 +147,144 @@ _SALUTATION_TOKENS: frozenset[str] = frozenset({
     "Gentile", "Bonjour", "Salut", "Hola", "Buongiorno", "Cher", "Chère",
     "Querido", "Querida", "Caro", "Cara", "Hallo", "Hej", "Ola",
 })
+
+
+#: sp7 #6 mention-propagation — a DOMAIN-GENERAL veto of Title-Case tokens that
+#: are common English words (or common words that double as surnames) and so are
+#: NOT safe to propagate as a bare PERSON_NAME mention. Designed a-priori (NOT
+#: derived from home-set FP surfaces — no test-split tuning); it deliberately
+#: forfeits ambiguous word-surnames (Green/Brown/Ford/King/Young/…) for
+#: precision. Matching is case-SENSITIVE on the token's own capitalisation, so
+#: lowercase common usage ("will", "rose", "park") can never match a surname.
+_PROPAGATION_STOPWORDS: frozenset[str] = frozenset({
+    # weekdays / months
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+    "Sunday", "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+    # document-structure / label / role nouns that surface Title-Cased in prose
+    "Patient", "Doctor", "Nurse", "Report", "Summary", "Subject", "Address",
+    "Account", "Name", "Date", "Number", "Record", "Case", "Section", "Note",
+    "Notes", "Page", "Table", "Figure", "Company", "Department", "Office",
+    "Team", "Group", "Client", "Customer", "Member", "Manager", "Director",
+    "President", "Officer", "Agent", "Owner", "User", "Admin", "Staff",
+    # common Title-Case prose openers / high-frequency words
+    "The", "This", "That", "These", "Those", "Their", "There", "Then", "Thus",
+    "When", "Where", "While", "With", "From", "Both", "Each", "After", "Before",
+    "During", "Please", "Thank", "Thanks", "Regards", "Sincerely", "Best",
+    # common English words that also occur as surnames — forfeited for precision
+    "Green", "Brown", "White", "Black", "Gray", "Grey", "King", "Young",
+    "Ford", "Park", "Hill", "Bank", "Price", "Bell", "Cook", "Fox", "Wood",
+    "Stone", "Field", "Rich", "Long", "Short", "Small", "Little", "Moon",
+    "Sun", "Rain", "Snow", "Winter", "Case", "Ward", "Bishop", "Marsh",
+})
+
+#: mid-band confidence for a propagated partial mention (above the 0.50 emit
+#: floor; below a directly-grammar-detected full name).
+_PROPAGATED_PERSON_CONFIDENCE = 0.80
+
+
+def _is_word_char(ch: str) -> bool:
+    """Word-boundary predicate for the propagation scan: alphanumeric or ``_``."""
+    return ch.isalnum() or ch == "_"
+
+
+def _standalone_occurrences(text: str, token: str) -> list[tuple[int, int]]:
+    """Return ``(start, end)`` for every whole-word occurrence of ``token`` in
+    ``text`` (not the interior of a longer word). O(n) ``str.find`` sweep with
+    manual boundary checks — no regex, ReDoS-free. A trailing apostrophe
+    ("Fennimore's") is a boundary, so the possessive matches the bare name."""
+    out: list[tuple[int, int]] = []
+    if not token:
+        return out
+    i = text.find(token)
+    n = len(text)
+    tlen = len(token)
+    while i != -1:
+        j = i + tlen
+        before_ok = i == 0 or not _is_word_char(text[i - 1])
+        after_ok = j >= n or not _is_word_char(text[j])
+        if before_ok and after_ok:
+            out.append((i, j))
+        i = text.find(token, i + 1)
+    return out
+
+
+def _propagate_surname_mentions(
+    findings: list[EngineFinding],
+    texts: dict[str | None, str],
+    *,
+    adapter_id: str,
+    language: str,
+    is_denied: Callable[[str, str], bool],
+) -> list[EngineFinding]:
+    """sp7 #6 — ADDITIVE surname mention-propagation (all paths, leak-safe).
+
+    A multi-token ``PERSON_NAME`` ("Alastair Fennimore") is detected once, but a
+    later bare "Fennimore" the grammar missed leaks. For each detected
+    multi-token PERSON_NAME, propagate its SURNAME (last token) to every
+    standalone verbatim occurrence in the SAME field not already covered by a
+    finding, emitting a new PERSON_NAME span. Gate: surname length >= 4,
+    all-alpha, strict Title-Case, not deny-listed, not a common-word stopword.
+
+    Purely additive — emits only NEW non-overlapping spans; never drops,
+    narrows, or re-types an existing finding. On the masking path it masks MORE
+    partial mentions (the safe leak-direction). Detection-only; no eval gating.
+    """
+    # per field: the surnames worth propagating + an occupancy mask over the
+    # field text (bytearray -> O(1) per char, so the whole pass is LINEAR in
+    # text length; a per-interval scan would be O(n^2) on a pathological
+    # many-repeats input — the sp7 mention-propagation close).
+    surnames_by_field: dict[str | None, set[str]] = {}
+    occupied_by_field: dict[str | None, list[tuple[int, int]]] = {}
+    for f in findings:
+        fp = f.field_path
+        if isinstance(f.span_start, int) and isinstance(f.span_end, int):
+            occupied_by_field.setdefault(fp, []).append((f.span_start, f.span_end))
+        if f.entity_type != "PERSON_NAME" or not isinstance(f.span_start, int):
+            continue
+        text = texts.get(fp, "")
+        span = text[f.span_start:f.span_end]
+        tokens = span.split()
+        if len(tokens) < 2:
+            continue
+        surname = tokens[-1].strip(".,'\"")
+        if (
+            len(surname) >= 4
+            and surname.isalpha()
+            and surname[0].isupper()
+            and surname[1:].islower()
+            and surname not in _PROPAGATION_STOPWORDS
+            and not is_denied("PERSON_NAME", surname)
+        ):
+            surnames_by_field.setdefault(fp, set()).add(surname)
+
+    added: list[EngineFinding] = []
+    for fp, surnames in surnames_by_field.items():
+        text = texts.get(fp, "")
+        mask = bytearray(len(text))
+        for os, oe in occupied_by_field.get(fp, []):
+            for k in range(max(0, os), min(len(text), oe)):
+                mask[k] = 1
+        # longest surname first so a longer name masks before a substring.
+        for surname in sorted(surnames, key=len, reverse=True):
+            for start, end in _standalone_occurrences(text, surname):
+                if any(mask[k] for k in range(start, end)):
+                    continue
+                for k in range(start, end):
+                    mask[k] = 1
+                added.append(
+                    EngineFinding(
+                        entity_type="PERSON_NAME",
+                        confidence=_PROPAGATED_PERSON_CONFIDENCE,
+                        field_path=fp,
+                        span_start=start,
+                        span_end=end,
+                        engine_id=adapter_id,
+                        explanation="propagated surname mention (sp7 mention-propagation)",
+                        language=language,
+                    )
+                )
+    return findings + added
 
 
 def _trim_salutation_led_person(
@@ -1168,6 +1307,16 @@ class RegexEngineAdapter(EngineAdapter):
             findings = _drop_bare9_ssn_noncontext(findings, text_all)
             findings = _drop_titlecase_noise_person(findings, text_all)
             findings = _trim_salutation_led_person(findings, text_all)
+        # sp7 #6 mention-propagation (ADDITIVE, all paths): seed from the
+        # PERSON_NAMEs that survived arbitration and propagate their surnames to
+        # bare standalone mentions the grammar missed. Masks MORE (leak-safe).
+        findings = _propagate_surname_mentions(
+            findings,
+            text_all,
+            adapter_id=self.adapter_id,
+            language=language,
+            is_denied=self._is_denied,
+        )
         return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
