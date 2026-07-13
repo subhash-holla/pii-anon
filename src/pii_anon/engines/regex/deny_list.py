@@ -23,6 +23,27 @@ from __future__ import annotations
 
 from typing import Any
 
+# Surrounding punctuation/quotes stripped when canonicalising a deny entry or a
+# matched span (sp7 panel, robustness lens).
+_CANONICAL_STRIP = " \t\r\n\"'`.,;:!?()[]{}<>"
+
+
+def canonical_deny_form(text: str) -> str:
+    """Canonical deny-list form: lowercase, collapse internal whitespace runs to
+    a single space, and strip SURROUNDING ASCII punctuation/quotes.
+
+    Deliberately does NOT fold unicode letter confusables: a homoglyph variant
+    of a denied phrase ("Jоhn Doe", Cyrillic о) is suspicious input that must
+    stay MASKABLE, never denied — a leak-direction safeguard. ``str.split()``
+    collapses ASCII whitespace only; zero-width chars (U+200B) are not
+    whitespace and are preserved (so a zero-width-injected variant is not
+    silently denied either). Interior punctuation is preserved
+    ("st. petersburg" != "st petersburg"). Uses ``lower()`` (not ``casefold()``)
+    to keep the existing de/es matching behaviour.
+    """
+    return " ".join(text.lower().split()).strip(_CANONICAL_STRIP)
+
+
 # ── Default deny-list entries ──────────────────────────────────────────────
 # Geographic names and test data that commonly trigger PERSON_NAME false
 # positives due to their multi-word capitalized structure.
@@ -140,7 +161,10 @@ class DenyListManager:
         if deny_config:
             self._load_lists(deny_config, target=self._deny_lists)
         else:
-            self._deny_lists = {k: set(v) for k, v in DEFAULT_DENY_LISTS.items()}
+            self._deny_lists = {
+                k: {canonical_deny_form(v) for v in vals} - {""}
+                for k, vals in DEFAULT_DENY_LISTS.items()
+            }
 
         if allow_config:
             self._load_lists(allow_config, target=self._allow_lists)
@@ -165,17 +189,20 @@ class DenyListManager:
         if not cfg.get("enabled", True):
             return
         for entity_type, values in cfg.get("lists", {}).items():
-            target[entity_type] = {v.lower() for v in values}
+            target[entity_type] = {canonical_deny_form(v) for v in values} - {""}
 
     def is_denied(self, entity_type: str, matched_text: str) -> bool:
         """Return *True* if *matched_text* is in the deny-list for *entity_type*.
 
-        Matching is case-insensitive.
+        Matching is canonical (case + surrounding-punctuation + whitespace-run
+        insensitive) so "New York" denies "New  York" / "New York." too, while
+        an interior-different or homoglyph variant stays maskable.
         """
         deny_set = self._deny_lists.get(entity_type)
         if not deny_set:
             return False
-        return matched_text.lower() in deny_set
+        canon = canonical_deny_form(matched_text)
+        return bool(canon) and canon in deny_set
 
     def is_allowed(self, entity_type: str, matched_text: str) -> bool:
         """Return *True* if *matched_text* is in the allow-list for *entity_type*.
