@@ -1127,15 +1127,14 @@ class RegexEngineAdapter(EngineAdapter):
         findings = _drop_ssn_shadowed_national_id(findings)
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
-            text_map: dict[str | None, str] = {
-                k: v for k, v in payload.items() if isinstance(v, str)
-            }
+            # text_all (built above for the DOB promotion) already holds the
+            # str fields — no need to rebuild the same dict (sp7 panel).
             findings = _drop_person_shadowed_by_specific(findings)
-            findings = _drop_undecimaled_gps(findings, text_map)
-            findings = _drop_nongeo_gps(findings, text_map)
-            findings = _drop_bare9_ssn_noncontext(findings, text_map)
-            findings = _drop_titlecase_noise_person(findings, text_map)
-            findings = _trim_salutation_led_person(findings, text_map)
+            findings = _drop_undecimaled_gps(findings, text_all)
+            findings = _drop_nongeo_gps(findings, text_all)
+            findings = _drop_bare9_ssn_noncontext(findings, text_all)
+            findings = _drop_titlecase_noise_person(findings, text_all)
+            findings = _trim_salutation_led_person(findings, text_all)
         return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────

@@ -1586,6 +1586,7 @@ class PIIOrchestrator:
         ingest_config: Any | None = None,
         output_path: str | Path | None = None,
         output_format: Any | None = None,
+        on_error: str = "skip",
     ) -> Any:
         """Process all records in a file and optionally write results.
 
@@ -1605,6 +1606,12 @@ class PIIOrchestrator:
             If provided, processed results are written to this path.
         output_format:
             Explicit output format; auto-detected from *output_path* if ``None``.
+        on_error:
+            ``"skip"`` (default) records the failure in ``errors`` / the log
+            and continues; ``"raise"`` re-raises the first per-record failure
+            (sp7 panel, API lens: a failed record silently VANISHED from the
+            output — a caller who never inspected ``records_failed`` had no
+            signal that data was dropped).
 
         Returns
         -------
@@ -1664,10 +1671,26 @@ class PIIOrchestrator:
                 results_buffer.append(result)
                 records_processed += 1
             except Exception as exc:
+                if on_error == "raise":
+                    raise
                 records_failed += 1
-                errors.append(f"record {record.record_id}: {exc}")
+                # keep the exception TYPE (a bare str(exc) can be empty) and
+                # emit an observable warning — a silently dropped record is
+                # data loss the caller must be able to see.
+                errors.append(f"record {record.record_id}: {type(exc).__name__}: {exc}")
+                self._async.logger.warning(
+                    "run_file: record %s failed (%s) and was dropped from output",
+                    record.record_id,
+                    type(exc).__name__,
+                )
 
         elapsed = time.monotonic() - start
+        if records_failed:
+            self._async.logger.warning(
+                "run_file: %d of %d records failed and are ABSENT from the output",
+                records_failed,
+                records_processed + records_failed,
+            )
 
         output_str: str | None = None
         if output_path is not None:
