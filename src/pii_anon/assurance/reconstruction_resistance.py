@@ -161,6 +161,14 @@ def assemble_paired_set(
             ReidPersona(
                 persona_id=rec.record_id,
                 quasi_identifiers=tuple(rec.pii_values),
+                # sp7 panel (privacy lens): with EMPTY auxiliary_knowledge the
+                # BSL half of the fused QIC+BSL score was identically 0 —
+                # halving every similarity and OPTIMISTICALLY biasing the
+                # reported protection. The adversary's background knowledge is
+                # the persona's own record context (what a linker would hold),
+                # so populate it — the bound now measures the STRONGER,
+                # advertised adversary.
+                auxiliary_knowledge={"background": rec.text},
                 source_text=rec.text,
             )
         )

@@ -211,14 +211,21 @@ class AsyncPIIOrchestrator:
         config: CoreConfig | None = None,
         tokenizer: TokenizerProvider | None = None,
         token_store: TokenStore | None = None,
+        max_token_store_size: int | None = None,
+        max_ledger_scopes: int | None = None,
     ) -> None:
+        # sp7 panel (API lens): the default in-memory token store and identity
+        # ledger grow WITHOUT BOUND — an RSS leak for any long-running /
+        # streaming deployment. Both classes already support bounds; these
+        # pass-throughs expose them. Defaults stay unbounded (silent eviction
+        # would break token consistency), but a service can now cap them.
         self.token_key = token_key
         self.segmenter = Segmenter()
         self.reconciler = BoundaryReconciler()
         self.tokenizer = tokenizer or DeterministicHMACTokenizer()
-        self.token_store = token_store or InMemoryTokenStore()
+        self.token_store = token_store or InMemoryTokenStore(max_size=max_token_store_size)
         self.config = config or CoreConfig.default()
-        self.identity_ledger = IdentityLedger()
+        self.identity_ledger = IdentityLedger(max_scopes=max_ledger_scopes)
         self.router = PolicyRouter(
             router_config=self.config.router.model_dump() if hasattr(self.config, "router") else None,
         )
@@ -1376,6 +1383,8 @@ class PIIOrchestrator:
         config_path: str | None = None,
         tokenizer: TokenizerProvider | None = None,
         token_store: TokenStore | None = None,
+        max_token_store_size: int | None = None,
+        max_ledger_scopes: int | None = None,
     ) -> None:
         if config is None and config_path is not None:
             config = ConfigManager().load(config_path)
@@ -1385,6 +1394,8 @@ class PIIOrchestrator:
             config=config,
             tokenizer=tokenizer,
             token_store=token_store,
+            max_token_store_size=max_token_store_size,
+            max_ledger_scopes=max_ledger_scopes,
         )
 
     def register_engine(self, engine: EngineAdapter) -> None:
