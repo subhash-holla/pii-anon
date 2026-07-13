@@ -472,6 +472,41 @@ def _drop_location_nested_in_address(
     return out
 
 
+def _drop_ssn_shadowed_national_id(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop a NATIONAL_ID finding whose span a US_SSN finding already covers
+    (sp7 panel, multilingual lens). "Tax ID: 573-33-7773" matched BOTH the SSN
+    pattern and the labeled national-id pattern on the SAME span — under
+    one-to-one strict scoring the second is a pure FP (dominant in the
+    zh/ko/hi/ar home docs, which scaffold SSN-format values behind an English
+    "Tax ID:" label). Leak-SAFE (the _drop_dob_shadowed_dates class): the
+    surviving US_SSN still masks the region, so this runs on ALL paths."""
+    ssn_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type == "US_SSN"
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not ssn_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "NATIONAL_ID"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+            and any(
+                field == f.field_path and s <= f.span_start and f.span_end <= e
+                for field, s, e in ssn_spans
+            )
+        ):
+            continue
+        out.append(f)
+    return out
+
+
 def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
     """Drop generic ``DATE_TIME`` findings overlapping a ``DATE_OF_BIRTH``.
 
@@ -1089,6 +1124,7 @@ class RegexEngineAdapter(EngineAdapter):
         }
         findings = _promote_dob_by_cue(findings, text_all)
         findings = _drop_location_nested_in_address(findings)
+        findings = _drop_ssn_shadowed_national_id(findings)
         findings = _drop_dob_shadowed_dates(findings)
         if self._eval_cross_type_arbitration:
             text_map: dict[str | None, str] = {

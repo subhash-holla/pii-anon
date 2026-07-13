@@ -661,6 +661,9 @@ _ORGANIZATION_CONTEXT = re.compile(
     r"|(?i:employed\s+(?:at|by)|works?\s+(?:at|for)|working\s+(?:at|for)|"
     r"position\s+at|role\s+at|affiliated\s+with|belongs?\s+to))"
     r"[ \t]*"
+    # sp7 panel (multilingual lens): a bare honorific is never an organization
+    # — "belongs to Mr. Wu" captured ORGANIZATION 'Mr'. Veto it at the head.
+    r"(?!(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Lord|Lady|Mme|Mlle|Sr|Sra|Srta|Dra|Hon)\.?(?![A-Za-z]))"
     r"(" + _ORG_ATOM + r"(?:[ \t]+" + _ORG_ATOM + r"(?![ \t]*[:=])){0,4})"
     r"(?![A-Za-z])"
 )
