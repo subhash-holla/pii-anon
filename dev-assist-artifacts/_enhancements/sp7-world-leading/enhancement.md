@@ -121,6 +121,19 @@ Honest targets (relaxed F2, swarm; each ≥76% of its binding no-new-model ceili
 | BSL | **★ Live-BSL adversary + memory bounds (`f642562`):** empty `auxiliary_knowledge` made BSL identically 0 — the re-id bound was OPTIMISTICALLY biased. With the background channel live: unmasked baseline 98.0%, masked 6.13% (n=1500), honest protection delta ~88pp — the report got MORE honest (the old 0.73% understated risk). + `max_token_store_size`/`max_ledger_scopes` pass-throughs (defaults unchanged) | DONE (TDD) |
 | — | **Flagship report (n=1500, all improvements): verbatim leak 5.93% (coreference on), masked re-id 6.13% vs live-BSL adversary, 0 FR-036 parity violations.** Remaining panel items deferred with reasons: NANP-for-non-US-phones (medium home-risk, needs measurement campaign) · deny-list folding (masking-path suppressor strengthening) · unicode normalization pre-pass (offset-mapping design needed) · swarm-masker report row (slow gliner run) · Dutch tussenvoegsel emails (M, external-only) | — |
 
+## Autonomous continuation #3 (2026-07-13, "continue with the remaining items")
+
+Resolved the 3 sign-off items with MEASURED evidence from a 6-agent investigation
+workflow (`wf_a9ed0ba6`: 3 mention-propagation framings prototyped+measured in
+parallel worktrees + geo/GLiNER-SDO analysts + a judge). Baseline home strict-F2
+0.9084 (full 50k, two agents agree).
+
+| # | Delta | Status |
+|---|---|---|
+| MP | **★ Surname mention-propagation (`4483175`):** additive detection post-pass — each detected multi-token PERSON_NAME's SURNAME propagated to bare standalone occurrences the grammar missed (partial-mention leak the coreference MASKER can't reach — it needs full-value verbatim). Chosen over 2 measured alternatives: given+surname-veto hit +0.0117 home but sprayed 20k+ spans @0.34 own-precision (overfits home's recall-weighted exact-span scoring, −0.035 P); cluster-full-token measured on a stale worktree base + a common-word FP. **Home strict-F2 0.9084→0.9114 (+0.0030), PERSON_NAME recall 0.8004→0.8160**; the "FPs" are ~65% real gold names at a different boundary. Close: 150 probes 0 coverage-superset violations, additive-only, O(n) bytearray occupancy (a prior O(n²) scan the close CAUGHT) | DONE (TDD 13 + close) |
+| GEO | **Geo taxonomy as advisory signal (`faf85a7`):** the library type-split was MEASURED to regress home −0.0021 (1251 LOCATION gold, 0 subtype gold, exact-type scoring) ⇒ REJECTED as a scored type. Delivered instead as a subtype signal on the finding `explanation` (`[subtype=STATE|COUNTRY]`) via `geo_subtype()`, `entity_type` stays LOCATION ⇒ scored tuple byte-identical ⇒ home-neutral BY CONSTRUCTION; eval relabel becomes a thin projection. No county data ⇒ COUNTY never fabricated | DONE (TDD 8) |
+| GLNR | **GLiNER acceptance default — already delivered (`f4b1c32`).** The per-(engine,type) GLiNER bars are the shipped `SwarmConfig` default (home swarm +0.0007). Nothing left to implement. SDO gate file byte-identical (md5 `3b842e81…`). The committed canonical artifact predates the sp7 gains; a full-census re-cert is the **user's Pass-2** (representative in-tree verdict stays NOT_YET, J≈0.28) — flagged, not auto-committed | DELIVERED; re-cert = user Pass-2 |
+
 ## Autonomous continuation #2 (2026-07-13, "address all remaining flagged items")
 
 Cleared the row-122 deferral list + the two standing suite reds. Each masking-path
