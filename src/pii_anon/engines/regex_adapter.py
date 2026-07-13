@@ -56,7 +56,7 @@ from pii_anon.engines.regex.confidence import (
     has_context_words,
 )
 from pii_anon.engines.regex.deny_list import DenyListManager
-from pii_anon.engines.regex.geo_lexicon import extract_locations
+from pii_anon.engines.regex.geo_lexicon import extract_locations, geo_subtype
 from pii_anon.engines.regex.labeled_fields import extract_labeled_fields
 from pii_anon.engines.regex.unicode_norm import normalize_for_detection, remap_span
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
@@ -1145,7 +1145,13 @@ class RegexEngineAdapter(EngineAdapter):
                 )
 
             # ── #9 geo gazetteer (additive LOCATION, all paths) ────
+            # entity_type stays LOCATION (home strict scoring byte-identical);
+            # the STATE/COUNTRY subtype is surfaced on the explanation as an
+            # advisory taxonomy signal (sp7 geo taxonomy — metadata, not a
+            # scored type: a library-side type-split would drop the 1251 home
+            # LOCATION gold under exact-type scoring).
             for etype, g_start, g_end, g_conf in extract_locations(value):
+                _subtype = geo_subtype(value[g_start:g_end])
                 labeled.append(
                     EngineFinding(
                         entity_type=etype,
@@ -1154,7 +1160,7 @@ class RegexEngineAdapter(EngineAdapter):
                         span_start=g_start,
                         span_end=g_end,
                         engine_id=self.adapter_id,
-                        explanation="geo gazetteer location (sp7 #9)",
+                        explanation=f"geo gazetteer location (sp7 #9) [subtype={_subtype}]",
                         language=language,
                     )
                 )

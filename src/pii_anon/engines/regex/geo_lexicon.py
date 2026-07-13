@@ -95,6 +95,24 @@ _GAZ_RE = re.compile(r"\b(" + "|".join(re.escape(g) for g in _ALL) + r")\b")
 _CONF = 0.72
 
 
+def geo_subtype(place: str) -> str:
+    """Classify a gazetteer place into its geographic SUBTYPE — ``"STATE"`` (US
+    state/territory) or ``"COUNTRY"`` — else ``"LOCATION"`` when unknown.
+
+    This is an ADVISORY signal only: the emitted ``entity_type`` stays
+    ``LOCATION`` (so home strict scoring is byte-identical). The subtype is
+    surfaced on the finding's ``explanation`` for downstream masking/policy and
+    lets the eval-side taxonomy relabel become a thin projection instead of a
+    re-classifier. The lexicon carries no county data, so ``COUNTY`` is never
+    fabricated. ``_US_STATES`` is checked first, so a name in both sets resolves
+    to the more specific ``STATE``."""
+    if place in _US_STATES:
+        return "STATE"
+    if place in _COUNTRIES:
+        return "COUNTRY"
+    return "LOCATION"
+
+
 def extract_locations(text: str) -> list[tuple[str, int, int, float]]:
     """Return ``(LOCATION, start, end, confidence)`` for gazetteer places that
     carry geographic evidence. Additive and leak-safe."""
