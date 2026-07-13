@@ -9,9 +9,13 @@ statement should be broadcast without exactly this disclosure.
 
 ## TL;DR — the honest picture
 
-- **Home benchmark** (pii-anon-eval-data v2.2.0, 66-type strict-v1, 31,048 test records):
-  pii_anon_swarm **F2 0.893** / pii_anon **F2 0.892** — #1/#2 of 13 detectors at full 66/66
-  coverage (best external: AWS Comprehend 0.736 at 24/66).
+- **Home benchmark** (pii-anon-eval-data v2.2.0, 66-type strict-v1, 31,048 **English** test records,
+  fresh on v1.7.0rc1): pii_anon_swarm **F2 0.908** / pii_anon **F2 0.905** — #1/#2 of 13 detectors at
+  full 66/66 coverage (best external: AWS Comprehend 0.736 at 24/66). **English-only caveat:** on the
+  FULL multilingual dataset (157,045-record test split, all languages) vanilla strict-F2 is **0.820**,
+  consistent across the 547,586-record train and 78,046-record dev splits — the 0.905 headline is
+  English; ~0.820 is the all-language reality. Full reproduction + the 13-player Elo table:
+  [benchmark-report.md](benchmark-report.md).
 - **Zero-shot on five external datasets:** relaxed-F2 between **0.10 (real court documents)
   and 0.39 (finance formats)** — a large transfer gap. The rule-based engine's patterns encode
   the home corpus's label conventions; they do not transfer for free.
@@ -47,18 +51,27 @@ over **reachable** gold only (types our native labels can map onto — the label
 disclosed per dataset). Seed 20260710. `pii_anon` = the vanilla regex engine; `pii_anon_swarm` =
 the ensemble (regex + GLiNER + Presidio + Scrubadub through the swarm fusion).
 
+**Refreshed on v1.7.0rc1 (2026-07-13)** — the rows below are the FRESH current-code numbers; the
+sp4 originals (the "first reported" record) are preserved in git history and the sp6 update table.
+
 | Dataset | detector | strict F2 | relaxed F2 | relaxed F2 (reachable) | gold reachable |
 |---|---|---:|---:|---:|---:|
-| ai4privacy-400k | pii_anon | 0.174 | 0.213 | 0.245 | 84% |
-| | pii_anon_swarm | 0.204 | 0.237 | 0.272 | |
-| Nemotron-PII | pii_anon | 0.296 | 0.324 | 0.403 | 75% |
-| | pii_anon_swarm | 0.296 | 0.324 | 0.403 | |
-| Gretel finance | pii_anon | 0.255 | 0.379 | 0.390 | 95% |
-| | pii_anon_swarm | 0.302 | 0.389 | 0.401 | |
-| TAB (real documents) | pii_anon | 0.050 | 0.100 | 0.106 | 94% |
-| | pii_anon_swarm | 0.056 | 0.101 | 0.107 | |
-| PIIBench (F1) | pii_anon | 0.124 | 0.184 | — | — |
-| | pii_anon_swarm | 0.130 | 0.189 | 0.282 (reach) | |
+| ai4privacy-400k | pii_anon | 0.210 | 0.239 | 0.274 | 84% |
+| | pii_anon_swarm | 0.254 | 0.290 | 0.332 | |
+| Nemotron-PII | pii_anon | 0.347 | 0.380 | 0.445 | 75% |
+| | pii_anon_swarm | 0.357 | 0.390 | 0.456 | |
+| Gretel finance | pii_anon | 0.325 | 0.459 | 0.473 | 95% |
+| | pii_anon_swarm | 0.378 | 0.488 | 0.502 | |
+| TAB (real documents) | pii_anon | 0.387 | 0.494 | 0.521 | 94% |
+| | pii_anon_swarm | 0.405 | 0.505 | 0.532 | |
+| PIIBench | pii_anon | 0.152 | 0.216 | 0.324 | — |
+| | pii_anon_swarm | 0.172 | 0.236 | 0.351 | |
+
+Every external improved over the sp4 first-reported numbers, and `pii_anon_swarm ≥ pii_anon` on all
+five (the NER channel now contributes off-home). TAB — real court judgments — rose from relaxed F2
+0.100 to **0.505** (~5×) on general grammar, the largest transfer gain of the program. This remains
+a **disclosed transfer gap** (0.24–0.51 external vs 0.82–0.91 home), never a general best-in-class
+claim. Reproduction: [benchmark-report.md](benchmark-report.md) §3.
 
 Per-dataset mapping decisions, gold-quirk notes (e.g. ai4privacy's scrambled placeholder values;
 PIIBench gold where only 81.7% of EMAIL spans contain "@"; Nemotron's split first/last-name

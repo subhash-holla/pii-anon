@@ -28,6 +28,7 @@ For comprehensive documentation, PDLC artifacts, and research evidence, see the
 | [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark — incl. the `pii_anon.byo_pipelines` SDK group, identical-incumbent scoring, the external `pii-anon-eval-data` assessment, the 12-player `rate-elo-assessment` report, and the `canonical-run` / `supremacy` certification CLI |
 | [pii-rate-elo-value.md](pii-rate-elo-value.md) | Why the pii-rate-elo composite picks a different (better) system than raw F1 — the rank-divergence walkthrough |
 | [external-validity-report.md](external-validity-report.md) | Zero-shot performance on five NON-home PII benchmarks (ai4privacy, Nemotron-PII, Gretel finance, TAB/ECHR real documents, PIIBench) — the standing disclosure that gates any "best-in-class" broadcast |
+| [benchmark-report.md](benchmark-report.md) | **Reproducible** v1.7.0rc1 benchmark report — fresh home (EN + full-multilingual) numbers, the entirety of pii-anon-eval-data, the 13-player pii-rate-elo tournament, and external datasets, each with the exact regeneration command |
 | [powered-census-protocol.md](powered-census-protocol.md) | The powered-census measurement protocol — N=10000 sizing, runtime, the sp1 detection harness commands, and qualification |
 | [anonymization-vs-pseudonymization.md](anonymization-vs-pseudonymization.md) | The two distinct de-id scorer families (`AnonymizationScorer` / `PseudonymizationIntegrityScorer`), the no-merge invariant, and vanilla-vs-swarm positioning |
 

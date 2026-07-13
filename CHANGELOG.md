@@ -18,14 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (md5 `3b842e81`) across every close in this release.
 >
 > Home-benchmark results are synthetic and home-tuned and are **NOT** an
-> external-validity claim. Headline movement this release: **home vanilla strict-F2
-> 0.8916 → 0.9114** (cumulative sp7, home substrate); **TAB relaxed F2 0.10 → ~0.49**
-> zero-shot on real court documents (~5×; still a disclosed transfer gap, not a
-> general-performance claim); external zero-shot relaxed F2 spans **0.10 (TAB) to
-> 0.39–0.46 (Gretel finance)** vs 0.89 at home. The LLM-reconstruction-resistance
-> report now returns a *measured* bound against a disclosed adversary class (never
-> "impossible"): **verbatim leakage ~5.9%, masked Tier-3 re-identification ~6.1% vs a
-> 98.0% unmasked baseline** (n=1500, live-BSL adversary, 0 FR-036 parity violations).
+> external-validity claim. Fresh v1.7.0rc1 numbers (measured on current code — full
+> report + reproduction commands in `docs/benchmark-report.md`): **home strict-F2, EN
+> test (31,048 rec, 66-type): swarm 0.908 / vanilla 0.905** (prior published 0.893 /
+> 0.892); **full multilingual test (157,045 rec): 0.820** — the 0.905 is English-only,
+> ~0.820 is the all-language reality (consistent across the 547,586-rec train and
+> 78,046-rec dev splits). **13-player pii-rate-elo** (same EN corpus): swarm #1
+> (Elo 1868.7) / vanilla #2 (1867.8), both ~326 Elo and >2σ above the best competitor
+> (AWS 0.736); competitors carried at their last full-run vintage (mixed-vintage, AWS/
+> Flair need the benchmark env). **External zero-shot relaxed F2** rose across the board
+> — **TAB (real court docs) 0.10 → 0.505 (~5×)**, Gretel 0.379 → 0.488, Nemotron 0.324 →
+> 0.390 — still a disclosed transfer gap (0.24–0.51 vs 0.82–0.91 home), never a general
+> best-in-class claim. The LLM-reconstruction-resistance report returns a *measured*
+> bound against a disclosed adversary class (never "impossible"): **verbatim leakage
+> ~5.9%, masked Tier-3 re-identification ~6.1% vs a 98.0% unmasked baseline** (n=1500,
+> live-BSL adversary, 0 FR-036 parity violations).
 
 ### Added (sp7 — world-leading quality program, largest tranche)
 
