@@ -98,6 +98,18 @@ swarm:
   meta_learner_path: null                # Path to trained XGBoost model (.ubj)
   ds_params_path: null                   # Path to Dawid-Skene params (.json)
   calibration_path: null                 # Path to temperature calibration (.json)
+  # Per-(engine, type) single-engine acceptance bars — let a high-confidence NER
+  # finding emit without cross-engine corroboration (opens the GLiNER semantic
+  # channel). Additive/leak-safe; see docs/extend-swarm.md.
+  single_engine_min_confidence: {}       # {ENTITY_TYPE: bar}
+  single_engine_min_confidence_by_engine: # {engine_id: {ENTITY_TYPE: bar}}
+    gliner-compatible: {ORGANIZATION: 0.82, ADDRESS: 0.80, LOCATION: 0.80, DATE_TIME: 0.82}
+
+# NOTE: the `swarm:` block above is NOT part of `CoreConfig` — `ConfigManager`
+# loads only the core sections and IGNORES unknown keys. Swarm settings are
+# loaded separately by the swarm strategy (`SwarmConfig.from_json(...)` or the
+# strategy constructor). Keeping `swarm:` here documents the shape; it does not
+# take effect through a plain `CoreConfig` load.
 
 # ─── Confidence Scoring (Regex Engine) ──────────────────────
 confidence:
@@ -215,6 +227,7 @@ logging:
 | `placeholder_template` | str | `<{entity_type}:anon_{index}>` | Output placeholder format |
 | `entity_strategies` | dict | {} | Per-entity-type mode overrides |
 | `strategy_params` | dict | {} | Per-strategy parameters |
+| `value_consistent_masking` | bool | **true** | After the primary transform, mask every remaining verbatim occurrence of a detected sticky-type value (name/account/id, ≥4 chars, cross-field) with the *same* replacement. Closes the coreference reconstruction leak (a value detected once but repeated where detection missed it). Additive — only ever masks *more*; set `false` to disable. |
 
 ### Tracking Configuration (`tracking`)
 

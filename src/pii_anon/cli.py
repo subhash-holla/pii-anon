@@ -301,7 +301,7 @@ def create_app() -> Any:
 
     @app.command("eval-framework")
     def eval_framework_command(
-        dataset: str = typer.Option("pii_anon_eval", help="Evaluation framework dataset identifier"),
+        dataset: str = typer.Option("pii_anon", help="Evaluation framework dataset identifier"),
         language: str | None = typer.Option(None, help="Optional language filter"),
         difficulty: str | None = typer.Option(None, help="Optional difficulty filter"),
         adversarial_only: bool = typer.Option(False, help="Evaluate adversarial records only"),

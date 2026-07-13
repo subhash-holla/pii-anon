@@ -341,7 +341,7 @@ docs-smoke:
 # .github/workflows/release.yml auto-publishes any pushed v*-rc* tag to
 # TestPyPI (and any non-rc v* tag to PyPI). Push the branch WITHOUT --tags.
 rc-tag:
-	@test -n "$(TAG)" || { echo "usage: make rc-tag TAG=v1.5.0-rc1 [MSG='...']"; exit 1; }
+	@test -n "$(TAG)" || { echo "usage: make rc-tag TAG=v1.7.0-rc1 [MSG='...']"; exit 1; }
 	git tag -a "$(TAG)" -m "$(or $(MSG),$(TAG) — local-only release candidate)"
 	@echo ""
 	@echo "*** LOCAL-ONLY TAG CREATED: $(TAG) ***"

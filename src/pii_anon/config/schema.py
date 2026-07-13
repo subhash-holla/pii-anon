@@ -157,7 +157,16 @@ class TransformConfig(BaseModel):
     # account repeated but not individually detected) with the SAME replacement.
     # Additive on the masking path (redacts more) => leak-safe; closes the
     # dominant residual reconstruction leak (PERSON_NAME coreference).
-    value_consistent_masking: bool = True
+    value_consistent_masking: bool = Field(
+        default=True,
+        description=(
+            "After the primary transform, mask every remaining VERBATIM occurrence "
+            "of a detected sticky-type value (coreference / value-consistent masking) "
+            "with the same replacement — closes the residual reconstruction leak where "
+            "a repeated name/account was detected once but missed elsewhere. Additive "
+            "on the masking path (redacts more, never less). Set False to disable."
+        ),
+    )
 
 
 class TrackingConfig(BaseModel):

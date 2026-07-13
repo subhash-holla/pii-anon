@@ -5,7 +5,7 @@
 [![PyPI Version](https://img.shields.io/pypi/v/pii-anon.svg)](https://pypi.org/project/pii-anon/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-2437-brightgreen.svg)](#quality-and-testing)
+[![Tests](https://img.shields.io/badge/tests-4758-brightgreen.svg)](#quality-and-testing)
 
 [![Built with AI Agents](https://img.shields.io/badge/Built_with-AI_Agents-d946ef.svg)](#acknowledgements)
 
@@ -28,7 +28,7 @@ Both detectors outperform Presidio (F1=0.50) and Scrubadub (F1=0.33) on the 159,
 
 **6 compliance templates** (HIPAA Safe Harbor, GDPR Pseudo/Anon, CCPA, Minimal Risk, Maximum Privacy) validate your entity detection against real regulatory requirements.
 
-**Tier 3-aware benchmark dataset** — 159,891 synthetic records (100% CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, with behavioral-signal annotations and Re-identification Resistance Scores (RRS) per record, aligned with Lermen et al. 2026 (LLM-based deanonymization).
+**Tier 3-aware benchmark dataset** — 159,891 synthetic records (100% CC0/CC-BY-4.0) spanning 60 languages, 66 entity types, with behavioral-signal annotations and Re-identification Resistance Scores (RRS) per record, aligned with Lermen et al. 2026 (LLM-based deanonymization).
 
 **Sub-millisecond latency** with constant-memory streaming — process Kafka, Spark, or Beam pipelines without building specialized infrastructure. Async/sync dual APIs.
 
@@ -92,12 +92,12 @@ validator = ComplianceValidator()
 
 # Single standard
 hipaa_report = validator.validate(detected_entity_types, standard="hipaa")
-print(f"HIPAA coverage: {hipaa_report.coverage_percentage:.0f}%")
+print(f"HIPAA coverage: {hipaa_report.coverage_ratio * 100:.0f}%")
 
 # All standards at once
 multi_report = validator.validate_all(detected_entity_types)
-for standard, report in multi_report.reports.items():
-    print(f"{standard}: {report.coverage_percentage:.0f}% — {len(report.gaps)} gaps")
+for report in multi_report.reports:
+    print(f"{report.standard}: {report.coverage_ratio * 100:.0f}% — {len(report.gaps)} gaps")
 ```
 
 Supported: HIPAA Safe Harbor, GDPR (pseudonymization & anonymization), CCPA, Minimal Risk, Maximum Privacy.
@@ -123,7 +123,7 @@ result = orch.run(input_data, profile=profile, scope="etl", token_version=1)
 
 # Validate compliance
 validator = ComplianceValidator()
-gdpr_report = validator.validate(result["detected_entities"], standard="gdpr")
+gdpr_report = validator.validate(result["ensemble_findings"], standard="gdpr")
 
 # Compute composite score and check governance readiness
 composite = compute_composite(f1=0.85, precision=0.92, recall=0.80, latency_ms=5.2)
@@ -414,7 +414,7 @@ pii-anon detect "Contact alice@example.com"
 pii-anon evaluate-pipeline --dataset pii_anon_benchmark_v1 --transform-mode pseudonymize --max-samples 50
 
 # Run evaluation framework directly
-pii-anon eval-framework --dataset eval_framework_v1 --max-records 500
+pii-anon eval-framework --dataset pii_anon --max-records 500
 
 # Compare against competitors
 pii-anon compare-competitors --dataset pii_anon_benchmark_v1 --output json
@@ -450,10 +450,10 @@ The composite score normalizes latency via `1/(1+(lat/100ms)²)` and throughput 
 
 ## Quality & Testing
 
-- **2437 tests** covering detection, evaluation, composite scoring, governance, external-system evaluation, swarm extension workflows, ingestion, and research rigor
+- **4758 tests** covering detection, evaluation, composite scoring, governance, external-system evaluation, swarm extension workflows, ingestion, and research rigor
 - **Zero required dependencies** (only pydantic)
 - **Strict CI gates**: lint (ruff), type check (mypy), coverage (85%+), build, packaging, performance SLAs
-- **159,891 record Tier 3 evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, 2,500 paired personas, and per-record RRS annotations
+- **159,891 record Tier 3 evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 60 languages, 66 entity types, 2,500 paired personas, and per-record RRS annotations
 - **Reproducible benchmarks** with deterministic seeds and strict span matching
 
 ---

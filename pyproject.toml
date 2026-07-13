@@ -30,7 +30,7 @@ keywords = [
 ]
 classifiers = [
   # RC classifier (release-gate CQ finding): revert to "5 - Production/Stable"
-  # when the final 1.5.0 (non-rc) is tagged.
+  # when the next final, non-rc release is tagged.
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
