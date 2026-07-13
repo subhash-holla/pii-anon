@@ -1,6 +1,6 @@
 # External-Validity Report — pii-anon on five non-home PII benchmarks
 
-**Date:** 2026-07-10 · **Library:** pii-anon 1.6.0rc1 · **Program record:** `dev-assist-artifacts/_enhancements/sp4-external-validity/`
+**Date:** 2026-07-13 · **Library:** pii-anon 1.7.0rc1 · **Program record:** `dev-assist-artifacts/_enhancements/sp4-external-validity/` (updated through sp7)
 
 This report discloses how pii-anon's two first-party detectors perform on the five most relevant
 public PII datasets **other than** the library's own benchmark (`pii-anon-eval-data`). It exists
@@ -112,6 +112,36 @@ annotate. It is a documented workload profile, reported as its own row, never th
 never conflated with the zero-shot record. On TAB — real court judgments, the academic
 anonymization benchmark — it recovers ~90% of the engine-union counterfactual headroom
 (0.101 → 0.491 relaxed F2).
+
+## sp7 update (2026-07-13): world-leading detection tranche + a reconstruction-resistance bound
+
+sp7 was primarily a HOME detection + assurance program; the five external datasets above were
+**not** systematically re-measured this tranche, so the sp6 rows remain the standing external
+record. Two external-validity-relevant results did land:
+
+- **TAB (real ECHR court judgments) — the largest external transfer gain of the whole program.**
+  The sp7 detection levers that generalize (prose/locale date grammar + DOB-cue promotion,
+  organization/institution grammar, honorific + Unicode name hygiene, the public-domain geo
+  gazetteer) lifted TAB **vanilla relaxed F2 from 0.101 to 0.489 (~5×)** — measured per-lever on
+  the TAB split, each landed only after a home-benchmark regression check (home strict-F2 held
+  neutral-or-better throughout, cumulatively ~0.89 → ~0.91 on the home substrate). This is a
+  genuine out-of-domain improvement on real documents from general grammar, not benchmark-specific
+  tuning; it does **not** license a general "best-in-class" claim (TAB is still a disclosed
+  transfer gap and the other four externals were not re-run).
+
+- **A measured reconstruction-resistance bound (new disclosure artifact).** The
+  `reconstruction_resistance_report` produces a reproducible JSON+HTML report of a *measured bound
+  against a disclosed adversary class, never "impossible"* — verbatim leakage, Tier-3
+  re-identification (masked vs unmasked baseline), and membership inference, each with a Wilson 95%
+  CI. Flagship home run (n=1500, live background-knowledge adversary): **verbatim leak 5.93%,
+  masked re-id 6.13% vs a 98.0% unmasked baseline (~88pp protection delta), 0 FR-036 stream/batch
+  parity violations.** Simulated adversaries are labelled `AGENT_SIMULATED`; a real-LLM/full-power
+  run is a separately-labelled switch-point.
+
+The SDO competitive-supremacy verdict remains honestly **NOT_YET** (binding J ≈ 0.28); the
+`competitive_supremacy.py` / `canonical_run.py` control paths are byte-identical (md5 `3b842e81`).
+Nothing in sp7 changes the standing conclusion of this report: pii-anon is the strongest detector
+on its own benchmark, discloses a real transfer gap off-home, and makes only measured-bound claims.
 
 ## Methodology honesty
 
