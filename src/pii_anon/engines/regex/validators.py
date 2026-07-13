@@ -365,6 +365,12 @@ _PHONE_FALSE_POSITIVE_RE = re.compile(
     r")$"
 )
 
+# A 3-3-4 dotted string ("765.340.8856") is a NANP phone convention, never a
+# version number / date / ZIP+4 — exempt it from the FP rule (sp7 panel: the
+# version rule ``v?\d+\.\d+\.\d+`` rejected every dotted US phone, missed PII
+# on the masking path). The NANP area/exchange rules below still apply.
+_PHONE_DOTTED_NANP_RE = re.compile(r"^\d{3}\.\d{3}\.\d{4}$")
+
 # Area codes that are never assigned (N11, 0XX, 1XX).
 _INVALID_US_AREA_CODES = frozenset({
     "000", "100", "200", "211", "311", "411", "511", "611", "711", "811", "911",
@@ -385,9 +391,11 @@ def is_valid_phone_number(candidate: str) -> bool:
     if len(digits) < 7:
         return False
 
-    # Check for common false-positive patterns on the raw text
+    # Check for common false-positive patterns on the raw text. The 3-3-4
+    # dotted NANP shape is exempt — it is a phone convention, never a
+    # version/date/zip (the NANP area/exchange rules below still apply).
     stripped = candidate.strip()
-    if _PHONE_FALSE_POSITIVE_RE.match(stripped):
+    if _PHONE_FALSE_POSITIVE_RE.match(stripped) and not _PHONE_DOTTED_NANP_RE.match(stripped):
         return False
 
     # Check for all-same-digit sequences (e.g., 5555555555)
