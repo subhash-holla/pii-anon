@@ -149,6 +149,25 @@ SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
 )
 
 
+def _scannable_text(value: Any) -> str | None:
+    """The text form of a payload value the detection engines can scan.
+
+    Strings scan as-is. Numeric scalars (``int``/``float``, NOT ``bool`` — a
+    bool is an ``int`` subclass but never PII) are coerced to their string
+    form: an SSN or phone number stored as a number is exactly as much PII as
+    its string twin, and silently skipping it let it pass through UNMASKED
+    (sp7 panel, API lens — a genuine leak vector). Everything else (dict,
+    list, None, bytes) returns ``None`` and is left untouched.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
+
+
 class AsyncPIIOrchestrator:
     """Async orchestrator for PII detection, fusion, and transformation.
 
@@ -470,11 +489,18 @@ class AsyncPIIOrchestrator:
                 continue
             by_field.setdefault(finding.field_path, []).append(finding)
         for field, value in payload.items():
-            if not isinstance(value, str):
+            text = _scannable_text(value)
+            if text is None:
+                continue
+            field_findings = by_field.get(field, [])
+            if not isinstance(value, str) and not field_findings:
+                # a benign numeric field keeps its original value AND type;
+                # only a numeric field WITH findings is masked (masking must
+                # alter the value, so it necessarily becomes a string).
                 continue
             transformed_value, field_audit = self._apply_transform(
-                text=value,
-                findings=by_field.get(field, []),
+                text=text,
+                findings=field_findings,
                 scope=scope,
                 token_version=token_version,
                 profile=profile,
@@ -585,16 +611,19 @@ class AsyncPIIOrchestrator:
         plan = self._resolve_execution_plan(payload=payload, profile=profile)
 
         for field, value in payload.items():
-            if not isinstance(value, str):
+            # numeric scalars are coerced (an int SSN is still an SSN —
+            # skipping it silently leaked it unmasked; sp7 panel, API lens).
+            text = _scannable_text(value)
+            if text is None:
                 continue
 
             should_segment = (segmentation.enabled or plan.segmentation_enabled) and len(
-                value.split()
+                text.split()
             ) > segmentation.max_tokens
             if should_segment:
                 findings, boundary_trace, audits = await self._detect_segmented_field(
                     field=field,
-                    text=value,
+                    text=text,
                     profile=profile,
                     segmentation=segmentation,
                     plan=plan,
@@ -602,7 +631,7 @@ class AsyncPIIOrchestrator:
             else:
                 findings, audits, _source = await self._detect_on_text_field_async(
                     field,
-                    value,
+                    text,
                     profile,
                     plan=plan,
                 )
