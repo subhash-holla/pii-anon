@@ -47,9 +47,12 @@ zero-shot-ML: no train/test leakage, so the train split is a valid evaluation su
 | dev | 78,046 | 309,561 | **0.820** |
 
 **The English-only 0.905 does not hold across all languages — the full multilingual figure is
-~0.820** (consistent across train/test/dev, confirming no overfitting). `pii_anon_swarm` over the
-full multilingual test set is a long run (GLiNER over 157k records); it is measured separately and
-appended when complete.
+~0.820** (consistent across train/test/dev, confirming no overfitting). `pii_anon_swarm` on the
+full multilingual test measures **strict F2 0.823** (P 0.869 / R 0.812, on a seeded 12,000-record
+representative multilingual sample — the 60 languages are interleaved, so the head sample tracks the
+full distribution; the full 157k GLiNER run is ~6.5h and was not executed). So on multilingual text
+**swarm ≈ vanilla ≈ 0.82** — the GLiNER NER channel contributes far less off-English than it does on
+the 0.908 EN slice, which is the honest multilingual picture.
 
 ```bash
 PYTHONPATH="src:../pii-anon-code/src" python -m pii_anon_datasets.cli baselines \
