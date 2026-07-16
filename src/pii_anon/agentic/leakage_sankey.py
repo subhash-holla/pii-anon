@@ -387,10 +387,9 @@ def _load_payloads() -> tuple[tuple[tuple[str, str, str], ...], tuple[str, ...]]
     try:
         # Intentionally lazy (PLC0415): the optional ``datasets`` extra — this
         # module must load + score via the in-tree fallback when it is ABSENT.
-        # ``import-untyped``: the installed ``pii_anon_datasets`` ships no
-        # ``py.typed`` marker and the bare ``ignore_missing_imports`` entry does
-        # not cover this submodule (canonical ``mypy src/pii_anon`` flags it).
-        from pii_anon_datasets.scoring.adversary import INTENT_TAGS, build_payloads  # type: ignore[import-untyped]  # noqa: PLC0415
+        # The ``pii_anon_datasets.*`` mypy override (ignore_missing_imports)
+        # covers both the installed-untyped and the not-installed environments.
+        from pii_anon_datasets.scoring.adversary import INTENT_TAGS, build_payloads  # noqa: PLC0415
     except ImportError:
         rows = _in_tree_payloads()
         # Report only the obfuscation transforms — the direct probe is a

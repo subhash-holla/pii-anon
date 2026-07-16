@@ -33,7 +33,7 @@ try:
 
     _HAS_NUMPY = True
 except ImportError:  # pragma: no cover
-    _np = None  # type: ignore[assignment]
+    _np = None  # type: ignore[assignment, unused-ignore]
     _HAS_NUMPY = False
 
 from ..metrics.base import compute_f1, safe_div
