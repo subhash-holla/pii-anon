@@ -85,7 +85,67 @@ class GLiNERAdapter(EngineAdapter):
     #: without a code change.
     DEFAULT_MODEL = "knowledgator/gliner-pii-base-v1.0"
 
-    def __init__(self, enabled: bool = False, model_name: str | None = None) -> None:
+    #: Multilingual companion checkpoint (apache-2.0) used for NON-Latin /
+    #: non-English text. MEASURED 2026-07-17 on the home multilingual test
+    #: sample (960 records, 8 languages): PERSON relaxed-recall 0.505 (base)
+    #: -> 0.965 (multi with its NATIVE label vocabulary) — he 0.15->1.0,
+    #: el 0.53->1.0, ar 0.58->1.0, zh 0.36->0.94, th 0.0->0.85. GLiNER is
+    #: prompt-conditioned: each checkpoint family needs ITS OWN label
+    #: vocabulary (prompting urchade models with the knowledgator label set
+    #: yields near-zero output — the earlier "checkpoint not adopted"
+    #: verdict was exactly that artifact).
+    MULTILINGUAL_MODEL = "urchade/gliner_multi_pii-v1"
+
+    #: Label vocabulary for the urchade multilingual family, mapped onto the
+    #: same native entity types the base vocabulary produces (subset: only
+    #: labels with a faithful native counterpart).
+    _MULTI_LABELS = [
+        "person",
+        "organization",
+        "address",
+        "email",
+        "phone number",
+        "username",
+        "date of birth",
+        "credit card number",
+        "social security number",
+        "ip address",
+        "bank account number",
+        "passport number",
+        "driver's license number",
+        "identity card number",
+    ]
+
+    _MULTI_LABEL_MAP: dict[str, str] = {
+        "person": "PERSON_NAME",
+        "organization": "ORGANIZATION",
+        "address": "ADDRESS",
+        "email": "EMAIL_ADDRESS",
+        "phone number": "PHONE_NUMBER",
+        "username": "USERNAME",
+        "date of birth": "DATE_OF_BIRTH",
+        "credit card number": "CREDIT_CARD",
+        "social security number": "US_SSN",
+        "ip address": "IP_ADDRESS",
+        "bank account number": "BANK_ACCOUNT",
+        "passport number": "PASSPORT",
+        "driver's license number": "DRIVERS_LICENSE",
+        "identity card number": "NATIONAL_ID",
+    }
+
+    #: Languages the multilingual routing serves (the measured set + the
+    #: Latin-script languages the base model already handles well).
+    _MULTI_LANGUAGES = (
+        "ar", "bn", "de", "el", "es", "fr", "he", "hi", "it", "ja", "ko",
+        "nl", "pl", "pt", "ru", "th", "tr", "zh",
+    )
+
+    def __init__(
+        self,
+        enabled: bool = False,
+        model_name: str | None = None,
+        multilingual_model_name: str | None = None,
+    ) -> None:
         super().__init__(enabled=enabled)
         self._model: Any | None = None
         self._model_name = (
@@ -93,12 +153,49 @@ class GLiNERAdapter(EngineAdapter):
             or os.environ.get("PII_ANON_GLINER_MODEL")
             or self.DEFAULT_MODEL
         )
+        # "" / "off" disables the multilingual companion entirely.
+        raw_multi = (
+            multilingual_model_name
+            if multilingual_model_name is not None
+            else os.environ.get("PII_ANON_GLINER_MULTI_MODEL", self.MULTILINGUAL_MODEL)
+        )
+        self._multi_model_name = raw_multi if raw_multi and raw_multi.lower() != "off" else None
+        self._multi_model: Any | None = None
         self._native_import_probe_ok: bool | None = None
 
     def capabilities(self) -> EngineCapabilities:
         caps = super().capabilities()
-        caps.supports_languages = ["en"]
+        if self._multi_model_name:
+            caps.supports_languages = ["en", *self._MULTI_LANGUAGES]
+        else:
+            caps.supports_languages = ["en"]
         return caps
+
+    @staticmethod
+    def _predominantly_non_latin(text: str) -> bool:
+        """Deterministic script probe for the language-missing case: True iff
+        most alphabetic chars in the head of ``text`` are beyond the Latin
+        blocks (>= U+0370). Additive-only routing signal — Latin/ASCII text
+        can never leave the base model."""
+        head = text[:400]
+        letters = [c for c in head if c.isalpha()]
+        if not letters:
+            return False
+        non_latin = sum(1 for c in letters if ord(c) >= 0x0370)
+        return non_latin * 2 > len(letters)
+
+    def _runtime_for(
+        self, language: str, text: str
+    ) -> tuple[str, list[str], dict[str, str]]:
+        """Select (model-kind, labels, label_map) for one value: the
+        multilingual companion for declared non-English languages or
+        predominantly non-Latin text; the base PII model otherwise."""
+        if self._multi_model_name and (
+            (language and language not in ("en", "unknown"))
+            or self._predominantly_non_latin(text)
+        ):
+            return ("multi", self._MULTI_LABELS, self._MULTI_LABEL_MAP)
+        return ("base", self._PII_LABELS, self._LABEL_MAP)
 
     def _probe_native_import(self) -> bool:
         if self._native_import_probe_ok is not None:
@@ -132,6 +229,24 @@ class GLiNERAdapter(EngineAdapter):
                 warnings.filterwarnings("ignore", message=".*copying from a non-meta parameter.*")
                 self._model = GLiNER.from_pretrained(self._model_name)
             return self._model
+        except Exception:
+            return None
+
+    def _load_multi_model(self) -> Any | None:
+        """Lazy-load the multilingual companion; None degrades to base."""
+        if self._multi_model is not None:
+            return self._multi_model
+        if not self._multi_model_name or not self._probe_native_import():
+            return None
+        try:
+            import importlib
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*copying from a non-meta parameter.*")
+                GLiNER = importlib.import_module("gliner").GLiNER
+                self._multi_model = GLiNER.from_pretrained(self._multi_model_name)
+            return self._multi_model
         except Exception:
             return None
 
@@ -223,14 +338,27 @@ class GLiNERAdapter(EngineAdapter):
             return []
 
         language = str(context.get("language", "en")).lower()
-        model = self._load_model()
-        if model is None:
+        base_model = self._load_model()
+        if base_model is None:
             return self._fallback_detect(payload, language)
 
         findings: list[EngineFinding] = []
         for key, value in payload.items():
             if not isinstance(value, str):
                 continue
+            # Language/script-aware model routing: non-English / non-Latin
+            # values run the multilingual companion WITH ITS OWN label
+            # vocabulary; English/Latin values keep the base PII model
+            # (byte-identical EN behavior). A missing/unloadable companion
+            # degrades to the base model — never worse than before.
+            kind, run_labels, run_label_map = self._runtime_for(language, value)
+            model = base_model
+            if kind == "multi":
+                multi = self._load_multi_model()
+                if multi is not None:
+                    model = multi
+                else:
+                    run_labels, run_label_map = self._PII_LABELS, self._LABEL_MAP
             # (start, end, type) -> best finding; dedupes overlap-region
             # echoes keeping the higher-confidence emission.
             best: dict[tuple[int, int, str], EngineFinding] = {}
@@ -238,14 +366,14 @@ class GLiNERAdapter(EngineAdapter):
             for offset, chunk in self._windows(value):
                 try:
                     entities = model.predict_entities(
-                        chunk, self._PII_LABELS, threshold=0.5
+                        chunk, run_labels, threshold=0.5
                     )
                 except Exception:
                     failed = True
                     break
                 for entity in entities:
                     label = str(entity.get("label", "UNKNOWN")).lower()
-                    mapped_type = self._LABEL_MAP.get(label, label.upper())
+                    mapped_type = run_label_map.get(label, label.upper())
                     span_start = offset + int(entity.get("start", 0))
                     span_end = offset + int(entity.get("end", 0))
                     # Emission hygiene (sp6): a span must sit on word
