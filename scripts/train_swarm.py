@@ -426,6 +426,27 @@ def main() -> None:
         if not records:
             logger.error("No training data loaded. Install pii-anon-datasets or check dataset names.")
             sys.exit(1)
+
+        # Fail-loud train/test disjointness guard: a trained artifact whose
+        # pool contains test-split records is indefensible (the 2026-04 DS
+        # artifact was trained exactly that way). Guarded here, not just in
+        # the loader, so a stale datasets package that ignores split='train'
+        # can never silently reintroduce the leak.
+        if "pii_anon_eval" in dataset_names:
+            from pii_anon.swarm_datasets import assert_train_test_disjoint
+            try:
+                import pii_anon_datasets
+                test_ids = {
+                    str(r.get("record_id"))
+                    for r in pii_anon_datasets.load_dataset(split="test")
+                }
+                assert_train_test_disjoint(records, test_ids)
+                logger.info(
+                    "Train/test disjointness verified: 0 of %d training ids in the %d-id test split",
+                    len(records), len(test_ids),
+                )
+            except ImportError:  # pragma: no cover - loader already warned
+                pass
         load_elapsed = time.time() - t_load
 
         # Per-dataset / per-language / per-entity-type balance report —

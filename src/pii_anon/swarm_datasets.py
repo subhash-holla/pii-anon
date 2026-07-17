@@ -309,15 +309,26 @@ def map_entity_type(dataset_name: str, raw_type: str) -> str:
 
 # ── Dataset Loaders ─────────────────────────────────────────────────────────
 
-def load_pii_anon_data(max_records: int | None = None) -> list[TrainingRecord]:
-    """Load from the pii-anon-datasets package."""
+def load_pii_anon_data(
+    max_records: int | None = None,
+    *,
+    split: str = "train",
+) -> list[TrainingRecord]:
+    """Load from the pii-anon-datasets package.
+
+    ``split`` defaults to ``"train"`` — the leak-safe default. Training a
+    fusion/meta artifact on the unsplit corpus puts the entire test split
+    inside the training pool, which makes every number reported against that
+    split indefensible. Callers that genuinely need another split must say so
+    explicitly; :func:`assert_train_test_disjoint` is the fail-loud backstop.
+    """
     try:
         import pii_anon_datasets
     except ImportError:
         logger.warning("pii-anon-datasets not installed; skipping pii_anon_eval")
         return []
 
-    raw = pii_anon_datasets.load_dataset()
+    raw = pii_anon_datasets.load_dataset(split=split)
     records: list[TrainingRecord] = []
     for i, row in enumerate(raw):
         if max_records is not None and i >= max_records:
@@ -869,6 +880,26 @@ def load_jsonl(
         len(records), source_path, taxonomy_name,
     )
     return records
+
+
+def assert_train_test_disjoint(
+    train_records: list[TrainingRecord],
+    test_record_ids: set[str],
+) -> None:
+    """Fail loud if any training record id also appears in the test split.
+
+    The backstop for the split='train' plumbing: if a stale datasets package
+    ignores the split argument (or a caller loads unsplit data), the overlap
+    is caught HERE instead of silently producing a leaky trained artifact.
+    """
+    train_ids = {r.record_id for r in train_records}
+    overlap = train_ids & test_record_ids
+    if overlap:
+        sample = sorted(overlap)[:5]
+        raise ValueError(
+            f"train/test leak: {len(overlap)} training record ids appear in the "
+            f"test split (e.g. {sample}); refusing to train on contaminated data"
+        )
 
 
 # ── Unified Loader ──────────────────────────────────────────────────────────

@@ -39,11 +39,15 @@ print()
 
 t_global = time.time()
 
-print("[setup] Loading pii-anon-eval-data …")
+print("[setup] Loading pii-anon-eval-data (train split — calibration artifacts must never see test) …")
 import pii_anon_datasets
 
-all_records = pii_anon_datasets.load_dataset()
-print(f"[setup] Loaded {len(all_records):,} records")
+all_records = pii_anon_datasets.load_dataset(split="train")
+test_ids = {str(r.get("record_id")) for r in pii_anon_datasets.load_dataset(split="test")}
+_overlap = {str(r.get("record_id")) for r in all_records} & test_ids
+if _overlap:
+    raise SystemExit(f"train/test leak: {len(_overlap)} calibration records are in the test split; aborting")
+print(f"[setup] Loaded {len(all_records):,} train records (test disjointness verified against {len(test_ids):,} ids)")
 
 # Filter to records that have annotations with start/end spans
 records = [r for r in all_records if r.get("annotations")]
