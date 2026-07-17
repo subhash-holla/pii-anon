@@ -28,6 +28,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from pii_anon.engines.regex.geo_lexicon import _COUNTRIES as _GEO_COUNTRIES
+
 
 @dataclass(frozen=True, slots=True)
 class PatternSpec:
@@ -1251,6 +1253,85 @@ _MARITAL_STATUS = _categorical(
 )
 _HOUSEHOLD_SIZE = re.compile(r"(?i:\bhousehold[ \t]size\b)\s*[:\-]\s*(\d{1,2})\b")
 
+# NATIONALITY (demonym / nationality-mention grammar): TAB/ECHR-style
+# demographic mentions "a Turkish national" / "an Irish citizen" /
+# "of Kurdish origin" (roadmap lever #8 arm 2, the DEM sibling of the arm-1
+# docket grammar). Grounded in the TAB DEV split only (echr_dev.json,
+# 2026-07-17): dev DEM maskable gold = 590 spans; 224 are demonym /
+# nationality flavored, and the dominant surface is "<Demonym|Country>
+# national(s)/citizen(s)/nationality" ("British national" x14, "United
+# Kingdom national" x10, plural "British nationals" ...) with gold carrying
+# BOTH the bare-demonym and full-phrase extents via the annotator union —
+# the full-phrase capture overlaps both under TAB's relaxed scoring.
+# Cue discipline (the sp3 label-gating lesson): a BARE demonym is an FP bomb
+# ("Turkish delight", "French press", "the Swedish company") and NEVER
+# fires; every fire requires a person cue:
+#   * right cue nouns "national(s)" / "citizen(s)" / "nationality"
+#     (lowercase — case-sensitive so "British National Party" stays clean),
+#     modifier restricted to a CLOSED lexicon (static demonym tuple below +
+#     the geo_lexicon country gazetteer, for "a Djibouti national" forms);
+#   * the "of <X> origin/descent/extraction" frame, which additionally
+#     accepts one capitalized open-class token ("of Roma origin" — the TAB
+#     guideline class; stateless ethnonyms have no country row) because the
+#     frame itself is strongly demographic.
+# ADDITIVE: the label-gated _NATIONALITY above is untouched; NATIONALITY is
+# census-dropped in production (orchestrator.SUPPORTED_ENTITY_TYPES) but
+# scored on the eval path where it projects NATIONALITY -> DEM on TAB.
+_DEMONYMS: tuple[str, ...] = (
+    # Europe (ECHR-heavy)
+    "British", "English", "Scottish", "Welsh", "Irish", "Manx", "French",
+    "German", "Italian", "Spanish", "Portuguese", "Dutch", "Belgian",
+    "Luxembourgish", "Swiss", "Austrian", "Danish", "Swedish", "Norwegian",
+    "Finnish", "Icelandic", "Polish", "Czech", "Slovak", "Hungarian",
+    "Romanian", "Bulgarian", "Greek", "Turkish", "Cypriot", "Maltese",
+    "Albanian", "Serbian", "Croatian", "Bosnian", "Slovenian", "Macedonian",
+    "Montenegrin", "Kosovar", "Russian", "Ukrainian", "Belarusian",
+    "Moldovan", "Lithuanian", "Latvian", "Estonian", "Georgian", "Armenian",
+    "Azerbaijani",
+    # Middle East / North Africa
+    "Israeli", "Palestinian", "Lebanese", "Syrian", "Jordanian", "Iraqi",
+    "Iranian", "Saudi", "Kuwaiti", "Qatari", "Emirati", "Yemeni", "Omani",
+    "Egyptian", "Libyan", "Tunisian", "Algerian", "Moroccan",
+    # Sub-Saharan Africa
+    "Sudanese", "Ethiopian", "Eritrean", "Somali", "Djiboutian", "Kenyan",
+    "Ugandan", "Tanzanian", "Rwandan", "Congolese", "Nigerian", "Ghanaian",
+    "Ivorian", "Senegalese", "Malian", "Cameroonian", "Angolan", "Zambian",
+    "Zimbabwean", "Mozambican", "Namibian", "Gambian", "Guinean", "Liberian",
+    "Sierra Leonean", "South African", "Chadian",
+    # Asia-Pacific
+    "Indian", "Pakistani", "Bangladeshi", "Sri Lankan", "Nepalese", "Afghan",
+    "Chinese", "Japanese", "Korean", "North Korean", "South Korean",
+    "Taiwanese", "Mongolian", "Vietnamese", "Thai", "Cambodian", "Laotian",
+    "Burmese", "Malaysian", "Singaporean", "Indonesian", "Filipino",
+    "Filipina", "Australian", "Kazakh", "Uzbek", "Turkmen", "Kyrgyz",
+    "Tajik",
+    # Americas
+    "American", "Canadian", "Mexican", "Guatemalan", "Honduran",
+    "Nicaraguan", "Costa Rican", "Panamanian", "Cuban", "Jamaican",
+    "Haitian", "Dominican", "Colombian", "Venezuelan", "Ecuadorian",
+    "Peruvian", "Bolivian", "Chilean", "Argentine", "Argentinian",
+    "Brazilian", "Paraguayan", "Uruguayan", "Guyanese", "Trinidadian",
+    # Stateless / regional ethnonyms prominent in ECHR case law
+    "Kurdish", "Roma", "Romani", "Basque", "Catalan", "Chechen", "Tatar",
+    "Uyghur", "Tibetan", "Arab", "Asian", "African", "European",
+)
+
+# Longest-first so "Sierra Leonean" beats "Sierra Leone" etc.; interior
+# spaces become [ \t] via split/join (re.escape escapes the space itself,
+# so a naive .replace(" ", ...) would corrupt the class — measured bug).
+_NATIONALITY_MOD_ALT = "|".join(
+    r"[ \t]".join(re.escape(part) for part in mod.split(" "))
+    for mod in sorted(set(_DEMONYMS) | _GEO_COUNTRIES, key=len, reverse=True)
+)
+_NATIONALITY_PERSON_CUE = re.compile(
+    r"\b((?:" + _NATIONALITY_MOD_ALT + r")"
+    r"[ \t](?:nationals?|citizens?|nationality))\b"
+)
+_NATIONALITY_OF_ORIGIN = re.compile(
+    r"\bof[ \t]((?:" + _NATIONALITY_MOD_ALT + r"|[A-Z][a-z]+(?:-[A-Z]?[a-z]+)?))"
+    r"[ \t](?:origin|descent|extraction)\b"
+)
+
 _VEHICLE_MODEL_LABELED = re.compile(
     r"(?i:\bvehicle(?:[ \t]model)?\b)\s*[:\-]\s*"
     r"([A-Z0-9][A-Za-z0-9]*(?:[ \t][A-Z][A-Za-z0-9-]+){0,3})(?![A-Za-z])"
@@ -1855,6 +1936,11 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
     PatternSpec(entity_type="EDUCATION_LEVEL", pattern=_EDUCATION_LEVEL, base_confidence=0.82, group=1, explanation="regex education level"),
     PatternSpec(entity_type="GENDER", pattern=_GENDER, base_confidence=0.86, group=1, explanation="regex gender (contextual)"),
     PatternSpec(entity_type="NATIONALITY", pattern=_NATIONALITY, base_confidence=0.84, group=1, explanation="regex nationality (contextual)"),
+    # Demonym grammar (lever #8 arm 2): cue-gated "X national(s)/citizen(s)/
+    # nationality" + "of X origin/descent" — confidence per the categorical
+    # sibling above; see the _DEMONYMS block for the dev grounding.
+    PatternSpec(entity_type="NATIONALITY", pattern=_NATIONALITY_PERSON_CUE, base_confidence=0.84, group=1, explanation="regex nationality (demonym + person cue)"),
+    PatternSpec(entity_type="NATIONALITY", pattern=_NATIONALITY_OF_ORIGIN, base_confidence=0.84, group=1, explanation="regex nationality (of-origin frame)"),
     PatternSpec(entity_type="ETHNICITY", pattern=_ETHNICITY, base_confidence=0.84, group=1, explanation="regex ethnicity (contextual)"),
     PatternSpec(entity_type="POLITICAL_OPINION", pattern=_POLITICAL_OPINION, base_confidence=0.84, group=1, explanation="regex political opinion (contextual)"),
     PatternSpec(entity_type="RELIGIOUS_BELIEF", pattern=_RELIGIOUS_BELIEF, base_confidence=0.84, group=1, explanation="regex religious belief (contextual)"),
