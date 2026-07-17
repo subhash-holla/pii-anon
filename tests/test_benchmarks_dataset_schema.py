@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from conftest import requires_dataset
+from conftest import requires_dataset, requires_full_dataset
 
 from pii_anon.benchmarks import load_benchmark_dataset, load_use_case_matrix, resolve_benchmark_dataset_path, summarize_dataset
 from pii_anon.benchmarks import datasets as datasets_module
@@ -17,11 +17,13 @@ pytestmark = requires_dataset  # All tests in this file require the benchmark da
 # Unified dataset — pii_anon_benchmark (151,000+ records)
 # ---------------------------------------------------------------------------
 
+@requires_full_dataset
 def test_dataset_has_expected_size_and_split() -> None:
     rows = load_benchmark_dataset("pii_anon_benchmark")
     assert len(rows) >= 100000  # pii-anon-eval-data has 151K+ records
 
 
+@requires_full_dataset
 def test_dataset_summary_distribution() -> None:
     summary = summarize_dataset("pii_anon_benchmark")
     assert summary["records"] >= 100000  # 151K+ records
@@ -84,6 +86,7 @@ def test_core_dataset_has_diverse_entity_types() -> None:
     assert not missing, f"Missing required entity types: {missing}"
 
 
+@requires_full_dataset
 def test_core_dataset_has_size_tier_distribution() -> None:
     """Verify records span multiple context length tiers."""
     data_path = resolve_benchmark_dataset_path("pii_anon_benchmark")
@@ -102,6 +105,7 @@ def test_core_dataset_has_size_tier_distribution() -> None:
     assert sum(tiers.values()) >= 100000
 
 
+@requires_full_dataset
 def test_core_dataset_has_entity_clusters() -> None:
     """Verify that records with entity annotations exist."""
     rows = load_benchmark_dataset("pii_anon_benchmark")
@@ -136,6 +140,7 @@ def test_core_dataset_has_multilingual_records() -> None:
     assert "en" in languages
 
 
+@requires_full_dataset
 def test_core_dataset_has_multiple_dimensions() -> None:
     """Verify the dataset spans multiple evaluation dimensions."""
     data_path = resolve_benchmark_dataset_path("pii_anon_benchmark")

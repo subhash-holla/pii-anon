@@ -44,3 +44,25 @@ requires_dataset = pytest.mark.skipif(
     not _DATASET_INSTALLED,
     reason="pii-anon-datasets not installed (benchmark dataset unavailable)",
 )
+
+
+def _full_dataset_available() -> bool:
+    """Check that the resolved dataset is the FULL census corpus.
+
+    The resolver also finds the in-repo fallback slice
+    (packages/.../pii_anon_benchmark_v1.jsonl.gz, 50k records) on a fresh
+    checkout; census-level assertions (corpus size, split/language
+    distributions) must skip on that slice rather than fail.
+    """
+    try:
+        from pii_anon.benchmarks.datasets import resolve_benchmark_dataset_path
+        path = resolve_benchmark_dataset_path("pii_anon_benchmark")
+        return path is not None and "_v1" not in path.name
+    except Exception:
+        return False
+
+
+requires_full_dataset = pytest.mark.skipif(
+    not _full_dataset_available(),
+    reason="full benchmark corpus unavailable (only the in-repo v1 fallback slice, if any)",
+)
