@@ -1,0 +1,188 @@
+reviewer: axiom-compliance
+gate: story
+scope_id: S5-04
+iteration: 1
+verdict: APPROVE
+independence_attestation: >
+  I verified the diff and tests directly from the working tree and git history
+  before reading the story's self-reported Evidence. The AX-006/AX-001/AX-002
+  conclusions below rest on my own reads of spec.py / sandbox.py / __init__.py +
+  the two owned test files, an independent re-run of all 67 owned tests, an
+  independent in-process reproduction of the determinism + audit-cleanliness
+  claims, and a git-span review of the 5 commits (e1e7273..5059c56). Evidence-
+  section claims were used only for cross-check, never as the basis for a verdict.
+
+findings: []
+
+axioms_in_scope:
+  - id: AX-pii-anon-006
+    name: least-privilege-agentic-interception
+    triggered_by: >
+      The headline of the story. The attacks/ runner ingests adversarial material
+      and must not become a capability-escalation surface.
+    upheld: true
+    evidence: >
+      SandboxPolicy default is default-deny by construction (sandbox.py:88-99):
+      allowed_paths=frozenset() and network="deny" with the project-default budget
+      as the no-arg constructor (A7, test_a7_default_policy_is_default_deny +
+      test_a7_sandbox_grants_only_declared_capabilities both green). The capability
+      pre-check assert_no_unsafe_capability (sandbox.py:127-144) runs BEFORE the
+      attack body (AttackSandbox.run sandbox.py:271-273 calls it first; the egress
+      guard + watchdog wrap the body only afterwards), and refuses each
+      out-of-sandbox capability: (a) unsafe-deserialization — load_attack_spec only
+      reads scalar fields out of a plain mapping via the stdlib structured parser
+      and NEVER constructs objects named in the data (spec.py:114-163,217-283), with
+      _validate_scalar_params rejecting every non-scalar params value (A1 +
+      @given property test_a1_property_every_nonscalar_params_value_is_rejected:
+      ZERO reach the runner; dual property confirms no false refusal of scalars);
+      (b) subprocess / shell-out — a spec selects code ONLY via the in-code
+      allow-list registry (a plain dict, DEFAULT_ATTACK_REGISTRY sandbox.py:359-361);
+      a non-allow-listed or external-program-shaped runner is refused at load
+      (spec.py:257-262) AND re-checked before execution (sandbox.py:134-138), proven
+      by A2 + test_a2_sandbox_run_refuses_callable_not_matching_spec_runner (the
+      off-list runner's body is NOT invoked: invoked["called"] is False); (c) egress
+      — _EgressGuard intercepts socket.connect + connect_ex for the run's duration
+      and raises SandboxViolation on any outbound connect (sandbox.py:150-178),
+      restored in __exit__/finally (A3 incl. connect_ex + restore-after-run); (d)
+      out-of-allow-list paths — assert_path_allowed delegates to the single
+      source-of-truth _is_within_allowed (path-component containment, NOT naive
+      startswith), so a sibling sharing a string prefix is refused (A6 +
+      test_a6_sibling_prefix_is_not_treated_as_allowed); a *_path param outside
+      allowed_paths is refused at both load and run time. The AST/source guard
+      (test_attacks_package_has_no_unsafe_execution_call_signatures) proves the
+      package contains ZERO unsafe-deserialization imports / subprocess+shell-out
+      calls / dynamic-eval calls, and a meta-guard (test_ast_guard_would_catch_a_
+      forbidden_call) proves the scan is not a no-op. AX-006's other clause (no raw
+      sensitive data persisted post-masking) is upheld vacuously + positively: the
+      A7 audit asserts no AttackResult.audit line carries an email/SSN/secret-shaped
+      value, independently reproduced here on a live run (zero leaks).
+  - id: AX-pii-anon-001
+    name: synthetic-only-no-real-pii
+    triggered_by: The harness ingests attack specs/inputs; fixtures must be synthetic.
+    upheld: true
+    evidence: >
+      Every fixture spec + input in both owned test files is synthetic
+      (attack_id="synthetic-recon-001"; masked_texts are "[REDACTED]"/"alice here"
+      placeholder strings; known_tokens are "alice"/"bob"/"zzz"). The egress test
+      targets 192.0.2.1 (RFC-5737 TEST-NET-1, unroutable) and the in-process guard
+      fires BEFORE any real egress — confirmed: the only IP literals in the test
+      files are 192.0.2.1 (the other grep hits are the audit-leak detector regexes
+      themselves, not targets). The A7 audit assertion + my independent live run
+      confirm no AttackResult.audit line embeds a real-PII-shaped or real-secret-
+      shaped value. No real key / credential / network host anywhere. The @given
+      generators produce structural noise (mappings/lists/None/tuples of ints),
+      never realistic PII.
+  - id: AX-pii-anon-002
+    name: deterministic-reproducible-pseudonymization
+    triggered_by: >
+      replay-determinism flavor — the story commits the guards to be deterministic
+      given a spec, and AttackResult equality must hold across runs (A8).
+    upheld: true
+    evidence: >
+      AttackResult is a frozen dataclass whose equality is over (attack_id, outcome,
+      terminated_for_budget, audit) with NO wall-clock/timing field (sandbox.py:
+      71-85). Two runs of run_attack_under_sandbox on the same spec+inputs compare
+      equal: A8 test_a8_two_runs_yield_equal_attack_result +
+      test_a8_attack_result_equality_excludes_timing, and I reproduced it in-process
+      (r1 == r2 True; audit tuples identical). The guards are deterministic given a
+      spec: the capability checks, the egress posture, and the path/scalar checks
+      are pure over the spec. The one genuinely run-varying value — CPU already
+      consumed by the host process — is correctly EXCLUDED from the asserted-equality
+      audit: the RLIMIT_CPU audit line records the stable budget ("budget=5.0s (soft
+      set relative to CPU already consumed)"), never the consumed-relative soft int
+      (sandbox.py:228-239); verified live. The wall-clock elapsed value appears only
+      inside the SandboxBudgetExceeded message on the terminate path, never in a
+      success-path AttackResult field that participates in equality.
+  - id: AX-pii-anon-003
+    name: ensemble-recall-floor-guarantee
+    triggered_by: Not triggered.
+    upheld: not-applicable
+    evidence: >
+      The 5-commit span (e1e7273..5059c56) touches ONLY the 3 new attacks/ files +
+      the 2 new test files + the story doc. Zero detection/router/early-exit/floor
+      code is touched (grep for swarm|moe|fusion|policy|router|recall|floor|detect
+      over the diff: zero matches), and the A8 import-boundary AST guard
+      (test_a8_attacks_package_has_no_forbidden_imports, scanned>=3, green) proves
+      the attacks/ package imports nothing from swarm/moe/fusion/policy. The
+      recall-floor guarantee is therefore neither exercised nor at risk.
+  - id: AX-pii-anon-004
+    name: anonymization-pseudonymization-separation
+    triggered_by: Not triggered.
+    upheld: not-applicable
+    evidence: >
+      No scoring/metric code is touched; the legacy harness/attack.py +
+      stream_synth.py and rating/port.py + elo.py are byte-identical across the span
+      (git diff --stat empty). The runner wraps (does not rewrite) the synthetic
+      reconstruction_attack_score and produces an attack-runner outcome, not a
+      de-identification score; no path averages or merges the two metric families.
+      The anon-vs-pseudo wall is untouched.
+  - id: AX-pii-anon-005
+    name: calibrated-uncertainty-and-auditable-abstention
+    triggered_by: Not triggered.
+    upheld: not-applicable
+    evidence: >
+      AX-005 is a detection-pipeline axiom (calibrated confidence + a needs_review
+      abstention outcome + router_path on emitted findings). This story ships an
+      isolation substrate; AttackResult is an attack-runner outcome, not a PII
+      detection that could abstain. No finding-emission surface is introduced, so
+      the abstention/calibration axiom is out of scope for this diff. (Auditability
+      is nonetheless present in spirit: every capability check that passed is
+      recorded in the AttackResult.audit trail.)
+
+flagged_fix_adjudication:
+  commit: eaf116c
+  change: >
+    RLIMIT_CPU soft limit set RELATIVE to CPU already consumed (getrusage(RUSAGE_SELF)
+    .ru_utime+ru_stime + budget.cpu_seconds + 1s ceil headroom) instead of the bare
+    budget, because RLIMIT_CPU measures CUMULATIVE process CPU since start (the bare
+    budget sent SIGXCPU / exit 152 and killed the test-runner once it had already
+    consumed > budget).
+  compromises_any_axiom: false
+  reasoning: >
+    The fix is a faithful in-process realization of the budget guarantee and does not
+    weaken any axiom. (1) AX-006 budget guarantee preserved: the soft limit still caps
+    THIS attack's ADDITIONAL CPU at the declared budget; the absolute number is shifted
+    by host-consumed CPU precisely so the cap applies to the attack rather than the
+    already-spent host time, and the wall-clock watchdog remains the reliable primary
+    terminator (A4 over-budget termination is watchdog-driven, not rlimit-driven, and
+    is green). It is a SOFT limit, captured-and-restored in a finally (_restore_rlimits),
+    and never raises the hard ceiling (clamped to cur_hard) — so it does not broaden any
+    capability. (2) AX-002 determinism preserved: the run-varying consumed-CPU value is
+    deliberately kept OUT of the asserted-equality audit — the RLIMIT_CPU audit line
+    records the stable budget only — so AttackResult stays byte-equal across runs (I
+    reproduced this). The diff is confined to sandbox.py:_apply_soft_rlimits. Sound.
+  honesty_boundary_ok: true
+  honesty_note: >
+    AGENT_SIMULATED boundary is stated honestly: in-process guards (RLIMIT_CPU applied
+    for real, RLIMIT_AS honestly degrades to a recorded platform_limit_unavailable note
+    on darwin — I observed "RLIMIT_AS setrlimit refused (current limit exceeds maximum
+    limit)" on a live run, never a silent no-op — wall-clock watchdog + socket-egress
+    interceptor + load-time refusals all real). Real seccomp/namespace/cgroup kill +
+    any real-adversary/real-key execution are Pass-2, not simulated as real.
+
+owned_test_run:
+  command: pytest tests/test_attack_sandbox.py tests/test_attack_spec_loader.py (cov gate off)
+  result: 67 passed
+  note: >
+    The two-file run trips the global --cov-fail-under=84 only because coverage is
+    computed package-wide on a 2-file subset; that is a coverage-gate artifact, NOT a
+    test failure (story Evidence reports overall 86.83% on the full suite, sandbox.py
+    99% / spec.py 100% / __init__.py 100%). Zero owned-test failures.
+
+context_bounds_respected: true
+notes: >
+  APPROVE — 0 MAJOR+ findings; all three in-scope axioms (AX-006 least-privilege,
+  AX-001 synthetic-only, AX-002 determinism) are saturated by construction with green,
+  non-no-op tests, and the three not-applicable axioms (AX-003 recall-floor, AX-004
+  anon/pseudo, AX-005 abstention) are genuinely untriggered (verified against the
+  diff span, not assumed). The flagged fix eaf116c compromises no axiom: it is a
+  faithful in-process realization of the budget guarantee that preserves both the
+  least-privilege budget cap and AX-002 determinism (consumed-CPU correctly excluded
+  from the asserted-equality audit). Dimension boundaries respected: I did NOT assess
+  whether the attack outcome is correct (traceability/executor), the SAST adequacy of
+  the loader/egress refusals (security-sast PRIMARY owns the depth of the
+  unsafe-deserialization / subprocess / shell-out / egress refusals), code style
+  (code-quality), or FR/NFR mapping (requirements-coverage). One observation for the
+  record (no finding raised): AX-005 abstention will become live when a real Tier-3 /
+  MIA scoring body lands in a successor DC-09 story — that body's emitted findings (not
+  this substrate) are where calibrated-confidence + needs_review must be checked.

@@ -79,6 +79,10 @@ from pii_anon.transforms import (
     TransformContext,
     TransformStrategy,
 )
+from pii_anon.transforms.value_consistency import (
+    build_surfaces,
+    sweep_residual_occurrences,
+)
 from pii_anon.types import (
     ConfidenceEnvelope,
     EngineFinding,
@@ -143,8 +147,29 @@ SUPPORTED_ENTITY_TYPES: frozenset[str] = frozenset(
         "INVOICE_NUMBER",
         "INSURANCE_POLICY_NUMBER",
         "SALARY",
+        # sp7 panel #1: customer/client/member identifier (labeled-field bridge)
+        "CUSTOMER_ID",
     }
 )
+
+
+def _scannable_text(value: Any) -> str | None:
+    """The text form of a payload value the detection engines can scan.
+
+    Strings scan as-is. Numeric scalars (``int``/``float``, NOT ``bool`` — a
+    bool is an ``int`` subclass but never PII) are coerced to their string
+    form: an SSN or phone number stored as a number is exactly as much PII as
+    its string twin, and silently skipping it let it pass through UNMASKED
+    (sp7 panel, API lens — a genuine leak vector). Everything else (dict,
+    list, None, bytes) returns ``None`` and is left untouched.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
 
 
 class AsyncPIIOrchestrator:
@@ -190,14 +215,21 @@ class AsyncPIIOrchestrator:
         config: CoreConfig | None = None,
         tokenizer: TokenizerProvider | None = None,
         token_store: TokenStore | None = None,
+        max_token_store_size: int | None = None,
+        max_ledger_scopes: int | None = None,
     ) -> None:
+        # sp7 panel (API lens): the default in-memory token store and identity
+        # ledger grow WITHOUT BOUND — an RSS leak for any long-running /
+        # streaming deployment. Both classes already support bounds; these
+        # pass-throughs expose them. Defaults stay unbounded (silent eviction
+        # would break token consistency), but a service can now cap them.
         self.token_key = token_key
         self.segmenter = Segmenter()
         self.reconciler = BoundaryReconciler()
         self.tokenizer = tokenizer or DeterministicHMACTokenizer()
-        self.token_store = token_store or InMemoryTokenStore()
+        self.token_store = token_store or InMemoryTokenStore(max_size=max_token_store_size)
         self.config = config or CoreConfig.default()
-        self.identity_ledger = IdentityLedger()
+        self.identity_ledger = IdentityLedger(max_scopes=max_ledger_scopes)
         self.router = PolicyRouter(
             router_config=self.config.router.model_dump() if hasattr(self.config, "router") else None,
         )
@@ -279,19 +311,23 @@ class AsyncPIIOrchestrator:
             )
             self.registry.attach_moe_bridge(bridge)
 
-            # Apply offline calibration if available
+            # Apply offline calibration if present. CalibrationStore(path=None)
+            # resolves the default location (the PII_ANON_CALIBRATION_PATH env
+            # var or ~/.pii_anon/calibration.json), so the load is always
+            # attempted; a missing or unreadable file degrades gracefully below.
             cal_path = getattr(moe_config, "calibration_path", None)
-            if cal_path or True:  # Always try default path
-                try:
-                    from pii_anon.calibration.store import CalibrationStore
+            try:
+                from pii_anon.calibration.store import CalibrationStore
 
-                    store = CalibrationStore(path=cal_path)
-                    store.apply_to_registry(
-                        expert_registry,
-                        min_samples=getattr(moe_config, "calibration_min_samples", 10),
-                    )
-                except Exception:
-                    pass  # No calibration file is normal
+                store = CalibrationStore(path=cal_path)
+                store.apply_to_registry(
+                    expert_registry,
+                    min_samples=getattr(moe_config, "calibration_min_samples", 10),
+                )
+            except Exception:
+                # A missing file returns None (no error); this catches a
+                # corrupt/unreadable calibration file. Degrade gracefully.
+                self.logger.debug("calibration_apply_skipped", exc_info=True)
 
             return bridge
         except Exception:
@@ -464,11 +500,18 @@ class AsyncPIIOrchestrator:
                 continue
             by_field.setdefault(finding.field_path, []).append(finding)
         for field, value in payload.items():
-            if not isinstance(value, str):
+            text = _scannable_text(value)
+            if text is None:
+                continue
+            field_findings = by_field.get(field, [])
+            if not isinstance(value, str) and not field_findings:
+                # a benign numeric field keeps its original value AND type;
+                # only a numeric field WITH findings is masked (masking must
+                # alter the value, so it necessarily becomes a string).
                 continue
             transformed_value, field_audit = self._apply_transform(
-                text=value,
-                findings=by_field.get(field, []),
+                text=text,
+                findings=field_findings,
                 scope=scope,
                 token_version=token_version,
                 profile=profile,
@@ -477,6 +520,16 @@ class AsyncPIIOrchestrator:
             for item in field_audit:
                 item["field_path"] = field
             link_audit.extend(field_audit)
+
+        # sp7 panel #2 — value-consistent (coreference) masking pass-2: redact
+        # any REMAINING verbatim occurrence of a detected sticky-type value
+        # (a name/account repeated but not individually detected, incl.
+        # cross-field) with the SAME replacement. Additive on the masking path.
+        if getattr(self.config.transform, "value_consistent_masking", False):
+            self._apply_value_consistent_masking(
+                payload, transformed_payload, link_audit
+            )
+
         return {
             "transformed_payload": transformed_payload,
             "ensemble_findings": detect["ensemble_findings"],
@@ -579,16 +632,19 @@ class AsyncPIIOrchestrator:
         plan = self._resolve_execution_plan(payload=payload, profile=profile)
 
         for field, value in payload.items():
-            if not isinstance(value, str):
+            # numeric scalars are coerced (an int SSN is still an SSN —
+            # skipping it silently leaked it unmasked; sp7 panel, API lens).
+            text = _scannable_text(value)
+            if text is None:
                 continue
 
             should_segment = (segmentation.enabled or plan.segmentation_enabled) and len(
-                value.split()
+                text.split()
             ) > segmentation.max_tokens
             if should_segment:
                 findings, boundary_trace, audits = await self._detect_segmented_field(
                     field=field,
-                    text=value,
+                    text=text,
                     profile=profile,
                     segmentation=segmentation,
                     plan=plan,
@@ -596,7 +652,7 @@ class AsyncPIIOrchestrator:
             else:
                 findings, audits, _source = await self._detect_on_text_field_async(
                     field,
-                    value,
+                    text,
                     profile,
                     plan=plan,
                 )
@@ -1187,6 +1243,97 @@ class AsyncPIIOrchestrator:
 
         return "".join(parts), link_audit
 
+    def _apply_value_consistent_masking(
+        self,
+        payload: Payload,
+        transformed_payload: Payload,
+        link_audit: list[dict[str, Any]],
+    ) -> None:
+        """sp7 panel #2 — pass-2 value-consistent (coreference) masking.
+
+        Redacts every REMAINING verbatim occurrence of a detected sticky-type
+        value with the SAME replacement it already received, sweeping the
+        ORIGINAL field text (never the transformed text — an inserted HMAC
+        token can itself contain a run equal to a short surface, so replacing
+        in output space could corrupt a token). Only fields with an ACTUAL
+        residual occurrence are re-assembled, so a payload with no coreference
+        leak keeps its pass-1 output and link_audit byte-identical.
+
+        Additive on the masking path: it can only ever redact MORE text, with a
+        replacement already deemed safe for that value; it never narrows a
+        pattern, drops a finding, or touches detection.
+        """
+        surfaces = build_surfaces(link_audit)
+        if not surfaces:
+            return
+        # pass-1 replacements grouped by field (original-offset spans), used to
+        # both exclude already-covered regions from the sweep and to re-assemble
+        # an affected field from its ORIGINAL text.
+        pass1_by_field: dict[str, list[tuple[int, int, str]]] = {}
+        for entry in link_audit:
+            field = entry.get("field_path")
+            span = entry.get("span") or {}
+            start = span.get("start")
+            end = span.get("end")
+            if not isinstance(field, str) or start is None or end is None:
+                continue
+            pass1_by_field.setdefault(field, []).append(
+                (int(start), int(end), str(entry.get("replacement", "")))
+            )
+
+        pass2_audit: list[dict[str, Any]] = []
+        for field, value in payload.items():
+            text = _scannable_text(value)
+            if text is None:
+                continue
+            field_pass1 = pass1_by_field.get(field, [])
+            covered = [(s, e) for s, e, _ in field_pass1]
+            residuals = sweep_residual_occurrences(text, surfaces, covered)
+            if not residuals:
+                continue  # byte-identical: leave transformed_payload[field] as-is
+            merged: list[tuple[int, int, str]] = list(field_pass1)
+            merged.extend((s, e, repl) for s, e, repl, _et, _cid in residuals)
+            merged.sort(key=lambda r: (r[0], r[1]))
+            transformed_payload[field] = self._assemble_with_replacements(text, merged)
+            for s, e, repl, etype, cluster_id in residuals:
+                pass2_audit.append(
+                    {
+                        "entity_type": etype,
+                        "span": {"start": s, "end": e},
+                        "mention_text": text[s:e],
+                        "canonical_text": text[s:e],
+                        "replacement": repl,
+                        # attribute the redaction to the same identity cluster as
+                        # the value it mirrors (keeps cluster-precision metrics
+                        # consistent — a residual of "Jack" IS in Jack's cluster).
+                        "cluster_id": cluster_id,
+                        "field_path": field,
+                        "rule": "value-consistent-coreference",
+                        "strategy_id": "value-consistent",
+                    }
+                )
+        link_audit.extend(pass2_audit)
+
+    @staticmethod
+    def _assemble_with_replacements(
+        text: str, spans: list[tuple[int, int, str]]
+    ) -> str:
+        """Rebuild ``text`` inserting each ``(start, end, replacement)`` at its
+        span. ``spans`` must be sorted and non-overlapping; any residual overlap
+        is skipped defensively (never double-emits)."""
+        parts: list[str] = []
+        cursor = 0
+        for start, end, repl in spans:
+            if start < cursor:
+                continue
+            if start > cursor:
+                parts.append(text[cursor:start])
+            parts.append(repl)
+            cursor = end
+        if cursor < len(text):
+            parts.append(text[cursor:])
+        return "".join(parts)
+
     @staticmethod
     def _cluster_entity_type(cluster_id: str, fallback_entity_type: str) -> str:
         if cluster_id.startswith("person_contact-"):
@@ -1341,6 +1488,8 @@ class PIIOrchestrator:
         config_path: str | None = None,
         tokenizer: TokenizerProvider | None = None,
         token_store: TokenStore | None = None,
+        max_token_store_size: int | None = None,
+        max_ledger_scopes: int | None = None,
     ) -> None:
         if config is None and config_path is not None:
             config = ConfigManager().load(config_path)
@@ -1350,6 +1499,8 @@ class PIIOrchestrator:
             config=config,
             tokenizer=tokenizer,
             token_store=token_store,
+            max_token_store_size=max_token_store_size,
+            max_ledger_scopes=max_ledger_scopes,
         )
 
     def register_engine(self, engine: EngineAdapter) -> None:
@@ -1551,6 +1702,7 @@ class PIIOrchestrator:
         ingest_config: Any | None = None,
         output_path: str | Path | None = None,
         output_format: Any | None = None,
+        on_error: str = "skip",
     ) -> Any:
         """Process all records in a file and optionally write results.
 
@@ -1570,6 +1722,12 @@ class PIIOrchestrator:
             If provided, processed results are written to this path.
         output_format:
             Explicit output format; auto-detected from *output_path* if ``None``.
+        on_error:
+            ``"skip"`` (default) records the failure in ``errors`` / the log
+            and continues; ``"raise"`` re-raises the first per-record failure
+            (sp7 panel, API lens: a failed record silently VANISHED from the
+            output — a caller who never inspected ``records_failed`` had no
+            signal that data was dropped).
 
         Returns
         -------
@@ -1629,10 +1787,26 @@ class PIIOrchestrator:
                 results_buffer.append(result)
                 records_processed += 1
             except Exception as exc:
+                if on_error == "raise":
+                    raise
                 records_failed += 1
-                errors.append(f"record {record.record_id}: {exc}")
+                # keep the exception TYPE (a bare str(exc) can be empty) and
+                # emit an observable warning — a silently dropped record is
+                # data loss the caller must be able to see.
+                errors.append(f"record {record.record_id}: {type(exc).__name__}: {exc}")
+                self._async.logger.warning(
+                    "run_file: record %s failed (%s) and was dropped from output",
+                    record.record_id,
+                    type(exc).__name__,
+                )
 
         elapsed = time.monotonic() - start
+        if records_failed:
+            self._async.logger.warning(
+                "run_file: %d of %d records failed and are ABSENT from the output",
+                records_failed,
+                records_processed + records_failed,
+            )
 
         output_str: str | None = None
         if output_path is not None:

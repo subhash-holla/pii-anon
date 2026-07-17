@@ -1,3 +1,4 @@
+from .canonical_run import CanonicalRunGate, produce_canonical_artifact
 from .compare import StrategyEvaluationReport, StrategyEvaluator
 from .competitor_compare import (
     CompetitorComparisonReport,
@@ -22,4 +23,6 @@ __all__ = [
     "compare_competitors",
     "merge_profile_checkpoints",
     "run_benchmark_runtime_preflight",
+    "produce_canonical_artifact",
+    "CanonicalRunGate",
 ]

@@ -12,12 +12,90 @@ Architecture (inspired by Mixtral 8x7B):
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
 
 from pii_anon.fusion import FusionStrategy, _cluster_overlapping_spans
+from pii_anon.moe_gate_signing import KeyRing, verify
 from pii_anon.types import EngineFinding, EnsembleFinding
+
+
+def load_verified_gate(
+    path: str | Path,
+    *,
+    key_ring: KeyRing,
+    verify_on_load: bool = True,
+) -> dict[str, Any] | None:
+    """Load a ``gate_v1.json`` artifact through the verify-on-load seam (S2-05).
+
+    This is the ONLY sanctioned way a learned gate enters the control path. It
+    is fail-closed by default:
+
+    * **Absence is graceful** — if ``path`` does not exist, returns ``None`` so the
+      caller keeps the static ``entity_strengths`` softmax (NFR-026). Absence of
+      the artifact is fine.
+    * **Present-but-unverifiable is a hard error** — a present file that fails
+      signature verification (a tampered byte, a missing/empty/malformed
+      signature, an unknown/retired key id, or malformed JSON) raises
+      :class:`~pii_anon.errors.GateSignatureError`. It does NOT degrade to the
+      static fallback (present-and-broken != absent) and NEVER returns the
+      unsigned content.
+
+    The gate file is parsed as JSON only — it is never routed through any unsafe
+    object-deserialization path.
+
+    Parameters
+    ----------
+    path : str | Path
+        Filesystem path to the ``gate_v1.json`` envelope.
+    key_ring : KeyRing
+        The trust root (current + grace-window previous keys). The signature's
+        ``key_id`` must resolve here or verification fails loud.
+    verify_on_load : bool
+        Defaults to ``True`` (fail-closed). The ``False`` escape hatch returns the
+        raw payload WITHOUT verification and exists ONLY for explicit offline
+        tooling; it is never the default and never reachable from the production
+        ``MoERouter`` construction seam (which passes ``verify_on_load=True``).
+
+    Returns
+    -------
+    dict | None
+        The verified gate payload, or ``None`` if the artifact is absent.
+
+    Raises
+    ------
+    GateSignatureError
+        If a present artifact fails verification (when ``verify_on_load`` is True).
+    """
+    gate_path = Path(path)
+    if not gate_path.exists():
+        return None
+
+    # JSON only — the gate file is never deserialized through any unsafe path.
+    from pii_anon.errors import GateSignatureError
+
+    try:
+        envelope = json.loads(gate_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, ValueError) as exc:
+        if verify_on_load:
+            raise GateSignatureError("malformed gate envelope: file is not valid JSON") from exc
+        return None
+
+    if not verify_on_load:
+        # Explicit offline-tooling escape hatch ONLY: return the raw payload
+        # without verification. Never the default; never the production path.
+        if not isinstance(envelope, dict):
+            return None
+        inner = envelope.get("payload")
+        if isinstance(inner, dict):
+            return dict(inner)
+        return dict(envelope)
+
+    verified: dict[str, Any] = verify(envelope, key_set=key_ring)
+    return verified
 
 
 @dataclass
@@ -156,6 +234,223 @@ class ExpertRegistry:
         return [e for eid in expert_ids if (e := self._experts.get(eid)) is not None]
 
 
+@dataclass(frozen=True)
+class RouteContext:
+    """Feature-conditioned routing signal threaded into :meth:`MoERouter.route`.
+
+    Carries the per-decision features a learned gate (S2-02 ``DistilledTopKGate``)
+    reads — everything *beyond* the ``entity_type`` positional, which stays the
+    first argument so existing call sites are untouched. The context is purely
+    additive: with no gate it is **inert** (the static-softmax ``base`` is
+    returned unchanged), and it is the distinct cache key that lets two different
+    contexts for the same entity type coexist without collision.
+
+    Frozen + hashable by construction (AX-002 / NFR-005): ``features`` is a
+    tuple-of-pairs (not a dict) so the whole context is hashable for cache keying
+    and immutable for determinism. It deliberately does NOT carry ``entity_type``.
+
+    Attributes
+    ----------
+    language : str | None
+        Language code of the field under routing (e.g. ``"es"``). ``None`` when
+        unknown / not yet detected.
+    field_path : str | None
+        Name of the field being routed (e.g. ``"notes"``). ``None`` for
+        unstructured text.
+    checksum_gated : bool | None
+        Whether the shared-layer span at this location was checksum/keyword-gated
+        — the S2-03 rules-first early-exit signal. ``None`` when not applicable.
+    features : tuple[tuple[str, float], ...]
+        An extensible, order-stable feature vector (name -> value) the distilled
+        gate reads. Tuple-of-pairs keeps the context hashable; empty by default.
+    """
+
+    language: str | None = None
+    field_path: str | None = None
+    checksum_gated: bool | None = None
+    features: tuple[tuple[str, float], ...] = ()
+
+
+#: Metadata key on :class:`ExpertSpec` carrying a per-expert latency cost (ms).
+#: The DC-03 SLA selection-bias reads ONLY this key — never ``default_weight``
+#: (the NFR-004 power signal) and never ``entity_strengths``.
+LATENCY_COST_KEY = "latency_cost_ms"
+
+
+@dataclass(frozen=True)
+class SLABias:
+    """Aux-loss-free SLA selection-bias config (DeepSeek-V3 loss-free balancing).
+
+    The SLA bias adds a per-expert latency penalty to :meth:`MoERouter.route`'s
+    **selection logits only** — never :class:`~pii_anon.types.EnsembleFinding`
+    ``confidence`` and never ``Shared``-layer membership — so that under a latency
+    SLA the router biases *selection* toward cheaper experts, with **no auxiliary
+    loss term** (a bias on the routing logits, not on a gradient/objective).
+
+    The penalty for an expert carrying a latency cost ``cost_e`` (from
+    ``ExpertSpec.metadata[LATENCY_COST_KEY]``) is::
+
+        biased_logit(e) = strength_e − strength · (cost_e / reference_ms)
+
+    Frozen + hashable (AX-002 / NFR-005), mirroring :class:`RouteContext`. Kept
+    DISTINCT from ``RouteContext`` (the gate's per-call feature channel): the SLA
+    is router-construction state, not a per-call gate feature.
+
+    Default-off: ``strength == 0.0`` makes the bias term identically 0, so a bare
+    ``SLABias()`` (and ``sla_bias=None``) is fully inert — ``route()`` is then
+    byte-identical to the static-softmax baseline (NFR-026).
+
+    Attributes
+    ----------
+    strength : float
+        The bias magnitude β ≥ 0. ``0.0`` (the default) ⇒ the bias is inert.
+        Must be finite and non-negative (a negative or NaN strength is rejected
+        at construction — see :meth:`__post_init__`).
+    reference_ms : float
+        A logit-scale latency normalizer (ms) so the penalty is unit-decoupled.
+        Defaults to ``1.0``. Must be finite and ``> 0`` (a ``0``/negative/NaN
+        normalizer is rejected at construction so the ``cost / reference_ms``
+        division in :meth:`MoERouter._apply_sla_bias` can never raise or poison
+        the distribution — NFR-026 "0 unhandled exceptions").
+    """
+
+    strength: float = 0.0
+    reference_ms: float = 1.0
+
+    def __post_init__(self) -> None:
+        """Fail-fast: reject a hostile/degenerate SLA config at construction.
+
+        Validation only (no field mutation — the dataclass stays frozen). Closes
+        the ``reference_ms=0.0`` ``ZeroDivisionError`` and the
+        ``strength``/``reference_ms`` ``NaN`` distribution-poisoning holes on the
+        production ``route()`` path: the SLA-bias ingress must be TOTAL over its
+        construction state (NFR-026 — ``_apply_sla_bias`` "never raises"). Mirrors
+        the existing fail-fast style (``gate_path requires a key_ring``).
+        """
+        if not _is_finite_number(self.strength) or self.strength < 0.0:
+            raise ValueError(
+                "SLABias.strength must be a finite number >= 0; "
+                f"got {self.strength!r}"
+            )
+        if not _is_finite_number(self.reference_ms) or self.reference_ms <= 0.0:
+            raise ValueError(
+                "SLABias.reference_ms must be a finite number > 0; "
+                f"got {self.reference_ms!r}"
+            )
+
+
+def _is_finite_number(value: object) -> bool:
+    """True iff *value* is a real, finite, non-``bool`` number.
+
+    A Python ``bool`` is an ``int`` subclass, so it is rejected explicitly — a
+    ``latency_cost_ms`` of ``True``/``False`` is "no cost", not 1.0/0.0.
+
+    TOTAL over all ``int``/``float`` inputs: ``math.isfinite`` first coerces its
+    argument to a C double, which raises ``OverflowError`` for a Python ``int``
+    wider than the double range (e.g. ``10**400``). That coercion is wrapped so an
+    out-of-range int is treated as "not a usable finite number" (→ "no cost" in
+    :func:`_latency_cost`) rather than crashing ``route()`` — NFR-026 ("0 unhandled
+    exceptions"); the ingress must never raise on hostile numeric metadata.
+    """
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        # An int wider than the C-double range is unusable as a latency cost /
+        # SLA field — treat as "not finite", never raise.
+        return False
+
+
+def _latency_cost(spec: ExpertSpec) -> float | None:
+    """Return the expert's latency cost (ms), or ``None`` when it has no opinion.
+
+    Reads ``spec.metadata[LATENCY_COST_KEY]`` and returns it ONLY when it is a
+    real, finite, non-negative, non-``bool`` number. A missing / ``NaN`` / ``±inf``
+    / negative / ``bool`` / non-numeric cost is coerced to ``None`` ("no cost") so
+    the SLA bias never produces a NaN or negative logit and never raises — an
+    expert with no usable cost is simply not penalized.
+    """
+    raw = spec.metadata.get(LATENCY_COST_KEY)
+    if not _is_finite_number(raw):
+        return None
+    cost = float(raw)  # type: ignore[arg-type]  # _is_finite_number narrows to a real number
+    if cost < 0.0:
+        return None
+    return cost
+
+
+@runtime_checkable
+class RoutingGate(Protocol):
+    """Advisory re-weighting hook for :class:`MoERouter` (the S2-02 plug point).
+
+    A gate sees the static-softmax ``base`` weights for an entity type plus the
+    optional :class:`RouteContext`, and returns advisory re-weighted / re-ordered
+    ``(expert_id, weight)`` pairs. The router **re-normalizes and validates** the
+    output (finite, ≥0, Σ=1.0) before use, and falls back to ``base`` on an
+    invalid return — a misbehaving gate can never emit NaN/negative weights
+    downstream (AX-002 / NFR-005).
+
+    The gate is **advisory on weighting/selection only**: it can re-order or
+    re-weight experts but it can **never cause a shared-layer span to be
+    dropped** — the recall-floor no-drop invariant (FR-016 / AX-003) is enforced
+    downstream by :class:`~pii_anon.routing.floor_fusion.FloorProjectingFusion`
+    /:class:`~pii_anon.routing.shared_layer.SharedLayerProjector`, which re-inject
+    a floored span post-fusion regardless of how the gate re-weighted it.
+
+    This story (S2-01) ships only the Protocol + the plug; the first concrete
+    implementation is S2-02's ``DistilledTopKGate``.
+    """
+
+    def adjust(
+        self,
+        entity_type: str,
+        context: RouteContext | None,
+        base: list[tuple[str, float]],
+    ) -> list[tuple[str, float]]:
+        """Return advisory re-weighted ``(expert_id, weight)`` pairs.
+
+        Parameters
+        ----------
+        entity_type : str
+            The entity type being routed.
+        context : RouteContext | None
+            The feature-conditioned routing signal (``None`` for the bare path).
+        base : list[tuple[str, float]]
+            The static-softmax weights the router computed (sums to 1.0).
+        """
+        ...
+
+
+def _normalize_weights(
+    pairs: list[tuple[str, float]],
+) -> list[tuple[str, float]] | None:
+    """Normalize ``(id, weight)`` pairs to a valid distribution, or ``None``.
+
+    Returns a finite, non-negative, sum-to-1.0 distribution over the SAME ids in
+    the SAME order. Returns ``None`` (signalling "invalid — fall back to base")
+    when the input cannot be coerced to a valid distribution: a non-finite weight
+    (NaN / ±inf), or a non-positive total mass after clamping negatives to zero.
+
+    This is the single weight-normalizer shared by the static-softmax path and
+    the gate-output validator (one definition, no drift). Empty input returns an
+    empty list (a degenerate-but-valid distribution).
+    """
+    if not pairs:
+        return []
+    clamped: list[tuple[str, float]] = []
+    for eid, w in pairs:
+        if not math.isfinite(w):
+            return None
+        clamped.append((eid, w if w > 0.0 else 0.0))
+    total = sum(w for _, w in clamped)
+    if total <= 0.0:
+        return None
+    return [(eid, w / total) for eid, w in clamped]
+
+
 class MoERouter:
     """Sparse Top-K router for expert selection per entity type.
 
@@ -179,6 +474,27 @@ class MoERouter:
         If True, always include the expert with the highest strength
         score for each entity type, ensuring ensemble >= best individual
         expert (default True).
+    gate_path : str | Path | None
+        Optional path to a learned-gate artifact (``gate_v1.json``). When given
+        together with ``key_ring``, the gate is loaded through the fail-closed
+        verify-on-load seam (S2-05): the signature is verified before the payload
+        is accepted. Absence of the file is graceful (``None`` -> static softmax,
+        NFR-026); a present-but-unverifiable file raises ``GateSignatureError``.
+        ``None`` (the default) keeps the no-gate static-softmax behaviour
+        unchanged — this parameter is strictly additive.
+    key_ring : KeyRing | None
+        Trust root for verifying ``gate_path``. Required when ``gate_path`` is
+        provided. ``None`` (the default) preserves the no-gate path.
+    sla_bias : SLABias | None
+        Optional aux-loss-free SLA selection-bias (DC-03). When given with
+        ``strength != 0.0``, a per-expert latency penalty is added to the
+        selection logits in :meth:`route` so the router biases *selection* toward
+        cheaper experts (from ``ExpertSpec.metadata[LATENCY_COST_KEY]``). ``None``
+        (the default) or ``SLABias(strength=0.0)`` is fully inert — ``route()`` is
+        then byte-identical to the static softmax (NFR-026). The bias is advisory
+        and selection-only: it never mutates ``EnsembleFinding.confidence`` and the
+        recall-floor (``FloorProjectingFusion``) remains the no-drop authority
+        (AX-003).
     """
 
     def __init__(
@@ -187,23 +503,77 @@ class MoERouter:
         top_k: int = 3,
         *,
         performance_floor: bool = True,
+        gate_path: str | Path | None = None,
+        key_ring: KeyRing | None = None,
+        gate: RoutingGate | None = None,
+        sla_bias: SLABias | None = None,
     ) -> None:
         self.registry = registry
         self.top_k = max(1, top_k)
         self.performance_floor = performance_floor
-        self._route_cache: dict[str, list[tuple[str, float]]] = {}
+        # Optional aux-loss-free SLA selection-bias (DC-03). Default None ⇒ the
+        # bias branch in route() is never taken (byte-identical static softmax,
+        # NFR-026). The per-expert latency cost is read lazily from
+        # metadata[LATENCY_COST_KEY] into _latency_cost_cache (invalidated by
+        # clear_cache()); it is NEVER default_weight (the POWER-TIER TRAP) and
+        # never entity_strengths.
+        self._sla_bias = sla_bias
+        self._latency_cost_cache: dict[str, float] | None = None
+        # Optional advisory re-weighting hook (S2-02 DistilledTopKGate). Default
+        # None ⇒ route() returns the static-softmax base unchanged (NFR-026). The
+        # gate is advisory on weighting only; the recall-floor (FR-016/AX-003) is
+        # enforced downstream by FloorProjectingFusion and cannot be defeated by it.
+        self.gate = gate
+        # Cache widened from `entity_type` to `(entity_type, context)`. A frozen
+        # RouteContext is hashable; the `None`-context key reproduces the
+        # pre-S2-01 cache EXACTLY (byte-identical on every existing call site).
+        self._route_cache: dict[
+            tuple[str, RouteContext | None], list[tuple[str, float]]
+        ] = {}
+        # Verified learned-gate payload (None on the no-gate static-softmax path,
+        # NFR-026). Loaded ONLY through the fail-closed verify-on-load seam — the
+        # production construction path always passes verify_on_load=True so a
+        # tampered/unsigned gate can never reach route().
+        self.gate_payload: dict[str, Any] | None = None
+        if gate_path is not None:
+            if key_ring is None:
+                raise ValueError("gate_path requires a key_ring for verify-on-load")
+            self.gate_payload = load_verified_gate(
+                gate_path, key_ring=key_ring, verify_on_load=True
+            )
 
-    def route(self, entity_type: str) -> list[tuple[str, float]]:
+    def route(
+        self,
+        entity_type: str,
+        *,
+        context: RouteContext | None = None,
+    ) -> list[tuple[str, float]]:
         """Compute routing for a single entity type.
 
         Returns the top-K experts (by strength score) for the given entity
         type, with softmax-normalized weights. If performance_floor is True,
         the highest-strength expert is always included.
 
+        The optional ``context`` carries feature-conditioned routing signal
+        (language / field / checksum-gated / a feature vector) for an advisory
+        :class:`RoutingGate`. **The widening is additive and inert**: with no
+        ``context`` and no ``gate`` the computation, the result, and the cache
+        are byte-identical to the pre-S2-01 static softmax. When a ``gate`` is
+        configured, the static ``base`` is computed exactly as before and then
+        handed to ``gate.adjust(...)``; the gate's output is re-normalized and
+        validated (finite, ≥0, Σ=1.0) before use, falling back to ``base`` on an
+        invalid return so a misbehaving gate can never propagate NaN/negative
+        weights (AX-002 / NFR-005). The gate is advisory on weighting only — it
+        cannot drop a floored shared span (FR-016 / AX-003, enforced downstream).
+
         Parameters
         ----------
         entity_type : str
             Entity type to route (e.g., "PERSON_NAME", "EMAIL_ADDRESS").
+        context : RouteContext | None
+            Feature-conditioned routing signal for the advisory gate. ``None``
+            (the default, every pre-S2-01 caller) reproduces today's behaviour
+            and today's cache exactly.
 
         Returns
         -------
@@ -211,8 +581,9 @@ class MoERouter:
             List of (expert_id, weight) tuples summing to 1.0.
             Empty list if no experts available or entity unknown.
         """
-        # Check cache
-        cached = self._route_cache.get(entity_type)
+        # Check cache (keyed on (entity_type, context); None-context == today).
+        cache_key = (entity_type, context)
+        cached = self._route_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -233,8 +604,26 @@ class MoERouter:
             # No expert has explicit knowledge of this entity type
             return []
 
-        # Sort by strength descending
-        scores.sort(key=lambda x: x[1], reverse=True)
+        # Aux-loss-free SLA selection-bias (DC-03). Applied to the SELECTION
+        # LOGITS only, BEFORE the sort, ONLY when an SLA is active. Default-off
+        # (sla_bias=None or strength==0.0) ⇒ `_sla_active` is False, the bias is a
+        # no-op, AND the sort stays the pre-S2-04 stable single-key sort, so the
+        # result is byte-identical to the static softmax / the S2-01 oracle
+        # (NFR-026 — equal-strength experts keep insertion order). The bias
+        # reshapes `scores`, affecting both top-k membership AND the softmax
+        # weights, but never touches confidence or Shared-layer membership (AX-003).
+        sla_active = self._sla_bias is not None and self._sla_bias.strength != 0.0
+        if sla_active:
+            scores = self._apply_sla_bias(scores)
+            # Total-order (logit, expert_id) tie-break: equal BIASED logits resolve
+            # deterministically by expert_id, so the order is stable across
+            # registry-insertion permutation (AX-002 / NFR-005). Gated behind the
+            # SLA path so the default-off sort is unchanged (byte-identical, A7).
+            scores.sort(key=lambda x: (x[1], x[0]), reverse=True)
+        else:
+            # Pre-S2-04 stable single-key sort: preserves insertion order for
+            # equal-strength experts ⇒ byte-identical to the recorded S2-01 oracle.
+            scores.sort(key=lambda x: x[1], reverse=True)
 
         # Select top-K
         selected = scores[: self.top_k]
@@ -252,13 +641,69 @@ class MoERouter:
 
         if total <= 0:
             # Fallback to equal weights
-            normalized = [(eid, 1.0 / len(selected)) for eid, _ in selected]
+            base = [(eid, 1.0 / len(selected)) for eid, _ in selected]
         else:
-            normalized = [(eid, es / total) for eid, es in exp_scores]
+            base = [(eid, es / total) for eid, es in exp_scores]
+
+        # Advisory gate (S2-02). Default gate=None ⇒ `base` is returned UNCHANGED
+        # (byte-identical to the pre-S2-01 static softmax). When present, the gate
+        # may re-weight/re-order; its output is re-normalized + validated, and any
+        # invalid return (non-finite / all-zero) falls back to `base` so a
+        # misbehaving gate can never emit NaN/negative weights downstream.
+        normalized = base
+        if self.gate is not None:
+            adjusted = self.gate.adjust(entity_type, context, list(base))
+            validated = _normalize_weights(adjusted)
+            normalized = validated if validated is not None else base
 
         # Cache result
-        self._route_cache[entity_type] = normalized
+        self._route_cache[cache_key] = normalized
         return normalized
+
+    def _latency_cost_by_id(self) -> dict[str, float]:
+        """Return ``{expert_id: latency_cost_ms}`` over the available experts.
+
+        Built lazily on first use from ``metadata[LATENCY_COST_KEY]`` (only experts
+        carrying a real, finite, non-negative cost appear — see :func:`_latency_cost`)
+        and cached so a repeated ``route()`` adds no per-call recompute. The cache
+        is invalidated by :meth:`clear_cache`. It is read ONLY by the SLA-bias step
+        — never by the static-softmax path.
+        """
+        if self._latency_cost_cache is None:
+            self._latency_cost_cache = {
+                e.expert_id: cost
+                for e in self.registry.available_experts()
+                if (cost := _latency_cost(e)) is not None
+            }
+        return self._latency_cost_cache
+
+    def _apply_sla_bias(
+        self, scores: list[tuple[str, float]]
+    ) -> list[tuple[str, float]]:
+        """Add the per-expert SLA latency penalty to the selection logits.
+
+        Returns ``scores`` UNCHANGED when no SLA is active (``sla_bias is None`` or
+        ``strength == 0.0``) — the default-off fast path (NFR-026). Otherwise
+        subtracts ``strength · (cost_e / reference_ms)`` from each expert that
+        carries a latency cost (others keep their raw logit). Pure-stdlib scalar
+        ``math``; never produces a NaN/negative-via-bad-cost logit because
+        :func:`_latency_cost` already coerced any unusable cost to "no cost".
+        """
+        sla = self._sla_bias
+        if sla is None or sla.strength == 0.0:
+            return scores
+        costs = self._latency_cost_by_id()
+        if not costs:
+            return scores
+        beta = sla.strength
+        reference = sla.reference_ms
+        return [
+            (
+                eid,
+                logit - beta * (costs[eid] / reference) if eid in costs else logit,
+            )
+            for eid, logit in scores
+        ]
 
     def route_all(self) -> dict[str, list[tuple[str, float]]]:
         """Precompute routing for all known entity types.
@@ -282,9 +727,12 @@ class MoERouter:
     def clear_cache(self) -> None:
         """Clear the routing cache.
 
-        Useful if registry is updated and routes need to be recomputed.
+        Useful if registry is updated and routes need to be recomputed. Also
+        invalidates the lazily-built per-expert latency-cost cache (DC-03) so a
+        registry change re-reads ``metadata[LATENCY_COST_KEY]`` on the next route.
         """
         self._route_cache.clear()
+        self._latency_cost_cache = None
 
 
 class MoEFusionStrategy(FusionStrategy):
@@ -317,6 +765,11 @@ class MoEFusionStrategy(FusionStrategy):
         Always include best expert for each entity type (default True).
     min_expert_weight : float
         Minimum weight for the performance floor expert (default 0.15).
+    sla_bias : SLABias | None
+        Optional aux-loss-free SLA selection-bias (DC-03). ``None`` (the
+        default) or ``SLABias(strength=0.0)`` is fully inert (NFR-026). Threaded
+        into the inner :class:`MoERouter`; selection-only — it can never move
+        ``merge()``'s confidence math nor weaken the recall-floor (AX-003).
     """
 
     strategy_id = "mixture_of_experts"
@@ -329,6 +782,7 @@ class MoEFusionStrategy(FusionStrategy):
         iou_threshold: float = 0.5,
         performance_floor: bool = True,
         min_expert_weight: float = 0.15,
+        sla_bias: SLABias | None = None,
     ) -> None:
         if registry is None:
             registry = build_default_registry()
@@ -337,10 +791,16 @@ class MoEFusionStrategy(FusionStrategy):
         self.iou_threshold = iou_threshold
         self.performance_floor = performance_floor
         self.min_expert_weight = min_expert_weight
+        # Optional aux-loss-free SLA selection-bias (DC-03), threaded into the
+        # inner router. Default None ⇒ inert (NFR-026). Selection-only: the bias
+        # cannot move merge()'s confidence math (single-expert clusters stay
+        # byte-identical) and the recall-floor wrap remains the no-drop authority.
+        self.sla_bias = sla_bias
         self.router = MoERouter(
             self.registry,
             top_k=top_k,
             performance_floor=performance_floor,
+            sla_bias=sla_bias,
         )
 
     def merge(self, findings: list[EngineFinding]) -> list[EnsembleFinding]:

@@ -1,0 +1,126 @@
+sign_off_id: SO-16-s7-04-latency-g5
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S7-04 — the LAST PENDING-placeholder guarantee (G5) goes computed. Two committed pieces +
+  a wired gate + a producer emission, modeled EXACTLY on how G2/G4 went placeholder→computed:
+  (1) a new committed NFR-009 latency-ceiling registry (eval_framework/evaluation/latency_ceilings.py,
+  stdlib-only, frozen, per-objective p50/p95/p99; ensemble/full-swarm = 500/1000/2000 ms — grounded
+  in measurement with quiet + contention headroom); (2) the SDO gate's G5 `_pending_guarantee`
+  placeholder REPLACED by `_g5_audit_latency(systems, run_metadata)` = audit-pass ∧ latency-within-ceiling,
+  three-valued, every artifact value validated (the `pending_overrides['G5']` successor seam preserved
+  exactly like g2/g4); (3) the canonical-run producer emits run_metadata.latency_summary (real measured
+  full-swarm per-record latency, min-of-3 contention-robust) + audit_summary (the REAL S6-02/S6-05
+  surface under a seed-derived key), and CanonicalRunGate.validate step-7 requires them for certification
+  (audit-integrity bars refuse; latency-ceiling stays the SDO gate's job). The MANDATORY adversarial
+  close ran 2 ROUNDS — round-1 caught a real MAJOR breach-bury fabrication, fixed RED→GREEN, round-2
+  confirmatory = CLOSE_PASS 0-upheld / 764 probes. With G6 honestly FAILING, G5 PASS does NOT flip the
+  verdict (G6 binds) — this is COMPLETENESS, not a flip, exactly as scoped. dep: S7-02 keystone (DONE) +
+  S6-02 interception (DONE) + S6-05 leakage-Sankey (DONE) + S4-CS-01 §3 G5 definition.
+
+stories_closed:
+  - id: S7-04
+    title: NFR-009 committed latency ceilings + the SDO gate _g5_audit_latency wiring + producer G5 emission (DC-11; the last placeholder guarantee)
+    gate: _reviews/story/S7-04/   # 5/5 APPROVE THEN the MANDATORY adversarial close — 2 rounds, round-2 CLOSE_PASS 0-upheld
+    implements: [NFR-009]   # + makes G5 code-compute REAL on a certified run; consumes FR-025/026/028/029 (the audit half)
+    upholds: [AX-001, AX-002, AX-003, AX-006]
+    effect: >
+      new src/pii_anon/eval_framework/evaluation/latency_ceilings.py (the committed budget registry,
+      added to the SDO gate import-boundary AST scan; the detector_class field is the R10 per-detector-class
+      Pass-2 seam); competitive_supremacy.py G5 wired (`_g5_audit_latency` + `_G5Half` + `_g5_latency_half`
+      + `_g5_audit_half` + `_g5_latency_bar` [tighten-only] + `_g5_genuine_count` + gate-owned bars
+      G5_MAX_ATTACK_SUCCESS_RATE=0.0 / G5_MIN_BENIGN_TASK_SUCCESS=0.95 / _G5_CHANNELS / _G5_MAX_COUNT) +
+      the `_safe_repr`/`_safe_names` int→str digit-limit DoV hardening on every artifact-value detail/sort
+      site; canonical_run.py `_measure_swarm_latency` (real timed _ensemble_detector, min-of-3) +
+      `_attach_g5_fields` (real FourChannelGuard + build_leakage_sankey + score_injection_resistance under
+      a seed-derived key) + CanonicalRunGate.validate step-7. The producer writes ONLY artifacts/canonical/.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5 (security-sast PRIMARY + axiom-compliance + traceability + requirements-coverage + code-quality); 0 MAJOR; 4 MINOR remediated in-loop
+  adversarial_close:
+    rounds: 2
+    round_1: { run_id: wf_2e3f36d5-afb, verdict: CLOSE_FAIL, probes: 370, confirmed_holes: 1, severity: MAJOR }
+    final_close: { run_id: wf_4c4df480-634, verdict: CLOSE_PASS, probes: 764, upheld: 0, fabrication_refuters_completed: true, g5_contract_refuter_completed: true, null_refuters: [], offlimits_md5_ok: true }
+    holes_found_and_closed: 1
+    fabrications_closed:
+      - "★ round-1 MAJOR breach-bury: a REAL breach in the PRESENT G5 half (over-budget latency / leaked span) was buried into PENDING by OMITTING the other block, escalating the verdict NOT_YET→PROVISIONAL_SOTA (PENDING blocks CLAIM_GRADE but not PROVISIONAL). The breach-outranks-missing rule only fired when BOTH blocks were present dicts; whole-block absence short-circuited to PENDING before the combiner. FIX (`3b842e8`): an absent/non-dict block becomes a missing-shape _G5Half(ok=None) so the combiner applies at the whole-block level. Independently verified via from_artifacts AND the shipped CLI, both directions."
+    lesson: >
+      The breach-bury was the SAME root cause as the close-9 nested-value SHOWSTOPPERs at a HIGHER level —
+      a correctness rule (breach-outranks-missing) implemented for the inner case but not the outer
+      whole-block case. THE CLOSE CAUGHT IT; the 5/5 story gate (which APPROVED the buggy code) did NOT,
+      and is necessary-but-not-sufficient for a control-path change. The close remains the only reliable
+      certifier — declare DONE only on a 0-upheld close where the fabrication refuters complete.
+
+decisions_acknowledged:
+  - "★ G5 PASS does NOT flip the verdict — G6 binds (decision A, f2-gap-no-regression). The freshly-produced certified artifact reads NOT_YET / canonical_claim_run=True / binding G6 FAIL with G1·G2·G3·G4·G5·G7 ALL PASS and ZERO pending axes. G5 is the program's COMPLETENESS milestone (every guarantee now code-computes a real value on a certified run), NOT a verdict flip. Do NOT 'fix' F2; do NOT weaken G6."
+  - "★ NO-FABRICATION is LOAD-BEARING — the breach-bury MAJOR proves a correctness rule must hold at EVERY level it applies (nested value AND whole-block). Every artifact value the G5 path reads routes through a validator (latency ms via _is_finite_number+nonneg+order; rates via _finite_unit_score; counts via _g5_genuine_count; profile via ceiling_for; system via ladder membership; persist via strict is-True; detail/sort via _safe_repr/_safe_names; the artifact ceiling tighten-only)."
+  - "NFR-009 ceiling is a COMMITTED NUMERIC per-profile p50/p95/p99; the full-swarm ensemble budget 500/1000/2000 ms is real (sub-2s p99, ~6x quiet headroom + contention headroom), NOT sub-0.24ms parity, NOT vacuous. The producer measures min-of-3 per record (a single-shot wall-clock timing on a saturated host measures the scheduler, not the swarm — a 10-worker xdist host tripled the single-shot p50)."
+  - "NFR-005 determinism contract: the measured wall-clock latency_summary joins timestamp_utc as the TWO sanctioned determinism-comparison exclusions (NFR-005 itself excludes wall-clock speed); the audit_summary stays byte-deterministic (keyed HMAC under a seed-derived key). The gate-read composite/J are UNTOUCHED — honest verdicts byte-identical."
+  - "The certification-vs-performance line (deliberate): an over-budget-but-shape-valid measured latency still CERTIFIES the run (canonical_claim_run=True) and G5 then honestly FAILS at the SDO gate — exactly like G6's F2 on a certified run. An AUDIT-integrity breach (a leak / corrupt persist stamp / exfiltration) DOES refuse certification (the artifact itself is untrustworthy, like the step-3 ε bound)."
+  - "RISK-6 honoured: competitor_compare.py byte-identical (7cae16c8…); competitor_tiers.py byte-identical (d9202479…). The producer writes ONLY artifacts/canonical/. Import isolation intact: latency_ceilings.py is stdlib-only and in the gate boundary scan; the gate + attacks + rating import nothing from swarm/moe/fusion/policy."
+
+findings_waived_or_deferred:
+  - id: per-detector-class-latency-ceilings
+    disposition: pass2-seam
+    detail: "The R10 PERSONA-CONDITIONAL re-scope asks for per-detector-class p50/p95/p99; LatencyCeiling.detector_class (default 'full-swarm') is the BUILD-AND-FLAG seam — a future per-engine-class commitment extends the registry without a schema change."
+  - id: full-census-latency
+    disposition: pass2
+    detail: "The producer times min(sampled, 200) records; a full-census latency measurement is Pass-2 (same envelope as the headline full-census G6 run)."
+  - id: live-agent-audit
+    disposition: pass2
+    detail: "The G5 audit half runs the REAL S6-02/S6-05 surface over SYNTHETIC inputs in-tree; a live-agent runtime + real transcript-residual leakage are the S6 honesty boundary (Pass-2)."
+  - id: g7-culprit-safe-repr-sweep
+    disposition: pass2-polish
+    detail: "security-sast SEC-1 OBSERVATION (out of S7-04 scope, not artifact-triggerable on honest JSON, system name already shape-shielded): the G7 RecallFloorVerdictGuard detail retains {culprit!r} while G1/G4 sibling sites use _safe_repr. Route through _safe_repr in a future control-path touch for symmetry."
+
+sdo_verdict:
+  committed_smoke_artifact:   # `pii-anon supremacy` default (artifacts/benchmarks/benchmark-results.json, read-only)
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    j_value: 1.0
+    j_source: mle-bootstrap
+    guarantees: { G1: PENDING, G2: PENDING, G3: PASS, G4: PENDING, G5: PENDING, G6: PASS, G7: FAIL }
+    note: "UNCHANGED / byte-stable vs SO-15. The smoke artifact predates the producer and carries no G5 fields, so G5 is honestly PENDING."
+  produced_canonical_artifact:   # produce_canonical_artifact(max_samples=8) → from_artifacts
+    verdict: NOT_YET
+    canonical_claim_run: true
+    scope: representative-in-tree
+    binding_constraint: "G6 FAIL: core F2=0.7214 vs best Tier-R gliner F2=0.75 (ε_F=0.01); entity coverage=0.824 (≥0.80)"
+    j_value: 0.0
+    j_source: mle-bootstrap
+    guarantees: { G1: PASS, G2: PASS, G3: PASS, G4: PASS, G5: PASS, G6: FAIL, G7: PASS }
+    note: >
+      ★ S7-04 makes G5 code-compute a REAL PASS — measured full-swarm p50/p95/p99 within the committed
+      500/1000/2000 ms ceiling + a clean 4-channel audit (no-raw-PII-persist, zero leaked, ASR 0, benign 1).
+      EVERY guarantee now computes a real value on a certified run; ZERO pending axes. The binding constraint
+      remains the HONEST, draw-sensitive raw-detection axis G6 (decision A — not a regression). G5 PASS is
+      completeness, not a flip. PROVISIONAL_SOTA / CLAIM_GRADE still need the full-census Pass-2 (G6) + real
+      Tier-C + real-NUTS J.
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): exit 0, 3685 passed / 16 skipped / 0 failed (+3 over SO-15's 3682: the new G5/breach-bury/DoV tests net of the contention-recalib churn)."
+  coverage: "88.66% (≥ 84 gate)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 137 files."
+  env: "AGENT_SIMULATED on the local .venv. The producer runs REAL detection + the REAL S6-02/S6-05 audit surface + the REAL timed _ensemble_detector at representative scale. numpyro/jax absent (16 env-gated skips); no cloud keys."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md b5cb977b…, benchmark-diagnostics.json 47f9b116…, artifacts/benchmarks/*, docs/* — S2-03 stays BLOCKED (orchestrator.py unchanged)
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py (post breach-bury fix)
+  producer_md5: d8f0f80e113c3b5d59c06d0b5fd36fac   # canonical_run.py (G5 emission)
+  ceilings_md5: 848f21bef3731ad56bae3b0b5aa86fee   # latency_ceilings.py
+  nothing_under_artifacts_benchmarks: true   # the producer writes ONLY artifacts/canonical/ (produced to /tmp in tests; never committed)
+  recall_floor_intact: true
+  narrow_git_add_only: true
+  no_new_hard_dependency: true   # latency_ceilings.py stdlib-only
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. NEITHER is a regression; NEITHER is 'fixable' without the full-census Pass-2."
+  immediate: "Feature surface, SEQUENTIAL in the main tree (worktree parallel dispatch is UNRELIABLE here): S5-02 (Tier-3 representative adversary), S5-03 (MIA representative) — both via run_attack_under_sandbox, attacks import-boundary CI test stays green; S6-01 (query-aware masking; the FR-028/UC-22 6-channel vs FR-025/DC-13 4-channel reconciliation is a tracked PO item); S6-04 (BYO-SDK adapter); S7-01 (multimodal readers); S7-03 (multilingual fairness). Author each via /dev-assist-story-new. NONE of these touch competitive_supremacy.py, so none requires the SDO close (unless they become a control-path-artifact producer/consumer)."
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) → release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) → packaging extras → tag the RC on pdlc/sota-program → build sdist+wheel (NOT published)."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J (numpyro/jax absent); per-detector-class latency ceilings (the detector_class seam); full-census latency; live-agent audit; the G7 _safe_repr sweep; DATA bradley_terry/canary/query-aware; Papers 1 & 2 (siblings ../pii-anon-eval-data + ../pii-anon-research-paper are FLAGGED FOLLOW-ON — code-only this run)."
+  milestone: "M4 (CODE v2) — EVERY SDO guarantee (G1–G7) now code-computes a REAL value on a certified canonical run (G5 was the last placeholder). The honest endpoint is NOT_YET on the draw-sensitive raw-detection axis G6, pending the full-census Pass-2; all moat axes (G1/G2/G3/G4/G5/G7) PASS."

@@ -16,6 +16,9 @@ htmlcov/
 .venv/
 venv/
 
+# Local Claude Code tooling (settings.local.json, session plans) — machine-local.
+.claude/
+
 # Benchmark dataset (lives in pii-anon-eval-data repo)
 packages/pii_anon_datasets/src/pii_anon_datasets/benchmarks/data/*.jsonl
 

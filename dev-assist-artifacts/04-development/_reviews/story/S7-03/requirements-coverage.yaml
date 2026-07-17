@@ -1,0 +1,28 @@
+reviewer: requirements-coverage
+story: S7-03
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 MAJOR/MINOR; 1 OBSERVATION (matrix-precision note)
+run: wf_bb94aa83-837 (2026-06-09); transcribed from the workflow structured result
+summary: >
+  FR-038 (SHOULD) ACTIVE in detection with a real RED->GREEN proof (the
+  dead-keyword activation); FR-039/NFR-025 (SHOULD) shipped as the
+  fail-closed powered gate primitive with exact anchors; NFR-004 power
+  semantics implemented (floor injectable; long-tail 200 default). The
+  corpus-scale fairness number stays DATA Pass-2 (# SWITCH-POINT(DATA));
+  the canonical wire-in stays Pass-2 (# SWITCH-POINT(CANONICAL), SDO-close
+  -gated). No silent claim.
+findings:
+  - id: requirements-coverage-story-01
+    severity: OBSERVATION
+    location: dev-assist-artifacts/05-testing/03-nfr-verification/nfr-verification-matrix.md:23
+    description: >
+      The NFR-025 matrix row reads 'DEFERRED | S7-03' — still correct
+      (corpus-scale remains DATA Pass-2), but could optionally be annotated
+      'gate primitive in-tree (A6-A10); corpus-scale = Pass-2', mirroring
+      the NFR-009 VERIFIED-in-tree phrasing. Matrix update is out of this
+      story's owned-files scope.
+    suggested_resolution: Optional annotation at the epic/sprint gate.
+    disposition: CARRY-FORWARD to the epic/sprint snapshot.
+context_bounds_respected: true
+offlimits_md5_ok: true

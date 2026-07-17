@@ -40,6 +40,7 @@ are re-exported as class attributes so that existing code referencing
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
 from pii_anon.engines.base import EngineAdapter
@@ -50,10 +51,14 @@ from pii_anon.engines.regex.confidence import (
     CONTEXT_WORDS,
     HIGH_FP_TYPES,
     adjust_confidence,
+    apply_negative_context,
     extract_context,
     has_context_words,
 )
 from pii_anon.engines.regex.deny_list import DenyListManager
+from pii_anon.engines.regex.geo_lexicon import extract_locations, geo_subtype
+from pii_anon.engines.regex.labeled_fields import extract_labeled_fields
+from pii_anon.engines.regex.unicode_norm import normalize_for_detection, remap_span
 from pii_anon.engines.regex.patterns import PATTERN_REGISTRY, PatternSpec
 from pii_anon.engines.regex import validators
 from pii_anon.engines.regex.validators import _extract_digits
@@ -83,6 +88,641 @@ _HIGH_FP_TYPES = HIGH_FP_TYPES
 # this threshold are suppressed to reduce false positives from patterns
 # that receive context penalties.
 _MIN_EMIT_CONFIDENCE: float = 0.50
+
+
+#: Specific types whose spans shadow a coinciding PERSON_NAME finding: the
+#: person patterns are generic Title-Case matchers, so a span that a
+#: specific-type pattern claimed (org, job title, condition, medication, ...)
+#: is near-certainly not a person — emitting both costs a guaranteed FP
+#: under exact-span scoring.
+_PERSON_SHADOWING_TYPES: frozenset[str] = frozenset({
+    "ORGANIZATION",
+    "JOB_TITLE",
+    "HEALTH_CONDITION",
+    "MEDICATION_NAME",
+    "PROCEDURE_NAME",
+    "EDUCATION_LEVEL",
+    "VEHICLE_MODEL",
+})
+
+
+#: sp7 A1 — leading tokens that a real PERSON/ORG name never starts with;
+#: a Title-Case phrase led by one is document prose, not a name.
+_NAME_LEADING_STOPWORDS: frozenset[str] = frozenset({
+    "The", "A", "An", "This", "That", "These", "Those", "Our", "Your",
+    "Their", "His", "Her", "Its", "United", "New", "All", "Any", "Each",
+    "Some", "Please", "Note", "See", "Per", "Via", "For", "From", "With",
+    # sp7 #6 — public DE/FR/IT/ES definite/indefinite articles + possessives
+    # (foreign prose that a Title-Case run leads with, not a name).
+    "Die", "Der", "Das", "Den", "Dem", "Ein", "Eine", "Ihre", "Ihr",
+    "Ihren", "Unsere", "Unser", "Le", "La", "Les", "Un", "Une", "Des",
+    "Du", "Votre", "Vos", "Notre", "Nos", "El", "Los", "Las", "Una",
+    "Su", "Sus", "Il", "Lo", "Gli", "Vostro",
+})
+#: General document-structure / label vocabulary (NOT dataset gold): a
+#: Title-Case phrase whose tokens are ALL drawn from this set is a heading or
+#: field label, not a name. Kept domain-general to avoid benchmark-gaming.
+_HEADER_COMMON_WORDS: frozenset[str] = frozenset({
+    "Tax", "Form", "Information", "Report", "Section", "Number", "Account",
+    "Service", "Product", "Court", "District", "State", "Department", "Office",
+    "Committee", "Details", "Summary", "Notice", "Terms", "Policy", "Payment",
+    "Invoice", "Order", "Customer", "Client", "Investor", "Balance", "Amount",
+    "Status", "Address", "Contact", "Record", "Reference", "Case", "Claim",
+    "Data", "Type", "Date", "Time", "Name", "Title", "Value", "Total", "Code",
+    "Group", "Team", "Level", "Rate", "Fee", "Plan", "Line", "Page", "Table",
+})
+#: Common given names that override the stopword/common-word drop (protects a
+#: real name like "Summer Rose" / "April Chen" whose first token is a word).
+_COMMON_GIVEN_NAMES: frozenset[str] = frozenset({
+    "Summer", "April", "May", "June", "Autumn", "Dawn", "Faith", "Grace",
+    "Hope", "Joy", "Rose", "Ruby", "Pearl", "Crystal", "Star", "Sky",
+    "Amber", "Ivy", "Jade", "Iris", "Belle", "Chase", "Grant", "Miles",
+})
+
+
+#: sp7 #6 — leading greeting/role tokens a real name span never starts with;
+#: trimmed (not dropped) on the eval path so "Ciao Nalda" scores as "Nalda".
+_SALUTATION_TOKENS: frozenset[str] = frozenset({
+    "Ciao", "Hallo", "Hey", "Hi", "Hello", "Dear", "Estimado", "Estimada",
+    "Gentile", "Bonjour", "Salut", "Hola", "Buongiorno", "Cher", "Chère",
+    "Querido", "Querida", "Caro", "Cara", "Hallo", "Hej", "Ola",
+})
+
+
+#: sp7 #6 mention-propagation — a DOMAIN-GENERAL veto of Title-Case tokens that
+#: are common English words (or common words that double as surnames) and so are
+#: NOT safe to propagate as a bare PERSON_NAME mention. Designed a-priori (NOT
+#: derived from home-set FP surfaces — no test-split tuning); it deliberately
+#: forfeits ambiguous word-surnames (Green/Brown/Ford/King/Young/…) for
+#: precision. Matching is case-SENSITIVE on the token's own capitalisation, so
+#: lowercase common usage ("will", "rose", "park") can never match a surname.
+_PROPAGATION_STOPWORDS: frozenset[str] = frozenset({
+    # weekdays / months
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+    "Sunday", "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+    # document-structure / label / role nouns that surface Title-Cased in prose
+    "Patient", "Doctor", "Nurse", "Report", "Summary", "Subject", "Address",
+    "Account", "Name", "Date", "Number", "Record", "Case", "Section", "Note",
+    "Notes", "Page", "Table", "Figure", "Company", "Department", "Office",
+    "Team", "Group", "Client", "Customer", "Member", "Manager", "Director",
+    "President", "Officer", "Agent", "Owner", "User", "Admin", "Staff",
+    # common Title-Case prose openers / high-frequency words
+    "The", "This", "That", "These", "Those", "Their", "There", "Then", "Thus",
+    "When", "Where", "While", "With", "From", "Both", "Each", "After", "Before",
+    "During", "Please", "Thank", "Thanks", "Regards", "Sincerely", "Best",
+    # common English words that also occur as surnames — forfeited for precision
+    "Green", "Brown", "White", "Black", "Gray", "Grey", "King", "Young",
+    "Ford", "Park", "Hill", "Bank", "Price", "Bell", "Cook", "Fox", "Wood",
+    "Stone", "Field", "Rich", "Long", "Short", "Small", "Little", "Moon",
+    "Sun", "Rain", "Snow", "Winter", "Case", "Ward", "Bishop", "Marsh",
+})
+
+#: mid-band confidence for a propagated partial mention (above the 0.50 emit
+#: floor; below a directly-grammar-detected full name).
+_PROPAGATED_PERSON_CONFIDENCE = 0.80
+
+
+def _is_word_char(ch: str) -> bool:
+    """Word-boundary predicate for the propagation scan: alphanumeric or ``_``."""
+    return ch.isalnum() or ch == "_"
+
+
+def _standalone_occurrences(text: str, token: str) -> list[tuple[int, int]]:
+    """Return ``(start, end)`` for every whole-word occurrence of ``token`` in
+    ``text`` (not the interior of a longer word). O(n) ``str.find`` sweep with
+    manual boundary checks — no regex, ReDoS-free. A trailing apostrophe
+    ("Fennimore's") is a boundary, so the possessive matches the bare name."""
+    out: list[tuple[int, int]] = []
+    if not token:
+        return out
+    i = text.find(token)
+    n = len(text)
+    tlen = len(token)
+    while i != -1:
+        j = i + tlen
+        before_ok = i == 0 or not _is_word_char(text[i - 1])
+        after_ok = j >= n or not _is_word_char(text[j])
+        if before_ok and after_ok:
+            out.append((i, j))
+        i = text.find(token, i + 1)
+    return out
+
+
+def _propagate_surname_mentions(
+    findings: list[EngineFinding],
+    texts: dict[str | None, str],
+    *,
+    adapter_id: str,
+    language: str,
+    is_denied: Callable[[str, str], bool],
+) -> list[EngineFinding]:
+    """sp7 #6 — ADDITIVE surname mention-propagation (all paths, leak-safe).
+
+    A multi-token ``PERSON_NAME`` ("Alastair Fennimore") is detected once, but a
+    later bare "Fennimore" the grammar missed leaks. For each detected
+    multi-token PERSON_NAME, propagate its SURNAME (last token) to every
+    standalone verbatim occurrence in the SAME field not already covered by a
+    finding, emitting a new PERSON_NAME span. Gate: surname length >= 4,
+    all-alpha, strict Title-Case, not deny-listed, not a common-word stopword.
+
+    Purely additive — emits only NEW non-overlapping spans; never drops,
+    narrows, or re-types an existing finding. On the masking path it masks MORE
+    partial mentions (the safe leak-direction). Detection-only; no eval gating.
+    """
+    # per field: the surnames worth propagating + an occupancy mask over the
+    # field text (bytearray -> O(1) per char, so the whole pass is LINEAR in
+    # text length; a per-interval scan would be O(n^2) on a pathological
+    # many-repeats input — the sp7 mention-propagation close).
+    surnames_by_field: dict[str | None, set[str]] = {}
+    occupied_by_field: dict[str | None, list[tuple[int, int]]] = {}
+    for f in findings:
+        fp = f.field_path
+        if isinstance(f.span_start, int) and isinstance(f.span_end, int):
+            occupied_by_field.setdefault(fp, []).append((f.span_start, f.span_end))
+        if f.entity_type != "PERSON_NAME" or not isinstance(f.span_start, int):
+            continue
+        text = texts.get(fp, "")
+        span = text[f.span_start:f.span_end]
+        tokens = span.split()
+        if len(tokens) < 2:
+            continue
+        surname = tokens[-1].strip(".,'\"")
+        if (
+            len(surname) >= 4
+            and surname.isalpha()
+            and surname[0].isupper()
+            and surname[1:].islower()
+            and surname not in _PROPAGATION_STOPWORDS
+            and not is_denied("PERSON_NAME", surname)
+        ):
+            surnames_by_field.setdefault(fp, set()).add(surname)
+
+    added: list[EngineFinding] = []
+    for fp, surnames in surnames_by_field.items():
+        text = texts.get(fp, "")
+        mask = bytearray(len(text))
+        for os, oe in occupied_by_field.get(fp, []):
+            for k in range(max(0, os), min(len(text), oe)):
+                mask[k] = 1
+        # longest surname first so a longer name masks before a substring.
+        for surname in sorted(surnames, key=len, reverse=True):
+            for start, end in _standalone_occurrences(text, surname):
+                if any(mask[k] for k in range(start, end)):
+                    continue
+                for k in range(start, end):
+                    mask[k] = 1
+                added.append(
+                    EngineFinding(
+                        entity_type="PERSON_NAME",
+                        confidence=_PROPAGATED_PERSON_CONFIDENCE,
+                        field_path=fp,
+                        span_start=start,
+                        span_end=end,
+                        engine_id=adapter_id,
+                        explanation="propagated surname mention (sp7 mention-propagation)",
+                        language=language,
+                    )
+                )
+    return findings + added
+
+
+def _trim_salutation_led_person(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: strip a leading greeting token from a PERSON_NAME span so the
+    scored span starts at the actual name ("Ciao Nalda" -> "Nalda"). Boundary
+    hygiene on the scoring path only — the production masking span is unchanged
+    (over-masking the greeting is harmless; the sp2 discipline)."""
+    for f in findings:
+        if (
+            f.entity_type == "PERSON_NAME"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            text = texts.get(f.field_path, "")
+            span = text[f.span_start:f.span_end]
+            toks = span.split()
+            while len(toks) >= 2 and toks[0].rstrip(".,").capitalize() in _SALUTATION_TOKENS:
+                advance = len(toks[0])
+                rest = span[advance:]
+                stripped = len(rest) - len(rest.lstrip())
+                f.span_start += advance + stripped
+                span = text[f.span_start:f.span_end]
+                toks = span.split()
+    return findings
+
+
+def _drop_titlecase_noise_person(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: drop PERSON_NAME/ORGANIZATION spans that are Title-Case
+    document noise, not names (sp7 A1 — mined the single largest FP class
+    across 5/5 external datasets: 71% of ALL Nemotron FPs).
+
+    Dropped shapes (each provably absent from the home corpus's name gold, so
+    home recall is unaffected): (1) markdown-wrapped (``**X**`` / ``__X__``);
+    (2) led by a determiner/preposition stopword ("The Court", "United States
+    District"); (3) EVERY token in the general header/label vocabulary ("Tax
+    Form", "Investor Information"). A leading common GIVEN name overrides the
+    drop ("Summer Rose" is kept).
+
+    sp2 LEAK-DIRECTION discipline: runs ONLY under
+    ``eval_cross_type_arbitration``. On the production masking path this never
+    fires, so a real name that sits in a heading is still masked — over-masking
+    a heading is the safe direction; dropping it would be the leak.
+    """
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type in ("PERSON_NAME", "ORGANIZATION")
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+        ):
+            text = texts.get(finding.field_path, "")
+            span = text[finding.span_start:finding.span_end]
+            tokens = span.split()
+            first = tokens[0] if tokens else ""
+            if first in _COMMON_GIVEN_NAMES:
+                out.append(finding)
+                continue
+            pre = text[max(0, finding.span_start - 2):finding.span_start]
+            post = text[finding.span_end:finding.span_end + 2]
+            markdown_wrapped = (
+                (pre.endswith("**") and post.startswith("**"))
+                or (pre.endswith("__") and post.startswith("__"))
+            )
+            stopword_led = first in _NAME_LEADING_STOPWORDS
+            all_header_words = bool(tokens) and all(
+                t in _HEADER_COMMON_WORDS for t in tokens
+            )
+            if markdown_wrapped or stopword_led or all_header_words:
+                continue
+        out.append(finding)
+    return out
+
+
+def _drop_undecimaled_gps(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """EVAL-ONLY: drop GPS_COORDINATES spans carrying no decimal point.
+
+    The permissive GPS pattern is deliberately kept on the masking path —
+    the sp6 close proved that narrowing the PATTERN leaked "41, -87"-style
+    pairs to production unmasked via the AX-003 floor (the sp2 showstopper
+    class). At eval, undecimaled pairs are date fragments ("15/09";
+    coordinate strict P=0.072 on Nemotron, P=0.157 at home) while every real
+    coordinate gold (77/77 home dev) carries a decimal. sp2 discipline: runs
+    ONLY under ``eval_cross_type_arbitration`` — in production, over-masking
+    a date fragment is the safe direction.
+    """
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "GPS_COORDINATES"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+        ):
+            text = texts.get(finding.field_path, "")
+            if "." not in text[finding.span_start:finding.span_end]:
+                continue
+        out.append(finding)
+    return out
+
+
+# ── sp7 #7 numeric-identifier guards (ALL SCORING-ONLY suppressors) ─────────
+_GPS_MONEY = re.compile(r"^\$?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$")
+_GPS_RATING = re.compile(r"^\d{1,3}(?:\.\d+)?/\d{1,2}$")
+_SSN_POS = re.compile(
+    r"(?i)\b(?:ssn|social\s+security|social\s+insurance|taxpayer|tin)\b"
+)
+_SSN_SEQ = re.compile(
+    r"^(?:123456789|987654321|012345678|876543210|123123123|111111111|000000000)$"
+)
+_SSN_GLUE = frozenset({"=", "|", "&", ":"})
+
+
+def _drop_nongeo_gps(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """SCORING-ONLY: drop GPS spans whose FULL text is a money or rating shape
+    ("$1,125.00", "4.5/5") — real coordinate pairs never match these anchors.
+    The masking-path GPS pattern is untouched (sp6 leak lesson); paired with the
+    additive hemisphere pattern so GPS coverage never shrinks."""
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "GPS_COORDINATES"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            span = texts.get(f.field_path, "")[f.span_start:f.span_end]
+            if _GPS_MONEY.match(span) or _GPS_RATING.match(span):
+                continue
+        out.append(f)
+    return out
+
+
+def _drop_bare9_ssn_noncontext(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """SCORING-ONLY: drop a bare 9-digit US_SSN span that is a sequential
+    placeholder OR glued to a FIX/tag delimiter (=|&:), UNLESS a positive SSN
+    cue sits in the ±40-char window. Masking path keeps every candidate."""
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "US_SSN"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+        ):
+            text = texts.get(f.field_path, "")
+            span = text[f.span_start:f.span_end]
+            if span.isdigit() and len(span) == 9:
+                glued = f.span_start > 0 and text[f.span_start - 1] in _SSN_GLUE
+                window = text[max(0, f.span_start - 40):f.span_end + 40]
+                if (_SSN_SEQ.match(span) or glued) and not _SSN_POS.search(window):
+                    continue
+        out.append(f)
+    return out
+
+
+# NOTE: an IBAN mod-97 scoring-drop was prototyped and REJECTED — it removed
+# 225 home gold IBANs (home synthetic IBANs are checksum-invalid by
+# construction), a home-recall regression for negligible external gain. The
+# mining flag ("home-floor sign-off") was correct; the home floor moved, so the
+# guard is not shipped.
+
+
+def _apply_label_wins(
+    findings: list[EngineFinding], labeled: list[EngineFinding]
+) -> list[EngineFinding]:
+    """Merge A2 labeled-field findings with the pattern findings under a
+    leak-SAFE ``label-wins`` rule.
+
+    Two leak-safe moves, both preserving coverage:
+
+    1. **Defer to same-type pattern coverage.** A labeled finding is dropped
+       when a pattern finding of the SAME type already overlaps it — the
+       pattern already ruled on that span with its own validator/confidence
+       (checksum, length), so A2 must not override it (e.g. an invalid-ABA
+       routing number keeps the pattern's lower confidence, not A2's 0.90).
+    2. **Different-type label-wins relabel.** A pattern finding wholly
+       contained in a DIFFERENT-type surviving labeled span is dropped in
+       favour of the label's type — the value span stays covered by the
+       labeled finding, so masking is preserved (the sp6 "changes labels,
+       not coverage" invariant).
+
+    Runs on ALL paths: the merge is additive and every drop keeps the span
+    masked, so it is leak-safe by construction.
+    """
+    if not labeled:
+        return findings
+
+    def _spanned(a: EngineFinding, b: EngineFinding) -> bool:
+        return (
+            a.field_path == b.field_path
+            and a.span_start is not None
+            and a.span_end is not None
+            and b.span_start is not None
+            and b.span_end is not None
+        )
+
+    # 1) drop A2 findings the patterns already cover with the same type.
+    surviving: list[EngineFinding] = [
+        lab
+        for lab in labeled
+        if not any(
+            f.entity_type == lab.entity_type
+            and _spanned(f, lab)
+            and f.span_start < lab.span_end  # type: ignore[operator]
+            and lab.span_start < f.span_end  # type: ignore[operator]
+            for f in findings
+        )
+    ]
+
+    # 2) relabel: drop pattern findings contained in a different-type label.
+    kept: list[EngineFinding] = []
+    for f in findings:
+        shadowed = any(
+            lab.entity_type != f.entity_type
+            and _spanned(lab, f)
+            and lab.span_start <= f.span_start  # type: ignore[operator]
+            and f.span_end <= lab.span_end  # type: ignore[operator]
+            for lab in surviving
+        )
+        if not shadowed:
+            kept.append(f)
+    return kept + surviving
+
+
+def _drop_person_shadowed_by_specific(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop PERSON_NAME findings covered by a specific-type finding's span."""
+    shadow_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type in _PERSON_SHADOWING_TYPES
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not shadow_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "PERSON_NAME"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+            and any(
+                field == finding.field_path
+                and start <= finding.span_start
+                and finding.span_end <= end
+                for field, start, end in shadow_spans
+            )
+        ):
+            continue
+        out.append(finding)
+    return out
+
+
+#: birth cue for sp7 A3 DOB promotion (word-bounded so "reborn" never fires).
+_BIRTH_CUE_RE = re.compile(
+    r"(?i)\b(?:born|d\.?o\.?b\.?|date\s+of\s+birth|birth\s*date|birthday|bday)\b"
+)
+_PROMOTABLE_DATE_TYPES = frozenset({"DATE_TIME", "DATE_ISO"})
+
+
+def _promote_dob_by_cue(
+    findings: list[EngineFinding], texts: dict[str | None, str]
+) -> list[EngineFinding]:
+    """Re-type a general date to ``DATE_OF_BIRTH`` when a birth cue precedes it
+    within ~30 chars (sp7 A3, mining candidate #5).
+
+    Leak-SAFE relabel: the span stays covered/masked either way; only the type
+    changes. Cue-gated (``born``/``DOB``/``date of birth`` word-bounded) for
+    precision. Runs on ALL paths — masking is preserved and DOB is the more
+    specific, more-protective type. The A2 labeled-field bridge already handles
+    the clean ``Date of Birth: <value>`` form; this catches prose cues
+    ("was born on 27 May 1994") the bridge does not.
+    """
+    for f in findings:
+        if (
+            f.entity_type in _PROMOTABLE_DATE_TYPES
+            and isinstance(f.span_start, int)
+        ):
+            text = texts.get(f.field_path)
+            if not text:
+                continue
+            window = text[max(0, f.span_start - 30) : f.span_start]
+            if _BIRTH_CUE_RE.search(window):
+                f.entity_type = "DATE_OF_BIRTH"
+    return findings
+
+
+def _drop_location_nested_in_address(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop a gazetteer LOCATION wholly contained in an ADDRESS/GPS span (sp7
+    #9). Leak-SAFE: the covering ADDRESS/GPS still masks those characters, so
+    the nested duplicate is a pure false positive under one-to-one scoring."""
+    cover = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type in ("ADDRESS", "GPS_COORDINATES")
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not cover:
+        return findings
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "LOCATION"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+            and any(
+                field == f.field_path and s <= f.span_start and f.span_end <= e
+                for field, s, e in cover
+            )
+        ):
+            continue
+        out.append(f)
+    return out
+
+
+def _drop_ssn_shadowed_national_id(
+    findings: list[EngineFinding],
+) -> list[EngineFinding]:
+    """Drop a NATIONAL_ID finding whose span a US_SSN finding already covers
+    (sp7 panel, multilingual lens). "Tax ID: 573-33-7773" matched BOTH the SSN
+    pattern and the labeled national-id pattern on the SAME span — under
+    one-to-one strict scoring the second is a pure FP (dominant in the
+    zh/ko/hi/ar home docs, which scaffold SSN-format values behind an English
+    "Tax ID:" label). Leak-SAFE (the _drop_dob_shadowed_dates class): the
+    surviving US_SSN still masks the region, so this runs on ALL paths."""
+    ssn_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type == "US_SSN"
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not ssn_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for f in findings:
+        if (
+            f.entity_type == "NATIONAL_ID"
+            and isinstance(f.span_start, int)
+            and isinstance(f.span_end, int)
+            and any(
+                field == f.field_path and s <= f.span_start and f.span_end <= e
+                for field, s, e in ssn_spans
+            )
+        ):
+            continue
+        out.append(f)
+    return out
+
+
+def _drop_dob_shadowed_dates(findings: list[EngineFinding]) -> list[EngineFinding]:
+    """Drop generic ``DATE_TIME`` findings overlapping a ``DATE_OF_BIRTH``.
+
+    A date in DOB context is annotated DATE_OF_BIRTH, never ALSO a generic
+    date — under exact-span scoring the second typed span on the same text
+    is a pure false positive ("DOB: 12/28/1966" must yield one finding).
+    """
+    dob_spans = [
+        (f.field_path, f.span_start, f.span_end)
+        for f in findings
+        if f.entity_type == "DATE_OF_BIRTH"
+        and isinstance(f.span_start, int)
+        and isinstance(f.span_end, int)
+    ]
+    if not dob_spans:
+        return findings
+    out: list[EngineFinding] = []
+    for finding in findings:
+        if (
+            finding.entity_type == "DATE_TIME"
+            and isinstance(finding.span_start, int)
+            and isinstance(finding.span_end, int)
+            and any(
+                field == finding.field_path
+                and finding.span_start < end
+                and start < finding.span_end
+                for field, start, end in dob_spans
+            )
+        ):
+            continue
+        out.append(finding)
+    return out
+
+
+def _drop_nested_same_type(findings: list[EngineFinding]) -> list[EngineFinding]:
+    """Drop same-type findings nested inside (or duplicating) a kept span.
+
+    Several patterns per entity type legitimately match one mention
+    ("Melissa" via surname-context inside "Melissa White" via full-name;
+    two phone patterns on the same number). Under multiset exact-span
+    scoring every nested or duplicate emission is a pure false positive.
+    Per ``(field_path, entity_type)`` group, keep maximal spans: longest
+    first, then earliest start, then highest confidence; a span equal to
+    or strictly contained in a kept span is dropped. Original list order
+    is preserved for the survivors (downstream fusion is order-sensitive).
+    """
+    if len(findings) < 2:
+        return findings
+    groups: dict[tuple[str | None, str], list[EngineFinding]] = {}
+    spanless: list[EngineFinding] = []
+    for finding in findings:
+        if isinstance(finding.span_start, int) and isinstance(finding.span_end, int):
+            groups.setdefault((finding.field_path, finding.entity_type), []).append(finding)
+        else:
+            spanless.append(finding)
+
+    keep: set[int] = {id(f) for f in spanless}
+    for group in groups.values():
+        kept: list[EngineFinding] = []
+        for finding in sorted(
+            group,
+            key=lambda f: (
+                -(f.span_end - f.span_start),  # type: ignore[operator]
+                f.span_start,
+                -f.confidence,
+            ),
+        ):
+            contained = any(
+                k.span_start <= finding.span_start and finding.span_end <= k.span_end  # type: ignore[operator]
+                for k in kept
+            )
+            if not contained:
+                kept.append(finding)
+                keep.add(id(finding))
+    return [f for f in findings if id(f) in keep]
+
 
 # ISO 3166-1 alpha-2 country codes — used by the ``swift_context``
 # validator to reject BIC-shaped strings whose country-code pair is
@@ -326,8 +966,23 @@ class RegexEngineAdapter(EngineAdapter):
         enabled: bool = True,
         deny_list_config: dict[str, Any] | None = None,
         allow_list_config: dict[str, Any] | None = None,
+        eval_cross_type_arbitration: bool = False,
+        unicode_normalize_detection: bool = True,
     ) -> None:
         super().__init__(enabled=enabled)
+        # sp7 panel: strip zero-width / fold fullwidth chars for DETECTION so
+        # obfuscated PII ("SSN: 123<ZWSP>-45-6789", fullwidth phones) cannot
+        # evade the masking path. ASCII text takes a C-speed identity fast path
+        # (byte-identical behaviour); spans are remapped to ORIGINAL offsets.
+        self._unicode_normalize = unicode_normalize_detection
+        # Cross-type arbitration (drop a generic PERSON_NAME when a more
+        # specific type covers the same span) is an EVAL-ONLY precision
+        # optimisation. It is OFF by default because in the production
+        # masking path most specific shadowing types (JOB_TITLE,
+        # HEALTH_CONDITION, ...) are NOT masked downstream — dropping the
+        # PERSON_NAME there would LEAK the name (the safe direction is to
+        # over-mask). Benchmark predictors opt in; production never does.
+        self._eval_cross_type_arbitration = eval_cross_type_arbitration
         self._list_mgr = DenyListManager(
             deny_config=deny_list_config,
             allow_config=allow_list_config,
@@ -354,6 +1009,10 @@ class RegexEngineAdapter(EngineAdapter):
                     context_window=conf.get("context_window"),
                     confidence_cap=conf.get("confidence_cap"),
                     confidence_floor=conf.get("confidence_floor"),
+                    # Not (yet) a ConfidenceConfig schema field — forwarded
+                    # when present in dict-form config; absent -> None ->
+                    # the module default is preserved.
+                    negative_context_penalty=conf.get("negative_context_penalty"),
                 )
 
     def capabilities(self) -> EngineCapabilities:
@@ -447,6 +1106,7 @@ class RegexEngineAdapter(EngineAdapter):
             Detected PII findings with confidence scores.
         """
         findings: list[EngineFinding] = []
+        labeled: list[EngineFinding] = []
         if not self.enabled:
             return findings
 
@@ -455,6 +1115,55 @@ class RegexEngineAdapter(EngineAdapter):
         for key, value in payload.items():
             if not isinstance(value, str):
                 continue
+
+            # sp7 panel: normalize for detection (strip zero-width, fold
+            # fullwidth). Rebind ``value`` to the normalized scan-text so the
+            # whole loop body runs against it; the field's new spans are
+            # remapped back to ORIGINAL offsets at the loop bottom. ASCII text
+            # returns (value, None) — identity, byte-identical behaviour.
+            _f0, _l0 = len(findings), len(labeled)
+            _norm_map: list[int] | None = None
+            if self._unicode_normalize:
+                value, _norm_map = normalize_for_detection(value)
+
+            # ── A2 labeled-field value bridge (additive, all paths) ─
+            # A value behind an unambiguous field-label cue ("SSN:",
+            # "Date of Birth:") typed FROM THE LABEL. Additive recall +
+            # leak-safe relabel via _apply_label_wins below.
+            for etype, l_start, l_end, l_conf in extract_labeled_fields(value):
+                labeled.append(
+                    EngineFinding(
+                        entity_type=etype,
+                        confidence=l_conf,
+                        field_path=key,
+                        span_start=l_start,
+                        span_end=l_end,
+                        engine_id=self.adapter_id,
+                        explanation="labeled-field cue->value bridge (sp7 A2)",
+                        language=language,
+                    )
+                )
+
+            # ── #9 geo gazetteer (additive LOCATION, all paths) ────
+            # entity_type stays LOCATION (home strict scoring byte-identical);
+            # the STATE/COUNTRY subtype is surfaced on the explanation as an
+            # advisory taxonomy signal (sp7 geo taxonomy — metadata, not a
+            # scored type: a library-side type-split would drop the 1251 home
+            # LOCATION gold under exact-type scoring).
+            for etype, g_start, g_end, g_conf in extract_locations(value):
+                _subtype = geo_subtype(value[g_start:g_end])
+                labeled.append(
+                    EngineFinding(
+                        entity_type=etype,
+                        confidence=g_conf,
+                        field_path=key,
+                        span_start=g_start,
+                        span_end=g_end,
+                        engine_id=self.adapter_id,
+                        explanation=f"geo gazetteer location (sp7 #9) [subtype={_subtype}]",
+                        language=language,
+                    )
+                )
 
             # ── Performance pre-filter signals ─────────────────────
             # Computed once per field to skip patterns that cannot match.
@@ -529,6 +1238,15 @@ class RegexEngineAdapter(EngineAdapter):
                         confidence = adjust_confidence(
                             spec.context_type, confidence, value, span_start, span_end,
                         )
+                    else:
+                        # Specs without context scoring (e.g. ORGANIZATION)
+                        # still get the negative-context demotion: a window
+                        # naming ANOTHER identifier's field label demotes
+                        # the finding below the emit floor. No-op for
+                        # entity types without NEGATIVE_CONTEXT_WORDS.
+                        confidence = apply_negative_context(
+                            spec.entity_type, confidence, value, span_start, span_end,
+                        )
 
                     # ── Confidence threshold filter ────────────────
                     # Suppress low-confidence findings to reduce false
@@ -551,7 +1269,61 @@ class RegexEngineAdapter(EngineAdapter):
                         )
                     )
 
-        return findings
+            # sp7 panel: remap THIS field's new spans from normalized coords
+            # back to the ORIGINAL text, so masking replaces the exact original
+            # region (incl. any interior obfuscation chars). No-op on the ASCII
+            # fast path (_norm_map is None).
+            if _norm_map is not None:
+                for _fnd in findings[_f0:]:
+                    if isinstance(_fnd.span_start, int) and isinstance(_fnd.span_end, int):
+                        _fnd.span_start, _fnd.span_end = remap_span(
+                            _norm_map, _fnd.span_start, _fnd.span_end
+                        )
+                for _lbl in labeled[_l0:]:
+                    if isinstance(_lbl.span_start, int) and isinstance(_lbl.span_end, int):
+                        _lbl.span_start, _lbl.span_end = remap_span(
+                            _norm_map, _lbl.span_start, _lbl.span_end
+                        )
+
+        # _drop_nested_same_type (same-type containment) and
+        # _drop_dob_shadowed_dates (DOB ⊇ region, both masked) are
+        # LEAK-SAFE — the surviving span still covers the dropped region
+        # with a masked type, so they always run. Cross-type PERSON
+        # arbitration + the undecimaled-GPS drop are EVAL-ONLY (see
+        # __init__ and _drop_undecimaled_gps — the sp6 close).
+        # A2: merge labeled-field findings (additive) with the leak-safe
+        # label-wins relabel, BEFORE the drop pipeline so downstream dedup
+        # sees the final type assignment. Runs on all paths.
+        findings = _apply_label_wins(findings, labeled)
+        # A3: promote general dates behind a birth cue to DATE_OF_BIRTH
+        # (leak-safe relabel, all paths), then drop the now-shadowed dates.
+        text_all: dict[str | None, str] = {
+            k: v for k, v in payload.items() if isinstance(v, str)
+        }
+        findings = _promote_dob_by_cue(findings, text_all)
+        findings = _drop_location_nested_in_address(findings)
+        findings = _drop_ssn_shadowed_national_id(findings)
+        findings = _drop_dob_shadowed_dates(findings)
+        if self._eval_cross_type_arbitration:
+            # text_all (built above for the DOB promotion) already holds the
+            # str fields — no need to rebuild the same dict (sp7 panel).
+            findings = _drop_person_shadowed_by_specific(findings)
+            findings = _drop_undecimaled_gps(findings, text_all)
+            findings = _drop_nongeo_gps(findings, text_all)
+            findings = _drop_bare9_ssn_noncontext(findings, text_all)
+            findings = _drop_titlecase_noise_person(findings, text_all)
+            findings = _trim_salutation_led_person(findings, text_all)
+        # sp7 #6 mention-propagation (ADDITIVE, all paths): seed from the
+        # PERSON_NAMEs that survived arbitration and propagate their surnames to
+        # bare standalone mentions the grammar missed. Masks MORE (leak-safe).
+        findings = _propagate_surname_mentions(
+            findings,
+            text_all,
+            adapter_id=self.adapter_id,
+            language=language,
+            is_denied=self._is_denied,
+        )
+        return _drop_nested_same_type(findings)
 
     # ── Custom validator handlers ──────────────────────────────────────
 

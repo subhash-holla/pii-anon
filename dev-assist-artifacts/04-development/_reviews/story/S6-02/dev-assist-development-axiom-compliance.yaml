@@ -1,0 +1,231 @@
+# Story-gate review — axiom-compliance (PRIMARY)
+schema: dev-assist/reviewer-output/v1
+review:
+  gate: story
+  story_id: S6-02
+  story_title: "4-channel least-privilege interception + no-raw-PII-persist (DC-13)"
+  iteration: 2
+  dimension: axiom-compliance
+  role: PRIMARY
+  reviewer: dev-assist-development-axiom-compliance
+  model: claude-opus-4-8[1m]
+  timestamp: "2026-06-04T00:00:00Z"
+  base_commit: "0bb61b4"          # iter-1 head (pre-remediation S6-02)
+  head_commit: "83b73bf"          # security-MAJOR remediation: keyed surrogate
+  diff_range: "0bb61b4..83b73bf"
+  re_review_of_iteration: 1
+  re_review_trigger: >
+    iter-1 was APPROVE (axiom) but the 5-gate close returned REQUEST_CHANGES on a
+    security-sast MAJOR (security-S6-02-01: keyless-BLAKE2b surrogate offline
+    dictionary-reversible). The remediation KEYS the surrogate (keyless BLAKE2b ->
+    keyed HMAC-SHA256) and mints a random per-instance key at CONSTRUCTION via
+    secrets.token_bytes(32). This re-review confirms the determinism axiom
+    (AX-002) STILL HOLDS after that change and that AX-006/AX-001/no-plaintext are
+    unchanged.
+  files_reviewed:
+    - src/pii_anon/agentic/interception.py
+    - tests/test_agentic_interception.py
+    - dev-assist-artifacts/04-development/02-stories/sprint-6/S6-02-four-channel-interception.md
+  consumed_read_only:
+    - src/pii_anon/tokenization/store.py
+    - src/pii_anon/tokenization/encrypted_store.py
+    - src/pii_anon/tokenization/providers.py
+    - src/pii_anon/errors.py
+  axioms_in_scope:
+    - id: AX-pii-anon-006
+      name: least-privilege-agentic-interception
+      verdict: UPHELD
+    - id: AX-pii-anon-002
+      name: deterministic-reproducible-pseudonymization
+      verdict: UPHELD          # FOCUS of this re-review — re-verified post-keying
+    - id: AX-pii-anon-001
+      name: synthetic-only-no-real-pii
+      verdict: UPHELD
+    - id: AX-pii-anon-003
+      name: ensemble-recall-floor-guarantee
+      verdict: NOT_TRIGGERED   # agentic-masking surface; not on the detection-fusion/recall path
+  source_packs_loaded: []      # no domain_packs reviewer-extension for axiom-compliance present for this story
+
+verdict: APPROVE
+
+summary: >
+  S6-02 remediation (83b73bf) is axiom-clean and the keyed-surrogate change does
+  NOT regress any axiom in scope. The re-review FOCUS — AX-002 (determinism) under
+  the new keyed/HMAC path with construction-time RNG — HOLDS with margin, verified
+  by independent probes (not just by re-running the executor's tests):
+
+  (1) DETERMINISM PER FIXED KEY. With an injected fixed surrogate_key, two
+  independent FourChannelGuard instances produce byte-identical masked_text,
+  identical InterceptionRecord tuples, AND identical ledger as_dict() across all
+  four channels (independently reproduced). _keyed_token_id under a fixed key is a
+  pure function: 2000 repeat calls yield exactly ONE distinct token id. The
+  per-mask path (HMAC over (scope, entity_type, raw)) carries no per-call RNG or
+  clock. test_ax002_a9_deterministic_replay now correctly INJECTS FIXED_KEY into
+  both guards and asserts byte-identical masked output + records (the FR-030
+  reproducible path); the prior keyless-default formulation would have masked a
+  re-introduced nondeterminism, so pinning the key is the right reconciliation.
+
+  (2) CONSTRUCTION-TIME RNG IS SOUND (does not violate per-mask determinism).
+  secrets.token_bytes is invoked ONCE in FourChannelGuard.__post_init__ to mint a
+  per-instance key when none is injected (secure-by-default). Independent AST
+  walk of the real module confirms: random/uuid/time are absent (banned); the ONLY
+  function referencing the name `secrets` is __post_init__; the ONLY secrets.*
+  attribute used is token_bytes; and the per-mask functions mask /
+  _keyed_token_id / _make_surrogate reference `secrets` ZERO times. The
+  reconciliation in test_ax002_a9_no_nondeterministic_imports_on_path — ban
+  random/uuid/time outright, ALLOW secrets/os for construction-only key gen, and
+  AST-assert the per-mask path never names `secrets` — is exactly the correct and
+  minimal carve-out. Construction-time key generation is a per-instance setup
+  choice, not part of the input->output mask transform, so AX-002's "identical
+  inputs (including the key) -> identical outputs" contract is preserved; the
+  axiom was always per-key (a pseudonymization key is part of the reproducible
+  input set, cf. FR-030 / the canonical DeterministicHMACTokenizer).
+
+  (3) THE KEYING DID NOT BUY DETERMINISM AT THE COST OF RE-IDENTIFIABILITY.
+  Independently confirmed the inverse property the security MAJOR demanded: the
+  same raw value under two different keys yields different surrogates, and the
+  attacker's exact offline keyless-BLAKE2b dictionary guess over a candidate set
+  that CONTAINS the true synthetic value never reproduces the keyed surrogate.
+  AX-002 and the de-identification fix are jointly satisfied.
+
+  UNCHANGED INVARIANTS RE-CONFIRMED (the remediation touched only the surrogate
+  derivation + docstrings + test names, so these should be untouched — verified):
+  AX-006 least-privilege — TRACE/PROMPT/TOOL_IO each write 0 rows to an injected
+  AEAD store; only MEMORY (reversible) persists exactly 1; the persisted
+  TokenMapping.plaintext == surrogate (surrogate->surrogate, raw never reaches the
+  store). FR-026 no-raw-persist — an independent leaky masker still RAISES
+  NoRawPIIPersistError. No-plaintext — InterceptionRecord fields are surrogate-only
+  {channel,entity_type,surrogate,span_start,span_end,scope}; ledger JSON carries
+  no raw email/phone. AX-001 — fixtures use only the reserved example.test TLD
+  (no real-domain literal). AX-003 adjacency clean — diff scope is exactly the 3
+  expected files; no detection/fusion/recall-floor/SDO file touched.
+
+  iter-1 OBS-2 (the store holds surrogate->surrogate, so the surface as-built
+  cannot reverse-to-raw) is now HONESTLY DOCUMENTED: _persist and the
+  reversible_channels param doc describe "surrogate -> surrogate linkage record"
+  (plaintext column receives the surrogate, raw never written) and explicitly
+  defer true authorized reversal-to-raw to FR-027 (session pseudonyms), out of
+  S6-02 scope. OBS-2 is RESOLVED. iter-1 OBS-1 (fragment re-injection by a
+  hypothetical adversarial custom masker is out of the whole-value invariant's
+  scope) is UNCHANGED by this remediation and CARRIED FORWARD as a threat-model
+  note for S6-04 / a real engine masker — it remains a depth-of-invariant
+  observation, not an axiom violation for any path this story ships.
+
+  Gates re-verified in the working tree: ruff clean; mypy src/pii_anon clean (133
+  files); agentic suite 24 passed (A1-A11 + 5 renamed edge); targeted axiom subset
+  (A11/A9/A5/A6/A3/A8) 10 passed. Protected/user-WIP byte-identical: orchestrator
+  0afc6dee…, competitor_compare 7cae16c8… (memory-stable), errors 1d3ed9f7…,
+  encrypted_store 132fa3c1…, reidentification c2367ed6…, providers b891811d… —
+  all unchanged; SDO gate competitive_supremacy.py untouched. No axiom finding at
+  MINOR or above; the single carried-forward item is an OBSERVATION.
+
+findings:
+  - id: AX-S602-OBS-1
+    severity: OBSERVATION
+    axiom: AX-pii-anon-006
+    location: src/pii_anon/agentic/interception.py (_known_raw_values + _assert_no_raw_pii)
+    title: "[carried from iter-1, unchanged by remediation] no-raw-persist invariant keys on the FULL spanned value — a fragment re-injection by an adversarial CUSTOM masker is not scanned"
+    description: >
+      Unchanged by 83b73bf (the remediation touched surrogate derivation, not the
+      invariant). _known_raw_values forbids, per record, the EXACT source
+      substring source_text[span_start:span_end]; _assert_no_raw_pii checks
+      `raw in masked_text`. This catches the story's headline threat — a masker
+      that LIES and leaves the WHOLE raw value un-masked (verified RAISES, both
+      iter-1 and iter-2). It does NOT catch a hypothetical adversarial custom
+      masker that masks the full span but re-injects a FRAGMENT of the raw value
+      in the clear. NOT an axiom violation: (a) the in-tree _DefaultMasker never
+      partial-re-injects — it replaces each full match with a surrogate; (b) the
+      invariant's documented contract is the whole spanned values masking CLAIMS
+      to have removed, which is internally consistent; (c) a production
+      engine-backed masker that fragments a value would be a masker bug surfaced
+      by that masker's own tests. AX-006's passing criterion (no raw PII written
+      post-masking) is met for every path this story ships. Raised so the threat
+      model is explicit when S6-04 (BYO-SDK adapter) or a real engine masker lands.
+    suggested_resolution: >
+      No change required for S6-02. Track as a threat-model note for S6-04 /
+      real-masker integration: either (a) re-run the default detectors over
+      masked_text as a backstop and forbid any detector match the masker did not
+      account for, or (b) document in the ChannelMasker Protocol docstring that
+      implementations MUST NOT emit any substring of a masked raw value, making
+      fragment-safety an explicit contract the invariant assumes.
+    blocking: false
+
+resolved_findings:
+  - id: AX-S602-OBS-2
+    severity_was: OBSERVATION
+    axiom: AX-pii-anon-006
+    resolution: DOCUMENTED
+    note: >
+      iter-1 OBS-2 (reversible channel persists surrogate->surrogate via
+      plaintext=surrogate, so the surface as-built cannot reverse-to-raw and a
+      consumer expecting store.get(surrogate).plaintext == raw would be surprised)
+      is resolved by honest docstrings in 83b73bf: _persist now reads "Persist a
+      surrogate -> surrogate linkage record … the plaintext column … receives the
+      surrogate … no raw value is ever written … True surrogate -> raw reversal is
+      FR-027 (session pseudonyms) and is out of S6-02's scope", and the
+      reversible_channels param doc matches ("surrogate -> surrogate linkage
+      record … plaintext column receives the SURROGATE, never raw PII"). The
+      stronger-than-promised AX-006/FR-026 reading (no raw at the store at all) is
+      now stated, not implicit. Verified read-back plaintext == surrogate, never
+      the raw email.
+
+axiom_checks:
+  AX-pii-anon-006:
+    least_privilege_trace_never_reverses_by_default: PASS   # store rows==0 after TRACE; independently re-verified (A5)
+    only_reversible_channels_persist: PASS                  # PROMPT/TOOL_IO/TRACE all write 0; MEMORY (reversible) writes 1
+    non_reversible_writes_nothing_to_store: PASS            # A5; re-verified post-remediation
+    no_raw_pii_persisted_post_masking: PASS                 # _persist writes surrogate (==surrogate), not raw; read-back is surrogate-only
+    assert_no_raw_pii_raises_on_masked_text_leak: PASS      # NoRawPIIPersistError raised (A4 + independent leaky-masker probe)
+    assert_no_raw_pii_scans_persisted_record: PASS          # scans serialized record per known raw value
+    capability_surface_not_broadened: PASS                  # standalone lib; not wired to orchestrator; imports only stdlib+tokenization+errors
+    persist_docstring_honest_surrogate_to_surrogate: PASS   # OBS-2 resolved; FR-027 reversal explicitly deferred
+  AX-pii-anon-002:
+    byte_identical_replay_under_fixed_key: PASS             # masked_text + records + as_dict identical across 2 guards w/ FIXED_KEY (A9 + probe)
+    keyed_token_id_is_pure_fn_under_fixed_key: PASS         # 2000 repeat calls -> 1 distinct token id (independent probe)
+    surrogate_is_keyed_hmac_sha256: PASS                    # hmac.new(key, (scope,entity,raw), sha256); keyless BLAKE2b removed
+    construction_time_rng_only_not_per_mask: PASS           # AST: `secrets` referenced ONLY in __post_init__; per-mask fns reference it 0x
+    secrets_attribute_used_is_token_bytes_only: PASS        # AST: only secrets.token_bytes; minted once at construction
+    zero_random_uuid_time_imports: PASS                     # AST: random/uuid/time absent (banned outright, A9 + independent AST scan)
+    determinism_reconciliation_test_sound: PASS             # A9 import-test bans random/uuid/time, allows secrets/os construction-only, AST-asserts per-mask path never names secrets, re-proves fixed-key byte-identical replay
+    raw_not_recoverable_from_surrogate: PASS                # keyed image only; different key -> different surrogate; keyless dict guess never lands (A11)
+  AX-pii-anon-001:
+    synthetic_fixtures_only: PASS                           # jane.roe@example.test / 555-0100 — example.test reserved TLD; no real-domain literal
+    no_real_pii_literals_in_tests: PASS
+  AX-pii-anon-003:
+    not_triggered_recall_floor_untouched: PASS              # diff scope = interception.py + tests + story doc; no detection/fusion/floor/SDO path touched
+  no_plaintext_invariant:
+    record_has_no_raw_value_field: PASS                     # fields == {channel,entity_type,surrogate,span_start,span_end,scope}; frozen+slots
+    ledger_as_dict_surrogate_only: PASS                     # JSON blob carries no raw email/phone (A8)
+  protected_files_byte_identical: PASS                      # orchestrator 0afc6dee…; competitor_compare 7cae16c8…; errors 1d3ed9f7…; encrypted_store 132fa3c1…; reidentification c2367ed6…; providers b891811d…
+  diff_scope_minimal: PASS                                  # 83b73bf touches exactly 3 files: interception.py + tests + story doc
+
+verification_performed:
+  - "Ran tests/test_agentic_interception.py -o addopts='' -q ⇒ 24 passed (exit 0)."
+  - "Ran targeted axiom subset (A11/A9/A5/A6/A3/A8) ⇒ 10 passed; mypy src/pii_anon ⇒ Success (133 files)."
+  - "Independent FIXED-KEY determinism probe: 2 guards w/ surrogate_key=b'\\x11'*32 ⇒ byte-identical masked_text + identical records + identical ledger as_dict across all 4 channels."
+  - "Independent pure-function probe: _keyed_token_id(FIXED_KEY, scope, EMAIL, raw) over 2000 calls ⇒ exactly 1 distinct token id (no per-call RNG/clock)."
+  - "Independent AST walk of real interception.py: random/uuid/time absent; the only function naming `secrets` is __post_init__; only secrets.* attribute is token_bytes; per-mask fns {mask,_keyed_token_id,_make_surrogate} name `secrets` 0 times."
+  - "Independent secure-by-default probe: 8 default (no-key) guards mask same value ⇒ 8 DISTINCT surrogates (random per-instance key); same value under K1 vs K2 ⇒ different surrogate."
+  - "Independent AX-006 least-privilege probe (real AEAD store): TRACE+PROMPT+TOOL_IO ⇒ store.count()==0; MEMORY (reversible) ⇒ 1; read-back plaintext == surrogate, raw absent."
+  - "Independent FR-026 probe: leaky masker (leaves whole raw value) ⇒ NoRawPIIPersistError raised."
+  - "Independent fragment-leak consideration ⇒ unchanged by remediation; carried as OBS-1 (out of this story's whole-value invariant scope)."
+  - "Docstring honesty check: _persist + reversible_channels doc now state surrogate->surrogate + defer reversal to FR-027 (OBS-2 resolved)."
+  - "Protected md5 (working tree): orchestrator 0afc6deed62bbd0653ae1051b723bace; competitor_compare 7cae16c89f4c97136e1a12394dae2025; errors 1d3ed9f784d425b25e76ed776a215a95; encrypted_store 132fa3c1b6ee14a98a7d3c6c8eb0b94f; reidentification c2367ed62cb3e2a123ba88b8a3697751; providers b891811d449e4c12af587e1ef7914a90."
+  - "Diff-scope check (git show 83b73bf --name-only) ⇒ interception.py + tests + story doc only; SDO competitive_supremacy.py untouched."
+
+context_bounds_respected: true
+
+self_attestation:
+  independent_review: true
+  no_collusion_with_executor: true
+  ran_own_verification: true
+  scope_adhered: >
+    Reviewed ONLY axiom-compliance (AX-006/002/001/003 + no-plaintext invariant),
+    with the re-review FOCUS on AX-002 determinism after the keyed-surrogate
+    remediation. Deferred the cryptographic adequacy of HMAC-SHA256 keying and the
+    secrets-token strength to security-sast (the gate that raised the MAJOR);
+    deferred AI-output correctness to traceability; provenance/coverage styling
+    and a11y to their owners; the AEAD-store internals to security-sast (consumed
+    read-only); finer latency to performance-benchmark. No findings outside the
+    axiom dimension. Confirmed the security MAJOR fix did not regress AX-002 and
+    did not re-introduce keyless re-identifiability.

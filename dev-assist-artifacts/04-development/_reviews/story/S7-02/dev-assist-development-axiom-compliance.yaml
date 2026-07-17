@@ -1,0 +1,214 @@
+reviewer: dev-assist-development-axiom-compliance
+
+scope_id: S7-02
+
+gate: story
+
+iteration: 2
+
+verdict: APPROVE
+
+findings:
+  - id: axiom-S7-02-01
+    severity: MAJOR
+    status: CLOSED
+    location: src/pii_anon/evaluation/canonical_run.py:153-426
+    description: |
+      [CLOSED in remediation commit 5496d3c — retained for the audit trail.]
+      iter-1 MAJOR (HONESTY / EPISTEMIC-PROVENANCE VIOLATION): the gate-read
+      G3/G6/J scalars (recall / precision / per_entity_recall) were a PRIOR run's
+      OUTPUT numbers — hardcoded BYTE-FOR-BYTE from benchmark-results.json
+      (git_sha 2761a27, whose OWN canonical_claim_run=False) via _CENSUS_PROFILES
+      + the _*_PER_ENTITY maps + _DetectionProfile — then re-stamped under FRESH
+      provenance (HEAD git_sha, scope=data-v2.0.0, canonical_claim_run=True), with
+      NO in-band disclosure. That presented prior-run numbers under fresh
+      provenance: a breach of AX-pii-anon-002's documented-derivation clause and
+      the project's "the gate must never trust artifact values" invariant.
+
+      VERIFICATION THAT IT IS CLOSED (re-read of 5496d3c + a live produce):
+      1. _CENSUS_PROFILES, _DetectionProfile, and ALL FIVE _*_PER_ENTITY literals
+         are DELETED from the module (git show confirms the removal; the only
+         remaining "census"/"per-entity" tokens are the new transparent reference
+         block + docstrings — NONE in the gate-read path).
+      2. _assemble_base_payload no longer branches on _CENSUS_PROFILES.get(name).
+         It takes recall / precision / per_entity_recall from the LIVE
+         compare_competitors report VERBATIM, and computes composite_score via the
+         REAL compute_composite over those FRESH detection-quality axes (recall /
+         precision / F1 / entity-coverage) + a FIXED, EQUAL-ACROSS-SYSTEMS
+         reference speed (_REFERENCE_LATENCY_MS / _REFERENCE_DOCS_PER_HOUR, fed
+         identically to every system — no fabricated per-system speed advantage).
+      3. Live produce confirms the gate-read systems are FRESH, not the census
+         literals: pii-anon recall=0.672761 (NOT the old 0.7958), gliner=0.714808
+         (NOT 0.6581), presidio=0.564899 (NOT 0.6308). The decisive numbers are
+         measured THIS run.
+      4. The census is DEMOTED to a TRANSPARENT top-level
+         `pass2_full_census_reference` block (source_git_sha=2761a27,
+         source_record_count=148994, source_canonical_claim_run=False) — a SIBLING
+         of `systems`, provably NEVER gate-read (the gate iterates
+         payload["systems"] at lines 584/688/806). This is in-band disclosure of
+         the census source for a Paper-1 reader — exactly iter-1
+         suggested_resolution path (1). The honesty axiom (no presenting prior-run
+         outputs under fresh provenance) is now UPHELD.
+    suggested_resolution: |
+      CLOSED — no action. The gate-read recall/precision/per_entity_recall are the
+      fresh THIS-run measurement; the census is a transparent, disclosed,
+      not-gate-read Pass-2 reference block.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-002
+      - dev-assist-artifacts/04-development/02-stories/sprint-7/S7-02-canonical-run-producer.md#2a
+
+  - id: axiom-S7-02-03
+    severity: MINOR
+    status: OPEN
+    location: src/pii_anon/evaluation/canonical_run.py:306-308
+    description: |
+      AXIOM-ADJACENT (spirit upheld, form lags) — a stale section comment. The
+      remediation made the gate-read composite FRESH-measured (verified above), but
+      the section banner above _assemble_base_payload still reads "Base payload
+      assembly (G1/G3/G6 fields — real detection + the census-validated composite
+      via the real compute_composite scorer)". The phrase "census-validated
+      composite" is now untrue of the code beneath it (the composite is the real
+      compute_composite over FRESH detection axes + an equal reference speed; there
+      is no census-validated profile anymore). This is a documentation-only lag —
+      every executable path and every emitted field is honest and fresh — so it is
+      a MINOR (the no-scope-laundering substance is fully met). The function's OWN
+      docstring (lines 326-340) is already correct ("FRESH detection measurement
+      ... no prior-run numbers"); only the banner comment is stale. Flagged so the
+      honesty narrative in the source is fully internally consistent and a future
+      reader is not misled by a leftover "census-validated" phrase.
+    suggested_resolution: |
+      Reword the line-307 section banner to drop "census-validated" (e.g. "Base
+      payload assembly (G1/G3/G6 fields — FRESH compare_competitors detection +
+      the real compute_composite over those fresh quality axes with an
+      equal-across-systems reference speed)"). Documentation-only; no code change.
+      Non-blocking — may be folded into the next REFACTOR touch of this file.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-002
+
+  - id: axiom-S7-02-02
+    severity: OBSERVATION
+    status: OPEN
+    location: src/pii_anon/evaluation/canonical_run.py
+    description: |
+      AX-pii-anon-004 (anon/pseudo separation) — UPHELD, carried forward from iter-1
+      as a forward-notice (no regression). The two family fields remain SEPARATE
+      keys from SEPARATE scorer classes (verified live: anonymization_score=1.0 and
+      pseudonymization_integrity_score=1.0 on pii-anon are two coincidentally-equal
+      outputs from two distinct scorers in this synthetic perfect case, NOT one
+      merged number). The SO-11 honest-competitor pseudonymization_integrity_score
+      is a HARDCODED structural 0.0 for irreversible incumbents (verified live:
+      gliner/presidio/scrubadub=0.0, pii-anon-swarm=1.0). If a future Tier-R
+      competitor ever GAINS a reversible-under-key scheme, that literal must become
+      a real PseudonymizationIntegrityScorer call or it would understate a real
+      comparator.
+    suggested_resolution: |
+      No change this story. When/if a Tier-R competitor gains a reversible-under-key
+      scheme, replace the literal 0.0 with a real PseudonymizationIntegrityScorer
+      call over that competitor's output.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-004
+
+notes: |
+  Story-gate axiom RE-REVIEW of S7-02 (the canonical-run producer KEYSTONE),
+  ITERATION 2 — re-review after remediation commit 5496d3c. Read-only, independent.
+  Reviewed `git show 5496d3c -- src/pii_anon/evaluation/canonical_run.py
+  src/pii_anon/eval_framework/evaluation/competitive_supremacy.py` against the
+  project axiom registry, re-read the post-remediation source, executed
+  produce_canonical_artifact() live (twice, parallel + single-threaded), drove
+  SupremacyVerdict.from_artifacts over the produced artifact, and ran the two
+  verification suites. VERDICT: APPROVE.
+
+  THE iter-1 MAJOR (axiom-S7-02-01) IS CLOSED.
+  * The census scalars are GONE from the gate-read path (_CENSUS_PROFILES /
+    _DetectionProfile / _*_PER_ENTITY deleted). The gate-read G3/G6/J
+    recall/precision/per_entity_recall/composite_score are FRESH-measured THIS run
+    by the live compare_competitors + the real compute_composite (verified: fresh
+    pii-anon recall=0.672761 != the old census literal 0.7958; gliner=0.714808 !=
+    0.6581; presidio=0.564899 != 0.6308 — the decisive numbers are this run's).
+  * The census survives ONLY as a TRANSPARENT top-level
+    `pass2_full_census_reference` block (source_git_sha=2761a27,
+    source_canonical_claim_run=False, source_record_count=148994), a sibling of
+    `systems` that the gate provably NEVER reads (the gate iterates
+    payload["systems"] at lines 584/688/806). This is the in-band disclosure my
+    iter-1 suggested_resolution path (1) required. The honesty/epistemic axiom is
+    now upheld: no prior-run outputs presented under fresh provenance.
+
+  THE VERDICT IS HONESTLY COMPUTED, NOT ENGINEERED — I APPROVE THE INTEGRITY.
+  * Live SupremacyVerdict.from_artifacts(produced) = NOT_YET, binding constraint
+    "G6 FAIL: core F2=0.6631 vs best Tier-R F2=0.7462" — a RAW-DETECTION axis.
+    canonical_claim_run=True with canonical_gate_missing=[] (the fail-closed
+    CanonicalRunGate certified every required field; the verdict is the gate's
+    honest read of the FRESH metrics, NOT a manufactured PROVISIONAL_SOTA). A
+    NOT_YET bound on a raw-detection non-inferiority axis is the correct, honest
+    output of from_artifacts over the fresh metrics — integrity-over-outcome. The
+    full-census re-run that certifies the composite/J/G6 dominance is openly
+    declared Pass-2. The keystone-teeth requirement (build → from_artifacts →
+    G1/G2/G4 NOT PENDING, G7 PASS, canonical_claim_run=True) is met with the
+    verdict whatever from_artifacts honestly yields (the story's DoD A10/A11 assert
+    verdict in {PROVISIONAL_SOTA, NOT_YET}, NOT a hardcoded PROVISIONAL_SOTA).
+
+  THE FOUR STILL-UPHELD AXIOMS DID NOT REGRESS (re-confirmed empirically):
+
+  AX-pii-anon-002 (determinism, NFR-005 / "AX-002") — UPHELD. Two
+  produce_canonical_artifact() calls — one enable_parallel=True, one False — are
+  BYTE-IDENTICAL modulo timestamp_utc (verified: json.dumps(strip_ts(a))==
+  strip_ts(b) is True). This confirms the remediation's parallel-invariance claim:
+  the gate-read detection-quality metrics (recall / precision / per_entity_recall +
+  the composite derived from them with a FIXED reference speed) are a pure function
+  of the record set, identical across parallel modes. The representative_in_tree_
+  detection side-block records ONLY {recall, precision, samples} (no wall-clock /
+  docs_per_hour), so the determinism is genuine. A18 + the new parallel-invariance
+  test pin it; 48/48 canonical-run tests pass.
+
+  AX-pii-anon-001 (synthetic-only, "AX-001") — UPHELD. The remediation only REMOVED
+  literals (the census recall/precision aggregates — statistics, never PII) and
+  added the _PASS2_FULL_CENSUS_REFERENCE block (two composite floats + provenance
+  strings — no PII) + _REFERENCE_LATENCY_MS/_REFERENCE_DOCS_PER_HOUR (operational
+  constants). No new PII literal entered the diff. The G1/G2/G4 synthetic-input →
+  live-scorer paths (verified clean iter-1) are UNCHANGED.
+
+  AX-pii-anon-003 (recall-floor not weakened, "AX-003") — UPHELD. build_fusion
+  ("swarm") consumption is unchanged (the producer records the per-language ε from
+  the live floored seam; worst ε=0.0 <= 0.005 — a live measurement). The gate's
+  RecallFloorVerdictGuard / the floor authority in competitive_supremacy.py is
+  untouched EXCEPT the sanctioned _is_finite_number wrap (below) — the floor logic
+  is byte-identical.
+
+  AX-pii-anon-004 (anon != pseudo, "AX-004") — UPHELD (see finding -02). Separate
+  keys from separate scorer classes; SO-11 competitors carry honest 0.0/1.0.
+
+  THE VECTOR-#11 GATE CHANGE STRENGTHENS THE NO-FABRICATION CONTRACT (does NOT
+  weaken it): the ONE sanctioned change to competitive_supremacy.py wraps
+  math.isfinite in `try/except (OverflowError, ValueError): return False`. A
+  Python int wider than a C double (10**400) previously CRASHED math.isfinite with
+  OverflowError (a fail-LOUD denial-of-verdict); it now returns False — a
+  fail-CLOSED REJECT. This makes a huge-int artifact field rejected instead of
+  crashing, STRENGTHENING every validator that routes through _is_finite_number
+  (_finite_unit_score, the G1 ε guard, the G4 coverage check). The diff is ONLY
+  that wrap (8 insertions / 1 deletion). The gate suite is 97/97 (zero regression);
+  ruff + mypy (src/pii_anon AND --strict, per the numpy gotcha) both clean.
+
+  OFF-LIMITS / ISOLATION — independently md5-verified byte-identical:
+  competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py
+  d9202479d84c519d5866b7d9d515c903; orchestrator.py 0afc6deed62bbd0653ae1051b723bace;
+  test_moe_enhancements.py 910e9cd66ad6e38c7bb64a9c51ecb1cb. The remediation diff
+  touches NO eval_framework file other than competitive_supremacy.py (the sanctioned
+  _is_finite_number wrap) and NOTHING under artifacts/benchmarks/* (verified: 0
+  matches). _write_canonical still refuses any path containing "benchmarks".
+
+  CATCH-NET NOTE (non-binding): finding -01 was the close's "scope-laundering"
+  vector (#7) generalized to scalar-provenance, and it is now resolved by making
+  the gate-read scalars fresh + disclosing the census source in-band. The MANDATORY
+  adversarial close (the 11 fabrication vectors, bar=0 upheld) remains the
+  orchestrator's next step after the 5/5 — and a clean close on this control-path
+  producer still earns its keep (per the standing catch-net rule).
+
+  Independence + self-attestation: rendered independently against the project axiom
+  registry + the post-remediation source + a live produce + the verification
+  suites. I did not consult other reviewers' S7-02 iter-2 outputs. Read only the
+  bounded set (story, the 5496d3c diff, the two touched modules, the axiom
+  registry, my own iter-1 YAML, test output).
+
+review_time_seconds: 1605
+
+context_bounds_respected: true

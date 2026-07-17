@@ -21,6 +21,12 @@ class FileFormat(str, Enum):
     PARQUET = "parquet"
     XML = "xml"
     HTML = "html"
+    # Native formats (S7-01, DC-14) — dispatched to ingestion.native readers.
+    PDF = "pdf"
+    PNG = "png"
+    JPEG = "jpeg"
+    DICOM = "dicom"
+    WAV = "wav"
 
 
 @dataclass
@@ -82,8 +88,19 @@ def detect_format(path: str) -> FileFormat:
         return FileFormat.XML
     if lower.endswith(".html") or lower.endswith(".htm"):
         return FileFormat.HTML
+    if lower.endswith(".pdf"):
+        return FileFormat.PDF
+    if lower.endswith(".png"):
+        return FileFormat.PNG
+    if lower.endswith(".jpg") or lower.endswith(".jpeg"):
+        return FileFormat.JPEG
+    if lower.endswith(".dcm") or lower.endswith(".dicom"):
+        return FileFormat.DICOM
+    if lower.endswith(".wav"):
+        return FileFormat.WAV
     raise ValueError(
         f"Cannot detect file format from extension: {path!r}. "
         f"Supported: .csv, .json, .jsonl, .ndjson, .txt, .text, "
-        f".parquet, .pq, .xml, .html, .htm"
+        f".parquet, .pq, .xml, .html, .htm, .pdf, .png, .jpg, .jpeg, "
+        f".dcm, .dicom, .wav"
     )

@@ -1,0 +1,107 @@
+reviewer: dev-assist-development-code-quality
+story: S6-02
+gate: story
+iteration: 2
+verdict: APPROVE
+
+findings: []
+
+notes: |
+  ITERATION-2 SUMMARY: Both iteration-1 MINORs are CLOSED. The keyed-surrogate
+  change is clean. Zero new findings.
+
+  --- MINOR CLOSURE CONFIRMATION ---
+
+  code-quality-S6-02-01 (surrogate->surrogate docstrings): CLOSED.
+    _persist docstring (interception.py:487) now reads: "Persist a surrogate ->
+    surrogate linkage record for a reversible channel. The ``plaintext`` column
+    of each TokenMapping receives the SURROGATE value (plaintext=rec.surrogate),
+    not the raw PII — no raw value is ever written to the store (FR-026)…
+    True surrogate -> raw reversal is FR-027 (session pseudonyms) and is out of
+    S6-02's scope."
+    The reversible_channels parameter doc (interception.py:370-375) now reads:
+    "permitted to persist a surrogate -> surrogate linkage record (the ``plaintext``
+    column receives the SURROGATE, never raw PII — see _persist). True authorized
+    reversal-to-raw is FR-027 (session pseudonyms) and is OUT OF S6-02's scope."
+    The previously-misleading "surrogate -> raw" language is gone throughout.
+    CLOSED.
+
+  code-quality-S6-02-02 (test_edge_* naming): CLOSED.
+    All 5 REFACTOR-phase edge tests now carry FR/AX prefixes, confirmed at the
+    correct lines:
+      line 606: test_ax001_edge_lazy_reexport_resolves_public_names
+      line 630: test_fr025_edge_default_masker_dedupes_overlapping_detectors
+      line 642: test_fr026_edge_known_values_skips_out_of_bounds_span
+      line 674: test_fr026_edge_persist_noop_without_store
+      line 689: test_fr025_edge_empty_text_yields_no_records
+    Naming is now consistent across all 24 tests. CLOSED.
+
+  --- KEYED-SURROGATE CHANGE ASSESSMENT (code quality) ---
+
+  _keyed_token_id / hmac.new usage: CLEAN. The function uses hmac.new (stdlib,
+  no new dependency) with hashlib.sha256 as the digestmod — the same primitive
+  family as DeterministicHMACTokenizer and encrypted_store.py's blind index.
+  No new crypto is introduced; the keyless BLAKE2b is removed. The function
+  signature (surrogate_key, scope, entity_type, raw_value) -> str is idiomatic,
+  has a full docstring explaining the two key properties (within-key determinism
+  and without-key non-reversibility), and is correct.
+
+  _DefaultMasker refactor: CLEAN. Converted from stateless module-level singleton
+  to a keyed instance (surrogate_key injected at construction, stored in
+  __slots__). FourChannelGuard gains the surrogate_key: bytes | None field;
+  __post_init__ mints secrets.token_bytes(32) when None is passed (secure-by-
+  default). The test confirms two default-constructed guards produce different
+  surrogates. All mypy-clean.
+
+  secrets scoping: CORRECT. secrets.token_bytes is called ONLY in
+  FourChannelGuard.__post_init__ (construction-time). The per-mask path
+  (_DefaultMasker.mask, _keyed_token_id, _make_surrogate) is proven free of
+  any secrets reference by the A9 AST test that walks each of those functions'
+  ASTs and asserts no Name node is 'secrets'. AX-002 determinism-under-a-fixed-
+  key is preserved.
+
+  _keyed_token_id imported in tests (line 51): OBSERVATION only. Importing a
+  module-private (_-prefixed) function in a test is a mild convention violation
+  (the function is in __all__ indirectly via inclusion in test fixtures), but the
+  import is load-bearing for A11's exact-key reconstruction probe
+  (test_fr026_a11_keyed_surrogate_resists_dictionary_reidentification line 518-521:
+  verifying that only FIXED_KEY reproduces the target surrogate). This is an
+  accepted pattern for security proof-of-correctness tests that must verify the
+  internal primitive directly. Not a blocking finding.
+
+  New A11 tests: WELL-FORMED. Both test_fr026_a11_* carry FR-026 prefixes,
+  document the security guarantee clearly, and the probe logic is correct: (1)
+  two different keys yield different surrogates for the same input; (2) the
+  attacker's keyless blake2b offline guess does not match the keyed HMAC
+  surrogate; (3) wrong key misses, right key hits.
+
+  --- GATE CHECKS (re-verified) ---
+
+  Lint: ruff check src tests — All checks passed (re-run confirmed).
+  Type: mypy src/pii_anon (config strict=true, 133 files) — Success: no issues.
+  Type: mypy src/pii_anon --strict (explicit flag, 133 files) — Success: no issues.
+  Full suite: 3367 passed / 0 failed per executor evidence; agentic suite 24/24
+  passed, re-run confirmed.
+
+  Scope discipline: commit 83b73bf touches exactly 3 files —
+    dev-assist-artifacts/04-development/02-stories/sprint-6/S6-02-four-channel-interception.md
+    src/pii_anon/agentic/interception.py
+    tests/test_agentic_interception.py
+  All 3 are in story §8 "Files owned" (the story file update is the expected
+  history-log amendment). No scope creep.
+
+  TDD discipline (unchanged from iteration-1): RED f47aa05 precedes GREEN 88319bd
+  precedes REFACTOR fab9b1e. Remediation commit 83b73bf is post-story-review
+  (correct — remediation is not a TDD violation).
+
+  No new public API surfaces were added that lack docstrings. _keyed_token_id and
+  _make_surrogate are module-private (leading underscore) so the public-doc gate
+  does not apply; they do carry full docstrings regardless. FourChannelGuard's new
+  surrogate_key parameter is documented in the class Parameters section.
+
+review_time_seconds: 420
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed
+iteration1_minors_closed: true

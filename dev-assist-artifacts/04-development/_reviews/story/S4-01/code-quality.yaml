@@ -1,0 +1,78 @@
+reviewer: code-quality
+gate: story
+scope_id: S4-01
+iteration: 1
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S4-01-01
+    severity: MINOR
+    location: tests/test_deid_families.py:252-275
+    description: >
+      Two test functions — test_anonymization_clean_output_has_low_reidentification_risk
+      and test_anonymization_leaky_output_raises_reidentification_risk — carry neither
+      an FR/NFR/AX ID in the function name nor one in the docstring body. All other
+      22 tests in the file embed at least one such ID. These two are clearly exercising
+      the anonymization family (implicitly FR-006 / AX-004) but the pin is absent from
+      both name and docstring text.
+    suggested_resolution: >
+      Add a docstring annotation citing the FR/NFR: e.g. prefix the docstring with
+      "[UNIT-TEST] FR-006 / AX-004: ..." to match the rest of the file's style.
+    status: open
+
+notes: >
+  TDD discipline: RED commit 2143b6a precedes GREEN 2f69f89 (git merge-base
+  --is-ancestor confirmed). The RED commit message accurately describes both failure
+  modes: (a) test_deid_families.py fails at collection with ModuleNotFoundError on
+  pii_anon.eval_framework.metrics.deid_families, and (b) G2 PASS/FAIL fixtures in
+  test_competitive_supremacy.py assert True/False but the placeholder returns
+  PENDING. REFACTOR e2ba3d8 adds only one additive empty-input edge test
+  (behaviour-identical, no production change).
+
+  Lint and type checks: ruff check src/ tests/ — all checks passed (zero errors on
+  owned files; pre-existing scripts/ errors not in scope). mypy src/pii_anon
+  (128 files, strict) — Success: no issues found. Both clean.
+
+  Owned test run (python3 -m pytest tests/test_deid_families.py
+  tests/test_competitive_supremacy.py -q): 80 passed / 0 failed. The 80 includes
+  22 deid_families tests + 58 competitive_supremacy tests (the 197 G2 lines added in
+  RED map to 12 new test functions; the remaining 46 were pre-existing pass-through).
+  The coverage failure printed (22% total) is a full-suite artefact from running
+  pytest against only the two test files — the full suite reaches 86.89% per the
+  story evidence; this is not a regression on owned files.
+
+  Idiomatic quality: deid_families.py is cleanly typed with frozen dataclasses,
+  keyword-only scorer parameters, round() on all derived floats, and a module-level
+  docstring covering AX-004 / layering / determinism. The _g2_pseudonymization_integrity
+  function mirrors the _g1_recall_floor pure-guarantee pattern exactly (same
+  three-valued signature, same PENDING-on-absent-field discipline, same
+  binding_detail verbosity). No unwrap()/assert False/raise SystemExit found on
+  production paths.
+
+  Scope discipline: competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025
+  confirmed byte-identical (RISK-6 preserved). All working-tree modifications
+  confirmed as pre-existing user-WIP (README.md, artifacts/benchmarks/*, benchmark-
+  diagnostics.json, docs/benchmark-summary.md, src/pii_anon/orchestrator.py,
+  tests/test_moe_enhancements.py). None of the owned story files appear in the
+  user-WIP diff. The REFACTOR commit touches only tests/test_deid_families.py
+  (additive 15-line edge test). All five story §8 owned files and no others appear
+  in the GREEN commit.
+
+  Public-API regression: SystemScorecard.privacy_score is preserved as a field and
+  serialized in to_dict() with its original key. The two new fields
+  (anonymization_score, pseudonymization_integrity_score) are additive with default
+  0.0. test_a9_scorecard_defaults_preserve_existing_leaderboard_shape confirms all
+  16 legacy to_dict keys remain present. composite_score numeric behaviour unchanged.
+
+  No-merge CI guard: the AST denylist scan in test_a2_no_merged_deid_field_in_deid_
+  families_module is non-vacuous (test_a2_meta_guard_scan_is_non_vacuous proves a
+  synthetic deid_score field IS flagged). DeidFamilyScores carries exactly two
+  sub-record fields with no combined/merged scalar anywhere on the record.
+
+  The only finding (MINOR) is two test functions in test_deid_families.py that lack
+  an explicit FR/NFR/AX ID in name or docstring; they are not vacuous (they do
+  exercise meaningful AnonymizationScorer behaviour) but the citation discipline is
+  inconsistent with the rest of the file. This does not block APPROVE.
+
+review_time_seconds: 520
+context_bounds_respected: true

@@ -1,0 +1,179 @@
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S2-02
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: coverage-S2-02-01
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-02-distilled-topk-gate.md:10
+    description: |
+      NFR-026 mismatch vs the requirements document. The story (Implements row +
+      acceptance A2) traces NFR-026 and tags it SHOULD; the dispatch brief for this
+      review called NFR-026 a "MUST determinism"/graceful-degradation requirement.
+      The AUTHORITATIVE source (requirements-document.md:89) lists NFR-026
+      "Optional-dependency graceful degradation" as **SHOULD** (the MoSCoW R7 list
+      at :93 also enumerates it under SHOULD). The story is therefore CORRECT and the
+      brief's "MUST" qualifier was loose. No over-claim and no under-claim by the
+      story — flagged only so the gate record carries the right MoSCoW class for
+      NFR-026. (NFR-005, which IS a MUST, is correctly tagged MUST and genuinely
+      tested by A6.) No verdict impact.
+    suggested_resolution: |
+      No change required to the story. Optionally add a one-line "NFR-026 is SHOULD
+      per requirements-document.md:89" parenthetical so future readers don't inherit
+      the brief's looser "MUST" framing.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-026
+      - dev-assist-artifacts/02-requirements/requirements-document.md#R7-MoSCoW
+
+  - id: coverage-S2-02-02
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-02-distilled-topk-gate.md:15
+    description: |
+      FR-018 deferred sub-parts (selective-activation / early-exit) name successor
+      stories S2-03 (rules-first Depth-1 early-exit) and S2-04 (aux-loss-free SLA
+      bias). At time of this story gate those successors are PLAN-TRACKED — enumerated
+      in the sprint-2 row of development-log.md:17 ("S2-03 rules-first Depth-1
+      early-exit (orchestrator hook) · S2-04 aux-loss-free SLA bias") and referenced
+      across the S2-01 review set — but the S2-03 / S2-04 STORY FILES are not yet
+      authored in dev-assist-artifacts/04-development/02-stories/sprint-2/ (only
+      S2-01, S2-02, S2-05 exist). For a STORY gate this is not a coverage gap (the
+      deferral target is named + plan-tracked, which is the bar my dimension requires
+      at story scope); whether the successor story files are written is an EPIC/SPRINT
+      gate concern, surfaced here only so the epic-gate coverage check does not treat
+      these successors as silently-missing.
+    suggested_resolution: |
+      Before the E2 epic gate (or the S2 sprint gate), author the S2-03 and S2-04
+      story files via /dev-assist-story-new so the FR-018 selective-activation /
+      early-exit successors carry an explicit verified-or-deferred row at that scope.
+      No action required for the S2-02 story gate.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-018
+      - dev-assist-artifacts/04-development/development-log.md
+
+notes: |
+  Dimension: requirements coverage + honesty (story gate, S2-02, iteration 1).
+  Read-only, independent. Bounded context: the S2-02 story file, the RED->GREEN->
+  REFACTOR diff (7e9882a^..6184def), both new test files, the live test run, the
+  three traced requirement rows (FR-018 / NFR-005 / NFR-026), DC-02, the sprint-2
+  plan row (development-log.md:17), and md5 verification of the byte-identical
+  untouched files. No browsing beyond these.
+
+  === FR-018 SCOPE HONESTY (MUST, the headline of this review) — VERDICT: HONEST ===
+  FR-018 is a 4-part MUST bundle (learned-routing + span-dedup + selective-activation
+  + early-exit). S2-02 ships ONLY the learned-routing slice (the runtime
+  DistilledTopKGate BODY + the offline distill_topk_gate/emit_signed_gate producer)
+  and is HONESTLY scoped as a PARTIAL discharge with NAMED successors:
+    - learned-routing  -> S2-02 (this story).
+    - span-dedup       -> the EXISTING MoE merge (pre-existing; correctly attributed,
+                          not re-claimed as new work).
+    - selective-activation / early-exit -> S2-03 + S2-04 (named, plan-tracked in
+                          development-log.md:17, which enumerates the full sprint-2
+                          FR-018 decomposition S2-01/02/03/04/05).
+  The story does NOT claim FR-018 fully discharged: provisional_status=AGENT_SIMULATED;
+  the Blocks row reads "The gate is part of FR-018's learned-routing MUST" (a slice
+  claim, not a closure claim). No MUST is over-claimed, none is claimed-but-unverified.
+  This is exactly the deferred-with-successor discipline the coverage dimension requires.
+
+  === A1-A10 -> NAMED, PASSING, NON-VACUOUS TEST MAP (62 passed / 0 skipped / 0 failed) ===
+    A1 (verify-on-load-only construction, SECURITY/CONTRACT):
+       test_a1_load_distilled_gate_returns_gate_for_signed_artifact (happy path),
+       test_a1_tampered_payload_raises_gate_signature_error (1 byte flipped -> fail-closed),
+       test_a1_wrong_key_raises_gate_signature_error (key not in ring -> fail-closed),
+       test_a1_no_unverified_construction_path_in_distilled_gate_module
+         -> NON-VACUOUS AST guard: parses distilled_gate.py, asserts EVERY
+            load_verified_gate call passes verify_on_load as an ast.Constant True,
+            and the source carries NO "verify_on_load=False" token. Real teeth.
+    A2 (absent => static softmax, NFR-026 SHOULD):
+       test_a2_absent_artifact_returns_none,
+       test_a2_absent_gate_router_keeps_static_softmax
+         -> NON-VACUOUS: asserts router_with_none.route("PERSON_NAME") ==
+            router_plain.route("PERSON_NAME") (a real no-gate-baseline equality,
+            not a mere "no exception" smoke). GENUINELY tested.
+    A3 (advisory re-weighting): test_a3_gate_upweights_named_expert (strict shift +
+       valid distribution Sigma=1.0), _unknown_entity_returns_base_unchanged,
+       _empty_opinion_returns_base_unchanged, _adjust_never_invents_an_expert.
+    A4 (advisory gate cannot drop a floored span, AX-003, INTEGRATION/AUDIT):
+       test_a4_distilled_gate_cannot_drop_floored_shared_span
+         -> NON-VACUOUS: runs the REAL FloorProjectingFusion(MoEFusionStrategy) with a
+            gate that ZEROES regex-oss for US_SSN; asserts the span SURVIVES AND that
+            survival is specifically via the shared_floor re-injection marker (the
+            mechanism is pinned, not mere survival). Upholds FR-018's no-drop invariant
+            under a learned gate.
+    A5 (closed-form distillation correct + RRS non-vacuous, UNIT/PROPERTY):
+       test_a5_distilled_weights_match_independent_closed_form
+         -> NON-VACUOUS: _expected_cell_means recomputes the RRS-up-weighted per-cell
+            survival mean INDEPENDENTLY (does NOT call the production trainer) and
+            asserts abs_tol 1e-9 against the softmaxed payload weights;
+       test_a5_raising_cell_survival_raises_routing_weight (monotone teeth),
+       test_a5_rrs_upweighting_is_non_vacuous (asserts rrs-weighted != uniform-weighted
+            -> the Tier-3 RRS hardening is demonstrably not a no-op).
+    A6 (determinism / byte-identical replay, NFR-005 MUST, PROPERTY):
+       test_a6_distill_is_byte_identical_across_replays
+         -> NON-VACUOUS: canonical_gate_bytes(p1) == canonical_gate_bytes(p2) +
+            stable oracle_hash/gate_feature_version;
+       test_a6_oracle_hash_changes_with_oracle_bytes (a different oracle => a different
+            hash -> the hash genuinely BINDS the teacher, not a constant).
+    A7 (sign->load round-trip, INTEGRATION): test_a7_emit_then_load_round_trip
+       (loaded advisory factor == 0.5 * payload weight, abs 1e-9),
+       _emit_writes_signed_envelope ({payload,signature}, hmac-sha256, key_id k1),
+       _re_emit_is_byte_identical.
+    A8 (REAL XGBoost oracle distillation, INTEGRATION, importorskip):
+       test_a8_real_xgboost_oracle_distillation
+         -> *** RAN, NOT SKIPPED *** : xgboost 3.2.0 IS installed; the test
+            importorskip-gates, trains a real XGBoostMetaLearner(seed=42) on synthetic
+            21-feature spans, asserts isinstance(learner, SurvivalOracle) (structural
+            Protocol satisfaction), distils -> signs -> loads -> and asserts a REAL
+            re-weight (out["gliner"] > out["presidio"], the high-survival feature
+            dominates). Confirmed PASSED in isolation (-rs shows no skip). A skipped A8
+            would have been a coverage gap; it is NOT skipped, so no gap.
+    A9 (payload-shape validation is loud, UNIT/SECURITY): 18 cases incl. missing
+       weights / nan / +-inf / negative / bool-as-weight / wrong schema_version /
+       missing oracle_hash / non-mapping / non-string keys / bad temperature ->
+       all GatePayloadError. Thorough.
+    A10 (import-boundary + no-nondeterminism, AUDIT):
+       test_a10_distilled_gate_imports_no_xgboost_or_eval_framework,
+       _distilled_gate_path_has_no_nondeterminism_sources,
+       test_a10_trainer_module_does_not_import_xgboost_at_top_level (top-level-only
+       AST walk -> Protocol decouples xgboost), _trainer_path_has_no_nondeterminism_sources
+       (no random/uuid/time/secrets).
+
+  === DEFERRALS (verified honest) ===
+    - distilled_moe v2 wiring LANDED (registered, in available_fusion_modes, both
+      no-gate and gated arms + fail-closed pinned); build_fusion PUBLIC signature
+      UNCHANGED (verified intent vs Evidence). The only deferral is threading
+      gate_path through build_fusion's public signature -> explicitly a documented
+      non-goal (section 5), follow-up only. Valid.
+    - A gate distilled on REAL Tier-3 survival labels + real key custody -> Pass-2
+      (provisional_status AGENT_SIMULATED; the in-tree teeth use synthetic oracles +
+      the real importorskip XGBoost arm). Honest Pass-2 deferral, NOT an over-claim.
+
+  === UNTOUCHED / SCOPE-CREEP CHECK (md5-verified) ===
+    git diff 7e9882a^..6184def touches EXACTLY the 7 owned files (errors.py,
+    fusion.py, routing/__init__.py, routing/distilled_gate.py,
+    routing/gate_distillation.py, + the 2 test files). Byte-identical confirmed:
+    competitor_compare.py 7cae16c89f4c97136e1a12394dae2025 (locked RISK-6),
+    orchestrator.py 0afc6deed62bbd0653ae1051b723bace (user-WIP, untouched),
+    test_moe_enhancements.py 910e9cd66ad6e38c7bb64a9c51ecb1cb (untouched),
+    swarm_learner.py / moe_gate_signing.py / moe.py / floor_fusion.py /
+    shared_layer.py all match the Evidence hashes. No scope creep.
+
+  === DIVERGED + Pass-2 cross-check ===
+    No MUST FR/NFR in this scope carries provisional_status: DIVERGED. NFR-005 (the MUST
+    in scope) is verified by A6 byte-identical replay; FR-018 is partially discharged
+    with named plan-tracked successors. The story-level AGENT_SIMULATED status is the
+    standard Pass-2 label for synthetic-only execution, not a DIVERGED-threshold
+    deferral, so no Pass-2 sample-size protocol is owed at this story gate.
+
+  Conclusion: every MUST in S2-02's scope is either VERIFIED (the FR-018 learned-routing
+  slice via A1/A3/A4/A5/A7/A8/A9/A10; NFR-005 via A6) or DEFERRED-WITH-NAMED-SUCCESSOR
+  (FR-018 selective-activation/early-exit -> S2-03/S2-04, plan-tracked). NFR-026 (SHOULD)
+  covered by A2. No MUST claimed-but-unverified; no over-claim. Zero
+  SHOWSTOPPER/CATASTROPHIC/MAJOR. APPROVE.
+
+review_time_seconds: 612
+
+context_bounds_respected: true

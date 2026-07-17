@@ -1,0 +1,31 @@
+reviewer: code-quality
+story: S7-01
+gate: story
+iteration: 2  # iter-1 REQUEST_CHANGES (1 MAJOR + 1 MINOR) -> remediated 258d3ec -> iter-2 APPROVE
+verdict: APPROVE
+runs: wf_44f8b3ae-51b (iter-1) -> wf_2d10a313-630 (iter-2); transcribed from the workflow structured results
+summary: >
+  iter-2 clean (0 findings). The iter-1 MAJOR (new-module coverage below the
+  DoD >=90% floor: native.py 73%, native_pdf.py 66% — real reachable
+  stdlib paths untested: escape branches, nested parens, '/" show ops,
+  zlib.error handler, empty-chunks skip, truncation, registry guards) is
+  closed by the A15/A16/A16b/A17 targeted tests + no-cover pragmas on the
+  dep-gated OCR/DICOM execution bodies: native.py 91% / native_pdf.py 92%.
+  The iter-1 MINOR (missing docstrings on the four concrete capabilities()
+  overrides) is closed. ruff clean; mypy clean BOTH modes; TDD evidence
+  intact (RED 48c189f precedes GREEN 169ab07).
+findings:
+  - id: code-quality-story-iter1-01
+    severity: MAJOR
+    location: ingestion/native.py + native_pdf.py (iter-1 coverage)
+    description: New-module coverage 73%/66% below the >=90% DoD floor; missed lines were real reachable production paths, not only optional-dep bodies.
+    suggested_resolution: Targeted tests for the testable paths + pragmas for the dep-gated bodies.
+    disposition: REMEDIATED (258d3ec) — 91%/92% at iter-2.
+  - id: code-quality-story-iter1-02
+    severity: MINOR
+    location: capabilities() overrides on PdfTextReader/ImageOcrReader/DicomReader/AudioReader (iter-1)
+    description: No docstrings on four public concrete overrides (Protocol docstrings are not inherited).
+    suggested_resolution: One-line docstrings each.
+    disposition: REMEDIATED (258d3ec).
+context_bounds_respected: true
+offlimits_md5_ok: true

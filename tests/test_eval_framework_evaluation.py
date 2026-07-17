@@ -189,6 +189,44 @@ class TestMetricAggregator:
         assert low > 0.0
         assert high <= 1.0
 
+    def test_micro_f1_ci_contains_micro_point_estimate(self) -> None:
+        # 1 large imperfect record + 99 tiny perfect records: the macro mean of
+        # per-record F1 is ~0.995, but the micro F1 = 2*Sum(tp)/(Sum(pred)+Sum(label))
+        # is ~0.749. A CI bootstrapped on per-record F1 (the OLD behaviour)
+        # EXCLUDES the micro point; the micro-F1 CI must CONTAIN it.
+        counts = [(50, 100, 100)] + [(1, 1, 1)] * 99
+        micro_point = 2 * sum(c[0] for c in counts) / (
+            sum(c[1] for c in counts) + sum(c[2] for c in counts)
+        )
+        per_record_f1 = [
+            2.0 * tp / (npred + nlab) for tp, npred, nlab in counts
+        ]
+
+        micro_lo, micro_hi = self.agg.compute_micro_f1_confidence_interval(
+            counts, n_bootstrap=2000,
+        )
+        macro_lo, macro_hi = self.agg.compute_confidence_intervals(
+            per_record_f1, n_bootstrap=2000,
+        )
+
+        # The fix: the micro point sits INSIDE the micro CI.
+        assert micro_lo <= micro_point <= micro_hi
+        # The regression being prevented: the macro CI EXCLUDES the micro point.
+        assert not (macro_lo <= micro_point <= macro_hi)
+
+    def test_micro_f1_ci_empty_returns_zero(self) -> None:
+        assert self.agg.compute_micro_f1_confidence_interval([]) == (0.0, 0.0)
+
+    def test_micro_f1_ci_is_deterministic(self) -> None:
+        counts = [(8, 10, 10), (1, 2, 1), (3, 3, 5), (10, 12, 11)]
+        first = self.agg.compute_micro_f1_confidence_interval(
+            counts, seed=7, n_bootstrap=500,
+        )
+        second = self.agg.compute_micro_f1_confidence_interval(
+            counts, seed=7, n_bootstrap=500,
+        )
+        assert first == second
+
 
 # ---------------------------------------------------------------------------
 # ReportGenerator

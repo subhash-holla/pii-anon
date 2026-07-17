@@ -1,0 +1,42 @@
+reviewer: code-quality
+story: S6-04
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 MAJOR; 2 MINOR -> both REMEDIATED IN-LOOP (see dispositions); 1 OBSERVATION
+run: wf_1fe5c271-7f5 (review-gate workflow, 2026-06-09; per-reviewer YAML transcribed from the workflow result — the scribe step hit a session limit before writing files; findings text verbatim)
+summary: >
+  ruff clean (src+tests); mypy clean under BOTH the canonical invocation and
+  --strict (141 files). 13/13 owned tests pass. TDD RED->GREEN confirmed
+  (f361063 tests-only precedes b45f9b5). Scope exactly the owned files
+  (additive __init__ + pyproject entry-points; orchestrator.py untouched).
+  byo_pipeline.py line coverage 92% (>=90% new-module floor).
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    location: src/pii_anon/eval_framework/byo_pipeline.py:125-135
+    description: >
+      BYOPipelineRegistry.unregister, .get, and .names are public methods that
+      lack individual docstrings (consistent with the pre-existing mirror
+      RatingEngineRegistry — not a regression).
+    suggested_resolution: Add one-line docstrings to unregister/get/names.
+    disposition: REMEDIATED IN-LOOP — one-line docstrings added to all three methods.
+  - id: code-quality-story-02
+    severity: MINOR
+    location: src/pii_anon/eval_framework/byo_pipeline.py __all__ vs eval_framework/__init__.py __all__
+    description: >
+      The five module-level predictor functions were listed in
+      byo_pipeline.__all__ but not re-exported from eval_framework.__init__ —
+      a surface-contract asymmetry (`from pii_anon.eval_framework import
+      presidio_predictor` raised ImportError).
+    suggested_resolution: Re-export the five at package level OR document them as path-referenced entry-point targets.
+    disposition: REMEDIATED IN-LOOP — all five predictors re-exported from eval_framework.__init__ (+ __all__), making the package surface consistent with the module surface.
+  - id: code-quality-story-03
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/byo_pipeline.py:154-157
+    description: >
+      The Python <3.12 entry_points().get() fallback + outer except guard are
+      uncovered (compat shim; module coverage 92% >= the 90% floor).
+    suggested_resolution: No action; removable if Python <3.12 support is dropped.
+    disposition: NO-ACTION (above the floor; legacy-compat path).
+context_bounds_respected: true
+offlimits_md5_ok: true

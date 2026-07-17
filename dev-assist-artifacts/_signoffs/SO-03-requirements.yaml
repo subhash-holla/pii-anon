@@ -1,0 +1,31 @@
+signoff_id: SO-03-requirements
+date: "2026-05-30"
+type: stage-transition
+stage_transition: "02-Requirements → 03-Design"
+policy: po-required
+signer: AGENT_SIMULATED          # autonomous run, user-authorized
+project: pii-anon (pii-anon-code, library pillar)
+
+inputs:
+  - dev-assist-artifacts/02-requirements/requirements-document.md   # 39 FR + 26 NFR + R7 + R10
+  - dev-assist-artifacts/02-requirements/traceability-matrix.md     # PGO→UC→FR/NFR + provisional_status + external_refs
+
+methodology:
+  agents: 22 (workflow wvsqmzw7j: 5 fr-author + 5 nfr-author + 6 simulated-survey-respondent + 6 threshold-validator)
+  scale: representative (single-session) — AGENT_SIMULATED; all FR/NFR provisional_status=AGENT_SIMULATED; Pass-2 follow-up for load-bearing MUSTs + latency/Tier-3 thresholds
+  counts: { FRs: 39, NFRs: 26, MoSCoW: "~56% MUST / ~38% SHOULD / ~6% COULD", orphans: 0 }
+
+decisions_acknowledged:
+  - "Evaluation-led, co-equal: ~20 eval FRs vs ~17 swarm vs 2 both; the eval-integrity foundation (FR-003 Bradley-Terry, FR-004 coherent-significance, FR-008 canonical-run, NFR-001/002/006) is MUST + critical path."
+  - "Headline novelty as MUST FRs: pseudonymization-integrity 5-axis family (FR-009) + anon-vs-pseudo no-merge (FR-010) + real Tier-3 LLM-adversary (FR-011)."
+  - "Swarm re-scoped: recall-floor-by-construction (FR-016/NFR-011, AX-003) + reversible pseudonymization (FR-019) + orchestrate incumbents (FR-021); latency NFRs HONEST (no sub-0.24ms parity claim)."
+  - "R10: 6 thresholds stress-tested — 0 DIVERGED; 5 PERSONA-CONDITIONAL + 1 REVISE-LOOSER (ECE per-class ≤0.05 high-resource / ≤0.08 long-tail). Power tiers (1522/753/200) LOCKED."
+  - "SME caveats encoded: EDPB Art 4(5) as engineering proxy (NFR-015); HIPAA Expert Determination hook; Tier-3 circularity controlled (FR-012); Bradley-Terry identifiability anchored (NFR-001)."
+
+cross_repo_evidence:
+  - "DATA-blocking: assemble_paired_set (eval-data S6) for FR-011/Tier-3; canary splits (S6) for FR-013; query-aware scorer (S5) for FR-023; agentic oracle (S7) for FR-028/029."
+  - "DATA-reuse (exists): stats/calibration, scoring/pseudonymization + anonymization, stats/power."
+  - "DATA-to-build: stats/bradley_terry.py (S6) for FR-003."
+  - "PAPER: FR-003/004/008/009/011/013 → Paper 1; FR-006/009/010 + benchmark → Paper 2."
+
+next: "Run /dev-assist-design (5-Diamond Cascade). Headline diamonds: (D-eval) the rating-engine + scoring-presentation redesign; (D-swarm) the MoE-router architecture w/ recall-floor-by-construction; (D-agentic) the interception surface. Carry the 0-DIVERGED NFR thresholds (esp. latency PERSONA-CONDITIONAL, ECE REVISE-LOOSER) into design constraints."

@@ -365,10 +365,35 @@ _PHONE_FALSE_POSITIVE_RE = re.compile(
     r")$"
 )
 
+# A 3-3-4 dotted string ("765.340.8856") is a NANP phone convention, never a
+# version number / date / ZIP+4 — exempt it from the FP rule (sp7 panel: the
+# version rule ``v?\d+\.\d+\.\d+`` rejected every dotted US phone, missed PII
+# on the masking path). The NANP area/exchange rules below still apply.
+_PHONE_DOTTED_NANP_RE = re.compile(r"^\d{3}\.\d{3}\.\d{4}$")
+
 # Area codes that are never assigned (N11, 0XX, 1XX).
 _INVALID_US_AREA_CODES = frozenset({
     "000", "100", "200", "211", "311", "411", "511", "611", "711", "811", "911",
 })
+
+# sp7 panel (robustness): the US NANP POSITIONAL digit rules (area/exchange
+# first-digit) reject US-FORMATTED synthetic numbers and non-NANP national
+# formats. The rules are gated to WEAKLY-formatted candidates; these shapes
+# carry their own phone evidence and skip the positional rules.
+# Strong US formatting: parenthesized area, explicit +1/1 prefix + grouping,
+# or -/. grouped 3-3-4. The never-assigned area SET still applies.
+_PHONE_US_STRONG_FORMAT_RE = re.compile(
+    r"^(?:\+?1[-.\s]*)?\(\d{3}\)[-.\s]*\d{3}[-.\s]?\d{4}$"
+    r"|^\+?1[-.\s]\d{3}[-.\s]\d{3}[-.\s]\d{4}$"
+    r"|^\d{3}[-.]\d{3}[-.]\d{4}$"
+)
+# 00-dialed international prefix: 00 + CC (nonzero, != 1) + a SEPARATOR — the
+# separator keeps bare leading-0 digit runs (EDI/CIK ids) out of this branch.
+_PHONE_00_INTL_RE = re.compile(r"^00(?!1[-.\s])[1-9]\d{0,2}[-.\s]\d")
+# +1 (NANP) prefix — handled by the US rules, not the intl branch.
+_PHONE_PLUS1_PREFIX_RE = re.compile(r"^\+\s?1[-.\s(]")
+# Leading-0 trunk national format ("06 12 34 56 78", "020 7946 0958"), grouped.
+_PHONE_TRUNK0_GROUPED_RE = re.compile(r"^0\d{1,4}(?:[-.\s]\d{1,4}){2,6}$")
 
 
 def is_valid_phone_number(candidate: str) -> bool:
@@ -385,14 +410,34 @@ def is_valid_phone_number(candidate: str) -> bool:
     if len(digits) < 7:
         return False
 
-    # Check for common false-positive patterns on the raw text
+    # Check for common false-positive patterns on the raw text. The 3-3-4
+    # dotted NANP shape is exempt — it is a phone convention, never a
+    # version/date/zip (the NANP area/exchange rules below still apply).
     stripped = candidate.strip()
-    if _PHONE_FALSE_POSITIVE_RE.match(stripped):
+    if _PHONE_FALSE_POSITIVE_RE.match(stripped) and not _PHONE_DOTTED_NANP_RE.match(stripped):
         return False
 
     # Check for all-same-digit sequences (e.g., 5555555555)
     if len(set(digits)) <= 2 and len(digits) >= 7:
         return False
+
+    # NANP posture (sp7): apply the POSITIONAL NANP digit rules only to
+    # weakly-formatted candidates. Every branch here ACCEPTS-or-falls-through,
+    # so the accepted set is a strict superset of the old one (additive =>
+    # leak-safe on the masking path).
+    if _PHONE_US_STRONG_FORMAT_RE.match(stripped):
+        # trust the US format; the never-assigned area SET still rejects.
+        d10 = digits[1:] if len(digits) == 11 and digits[0] == "1" else digits
+        if d10[:3] not in _INVALID_US_AREA_CODES:
+            return True
+    if stripped.startswith("+") and not _PHONE_PLUS1_PREFIX_RE.match(stripped):
+        if 8 <= len(digits) <= 15:
+            return True
+    elif _PHONE_00_INTL_RE.match(stripped):
+        if 8 <= (len(digits) - 2) <= 15:
+            return True
+    if _PHONE_TRUNK0_GROUPED_RE.match(stripped) and 8 <= len(digits) <= 12:
+        return True
 
     # US number validation: 10 or 11 digits (1 + 10)
     if len(digits) == 11 and digits[0] == "1":

@@ -5,7 +5,7 @@
 [![PyPI Version](https://img.shields.io/pypi/v/pii-anon.svg)](https://pypi.org/project/pii-anon/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-2437-brightgreen.svg)](#quality-and-testing)
+[![Tests](https://img.shields.io/badge/tests-4758-brightgreen.svg)](#quality-and-testing)
 
 [![Built with AI Agents](https://img.shields.io/badge/Built_with-AI_Agents-d946ef.svg)](#acknowledgements)
 
@@ -28,7 +28,7 @@ Both detectors outperform Presidio (F1=0.50) and Scrubadub (F1=0.33) on the 159,
 
 **6 compliance templates** (HIPAA Safe Harbor, GDPR Pseudo/Anon, CCPA, Minimal Risk, Maximum Privacy) validate your entity detection against real regulatory requirements.
 
-**Tier 3-aware benchmark dataset** — 159,891 synthetic records (100% CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, with behavioral-signal annotations and Re-identification Resistance Scores (RRS) per record, aligned with Lermen et al. 2026 (LLM-based deanonymization).
+**Tier 3-aware benchmark dataset** — 159,891 synthetic records (100% CC0/CC-BY-4.0) spanning 60 languages, 66 entity types, with behavioral-signal annotations and Re-identification Resistance Scores (RRS) per record, aligned with Lermen et al. 2026 (LLM-based deanonymization).
 
 **Sub-millisecond latency** with constant-memory streaming — process Kafka, Spark, or Beam pipelines without building specialized infrastructure. Async/sync dual APIs.
 
@@ -92,12 +92,12 @@ validator = ComplianceValidator()
 
 # Single standard
 hipaa_report = validator.validate(detected_entity_types, standard="hipaa")
-print(f"HIPAA coverage: {hipaa_report.coverage_percentage:.0f}%")
+print(f"HIPAA coverage: {hipaa_report.coverage_ratio * 100:.0f}%")
 
 # All standards at once
 multi_report = validator.validate_all(detected_entity_types)
-for standard, report in multi_report.reports.items():
-    print(f"{standard}: {report.coverage_percentage:.0f}% — {len(report.gaps)} gaps")
+for report in multi_report.reports:
+    print(f"{report.standard}: {report.coverage_ratio * 100:.0f}% — {len(report.gaps)} gaps")
 ```
 
 Supported: HIPAA Safe Harbor, GDPR (pseudonymization & anonymization), CCPA, Minimal Risk, Maximum Privacy.
@@ -123,7 +123,7 @@ result = orch.run(input_data, profile=profile, scope="etl", token_version=1)
 
 # Validate compliance
 validator = ComplianceValidator()
-gdpr_report = validator.validate(result["detected_entities"], standard="gdpr")
+gdpr_report = validator.validate(result["ensemble_findings"], standard="gdpr")
 
 # Compute composite score and check governance readiness
 composite = compute_composite(f1=0.85, precision=0.92, recall=0.80, latency_ms=5.2)
@@ -226,21 +226,23 @@ See [Benchmark Methodology](#benchmark-methodology) for details.
 
 ## Why `pii-rate-elo` over plain F1?
 
-**F1 alone picks the wrong system.**  By F1, `gliner` looks like the winner (0.766 vs 0.758). By `pii-rate-elo` composite — which folds in latency, throughput, entity-type coverage, and (when available) Tier 3 re-identification resistance — `pii-anon` leads instead (0.782 vs 0.680). 2 of 5 systems swap ranks between the two views.
+**F1 alone picks the wrong system.**  By F1, `gliner` looks like the winner (0.764 vs 0.756). By `pii-rate-elo` composite — which folds in latency, throughput, entity-type coverage, and (when available) Tier 3 re-identification resistance — `pii-anon` leads instead (0.785 vs 0.680). 4 of 5 systems swap ranks between the two views.
 
 | System | F1 | F1 Rank | Composite | Composite Rank | Δ Rank | p50 Latency | Throughput | Coverage |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| pii-anon | 0.758 | #2 | 0.782 | #1 | **+1** | 0.40 ms | 3.1M/hr | 22/29 |
-| gliner | 0.766 | #1 | 0.680 | #2 | **-1** | 86.24 ms | 34K/hr | 14/29 |
-| pii-anon-swarm | 0.611 | #3 | 0.555 | #3 | — | 98.58 ms | 29K/hr | 22/29 |
-| presidio | 0.496 | #4 | 0.513 | #4 | — | 14.76 ms | 119K/hr | 20/29 |
-| scrubadub | 0.333 | #5 | 0.509 | #5 | — | 0.25 ms | 4.8M/hr | 4/29 |
+| pii-anon | 0.756 | #2 | 0.785 | #1 | **+1** | 0.46 ms | 3.8M/hr | 24/29 |
+| gliner | 0.764 | #1 | 0.680 | #2 | **-1** | 81.93 ms | 35K/hr | 14/29 |
+| pii-anon-swarm | 0.610 | #3 | 0.558 | #3 | — | 91.53 ms | 31K/hr | 24/29 |
+| scrubadub | 0.333 | #5 | 0.515 | #4 | **+1** | 0.24 ms | 8.2M/hr | 4/29 |
+| presidio | 0.491 | #4 | 0.509 | #5 | **-1** | 14.99 ms | 119K/hr | 20/29 |
 
 
 ### Where the rankings diverge
 
-- **gliner** drops **#1 → #2** (loses 1) — F1 0.766 looks strong, but its **86.2ms p50 latency** — 34K/hr is three orders of magnitude below the reference throughput, so the composite lands at 0.680.
-- **pii-anon** moves **#2 → #1** (gains 1) — F1 0.758 is middling, but its **0.40ms p50 latency** (3.1M/hr) pushes the composite to 0.782.
+- **gliner** drops **#1 → #2** (loses 1) — F1 0.764, but its **81.9ms p50 latency** (35K/hr, orders of magnitude below the reference throughput) drags the composite to 0.680.
+- **pii-anon** moves **#2 → #1** (gains 1) — F1 0.756 is middling, but its **0.46ms p50 latency** (3.8M/hr) pushes the composite to 0.785.
+- **presidio** drops **#4 → #5** (loses 1) — F1 0.491, but its overall operational profile drags the composite to 0.509.
+- **scrubadub** moves **#5 → #4** (gains 1) — F1 0.333 is middling, but its **0.24ms p50 latency** (8.2M/hr) pushes the composite to 0.515.
 
 **Δ Rank** = F1 rank − Composite rank.  Positive means the composite view promotes the system (it's operationally stronger than F1 suggests); negative means the composite view demotes it (it's paying for F1 with latency, missing entity types, or Tier 3 leakage).  See [docs/pii-rate-elo.md](docs/pii-rate-elo.md) for the full algorithm.
 
@@ -412,7 +414,7 @@ pii-anon detect "Contact alice@example.com"
 pii-anon evaluate-pipeline --dataset pii_anon_benchmark_v1 --transform-mode pseudonymize --max-samples 50
 
 # Run evaluation framework directly
-pii-anon eval-framework --dataset eval_framework_v1 --max-records 500
+pii-anon eval-framework --dataset pii_anon --max-records 500
 
 # Compare against competitors
 pii-anon compare-competitors --dataset pii_anon_benchmark_v1 --output json
@@ -448,10 +450,10 @@ The composite score normalizes latency via `1/(1+(lat/100ms)²)` and throughput 
 
 ## Quality & Testing
 
-- **2437 tests** covering detection, evaluation, composite scoring, governance, external-system evaluation, swarm extension workflows, ingestion, and research rigor
+- **4758 tests** covering detection, evaluation, composite scoring, governance, external-system evaluation, swarm extension workflows, ingestion, and research rigor
 - **Zero required dependencies** (only pydantic)
 - **Strict CI gates**: lint (ruff), type check (mypy), coverage (85%+), build, packaging, performance SLAs
-- **159,891 record Tier 3 evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 60 languages, 63 entity types, 2,500 paired personas, and per-record RRS annotations
+- **159,891 record Tier 3 evaluation dataset** (100% synthetic, CC0/CC-BY-4.0) spanning 60 languages, 66 entity types, 2,500 paired personas, and per-record RRS annotations
 - **Reproducible benchmarks** with deterministic seeds and strict span matching
 
 ---

@@ -91,7 +91,7 @@ class CalibrationStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".json.tmp")
         data = result.to_dict()
-        tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+        tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
         os.replace(tmp, self._path)
 
     def load(self) -> CalibrationResult | None:
@@ -99,7 +99,7 @@ class CalibrationStore:
         if not self._path.exists():
             return None
         try:
-            data = json.loads(self._path.read_text())
+            data = json.loads(self._path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             raise CalibrationError(f"Failed to read calibration file: {exc}") from exc
         return CalibrationResult.from_dict(data)

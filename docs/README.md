@@ -17,6 +17,7 @@ For comprehensive documentation, PDLC artifacts, and research evidence, see the
 | [engine-plugin-guide.md](engine-plugin-guide.md) | Full EngineAdapter reference (companion to extend-swarm) |
 | [tutorial-llm-pipeline.md](tutorial-llm-pipeline.md) | LLM pipeline integration tutorial |
 | [long-context-entity-tracking.md](long-context-entity-tracking.md) | Entity linking across long documents |
+| [recall-floor.md](recall-floor.md) | Recall-floor by construction — `SharedLayerProjector`, the structural `entities(output) ⊇ entities(shared)` guarantee |
 | [autoresearch-integration.md](autoresearch-integration.md) | Iterate on the library with the autoresearch experiment loop |
 
 ### Evaluation (pii-rate-elo)
@@ -24,13 +25,18 @@ For comprehensive documentation, PDLC artifacts, and research evidence, see the
 | Document | Description |
 |----------|-------------|
 | [pii-rate-elo.md](pii-rate-elo.md) | Algorithm reference — composite metric, Tier 1/2/3, Elo, floor gates, deployment profiles |
-| [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark |
+| [evaluate-your-pipeline.md](evaluate-your-pipeline.md) | End-to-end guide to scoring **your own** detector against the benchmark — incl. the `pii_anon.byo_pipelines` SDK group, identical-incumbent scoring, the external `pii-anon-eval-data` assessment, the 12-player `rate-elo-assessment` report, and the `canonical-run` / `supremacy` certification CLI |
+| [pii-rate-elo-value.md](pii-rate-elo-value.md) | Why the pii-rate-elo composite picks a different (better) system than raw F1 — the rank-divergence walkthrough |
+| [external-validity-report.md](external-validity-report.md) | Zero-shot performance on five NON-home PII benchmarks (ai4privacy, Nemotron-PII, Gretel finance, TAB/ECHR real documents, PIIBench) — the standing disclosure that gates any "best-in-class" broadcast |
+| [benchmark-report.md](benchmark-report.md) | **Reproducible** v1.7.0rc1 benchmark report — fresh home (EN + full-multilingual) numbers, the entirety of pii-anon-eval-data, the 13-player pii-rate-elo tournament, and external datasets, each with the exact regeneration command |
+| [powered-census-protocol.md](powered-census-protocol.md) | The powered-census measurement protocol — N=10000 sizing, runtime, the sp1 detection harness commands, and qualification |
+| [anonymization-vs-pseudonymization.md](anonymization-vs-pseudonymization.md) | The two distinct de-id scorer families (`AnonymizationScorer` / `PseudonymizationIntegrityScorer`), the no-merge invariant, and vanilla-vs-swarm positioning |
 
 ### Reference
 
 | Document | Description |
 |----------|-------------|
-| [api-reference.md](api-reference.md) | Full API documentation |
+| [api-reference.md](api-reference.md) | Full API documentation — incl. the PDLC SOTA program surfaces (query-aware masking, BYO SDK, native readers, fairness gate, encrypted token store, attacks seam) |
 | [dependencies-and-platforms.md](dependencies-and-platforms.md) | OS-specific setup and dependencies |
 | [evidence-ledger.md](evidence-ledger.md) | Research evidence backing each claim |
 | [release-guide.md](release-guide.md) | Local evaluation, testing, and release workflow |

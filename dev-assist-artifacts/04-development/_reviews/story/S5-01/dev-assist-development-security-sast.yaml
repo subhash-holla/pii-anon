@@ -1,0 +1,148 @@
+reviewer: dev-assist-development-security-sast
+
+scope_id: S5-01
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: security-S5-01-01
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/__init__.py:67-69
+    description: |
+      The reid runners join the sandbox allow-list via an import-time IN-PLACE
+      mutation of `DEFAULT_ATTACK_REGISTRY` (`DEFAULT_ATTACK_REGISTRY[_name] =
+      _runner`). The annotation on that object is `Final[Mapping[str, AttackCallable]]`
+      (sandbox.py:376), but the underlying object is a runtime-mutable plain `dict`
+      — the `Final[Mapping]` is type-level only, so nothing prevents a later in-process
+      caller from injecting an arbitrary (non-allow-listed) runner into the shared
+      registry at runtime.
+
+      ASSESSMENT (the scrutiny mandate): this is NOT a breach and NOT a regression.
+      Verified by probe:
+        * Same-object identity — `attacks.DEFAULT_ATTACK_REGISTRY is
+          sandbox.DEFAULT_ATTACK_REGISTRY` is True, so the merge is visible to every
+          consumer: `run_attack_under_sandbox`, `AttackSandbox.__init__`, and the
+          `spec.load_attack_spec` lazy-default path all resolve against the merged dict.
+        * Determinism / idempotency — re-running the merge loop is a no-op (keys+values
+          stable, len stays 3); no double-registration.
+        * No override — the S5-04 `reconstruction_attack_score` runner survives
+          (disjoint keys: `reid_baseline` + the dotted-reid name vs the dotted-recon
+          name); the recon entry is not rebound to the reid runner.
+        * No skip path — importing the submodule `attacks.sandbox` directly always
+          executes the parent `attacks/__init__` first (Python import semantics), so the
+          merge can never be bypassed; the runner is present whenever sandbox is importable.
+        * No new dynamic-import vuln — the merge is a literal dict assignment; `reid.py`
+          contains zero `importlib`/`__import__`/`import_module`/`getattr`-routing
+          (verified). A spec still selects code ONLY by an allow-listed key; a crafted
+          `attack_kind` cannot select a non-allow-listed runner (kind is metadata; the
+          runner allow-list is the gate — `runner="os.system"` is refused by
+          `load_attack_spec`).
+      The mutability of `DEFAULT_ATTACK_REGISTRY` is a PRE-EXISTING property of the
+      byte-identical S5-04 substrate (it was already a plain `dict`); S5-01 reuses the
+      same channel and does NOT widen the surface. Logged to monitor, not to block.
+    suggested_resolution: |
+      No change required for S5-01. If/when the substrate is hardened, prefer exposing
+      the allow-list as a read-only view (e.g. `types.MappingProxyType`) with a single
+      sanctioned `register_runner()` registration API, so the `Final[Mapping]` contract
+      is enforced at runtime rather than type-level only. That is a substrate-layer
+      (sandbox.py) change and out of scope for this off-limits-byte-identical story.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-5/S5-01-reid-attack-protocol.md#2a
+      - src/pii_anon/eval_framework/attacks/sandbox.py
+
+  - id: security-S5-01-02
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/reid.py:139-161
+    description: |
+      NFR-016 non-strippable caveat (A6): `ReidSuccessMetrics.__post_init__` refuses a
+      blank/whitespace-only/non-str caveat (raises `ValueError`); the dataclass is
+      frozen so normal reassignment (`m.caveat = ""`) is blocked; `as_outcome()` always
+      re-emits the caveat and returns a FRESH dict each call (mutating the returned
+      Mapping cannot corrupt the frozen source — verified). The single residual bypass
+      is `object.__setattr__(m, "caveat", "")`, which succeeds — but that is the inherent
+      escape hatch frozen dataclasses themselves use for `__init__`, available against
+      ANY frozen dataclass, and is well outside the realistic NFR-016 threat (an exporter
+      constructing or mutating metrics with a missing caveat — both already blocked).
+      The production outcome path is single (the only `return {` is inside `as_outcome`;
+      the runner calls `metrics.as_outcome()`), so every exported privacy outcome carries
+      the caveat. No breach.
+    suggested_resolution: |
+      No change required. The `__post_init__` re-assertion + frozen-reassignment guard
+      cover the realistic strip vectors; an `object.__setattr__` bypass is not a
+      meaningful hardening target at this layer. Monitor only.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-5/S5-01-reid-attack-protocol.md#A6
+
+notes: |
+  PRIMARY security-sast review of S5-01 (ReidAttack protocol + deterministic baseline
+  body + attacks import-boundary test, DC-09), iteration 1, story gate. This is an
+  attack-surface story; conditional story-gate signals tripped (trust/attack-boundary
+  code: a new allow-listed runner joins the sandbox; new AST source-guards). All five
+  focus areas cleared; two OBSERVATIONs (no breach) logged above.
+
+  FOCUS-AREA VERDICTS (all verified by read + live probe):
+    * A7 (every body under the sandbox): the runner runs in production via
+      `run_attack_under_sandbox` (capability pre-check + egress-deny `_EgressGuard` +
+      SOFT rlimits + wall-watchdog; a non-Mapping return is a `SandboxViolation`). The
+      reid body performs ZERO socket/network/fs/subprocess ops (probed with a connect
+      spy — never touched). `reid_attack_runner` is also directly callable (A8 unit
+      test), but it is pure deterministic compute over scalar JSON holding NO capability
+      of its own, so a direct call grants nothing the sandbox would otherwise gate — not
+      a production bypass. SOUND.
+    * Registry-merge (the starred scrutiny item): in-place additive, same-object,
+      idempotent, no double-registration, no recon override, no skip path, no dynamic
+      import, kind/runner decoupled with the allow-list as the real gate. Mutating a
+      `Final`-annotated dict is a typing nuance (pre-existing substrate property), not a
+      new smell. SOUND + deterministic. (Logged as OBS security-S5-01-01.)
+    * A10 (import isolation): faithful verbatim adaptation of
+      tests/test_rating_import_boundary.py (identical FORBIDDEN_ROOTS, absolute-import
+      AST walk with `level == 0`, glob-based path collection), repointed at
+      `eval_framework.attacks`, with a STRONGER scanned-files guard (asserts `reid.py`
+      specifically is scanned, vs the reference's `__init__.py`-only check). FAITHFUL.
+    * A11 (no dangerous call signatures): `reid.py` is pure-stdlib; `json.loads` is
+      called with NO `object_hook`/`object_pairs_hook` (verified — adversarial
+      `py/object` / `__class__` keys are inert plain-dict data, never class
+      reconstruction; the runner reads only known scalar fields and `str()`-coerces
+      token-list elements). Package-wide guard
+      (test_attack_sandbox.py::test_attacks_package_has_no_unsafe_execution_call_signatures,
+      now `scanned >= 3` = 4 files) + reid-scoped guards (no random/uuid/time/secrets;
+      no eval/exec/compile/__import__; no pickle/subprocess/marshal/shelve; no
+      system/popen/execv) all GREEN. SOUND.
+    * A6 (non-strippable caveat): covered above (OBS security-S5-01-02). SOUND.
+
+  PATTERN-CATALOG SWEEP (15 base patterns; no active domain_packs per
+  developer-assistant.yaml `domain_packs: []`, so no pack extensions merged):
+    * No new egress route / socket / urllib / http / requests in the owned diff
+      (the one grep hit is reworded docstring prose, AST-safe).
+    * No supply-chain `git = "..."` dependency pins introduced.
+    * No weak hash primitive (md5/sha1) introduced.
+    * No `tokio::spawn`/thread/async crossing a capability boundary (the reid body is
+      synchronous pure compute; the only thread is the substrate's untouched watchdog).
+    * No SQL/NoSQL string interpolation; no hard-coded credential/API-key shape; no
+      wildcard `scope = "*"`; no new capability granted outside the allow-list.
+    * No `unsafe` blocks (Python; N/A).
+
+  INTEGRITY / SCOPE:
+    * Off-limits byte-identical CONFIRMED via md5: sandbox.py=1c60b03ef1464f88112d9d814d59d6a1,
+      spec.py=bd452e05236137109c650815a648c622,
+      competitor_compare.py=7cae16c89f4c97136e1a12394dae2025; SDO gate
+      (competitive_supremacy.py) has zero diff in-range.
+    * The 0bb61b4..HEAD range contains intervening non-story commits
+      (agentic/interception.py, an S6-02 story file) that are NOT part of S5-01; the
+      three S5-01 commits (RED 59b8404 / GREEN 68c5d67 / REFACTOR 9aa39bc) touch ONLY
+      the owned paths (reid.py, attacks/__init__.py, the two test files, the story .md).
+      Those out-of-range files were not reviewed (out of this story's scope).
+    * RED-before-GREEN confirmed (`git merge-base --is-ancestor 59b8404 68c5d67` => TRUE).
+
+  RE-VERIFICATION (read-only, this review): targeted acceptance subset
+  (test_attack_reid_protocol.py + test_attacks_import_boundary.py +
+  the package-wide unsafe-signature guard) PASS (35 selected, 0 fail); ruff clean and
+  `mypy --strict` clean on the owned reid files (the numpy-typing gotcha is N/A — pure
+  stdlib). Full-suite green per the dispatch evidence (3401 pass / 0 fail, cov 87.48%)
+  was taken as given and not independently re-run in full.
+
+review_time_seconds: 690
+
+context_bounds_respected: true

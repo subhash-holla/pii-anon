@@ -1,0 +1,45 @@
+reviewer: requirements-coverage
+story: S6-04
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 MAJOR/MINOR; 3 OBSERVATIONS (all coverage-strength confirmations)
+run: wf_1fe5c271-7f5 (review-gate workflow, 2026-06-09; transcribed from the workflow result — scribe failed before writing files)
+summary: >
+  FR-001 (UC-01 MUST): the claimed slice (zero-edit adapter / discovery /
+  bridge) is fully verified; the two unclaimed portions are explicitly
+  deferred WITH tracked successors (# SWITCH-POINT(ORCH) pii-anon-itself
+  predictor blocked on the protected orchestrator seam; # SWITCH-POINT(DATA)
+  full-census artifact regen) — no silent MUST gap. FR-002 (SHOULD):
+  identical-path delegation + exact-equality proof verified (A5/A6/A10).
+  NFR-026 upheld on the discovery surface (A3). The FR-019 erratum from
+  SO-19 is correctly disposed (FR-019 = reversible pseudonymization, UC-16 —
+  NOT claimed by this story).
+findings:
+  - id: requirements-coverage-story-01
+    severity: OBSERVATION
+    location: requirements-document.md:11-12,31; traceability-matrix.md:21; the story file:10
+    description: >
+      FR-019 erratum correctly disposed: the story traces FR-001/FR-002 per
+      the requirements doc + DC-12; FR-019 remains a separate UC-16
+      obligation, not silently claimed.
+    suggested_resolution: Ensure the S6 sprint ledger carries no stale FR-019 claim attributable to S6-04.
+    disposition: NOTED for the sprint ledger.
+  - id: requirements-coverage-story-02
+    severity: OBSERVATION
+    location: byo_pipeline.py:45-51; the story file:8,13,32,61,62
+    description: >
+      FR-001's two Pass-2 deferrals are concrete code anchors
+      (# SWITCH-POINT(ORCH)/(DATA)) plus story prose — deferred-with-successor,
+      a coverage strength.
+    suggested_resolution: Carry both SWITCH-POINTs into the epic/sprint coverage snapshot.
+    disposition: NOTED for the epic-gate delta ledger.
+  - id: requirements-coverage-story-03
+    severity: OBSERVATION
+    location: tests/test_byo_pipeline.py:177-209; byo_pipeline.py:137-168; traceability-matrix.md:36
+    description: >
+      NFR-026 upheld and verified by A3 on the new discovery surface; its
+      primary home (UC-24 ingestion) is honestly NOT claimed here.
+    suggested_resolution: No change required.
+    disposition: NO-ACTION.
+context_bounds_respected: true
+offlimits_md5_ok: true

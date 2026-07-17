@@ -10,6 +10,13 @@ from .base import (
     MatchMode,
     MultiLevelMetric,
 )
+from .deid_families import (
+    AnonymizationScore,
+    AnonymizationScorer,
+    DeidFamilyScores,
+    PseudonymizationIntegrityScore,
+    PseudonymizationIntegrityScorer,
+)
 from .fairness_metrics import (
     DifficultyFairnessMetric,
     EntityTypeFairnessMetric,
@@ -22,6 +29,14 @@ from .privacy_metrics import (
     LeakageDetectionMetric,
     ReidentificationRiskMetric,
     TClosenessMetric,
+)
+from .selective_risk import (
+    AbstentionOperatingPoint,
+    BrierDecomposition,
+    RiskCoveragePoint,
+    ScoredFinding,
+    SelectiveRiskReport,
+    SelectiveRiskReporter,
 )
 from .span_metrics import (
     DocumentLevelConsistencyMetric,
@@ -58,6 +73,12 @@ __all__ = [
     "LDiversityMetric",
     "TClosenessMetric",
     "LeakageDetectionMetric",
+    # de-id families (S4-01 — distinct anon vs pseudo, never merged)
+    "AnonymizationScore",
+    "AnonymizationScorer",
+    "PseudonymizationIntegrityScore",
+    "PseudonymizationIntegrityScorer",
+    "DeidFamilyScores",
     # utility
     "FormatPreservationMetric",
     "SemanticPreservationMetric",
@@ -68,4 +89,11 @@ __all__ = [
     "EntityTypeFairnessMetric",
     "DifficultyFairnessMetric",
     "ScriptFairnessMetric",
+    # calibration & selective-risk (S4-03 — per-class ECE/Brier/AURC + abstention)
+    "SelectiveRiskReporter",
+    "SelectiveRiskReport",
+    "ScoredFinding",
+    "BrierDecomposition",
+    "RiskCoveragePoint",
+    "AbstentionOperatingPoint",
 ]

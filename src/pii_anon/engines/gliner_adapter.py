@@ -5,7 +5,7 @@ import subprocess
 import sys
 from typing import Any
 
-from pii_anon.engines.base import EngineAdapter
+from pii_anon.engines.base import EngineAdapter, passes_ner_span_hygiene
 from pii_anon.types import EngineCapabilities, EngineFinding, Payload
 
 
@@ -22,6 +22,10 @@ class GLiNERAdapter(EngineAdapter):
     adapter_id = "gliner-compatible"
     native_dependency = "gliner"
 
+    # sp6 label extension: organization / location / occupation had NO ML
+    # channel at all (measured: 594 gretel + ~950 TAB + 294 nemotron + 95
+    # home ORGANIZATION gold spans with zero ML coverage; LOCATION similar) —
+    # the regex engine cannot enumerate open-vocabulary proper nouns.
     _PII_LABELS = [
         "name",
         "email address",
@@ -37,6 +41,9 @@ class GLiNERAdapter(EngineAdapter):
         "username",
         "password",
         "ip address",
+        "organization",
+        "location",
+        "occupation",
     ]
 
     _LABEL_MAP: dict[str, str] = {
@@ -56,6 +63,11 @@ class GLiNERAdapter(EngineAdapter):
         "username": "USERNAME",
         "password": "PASSWORD",
         "ip address": "IP_ADDRESS",
+        "organization": "ORGANIZATION",
+        "company": "ORGANIZATION",
+        "location": "LOCATION",
+        "city": "LOCATION",
+        "occupation": "JOB_TITLE",
     }
 
     SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
@@ -139,6 +151,56 @@ class GLiNERAdapter(EngineAdapter):
                 )
         return findings
 
+    # Long-document windowing (sp4 external-validity fix). Measured on real
+    # ECHR judgments: the model's effective detection COLLAPSES with input
+    # length (3 findings on the first 500 chars, 1 at 1,000, ZERO at >=2,000),
+    # so an unwindowed call silently loses every finding in a long document.
+    # Window size swept on the TAB DEV split (tuning-legal; test untouched):
+    # gold-PERSON overlap 50/56 at 400 chars vs 43/56 @600 / 35/56 @800 /
+    # 18/56 @1200 — monotone, so 400 it is. Windows are whitespace-aligned,
+    # overlap so a span straddling a boundary is seen whole by the next
+    # window, and offsets are re-based to the full text. Additive-only
+    # (leak-safe); texts under one window keep the single unwindowed call.
+    _WINDOW_CHARS = 400
+    _OVERLAP_CHARS = 100
+
+    def _windows(self, text: str) -> list[tuple[int, str]]:
+        """Whitespace-aligned (offset, chunk) windows covering ``text``.
+
+        Both EDGES are word-aligned (sp6): the end retreats to the last
+        whitespace, and the overlap re-entry point advances to the next
+        post-whitespace boundary — a mid-word window start made the model
+        report mid-word spans ("Col⟨leen Redding⟩"), measured in the sp6
+        cross-dataset mining.
+        """
+        if len(text) <= self._WINDOW_CHARS:
+            return [(0, text)]
+        windows: list[tuple[int, str]] = []
+        start = 0
+        while start < len(text):
+            end = min(start + self._WINDOW_CHARS, len(text))
+            if end < len(text):
+                # Retreat to the last whitespace so no token is split; a
+                # pathological whitespace-free run falls back to the hard cut.
+                cut = text.rfind(" ", start + self._OVERLAP_CHARS, end)
+                if cut > start:
+                    end = cut
+            windows.append((start, text[start:end]))
+            if end >= len(text):
+                break
+            nxt = max(end - self._OVERLAP_CHARS, start + 1)
+            # Word-align the re-entry: start the next window right after the
+            # next space at-or-past the overlap point (searching through the
+            # boundary space at `end`, which itself belongs to no entity).
+            # A whitespace-free run keeps the unaligned fallback — mid-token
+            # windows are unavoidable there and better than skipping text.
+            if not text[nxt - 1].isspace():
+                boundary = text.find(" ", nxt - 1, end + 1)
+                if boundary != -1:
+                    nxt = boundary + 1
+            start = nxt
+        return windows
+
     def detect(self, payload: Payload, context: dict[str, Any]) -> list[EngineFinding]:
         if not self.enabled:
             return []
@@ -152,25 +214,66 @@ class GLiNERAdapter(EngineAdapter):
         for key, value in payload.items():
             if not isinstance(value, str):
                 continue
-            try:
-                entities = model.predict_entities(value, self._PII_LABELS, threshold=0.5)
-            except Exception:
-                findings.extend(self._fallback_detect({key: value}, language))
-                continue
-
-            for entity in entities:
-                label = str(entity.get("label", "UNKNOWN")).lower()
-                mapped_type = self._LABEL_MAP.get(label, label.upper())
-                findings.append(
-                    EngineFinding(
+            # (start, end, type) -> best finding; dedupes overlap-region
+            # echoes keeping the higher-confidence emission.
+            best: dict[tuple[int, int, str], EngineFinding] = {}
+            failed = False
+            for offset, chunk in self._windows(value):
+                try:
+                    entities = model.predict_entities(
+                        chunk, self._PII_LABELS, threshold=0.5
+                    )
+                except Exception:
+                    failed = True
+                    break
+                for entity in entities:
+                    label = str(entity.get("label", "UNKNOWN")).lower()
+                    mapped_type = self._LABEL_MAP.get(label, label.upper())
+                    span_start = offset + int(entity.get("start", 0))
+                    span_end = offset + int(entity.get("end", 0))
+                    # Emission hygiene (sp6): a span must sit on word
+                    # boundaries of the FULL text — window-edge artifacts
+                    # produced mid-word spans ("Col⟨leen Redding⟩"). Snap
+                    # outward (never inward: over-masking is the safe
+                    # direction); drop only if the snap degenerates.
+                    while (
+                        span_start > 0
+                        and span_start < len(value)
+                        and value[span_start].isalnum()
+                        and value[span_start - 1].isalnum()
+                    ):
+                        span_start -= 1
+                    while (
+                        0 < span_end < len(value)
+                        and value[span_end - 1].isalnum()
+                        and value[span_end].isalnum()
+                    ):
+                        span_end += 1
+                    if span_end <= span_start:
+                        continue
+                    confidence = float(entity.get("score", 0.75))
+                    # sp6 general FP hygiene (see passes_ner_span_hygiene:
+                    # field-label-position veto + single-token-person bar).
+                    if not passes_ner_span_hygiene(
+                        value, span_start, span_end, mapped_type, confidence
+                    ):
+                        continue
+                    finding = EngineFinding(
                         entity_type=mapped_type,
-                        confidence=float(entity.get("score", 0.75)),
+                        confidence=confidence,
                         field_path=key,
-                        span_start=int(entity.get("start", 0)),
-                        span_end=int(entity.get("end", 0)),
+                        span_start=span_start,
+                        span_end=span_end,
                         engine_id=self.adapter_id,
                         explanation="gliner native ner",
                         language=language,
                     )
-                )
+                    dedupe_key = (span_start, span_end, mapped_type)
+                    prior = best.get(dedupe_key)
+                    if prior is None or finding.confidence > prior.confidence:
+                        best[dedupe_key] = finding
+            if failed:
+                findings.extend(self._fallback_detect({key: value}, language))
+                continue
+            findings.extend(best[k] for k in sorted(best))
         return findings

@@ -1,0 +1,41 @@
+reviewer: axiom-compliance
+story: S6-04
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 MAJOR/MINOR; 3 OBSERVATIONS (all upheld-with-evidence confirmations)
+run: wf_1fe5c271-7f5 (review-gate workflow, 2026-06-09; transcribed from the workflow result — scribe failed before writing files)
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # synthetic-only — full-diff real-PII/secret scan zero matches; fixtures zz-alias@synthetic.test / 000-0000 / "Zz Aa"; no native models invoked in tests
+  - { id: AX-pii-anon-002, status: UPHELD }  # deterministic — no random/uuid/time/secrets in the module; sorted-name evaluation order; A8 exact anchors + A9 replay; the only wall-clock component (latency) lives in the consumed evaluator and is zero-weighted in every scoring test
+  - { id: AX-pii-anon-003, status: NOT_TRIGGERED }  # ensemble-recall-floor — binds the detection/routing path; this scope touches none (A13 AST audit + independent import scan)
+  - { id: AX-pii-anon-004, status: UPHELD }  # anon/pseudo separation — docs keep detection F1 and Tier-3 re-ID resistance distinct; no redaction-quality merge introduced
+  - { id: AX-pii-anon-005, status: NOT_TRIGGERED }  # calibrated-abstention / router_path — routing path untouched
+findings:
+  - id: axiom-compliance-story-01
+    severity: OBSERVATION
+    location: byo_pipeline.py:345-390; tests A8/A9
+    description: AX-002 upheld with strong evidence (see axioms_in_scope).
+    suggested_resolution: ""
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-02
+    severity: OBSERVATION
+    location: byo_pipeline.py:54-71; tests A13; module docstring honesty notes
+    description: >
+      AX-003/AX-005 correctly NOT TRIGGERED; off-limits md5s byte-identical
+      (orchestrator 0afc6dee…, supremacy gate 3b842e81…, competitor_compare
+      7cae16c8…); the S2-03 no-orchestrator-touch discipline respected via
+      # SWITCH-POINT(ORCH); the legacy-vs-identical-path divergence disclosed
+      honestly (pre-empts a false identical-numbers claim).
+    suggested_resolution: ""
+    disposition: NO-ACTION.
+  - id: axiom-compliance-story-03
+    severity: OBSERVATION
+    location: tests/test_byo_pipeline.py:55-127,152-209
+    description: >
+      AX-001 (release-blocker axiom) upheld — zero real-PII/secret heuristic
+      matches across all six touched files; NFR-026 discovery-never-raises +
+      lazy-construction-on-first-call (A2 empty-cache pin) both verified.
+    suggested_resolution: ""
+    disposition: NO-ACTION.
+context_bounds_respected: true
+offlimits_md5_ok: true

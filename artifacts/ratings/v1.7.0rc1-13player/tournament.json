@@ -1,0 +1,1082 @@
+{
+  "schema": "pii-rate-elo-assessment-tournament/v1",
+  "source": "/private/tmp/claude-501/-Users-subhashholla-Development-pii-anonymize-pseudonymize-pii-anon-core-pii-anon-code/e0352e83-3914-4763-88e8-937f41672c93/scratchpad/merged_final.json",
+  "dataset": {
+    "dataset_version": "2.2.0",
+    "language": "en",
+    "n_gold": 201880,
+    "n_records": 31048,
+    "split": "test"
+  },
+  "matching_policy": "strict-v1",
+  "match_fields": [
+    "AGE",
+    "API_KEY",
+    "AUTHENTICATION_TOKEN",
+    "BANK_ACCOUNT_NUMBER",
+    "BANK_ROUTING_NUMBER",
+    "BAR_NUMBER",
+    "BIOMETRIC_ID",
+    "COURT_CASE_NUMBER",
+    "CREDIT_CARD_FRAGMENT",
+    "CREDIT_CARD_NUMBER",
+    "CRYPTOCURRENCY_ADDRESS",
+    "CVV",
+    "DATE_OF_BIRTH",
+    "DEA_NUMBER",
+    "DEVICE_IDENTIFIER",
+    "DOCKET_NUMBER",
+    "DRIVER_LICENSE_NUMBER",
+    "EDUCATION_LEVEL",
+    "EMAIL_ADDRESS",
+    "EMPLOYEE_ID",
+    "ETHNICITY",
+    "GENDER",
+    "GENETIC_DATA",
+    "HEALTH_CONDITION",
+    "HEALTH_INSURANCE_ID",
+    "HOUSEHOLD_SIZE",
+    "IBAN",
+    "INSURANCE_POLICY_NUMBER",
+    "INVOICE_NUMBER",
+    "IP_ADDRESS",
+    "JOB_TITLE",
+    "LATITUDE_LONGITUDE",
+    "LICENSE_PLATE",
+    "LOCATION_NAME",
+    "MAC_ADDRESS",
+    "MARITAL_STATUS",
+    "MEDICAL_RECORD_NUMBER",
+    "MEDICATION_NAME",
+    "NATIONALITY",
+    "NATIONAL_ID_NUMBER",
+    "NPI_NUMBER",
+    "ORGANIZATION_NAME",
+    "PASSPORT_NUMBER",
+    "PASSWORD",
+    "PERSON_NAME",
+    "PHONE_NUMBER",
+    "PIN",
+    "POLITICAL_OPINION",
+    "POSTAL_CODE",
+    "PRESCRIPTION_NUMBER",
+    "PROCEDURE_NAME",
+    "RELIGIOUS_BELIEF",
+    "SALARY",
+    "SEXUAL_ORIENTATION",
+    "SOCIAL_MEDIA_HANDLE",
+    "SOCIAL_SECURITY_NUMBER",
+    "STREET_ADDRESS",
+    "SWIFT_BIC_CODE",
+    "TAX_ID",
+    "TIMESTAMP",
+    "TRADE_UNION_MEMBERSHIP",
+    "URL",
+    "USERNAME",
+    "VEHICLE_IDENTIFICATION_NUMBER",
+    "VEHICLE_MODEL",
+    "VISA_NUMBER"
+  ],
+  "matches_per_pair": 66,
+  "excluded": [],
+  "players": {
+    "aws": {
+      "precision": 0.7688087692323784,
+      "recall": 0.7281900138696256,
+      "f1": 0.7479483278808632,
+      "f2": 0.7359667338850986,
+      "f2_macro": 0.2726407340911281,
+      "coverage": "24/66",
+      "n_gold": 201880,
+      "n_pred": 191214,
+      "strongest_entities": [
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.977358334937175
+        },
+        {
+          "entity_type": "PHONE_NUMBER",
+          "f2": 0.9632453156337607
+        },
+        {
+          "entity_type": "IP_ADDRESS",
+          "f2": 0.934117446518367
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "BAR_NUMBER",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "BIOMETRIC_ID",
+          "f2": 0.0
+        }
+      ]
+    },
+    "azure": {
+      "precision": 0.7303868739387122,
+      "recall": 0.6881910045571626,
+      "f1": 0.7086613771592234,
+      "f2": 0.6962355811200747,
+      "f2_macro": 0.13338769971329947,
+      "coverage": "17/66",
+      "n_gold": 201880,
+      "n_pred": 190217,
+      "strongest_entities": [
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.9660596026490067
+        },
+        {
+          "entity_type": "STREET_ADDRESS",
+          "f2": 0.9303961159762242
+        },
+        {
+          "entity_type": "PERSON_NAME",
+          "f2": 0.8888415092775201
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "flair": {
+      "precision": 0.5654125349907482,
+      "recall": 0.29515553794333266,
+      "f1": 0.38784762338697865,
+      "f2": 0.32635378270466253,
+      "f2_macro": 0.02074327902736186,
+      "coverage": "3/66",
+      "n_gold": 201880,
+      "n_pred": 105385,
+      "strongest_entities": [
+        {
+          "entity_type": "PERSON_NAME",
+          "f2": 0.8272900997133545
+        },
+        {
+          "entity_type": "ORGANIZATION_NAME",
+          "f2": 0.5264424002155421
+        },
+        {
+          "entity_type": "LOCATION_NAME",
+          "f2": 0.015323915876985944
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "gcp": {
+      "precision": 0.7224242796269866,
+      "recall": 0.6995541906082822,
+      "f1": 0.7108053220054911,
+      "f2": 0.704011629008314,
+      "f2_macro": 0.14557319391223175,
+      "coverage": "18/66",
+      "n_gold": 201880,
+      "n_pred": 195489,
+      "strongest_entities": [
+        {
+          "entity_type": "IP_ADDRESS",
+          "f2": 0.9937309386648595
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.9895872788501933
+        },
+        {
+          "entity_type": "PHONE_NUMBER",
+          "f2": 0.9725364195709431
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "gliner": {
+      "precision": 0.8129254951343876,
+      "recall": 0.7162869031107588,
+      "f1": 0.7615526607524206,
+      "f2": 0.7337317498155572,
+      "f2_macro": 0.24242600098309497,
+      "coverage": "23/66",
+      "n_gold": 201880,
+      "n_pred": 177881,
+      "strongest_entities": [
+        {
+          "entity_type": "PHONE_NUMBER",
+          "f2": 0.978284856777155
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.9699946838257124
+        },
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "f2": 0.9626727454053282
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "pii_anon": {
+      "precision": 0.8668986209519517,
+      "recall": 0.914533386170002,
+      "f1": 0.8900791364652058,
+      "f2": 0.9045921922051401,
+      "f2_macro": 0.7724415477873132,
+      "coverage": "66/66",
+      "n_gold": 201880,
+      "n_pred": 212973,
+      "strongest_entities": [
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 1.0
+        },
+        {
+          "entity_type": "BAR_NUMBER",
+          "f2": 1.0
+        },
+        {
+          "entity_type": "CVV",
+          "f2": 1.0
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "POLITICAL_OPINION",
+          "f2": 0.02262443438914027
+        },
+        {
+          "entity_type": "AGE",
+          "f2": 0.02418379685610641
+        },
+        {
+          "entity_type": "ETHNICITY",
+          "f2": 0.12437810945273632
+        }
+      ]
+    },
+    "pii_anon_swarm": {
+      "precision": 0.8528967461959607,
+      "recall": 0.9229096492966119,
+      "f1": 0.8865230341729871,
+      "f2": 0.9080023626375768,
+      "f2_macro": 0.7723094500545714,
+      "coverage": "66/66",
+      "n_gold": 201880,
+      "n_pred": 218452,
+      "strongest_entities": [
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 1.0
+        },
+        {
+          "entity_type": "BAR_NUMBER",
+          "f2": 1.0
+        },
+        {
+          "entity_type": "CVV",
+          "f2": 1.0
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "POLITICAL_OPINION",
+          "f2": 0.02262443438914027
+        },
+        {
+          "entity_type": "AGE",
+          "f2": 0.02418379685610641
+        },
+        {
+          "entity_type": "ETHNICITY",
+          "f2": 0.12437810945273632
+        }
+      ]
+    },
+    "piiranha": {
+      "precision": 0.44147195169198294,
+      "recall": 0.32737765008916186,
+      "f1": 0.37595922477004207,
+      "f2": 0.34522150463944773,
+      "f2_macro": 0.1083848119176613,
+      "coverage": "16/66",
+      "n_gold": 201880,
+      "n_pred": 149706,
+      "strongest_entities": [
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "f2": 0.9260425312687828
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.9099473404512297
+        },
+        {
+          "entity_type": "PHONE_NUMBER",
+          "f2": 0.8201852690154685
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "presidio": {
+      "precision": 0.4191596638655462,
+      "recall": 0.5621012482662968,
+      "f1": 0.4802192105458047,
+      "f2": 0.5262115752913299,
+      "f2_macro": 0.09140229928199366,
+      "coverage": "20/66",
+      "n_gold": 201880,
+      "n_pred": 270725,
+      "strongest_entities": [
+        {
+          "entity_type": "IP_ADDRESS",
+          "f2": 0.9940703091910208
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.979203131244918
+        },
+        {
+          "entity_type": "SOCIAL_SECURITY_NUMBER",
+          "f2": 0.9220590020638582
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "regex": {
+      "precision": 0.8569080549332814,
+      "recall": 0.3486378046364177,
+      "f1": 0.49562700692918715,
+      "f2": 0.39556300412743806,
+      "f2_macro": 0.12141302813132744,
+      "coverage": "9/66",
+      "n_gold": 201880,
+      "n_pred": 82136,
+      "strongest_entities": [
+        {
+          "entity_type": "TIMESTAMP",
+          "f2": 0.9953100573215214
+        },
+        {
+          "entity_type": "IP_ADDRESS",
+          "f2": 0.9940703091910208
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.9879748188293376
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "scrubadub": {
+      "precision": 0.8182647963105304,
+      "recall": 0.1687438082028928,
+      "f1": 0.27978908636946026,
+      "f2": 0.20058835167319866,
+      "f2_macro": 0.040566970985917425,
+      "coverage": "12/66",
+      "n_gold": 201880,
+      "n_pred": 41632,
+      "strongest_entities": [
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "f2": 0.864067983210624
+        },
+        {
+          "entity_type": "SOCIAL_MEDIA_HANDLE",
+          "f2": 0.6565176022835394
+        },
+        {
+          "entity_type": "URL",
+          "f2": 0.6342182890855458
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "spacy": {
+      "precision": 0.46407612012707555,
+      "recall": 0.29377848226669306,
+      "f1": 0.35979349547133865,
+      "f2": 0.31704725024002534,
+      "f2_macro": 0.01809164518443077,
+      "coverage": "3/66",
+      "n_gold": 201880,
+      "n_pred": 127798,
+      "strongest_entities": [
+        {
+          "entity_type": "PERSON_NAME",
+          "f2": 0.7944750726184125
+        },
+        {
+          "entity_type": "ORGANIZATION_NAME",
+          "f2": 0.37891235252922484
+        },
+        {
+          "entity_type": "LOCATION_NAME",
+          "f2": 0.020661157024793386
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    },
+    "stanza": {
+      "precision": 0.5831841066556661,
+      "recall": 0.30811868436695067,
+      "f1": 0.40320735331771146,
+      "f2": 0.3402116211122305,
+      "f2_macro": 0.021074101977613818,
+      "coverage": "3/66",
+      "n_gold": 201880,
+      "n_pred": 106661,
+      "strongest_entities": [
+        {
+          "entity_type": "PERSON_NAME",
+          "f2": 0.8436015992277945
+        },
+        {
+          "entity_type": "ORGANIZATION_NAME",
+          "f2": 0.5102865954565969
+        },
+        {
+          "entity_type": "LOCATION_NAME",
+          "f2": 0.037002535838120375
+        }
+      ],
+      "weakest_entities": [
+        {
+          "entity_type": "AGE",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "API_KEY",
+          "f2": 0.0
+        },
+        {
+          "entity_type": "AUTHENTICATION_TOKEN",
+          "f2": 0.0
+        }
+      ]
+    }
+  },
+  "tournament": {
+    "rankings": [
+      {
+        "name": "pii_anon_swarm",
+        "rating": 1868.71,
+        "rd": 30.0,
+        "ci_lower": 1809.91,
+        "ci_upper": 1927.51,
+        "num_matches": 792
+      },
+      {
+        "name": "pii_anon",
+        "rating": 1867.81,
+        "rd": 30.0,
+        "ci_lower": 1809.01,
+        "ci_upper": 1926.61,
+        "num_matches": 792
+      },
+      {
+        "name": "aws",
+        "rating": 1541.4,
+        "rd": 30.0,
+        "ci_lower": 1482.6,
+        "ci_upper": 1600.2,
+        "num_matches": 792
+      },
+      {
+        "name": "gliner",
+        "rating": 1489.45,
+        "rd": 30.0,
+        "ci_lower": 1430.65,
+        "ci_upper": 1548.25,
+        "num_matches": 792
+      },
+      {
+        "name": "gcp",
+        "rating": 1448.46,
+        "rd": 30.0,
+        "ci_lower": 1389.66,
+        "ci_upper": 1507.26,
+        "num_matches": 792
+      },
+      {
+        "name": "azure",
+        "rating": 1444.68,
+        "rd": 30.0,
+        "ci_lower": 1385.88,
+        "ci_upper": 1503.48,
+        "num_matches": 792
+      },
+      {
+        "name": "piiranha",
+        "rating": 1437.43,
+        "rd": 30.0,
+        "ci_lower": 1378.63,
+        "ci_upper": 1496.23,
+        "num_matches": 792
+      },
+      {
+        "name": "scrubadub",
+        "rating": 1431.1,
+        "rd": 30.0,
+        "ci_lower": 1372.3,
+        "ci_upper": 1489.9,
+        "num_matches": 792
+      },
+      {
+        "name": "regex",
+        "rating": 1414.63,
+        "rd": 30.0,
+        "ci_lower": 1355.83,
+        "ci_upper": 1473.43,
+        "num_matches": 792
+      },
+      {
+        "name": "presidio",
+        "rating": 1393.84,
+        "rd": 30.0,
+        "ci_lower": 1335.04,
+        "ci_upper": 1452.64,
+        "num_matches": 792
+      },
+      {
+        "name": "flair",
+        "rating": 1385.71,
+        "rd": 30.0,
+        "ci_lower": 1326.91,
+        "ci_upper": 1444.51,
+        "num_matches": 792
+      },
+      {
+        "name": "spacy",
+        "rating": 1385.59,
+        "rd": 30.0,
+        "ci_lower": 1326.79,
+        "ci_upper": 1444.39,
+        "num_matches": 792
+      },
+      {
+        "name": "stanza",
+        "rating": 1385.22,
+        "rd": 30.0,
+        "ci_lower": 1326.42,
+        "ci_upper": 1444.02,
+        "num_matches": 792
+      }
+    ],
+    "pairwise_significance": {
+      "pii_anon_swarm_vs_pii_anon": {
+        "rating_diff": 0.9,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "pii_anon_swarm_vs_aws": {
+        "rating_diff": 327.31,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_gliner": {
+        "rating_diff": 379.26,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_gcp": {
+        "rating_diff": 420.25,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_azure": {
+        "rating_diff": 424.03,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_piiranha": {
+        "rating_diff": 431.28,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_scrubadub": {
+        "rating_diff": 437.61,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_regex": {
+        "rating_diff": 454.08,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_presidio": {
+        "rating_diff": 474.87,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_flair": {
+        "rating_diff": 482.99,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_spacy": {
+        "rating_diff": 483.12,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_swarm_vs_stanza": {
+        "rating_diff": 483.49,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_aws": {
+        "rating_diff": 326.41,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_gliner": {
+        "rating_diff": 378.36,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_gcp": {
+        "rating_diff": 419.35,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_azure": {
+        "rating_diff": 423.13,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_piiranha": {
+        "rating_diff": 430.38,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_scrubadub": {
+        "rating_diff": 436.71,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_regex": {
+        "rating_diff": 453.18,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_presidio": {
+        "rating_diff": 473.97,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_flair": {
+        "rating_diff": 482.1,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_spacy": {
+        "rating_diff": 482.22,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "pii_anon_vs_stanza": {
+        "rating_diff": 482.59,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_gliner": {
+        "rating_diff": 51.95,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "aws_vs_gcp": {
+        "rating_diff": 92.95,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_azure": {
+        "rating_diff": 96.72,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_piiranha": {
+        "rating_diff": 103.98,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_scrubadub": {
+        "rating_diff": 110.3,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_regex": {
+        "rating_diff": 126.77,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_presidio": {
+        "rating_diff": 147.56,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_flair": {
+        "rating_diff": 155.69,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_spacy": {
+        "rating_diff": 155.81,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "aws_vs_stanza": {
+        "rating_diff": 156.18,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "gliner_vs_gcp": {
+        "rating_diff": 40.99,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gliner_vs_azure": {
+        "rating_diff": 44.77,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gliner_vs_piiranha": {
+        "rating_diff": 52.02,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gliner_vs_scrubadub": {
+        "rating_diff": 58.35,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gliner_vs_regex": {
+        "rating_diff": 74.82,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gliner_vs_presidio": {
+        "rating_diff": 95.61,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "gliner_vs_flair": {
+        "rating_diff": 103.74,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "gliner_vs_spacy": {
+        "rating_diff": 103.86,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "gliner_vs_stanza": {
+        "rating_diff": 104.23,
+        "significance_threshold": 84.85,
+        "significant": true
+      },
+      "gcp_vs_azure": {
+        "rating_diff": 3.78,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_piiranha": {
+        "rating_diff": 11.03,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_scrubadub": {
+        "rating_diff": 17.36,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_regex": {
+        "rating_diff": 33.82,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_presidio": {
+        "rating_diff": 54.62,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_flair": {
+        "rating_diff": 62.74,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_spacy": {
+        "rating_diff": 62.87,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "gcp_vs_stanza": {
+        "rating_diff": 63.23,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_piiranha": {
+        "rating_diff": 7.25,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_scrubadub": {
+        "rating_diff": 13.58,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_regex": {
+        "rating_diff": 30.05,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_presidio": {
+        "rating_diff": 50.84,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_flair": {
+        "rating_diff": 58.97,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_spacy": {
+        "rating_diff": 59.09,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "azure_vs_stanza": {
+        "rating_diff": 59.46,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_scrubadub": {
+        "rating_diff": 6.32,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_regex": {
+        "rating_diff": 22.79,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_presidio": {
+        "rating_diff": 43.59,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_flair": {
+        "rating_diff": 51.71,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_spacy": {
+        "rating_diff": 51.83,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "piiranha_vs_stanza": {
+        "rating_diff": 52.2,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "scrubadub_vs_regex": {
+        "rating_diff": 16.47,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "scrubadub_vs_presidio": {
+        "rating_diff": 37.26,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "scrubadub_vs_flair": {
+        "rating_diff": 45.39,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "scrubadub_vs_spacy": {
+        "rating_diff": 45.51,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "scrubadub_vs_stanza": {
+        "rating_diff": 45.88,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "regex_vs_presidio": {
+        "rating_diff": 20.79,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "regex_vs_flair": {
+        "rating_diff": 28.92,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "regex_vs_spacy": {
+        "rating_diff": 29.04,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "regex_vs_stanza": {
+        "rating_diff": 29.41,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "presidio_vs_flair": {
+        "rating_diff": 8.13,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "presidio_vs_spacy": {
+        "rating_diff": 8.25,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "presidio_vs_stanza": {
+        "rating_diff": 8.62,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "flair_vs_spacy": {
+        "rating_diff": 0.12,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "flair_vs_stanza": {
+        "rating_diff": 0.49,
+        "significance_threshold": 84.85,
+        "significant": false
+      },
+      "spacy_vs_stanza": {
+        "rating_diff": 0.37,
+        "significance_threshold": 84.85,
+        "significant": false
+      }
+    },
+    "min_distinguishable_diff": 84.85,
+    "converged": true,
+    "num_systems": 13,
+    "total_matches": 5148
+  }
+}

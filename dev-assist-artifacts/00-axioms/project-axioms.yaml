@@ -1,0 +1,169 @@
+# Project Axioms Registry — pii-anon (pii-anon-code library)
+#
+# Cross-cutting design principles the library commits to. Read by the
+# dev-assist-development-axiom-compliance reviewer at every applicable gate.
+# Grounded in the two research briefs (pii_enterprise_landscape_may26.md,
+# pii_eval_may26.md), the approved program plan, and the verified code findings
+# (F1–F4 in the plan). IDs AX-pii-anon-001 / -004 are intentionally aligned with
+# the sibling pii-anon-eval-data registry for cross-repo coherence.
+#
+# Schema: see ${CLAUDE_PLUGIN_ROOT}/references/project-axiom-spec.md
+# Stage 3 D0 prep will refine + extend this set.
+
+schema_version: 1
+
+axioms:
+
+  - id: AX-pii-anon-001
+    name: synthetic-only-no-real-pii
+    definition: |
+      No real natural person's identifiable data may appear in any test fixture,
+      example, doc snippet, benchmark slice, or bundled corpus shipped by this
+      library. A PII tool embedding real PII would itself become regulated
+      personal data and is an ethical/legal release blocker.
+    source: project
+    applicable_stages: [02-requirements, 03-design, 04-development, 05-testing]
+    verification:
+      method: pattern_scan_plus_provenance
+      passing_criteria: >
+        Zero matches for real-PII heuristics (Luhn-valid cards / structurally
+        valid SSNs outside declared synthetic generators, real API keys, real
+        person+contact pairs) on /dev-assist-validate --sensitive-data; every
+        fixture entity traces to a synthetic generator or surrogate pool.
+    reviewer_hooks:
+      - reviewer: dev-assist-development-security-sast
+        check: |
+          Scan src/, tests/, docs/, and any bundled data for real-PII leakage:
+          checksum-valid identifiers not produced by a declared synthetic
+          generator; real secrets/tokens; real email domains tied to named
+          individuals. Any finding is a release blocker.
+        severity_default: CATASTROPHIC
+
+  - id: AX-pii-anon-002
+    name: deterministic-reproducible-pseudonymization
+    definition: |
+      Pseudonymization and tokenization are deterministic and reproducible: the
+      same entity value, under the same key + pseudonymization scope, maps to the
+      same surrogate across documents and runs (RAG/joins/longitudinal analysis
+      depend on this). Detection + scoring runs are likewise reproducible: any
+      LLM-based detector/attacker/judge records model id + prompt + decoding
+      params + seed. (replay-determinism flavor.)
+    source: project
+    applicable_stages: [03-design, 04-development, 05-testing]
+    verification:
+      method: rerun_equivalence
+      passing_criteria: >
+        Same (value, key, scope) -> identical surrogate in a property test;
+        re-running a seeded pipeline reproduces results or records full LLM
+        provenance + a pinned content hash. CI re-run diff empty or documented.
+      reviewer_hooks:
+      - reviewer: dev-assist-development-code-quality
+        check: |
+          Verify tokenizers thread an explicit key + scope and are pure given
+          them; verify no unseeded random/uuid/time leaks into surrogate values;
+          verify LLM-based steps persist model+prompt+params+seed.
+        severity_default: MAJOR
+
+  - id: AX-pii-anon-003
+    name: ensemble-recall-floor-guarantee
+    definition: |
+      The swarm must never detect FEWER true entities than its always-on shared
+      (regex/checksum) layer: entities(ensemble) ⊇ entities(shared). The MoE-router
+      redesign (learned routing, early-exit, budget balancing) must preserve this
+      BY CONSTRUCTION — routing may trade latency, never recall below the floor.
+      This is the load-bearing T1 guarantee (recall is the swarm's only winning
+      metric, 0.82) and the central novelty claim ("sparse routing that does not
+      regress the dense ensemble's recall").
+    source: project
+    applicable_stages: [03-design, 04-development, 05-testing]
+    verification:
+      method: property_and_mutation_test_plus_ci_recall_gate
+      passing_criteria: >
+        Property test asserts ensemble span set ⊇ shared-expert span set across
+        shuffles/inputs; a per-language CI gate asserts router-on recall ≥
+        router-off recall − ε; mutation tests kill any code path that drops a
+        shared-layer hit.
+      reviewer_hooks:
+      - reviewer: dev-assist-development-axiom-compliance
+        check: |
+          Confirm the routing/early-exit path cannot suppress a shared-expert
+          finding; confirm the recall-floor property test + per-language recall
+          gate exist and are green; flag any early-exit that bypasses the shared
+          layer.
+        severity_default: CATASTROPHIC
+
+  - id: AX-pii-anon-004
+    name: anonymization-pseudonymization-separation
+    definition: |
+      Anonymization and pseudonymization are distinct end-states scored by
+      DIFFERENT metric families and never collapsed into one "redaction quality"
+      or "de-identification" score. Anonymization → residual re-identification
+      risk + utility preservation (Pareto, never merged). Pseudonymization →
+      unauthorized-reversal rate, authorized-reversal success, collision rate,
+      referential integrity, key-compromise blast radius. Pseudonymized output is
+      treated as still-personal-data (GDPR/EDPB).
+    source: project
+    applicable_stages: [02-requirements, 03-design, 04-development, 05-testing]
+    verification:
+      method: scoring_api_separation_check
+      passing_criteria: >
+        Distinct scoring entry points / metric schemas for anonymization vs
+        pseudonymization; no code path averages or merges the two families into
+        one headline number; output carries its end-state label.
+      reviewer_hooks:
+      - reviewer: dev-assist-development-traceability
+        check: |
+          Confirm anonymization vs pseudonymization metrics map to distinct
+          FRs/NFRs and distinct modules; flag any shared score that conflates
+          them or any "anonymized" label applied without residual-risk testing.
+        severity_default: MAJOR
+
+  - id: AX-pii-anon-005
+    name: calibrated-uncertainty-and-auditable-abstention
+    definition: |
+      Detections carry a calibrated confidence; the pipeline can ABSTAIN on
+      uncertain spans (route to human review / escalation via a needs_review
+      outcome) rather than silently emit (false positive) or drop (false
+      negative). Routing and masking decisions are auditable (router_path /
+      abstain_reason). Both landscape docs name calibrated abstention + human
+      escalation the top operational recommendation. (reasoning-visibility flavor.)
+    source: project
+    applicable_stages: [03-design, 04-development, 05-testing]
+    verification:
+      method: calibration_and_abstention_check
+      passing_criteria: >
+        Confidence is calibrated (ECE/Brier reported; reliability diagram); a
+        documented uncertainty band routes spans to needs_review; every emitted
+        finding can explain why it was emitted/abstained (router_path present).
+      reviewer_hooks:
+      - reviewer: dev-assist-development-axiom-compliance
+        check: |
+          Confirm findings carry calibrated confidence + a populated decision
+          path; confirm an abstention/escalation outcome exists and is reachable;
+          flag silently-dropped uncertain spans.
+        severity_default: MAJOR
+
+  - id: AX-pii-anon-006
+    name: least-privilege-agentic-interception
+    definition: |
+      When pii-anon intercepts agent runtimes (prompts, traces, memory, tool
+      I/O — Theme 3), the privacy layer accesses only the data + tools it needs
+      to detect and transform PII, with explicit, bounded scope. It never
+      broadens an agent's capability surface and never persists raw sensitive
+      data beyond the masking step. (capability-boundary flavor; scoped to
+      agentic/contextual-privacy features.)
+    source: project
+    applicable_stages: [03-design, 04-development, 05-testing]
+    verification:
+      method: capability_boundary_review
+      passing_criteria: >
+        Agentic interception components declare their data/tool scope; no raw
+        PII is written to traces/logs/memory after interception; scope is
+        least-privilege and documented.
+      reviewer_hooks:
+      - reviewer: dev-assist-development-security-sast
+        check: |
+          For Theme-3 interception code paths, confirm bounded data/tool access,
+          no raw-PII persistence post-masking, and no capability broadening; flag
+          any unscoped trace/memory write of sensitive content.
+        severity_default: MAJOR

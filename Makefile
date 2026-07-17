@@ -335,6 +335,18 @@ cli-smoke:
 	pii-anon health --output json
 
 docs-smoke:
-	jupyter nbconvert --to notebook --execute notebooks/llm_pipeline_quickstart.ipynb --output /tmp/llm_pipeline_quickstart.executed.ipynb
+	$(PYTHON) -m jupyter nbconvert --to notebook --execute notebooks/quickstart.ipynb --output /tmp/quickstart.executed.ipynb
+
+# Create the LOCAL-ONLY annotated RC tag. NEVER push this tag:
+# .github/workflows/release.yml auto-publishes any pushed v*-rc* tag to
+# TestPyPI (and any non-rc v* tag to PyPI). Push the branch WITHOUT --tags.
+rc-tag:
+	@test -n "$(TAG)" || { echo "usage: make rc-tag TAG=v1.7.0-rc1 [MSG='...']"; exit 1; }
+	git tag -a "$(TAG)" -m "$(or $(MSG),$(TAG) — local-only release candidate)"
+	@echo ""
+	@echo "*** LOCAL-ONLY TAG CREATED: $(TAG) ***"
+	@echo "*** Do NOT push this tag — pushing triggers a TestPyPI publish ***"
+	@echo "*** via .github/workflows/release.yml. Push the branch without  ***"
+	@echo "*** --tags (plain 'git push origin <branch>').                  ***"
 
 all: lint type test perf build twine-check package-size cli-smoke

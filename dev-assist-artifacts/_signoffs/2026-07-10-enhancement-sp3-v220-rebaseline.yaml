@@ -1,0 +1,85 @@
+# developer-assistant Sign-off — /dev-assist-signoff (enhancement close)
+# Schema: references/signoff-spec.md
+
+schema_version: 1
+
+signoff_id: "SO-25"
+date: "2026-07-10"
+type: "absorption_pass"                   # enhancement-close (delta path; reuses the pass-close type)
+
+scope:
+  stage: "06-documentation"               # furthest-completed PDLC stage — carried UNCHANGED (Y1)
+  transition: "ENHANCEMENT_CLOSE"
+  successor_stage: "n/a"
+  gate_type: "n/a"
+  scope_id: "sp3-v220-rebaseline"
+  kind: "enhancement"
+
+signer:
+  role: "po"
+  identity: "Subhash Holla"
+  authentication: "claude_session"
+
+content_hashes:
+  inputs:
+    - file: "dev-assist-artifacts/_enhancements/sp3-v220-rebaseline/enhancement.md"
+      sha256: "a30c3d70e405d91af167cded8392dbebd0d0e0a1a2f247ac1aa2ff2d79e48643"
+    - file: "dev-assist-artifacts/_enhancements/sp3-v220-rebaseline/impact.md"
+      sha256: "44abcc256687afcb0a1c08d35caca33baa81e287548291f8d2887d3c9fcca7d0"
+    - file: "dev-assist-artifacts/_enhancements/sp3-v220-rebaseline/05-regression/regression-readiness-report.md"
+      sha256: "400dc584f70e8cbe9f730554f66647a95a7fed52e366648bcea8aed92a2f2ae6"
+    - file: "dev-assist-artifacts/_enhancements/sp3-v220-rebaseline/_evidence/sp3-test-firstparty-results.json"
+      sha256: "79d103f4e4dd16d3b580dd2adbd719ea3547432892731bd871848882a466eff8"
+    - file: "src/pii_anon/engines/regex/patterns.py"
+      sha256: "8f6095ce0243952b8bbd83470a70f45a8f7f765efeb62281e60335514287a81f"
+
+decisions_acknowledged:
+  - "PL-1 (new-capability, FR-040): 3 GDPR Article-9 types (SEXUAL_ORIENTATION / TRADE_UNION_MEMBERSHIP / GENETIC_DATA) detected via label-gated + intrinsic-structure recognition; census 63->66; census-reachable (internal + external credit); 100% recall / 0 FP on 69 train-en gold + 600 negatives (DIVERGE/CONVERGE all frames 1.0/1.0/1.0)."
+  - "PL-2 (defect-fix): value-class recall recovery for CVV/PIN/PASSWORD/INSURANCE_POLICY_NUMBER/AUTHENTICATION_TOKEN (base64/alnum/zero-width/OCR-P0L/adversarial-8earer behind the specific field label); AUTHENTICATION_TOKEN 0.00->1.00 on dev-en; additive + label-gated (leak-safe)."
+  - "Dev-split re-measure: pii_anon 0.8840->0.8916, pii_anon_swarm 0.8849->0.8924, precision flat (no leak-direction/FP regression), coverage 63->66/66; both now above their sp2-era numbers."
+  - "Certified test-split (31,048 records / 201,880 gold, strict-v1): pii_anon_swarm F2 0.893 + pii_anon F2 0.892 = #1/#2 of 13 detectors at full 66/66 coverage (best external aws 0.736 at 24/66)."
+  - "SDO gate + canonical-run producer byte-identical (gate md5 3b842e81...); no adversarial close required; verdict UNCHANGED (NOT_YET, all G1-G7 PASS, binding J=0.2775)."
+  - "Full suite exit 0 @ 89.49% coverage; ruff + mypy(174 files) clean; no ReDoS; validator-drift clean (40 FRs, FR-040 traced)."
+
+findings_waived:
+  - finding_id: "test_docs_discoverability::test_a2_all_relative_doc_links_resolve"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing failure (verified RED without the delta via git stash). Broken doc links point at artifacts/benchmarks/benchmark-results.json, which is DELETED in the user's working tree (user WIP). Outside this delta's impact set; not touched to preserve user WIP; resolves when the user regenerates the benchmark artifacts."
+  - finding_id: "test_canonical_run::test_provenance_scope_matches_actual_sampler_used"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing dataset-rev drift (verified RED without the delta). The canonical-run producer stamps scope=data-v2.0.0 while the installed pii_anon_datasets is 2.2.0. Fixing it touches the control-path canonical-run producer and requires the program's mandatory adversarial close — deliberately out of this detection-scoped enhancement. Tracked as follow-up task_dc3b46b5."
+
+linked_pivots: []
+
+next_action: |
+  Optional follow-ups (not blocking this close):
+  (1) task_dc3b46b5 — update the canonical-run provenance scope for pii_anon_datasets 2.2.0
+      (control-path; needs the mandatory adversarial close).
+  (2) A fresh certified canonical run reflecting the Art-9 coverage (control-path; deferred).
+  (3) The stale tier1-en-all external-baseline run carries a 1.3.0 version stamp; a same-version
+      re-run of the local external detectors would let the CLI --merge produce the leaderboard
+      automatically (the numbers are already verified identical-gold).
+
+narrative: |
+  The sp3-v220-rebaseline enhancement re-baselined the two first-party detectors (pii_anon vanilla +
+  pii_anon_swarm) against the rebuilt pii-anon-eval-data v2.2.0 substrate (66-type strict-v1). A dev-split
+  measurement showed a ~0.006 F2 substrate-drift dip and a 63/66 coverage gap; a root-cause pass found the
+  rebuilt corpus obfuscates several secret-like values (base64 / zero-width / OCR variants) behind their
+  specific field labels, which the legacy digit-only value classes could not reach, and that the 3 new GDPR
+  Article-9 special-category types were entirely uncovered.
+
+  The delta is 12 additive, label-gated regex patterns (PL-1 Art-9 + PL-2 value-class recovery), each bound
+  by the leak-direction invariant (over-mask is the safe direction; no eval-time drop) and the eval-integrity
+  axiom (specific field labels / intrinsic structure only — never the universal "Record shows X" generator
+  filler). It was TDD'd (RED->GREEN), verified on train-en gold (Art-9 100% recall / 0 FP), and independently
+  cross-checked by a 3-frame DIVERGE/CONVERGE workflow. On the certified test split both detectors rank #1/#2
+  of 13 at full 66/66 coverage. Precision stayed flat throughout, confirming no false-positive/leak-direction
+  regression. The recall-floor (AX-003), the SDO gate, and the canonical-run producer are byte-identical, so
+  no guarantee flips and no adversarial close was required.
+
+  Verdict SHIP-WITH-CAVEATS. Caveats: (a) synthetic-data / home-team-tuning honesty boundary (AX-001 /
+  FR-027) — the first-party detectors are tuned to this corpus's label conventions, so the 0.89-vs-0.74 gap
+  over off-the-shelf detectors is not an external-validity claim; (b) two pre-existing, external-state-caused
+  suite failures waived above (one user-WIP, one control-path drift tracked as task_dc3b46b5); (c) SDO
+  unchanged, a fresh certified canonical run deferred as a control-path follow-up. The stage marker is carried
+  UNCHANGED at 06-documentation — an enhancement does not advance the PDLC stage.

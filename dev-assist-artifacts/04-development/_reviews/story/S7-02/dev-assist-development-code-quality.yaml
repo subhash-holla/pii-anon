@@ -1,0 +1,214 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S7-02
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S7-02-01
+    severity: MINOR
+    location: src/pii_anon/evaluation/canonical_run.py:871
+    description: |
+      Step numbering in `CanonicalRunGate.validate()` is misordered. The G4 block
+      check is labelled "# 6." at line 871, but it appears inside the else-branch
+      of the "# 4." (G2) block. Step "# 5." (competitor PIS check) appears later at
+      line 883, AFTER the "# 6." comment. The functional logic is correct — the
+      ordering produces the right validation — but the comment numbering jumps from
+      4 to 6 and then backtracks to 5, making the flow harder to audit in a
+      security-critical gate.
+    suggested_resolution: |
+      Renumber the inline comments to match the true execution order. Logical
+      grouping option: keep G2 + G4 both under step 4 (as one "claimant fields"
+      block) and relabel the competitor-PIS check as step 5. Alternatively, split
+      G4 into its own step 5 and move the competitor check to step 6 — any
+      consistent monotone numbering removes the ambiguity.
+
+  - id: code-quality-S7-02-02
+    severity: MINOR
+    location: src/pii_anon/evaluation/canonical_run.py:927
+    description: |
+      `_matrix_sha256()` uses a cwd-relative `Path("src/pii_anon/benchmarks/matrix/
+      use_case_matrix.json")`. This resolves correctly when pytest is invoked from
+      the project root (which pyproject.toml's `testpaths` enforces), but will
+      silently fall back to the deterministic sentinel hash (`sha256(b"canonical-run:
+      no-matrix-in-tree")`) whenever the caller's working directory is not the repo
+      root — for example, if the CLI command is invoked from a non-root directory.
+      This is not a correctness bug (the sentinel is a valid 64-hex digest; the gate
+      check passes), but it makes the provenance field non-reproducible across
+      invocation directories without any warning.
+    suggested_resolution: |
+      Anchor the path to `__file__` rather than cwd:
+        `matrix_path = Path(__file__).parents[4] / "benchmarks/matrix/use_case_matrix.json"`
+      (or derive it from the installed package). This keeps the path resolution
+      deterministic regardless of the caller's cwd and preserves the existing
+      fallback-to-sentinel behaviour for the not-found case.
+
+  - id: code-quality-S7-02-03
+    severity: MINOR
+    location: src/pii_anon/evaluation/canonical_run.py:100
+    description: |
+      `_aligned_prf` is imported by its private name from
+      `pii_anon.eval_framework.metrics.span_metrics`. There is no public alias
+      exported from `span_metrics.__all__` (the module has no `__all__`), so this
+      is a deliberate cross-module reach into a private helper. While the usage is
+      functionally identical to the same call made by `fairness_metrics` inside the
+      same package, importing a name prefixed with `_` from a sibling package
+      creates a fragile coupling point — a future refactor of `span_metrics` can
+      rename or remove `_aligned_prf` without a public-API breakage signal.
+    suggested_resolution: |
+      Two options: (a) add a thin public wrapper `aligned_prf` to
+      `span_metrics` (or its `__all__`) and import that; or (b) reuse the
+      existing `fairness_metrics.recall_per_language` primitive if it exposes
+      the same per-language breakdown. Either option removes the private-name
+      dependency without touching the functional logic.
+
+  - id: code-quality-S7-02-04
+    severity: OBSERVATION
+    location: src/pii_anon/evaluation/canonical_run.py:267-315
+    description: |
+      The `_Sampler` base dataclass has a `power_cells()` method that returns
+      `{"verdict": "unknown", "sample_size": sample_size}`. Both concrete
+      subclasses override this method, so the base implementation is a dead-code
+      fallback that is never exercised in practice (no test exercises the base
+      class's `power_cells` directly). Returning `"unknown"` from the base is a
+      reasonable defensive default, but the comment in the docstring ("A concrete
+      frozen base; the two concrete samplers ... override `power_cells`") implies
+      the base method should never be called — making it effectively an abstract
+      method that happens to have a body.
+    suggested_resolution: |
+      Optional (non-blocking): mark the base `power_cells` as an abstract-style
+      method with a comment `# Overridden by every concrete sampler; "unknown" is
+      the unreachable defensive default.` to clarify intent, or — if Python's
+      `@abstractmethod` is acceptable on a frozen dataclass — use it to make the
+      contract explicit. No correctness issue; purely a readability/intent
+      clarification.
+
+  - id: code-quality-S7-02-05
+    severity: OBSERVATION
+    location: src/pii_anon/evaluation/canonical_run.py:149-259
+    description: |
+      The `_CENSUS_PROFILES` data block (lines 149-259, ~110 lines) is a large
+      in-source literal of census-measured detection profiles. The block is clearly
+      and accurately documented (source: `artifacts/benchmarks/benchmark-results.json`,
+      148 994-record run, confirmed present in tree), and the design rationale
+      (the regex-vs-neural composite race resolves only at census scale; the
+      representative sample is too noisy) is explained in the module docstring.
+      Keeping it as source literals is an explicit engineering decision with good
+      justification. The sole concern is that the literal values carry no machine-
+      checkable link back to their source file — a future re-run that produces
+      different values would require a manual review to detect drift.
+    suggested_resolution: |
+      Non-blocking. Consider adding a `# Generated from: artifacts/benchmarks/
+      benchmark-results.json @ <git-sha-of-census-run>` comment above the block
+      so that future maintainers know the exact provenance revision. Alternatively,
+      a companion test that spot-checks one key ratio (e.g., pii-anon-swarm recall
+      > gliner recall) against the actual benchmark-results.json would provide a
+      machine-checkable guard against silent drift.
+
+  - id: code-quality-S7-02-06
+    severity: OBSERVATION
+    location: src/pii_anon/evaluation/canonical_run.py:346
+    description: |
+      `_resolve_sampler()` uses a bare `except Exception:` to catch the DATA-package
+      import path and fall back to the in-tree fixture. The story explicitly calls
+      this out (§3: "except Exception: ImportError OR any transitive failure") and
+      the comment `# In-tree representative fixture — the CI-stable path.` makes
+      the intent clear. The breadth of the catch is justified here: the lazy import
+      path involves dynamic module loading, version checks, filesystem access, and
+      potential transitive import errors from the DATA package — all of which must
+      trigger the fallback without surfacing the error (CI never depends on the DATA
+      sibling). The second `except Exception:` at line 912 in `_git_sha()` is
+      similarly justified (subprocess unavailability on restricted environments).
+      Both are correctly designed as resilient fallback paths.
+    suggested_resolution: |
+      No action required for correctness. For maximum observability, consider
+      logging the caught exception at DEBUG level in `_resolve_sampler()` (e.g.,
+      `import logging; logging.getLogger(__name__).debug("DATA package unavailable:
+      %s", exc, exc_info=True)`) so that operators can distinguish an expected
+      "package not installed" from an unexpected transitive failure. The `_git_sha`
+      fallback is a standard subprocess-unavailability pattern and needs no change.
+
+  - id: code-quality-S7-02-07
+    severity: OBSERVATION
+    location: src/pii_anon/evaluation/canonical_run.py:781-785
+    description: |
+      `CanonicalRunGate.validate()` imports `_finite_unit_score` via a deferred
+      `from pii_anon.eval_framework.evaluation.competitive_supremacy import
+      _finite_unit_score` inside the method body rather than at module level. The
+      design intent is defensible (avoids pulling the gate module into the top-level
+      import graph, keeping the sampler/detection import path clean), but the
+      private-name deferred import is worth flagging for auditability: if the gate
+      module renames `_finite_unit_score`, this will raise an `ImportError` at
+      validate-time rather than at module load time, making CI-level detection
+      slower. The A21 test (`test_competitive_supremacy_unchanged`) does pin this
+      name, so the regression is caught.
+    suggested_resolution: |
+      Non-blocking. If the module-level import graph is not a concern (the module
+      already imports from `competitive_supremacy` for `EPS_RECALL_PER_LANG` at
+      line 87), move the `_finite_unit_score` import to the top-level import block
+      alongside the existing `EPS_RECALL_PER_LANG` import. This removes the
+      deferred private-name dependency and makes the coupling visible at load time.
+
+notes: |
+  Overall assessment: the 1 068-line module is well-structured. The five logical
+  sections (constants, census profiles, samplers, G1/G2/G4 helpers, gate, write,
+  producer) are clearly delineated by section headers and could be split into sub-
+  modules if the file grows further — but at current size the single-file layout is
+  defensible and the section headers provide adequate navigation.
+
+  TDD evidence is solid: RED commit `b1f61d5` (tests only, `ModuleNotFoundError` on
+  import) precedes GREEN `890cb52` (producer added, all A1–A21 green) precedes
+  REFACTOR `396da5a`/`fe45528`/`4ddcae6` (additive edge tests + doc polish). The
+  RED-before-GREEN invariant is satisfied by git evidence.
+
+  Verification gate re-run (read-only):
+  - `ruff check src tests` → clean (zero warnings).
+  - `mypy src/pii_anon` → clean (136 files, 0 issues).
+  - `mypy src/pii_anon --strict` → clean (136 files, 0 issues).
+  - Full suite: 3461 passed / 15 skipped / 0 failed. New module coverage 95%,
+    total 88% (above the 84% gate).
+
+  Scope discipline confirmed: the diff touches exactly
+  `src/pii_anon/evaluation/canonical_run.py` (new),
+  `src/pii_anon/evaluation/__init__.py` (additive re-export),
+  `src/pii_anon/cli.py` (additive command),
+  `tests/test_canonical_run.py` (new), and
+  `tests/test_competitive_supremacy.py` (additive SO-11 contract test) — all in
+  story §8 "Files owned".
+
+  Off-limits file hashes verified byte-identical:
+  `competitor_compare.py` md5 = 7cae16c89f4c97136e1a12394dae2025 (PASS).
+  `competitive_supremacy.py` md5 = fa575f4f67adecca42c9e05aa7cf4f51 (PASS).
+
+  Public API surface: `produce_canonical_artifact`, `CanonicalRunGate`, `GATE_ID`,
+  `DEFAULT_OUTPUT_DIR`, and the six `KEY_*` constants are all in `__all__` and have
+  complete docstrings. The module docstring is accurate, thorough, and directly
+  traceable to the story §2/§2a design.
+
+  Test naming: integration/keystone tests (A1–A11) embed FR/NFR/guarantee IDs in
+  their names. The refactor-phase edge tests are named after the adversarial vector
+  they exercise (e.g., `test_gate_rejects_bool_masquerading_as_...`), which is
+  acceptable as the test docstrings carry the vector reference. No FR/NFR-ID
+  embedding gap rises above OBSERVATION.
+
+  `_CENSUS_PROFILES` data block: clearly documented with source (benchmark-results.json,
+  148 994-record census) and AX-001 provenance. The design rationale for keeping values
+  in-source (census scale required for stable composite) is explained. No correctness
+  concern; the OBSERVATION regarding a machine-checkable drift guard is noted.
+
+  `floor_pass: True` hardcode in `_assemble_base_payload` (line 461): the gate's
+  G1/G3/G6 methods explicitly do NOT read `floor_pass` (it mixes latency/throughput
+  floors and is deliberately excluded per `competitive_supremacy.py` lines 126/421/466).
+  The hardcode is harmless and consistent with the gate's design.
+
+  `except Exception` in `_resolve_sampler` (line 346): justified for lazy-optional-dep
+  fallback per story §3/RISK-5. The `_git_sha` fallback (line 912) is a standard
+  subprocess-unavailability pattern. Both rated OBSERVATION only.
+
+  The deferred import of `_finite_unit_score` inside `validate()` is defensible but
+  slightly redundant given the module already imports from `competitive_supremacy`.
+  Rated OBSERVATION.
+
+review_time_seconds: 2580
+context_bounds_respected: true
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

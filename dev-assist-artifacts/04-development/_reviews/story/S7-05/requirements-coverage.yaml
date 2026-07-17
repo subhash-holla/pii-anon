@@ -1,0 +1,27 @@
+reviewer: requirements-coverage
+story: S7-05
+gate: story
+iteration: 2  # iter-1 REQUEST_CHANGES (1 MAJOR) -> remediated 5f825b6 -> iter-2 APPROVE
+verdict: APPROVE
+runs: wf_941b38c6-52f (iter-1) -> wf_d8d3ca4e-c16 (iter-2); transcribed from the workflow structured results (scribe wrote synthesis.md only)
+summary: >
+  iter-2 clean. The iter-1 MAJOR is genuinely closed and verified against the
+  producer: the certify-a-run example now reads ./certified/canonical-run.json
+  (canonical_run.py:1275 writes out_dir/"canonical-run.json"; cli.py:908
+  reports the same) — copy-paste-runnable; the phantom benchmark-results.json
+  is gone. The A5 teeth now pin the path (.endswith canonical-run.json for any
+  certified-dir supremacy example).
+findings:
+  - id: requirements-coverage-story-iter1-01
+    severity: MAJOR
+    location: docs/evaluate-your-pipeline.md certify-a-run example (iter-1)
+    description: >
+      Step-2 read ./certified/benchmark-results.json — a file the
+      canonical-run producer never writes; verbatim execution raised
+      BadParameter; the A5 substring teeth could not catch the wrong path.
+      The documented [DOCS MUST] certification surface was not
+      copy-paste-runnable.
+    suggested_resolution: Point at the producer-emitted canonical-run.json + tighten A5 to pin the path.
+    disposition: REMEDIATED (5f825b6) — verified closed at iter-2 (incl. the counterfactual teeth proof).
+context_bounds_respected: true
+offlimits_md5_ok: true

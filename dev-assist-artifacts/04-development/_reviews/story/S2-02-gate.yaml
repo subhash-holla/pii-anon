@@ -1,0 +1,152 @@
+# S2-02 — DistilledTopKGate (runtime RoutingGate) + offline distillation trainer emitting the signed gate_v1.json (DC-02 core)
+# Canonical story gate. 5 reviewers (security-sast PRIMARY), parallel, independent, read-only. One iteration. + a control-path adversarial close.
+gate: story
+scope_id: S2-02
+final_iteration: 1
+date: 2026-06-03
+aggregate_verdict: APPROVE   # 5/5 APPROVE; 0 SHOWSTOPPER / 0 CATASTROPHIC / 0 MAJOR. Control-path adversarial close (wf_4664a0cd-f3a) RECLOSE_PASS — 0 upheld refutations (see adversarial_close).
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add); security-sast PRIMARY (control-path artifact)
+  - security-sast            # PRIMARY
+  - code-quality
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:      "7e9882a  # test: S2-02 RED — pin FR-018 DistilledTopKGate + offline distillation (A1–A10); NEW files only, failing on ImportError/ModuleNotFoundError"
+  green:    "c2cef8e  # feat: S2-02 GREEN — DistilledTopKGate + offline distillation"
+  refactor: "6184def  # refactor: S2-02 — share KEY_* payload-field constants across producer/consumer (drift-proof)"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor 7e9882a c2cef8e → exit 0; RED = test files only, failing
+  scope_discipline: "diff 7e9882a^..6184def touches ONLY the 7 owned files; competitor_compare.py 7cae16c… + swarm_learner.py + moe_gate_signing.py + moe.py + routing/floor_fusion.py + routing/shared_layer.py byte-identical (NOT in the diff); user-WIP md5 unchanged"
+
+owned_files:
+  new_src: [src/pii_anon/routing/distilled_gate.py, src/pii_anon/routing/gate_distillation.py]
+  additive_src: [src/pii_anon/errors.py (+GatePayloadError), src/pii_anon/fusion.py (+distilled_moe v2 mode), src/pii_anon/routing/__init__.py (lazy re-exports)]
+  new_tests: [tests/test_distilled_gate.py, tests/test_gate_distillation.py]
+
+reviewers:
+  - reviewer: security-sast      # PRIMARY
+    verdict: APPROVE
+    notes: >
+      gate_v1.json control-path artifact is correctly FAIL-CLOSED. Verify-on-load MANDATORY on every file-reading
+      path (sole route load_distilled_gate → load_verified_gate(verify_on_load=True) with an explicit True AST constant;
+      zero verify_on_load=False in src/; _build_distilled_moe fails closed on gate_path-without-key_ring). Tamper/wrong-key
+      ⇒ GateSignatureError; verified-malformed ⇒ GatePayloadError; absent ⇒ None static-softmax — all tested non-vacuously
+      (62/62 owned tests; A8 ran against xgboost 3.2.0, 0 skips). ZERO unsafe sinks in the changed production files. Signing
+      HMAC-SHA256 over canonical bytes + constant-time verify; bool rejected as a weight (_is_finite_number). The AST
+      no-unverified-construction guard is provably non-vacuous (independent mutation probe: catches =False, non-True, omitted-kwarg).
+      The 4 pinned primitives byte-identical + absent from the diff. 0 blocking; 2 OBSERVATION (generic ValueError for the
+      fail-closed misconfig — mirrors the existing MoERouter seam; the in-process-only direct DistilledTopKGate(payload)
+      constructor — adjudicated analogous to S2-05's escape, out of the file-attacker threat model).
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED-before-GREEN git-confirmed; additive discipline (errors.py +GatePayloadError only; fusion.py additive v2 mode;
+      routing/__init__ additive re-exports). Scope-disciplined (7 owned files). The closed-form distillation math is CORRECT
+      (the documented proof sketch — the BCE/KL-minimizing per-cell constant for a table-shaped student IS the weighted mean
+      of the teacher's soft targets — checks out; distill_topk_gate computes the RRS-weighted per-cell mean then a
+      numerically-stable temperature-softmax over sorted experts). ruff clean; mypy clean under BOTH invocations (131 files).
+      A8 importorskip arm RAN (xgboost 3.2.0). 0 blocking; 2 OBSERVATION (a comment-precision nit on `if not cell:`; the
+      documented `Any` key_ring annotation for import-cycle avoidance, consistent with FusionBuildSpec).
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      FR-018 (MUST, 4-part bundle) HONESTLY scoped — S2-02 ships the learned-routing slice (gate body + offline producer),
+      attributes span-dedup to the existing MoE merge, defers selective-activation/early-exit to NAMED successors S2-03/S2-04;
+      not claimed fully discharged. All A1–A10 map to named, passing, non-vacuous tests (62 passed / 0 skipped / 0 failed):
+      A2 router-equality vs no-gate (NFR-026); A5 independent closed-form recompute @1e-9 + monotone teeth + RRS-non-vacuous;
+      A6 byte-identical canonical_gate_bytes replay + oracle-hash binding (NFR-005); A8 the real XGBoost oracle arm RAN, not
+      skipped (real train() + structural Protocol check + re-weight). 0 blocking; 2 OBSERVATION (NFR-026 is SHOULD not MUST —
+      story correct; successor story FILES S2-03/04 not yet authored — epic-gate concern, not a story-gate coverage gap).
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-018 (:30), NFR-005 (:64), NFR-026 (:89), AX-001/002/003/006 all resolve with matching wording. DC-02
+      (D-implementation-ready-design.md:34) — every clause maps to GREEN (frozen-XGBoost-oracle via SurvivalOracle Protocol,
+      closed-form per-cell weighted-mean BCE/KL student, RRS up-weighting, select_f2_threshold reuse, oracle_hash +
+      gate_feature_version stamps, absent→static-softmax, advisory-can't-drop-a-shared-span). The S2-01 entry-gate obligation
+      is DISCHARGED — both real-gate paths (runtime load_distilled_gate + fusion.py _build_distilled_moe) route through
+      load_verified_gate(verify_on_load=True). A1–A10 → named tests; both new modules 100% coverage. RED→GREEN→REFACTOR
+      git-verified; diff exactly the 7 owned files. 1 MINOR (traceability-matrix backfill) DEFERRED-to-sprint-gate per convention.
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      AX-006 least-privilege UPHELD (the headline for a control-path artifact) — load_distilled_gate is the sole production
+      path → verify_on_load=True; the A1 AST guard asserts an explicit True on every call; _build_distilled_moe verifies +
+      fails closed; the gate is advisory-only (dict-get + multiply, no file/network/exec capability). AX-003 recall-floor
+      UPHELD non-vacuously — A4 runs the REAL FloorProjectingFusion(MoEFusionStrategy(... gate zeroes regex-oss for US_SSN ...))
+      and asserts the survivor carries shared_floor (mechanism, not mercy); adjust() only re-weights experts in base;
+      floor_fusion.py/shared_layer.py byte-identical. AX-002 determinism UPHELD (no random/uuid/time/secrets; A6 byte-identical
+      replay; XGBoost seeded only in the importorskip arm; payload+RouteContext frozen). AX-001 synthetic (NON-PRODUCTION key).
+      AX-004/005 NOT-TRIGGERED. 0 blocking; 1 OBSERVATION (a future RouteContext-conditioning story must re-pin A6 determinism).
+      Concurs (non-binding) with running the standing adversarial-close catch-net post-5/5 given the control-path artifact.
+
+findings:
+  - id: TRACE-S202-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md
+    description: "No S2-02 Story/Test backfill row yet (requirement + design level documented; only the Story→Test cell absent)."
+    disposition: "Backfill at the S2 sprint gate — mirrors S2-05/S4-01/S5-04/S4-CS-01/S2-01."
+  - id: SAST-S202-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "The in-process direct DistilledTopKGate(payload) constructor bypasses the signature check, but is reachable ONLY from already-executing code that owns the process — out of the file-attacker threat model (analogous to S2-05's adjudicated verify_on_load=False escape). The only FILE-reading path (load_distilled_gate) always verifies."
+  - id: SAST-S202-OBS-2 / CQ-S202-OBS-1 / CQ-S202-OBS-2 / REQCOV-S202-OBS / AXIOM-S202-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "Generic ValueError for the gate_path-without-key_ring fail-closed (mirrors MoERouter); a comment-precision nit on `if not cell:`; documented `Any` key_ring annotation (import-cycle); NFR-026 is SHOULD not MUST (story correct); a future RouteContext-conditioning story must re-pin A6 determinism. All non-blocking forward notes."
+
+cross_reviewer_patterns:
+  - pattern: "control-path artifact fail-closed verified independently (security-sast + axiom-compliance + traceability)"
+    raised_by: [security-sast, axiom-compliance, traceability]
+    detail: "Three reviewers independently confirmed the ONLY file-reading construction path is load_verified_gate(verify_on_load=True); the production v2 wiring _build_distilled_moe verifies + fails closed; the AST guard is non-vacuous. The S2-01 entry-gate obligation is discharged."
+  - pattern: "A8 real-XGBoost arm RAN (code-quality + requirements-coverage)"
+    raised_by: [code-quality, requirements-coverage]
+    detail: "Both confirmed the importorskip('xgboost') arm executed against xgboost 3.2.0 (real train() + distill + sign + load + re-weight), not skipped — the real oracle plugs the SurvivalOracle Protocol."
+
+adversarial_close:
+  workflow: wf_4664a0cd-f3a   # 3 break-probe refuters (verify-bypass / forge-fabricate / floor-defeat) + integration/SDO sweep; bar = 0 upheld
+  rationale: "gate_v1.json is a control-path/privilege-escalation artifact (the S2-05 hardening exists precisely for it); the story made the close a DoD item; security-sast PRIMARY + axiom-compliance concurred. Standing catch-net per SO-10/SO-11 (the 5/5 gate is necessary-but-not-sufficient for security-sensitive control-path work)."
+  result: RECLOSE_PASS   # 0 upheld refutations; the catch-net found NO hole this time (a clean control-path close)
+  upheld_refutations: 0
+  refuters:
+    - attack: "VERIFY-BYPASS — obtain a usable production gate from a file without a real HMAC verify (flip-byte / wrong-key / factory key_ring=None / full file-read-path audit / AST-guard evasion)"
+      broke: false
+      detail: "HOLDS. Exactly ONE DistilledTopKGate construction (distilled_gate.py:280) fed DistilledGatePayload.from_payload(load_verified_gate(..., verify_on_load=True)); exactly TWO load_verified_gate call sites in the package (moe.py:411 + distilled_gate.py:277), BOTH verify_on_load=True; NO verify_on_load=False literal anywhere in production; the single file-read primitive is unconditionally HMAC-gated under the KeyRing trust root. The in-process direct constructor is out-of-threat-model (already-executing code) and not reachable from a file without verification."
+    - attack: "FORGE/FABRICATE — make a malformed/forged gate be accepted OR propagate a bad weight / invented expert downstream"
+      broke: false
+      detail: "HOLDS. from_payload rejected 35+ malformed-but-correctly-signed payloads (NaN/±inf/-1.0/bool weights; every missing key; schema_version 2/'1'/1.0/True; weights-as-list; nested non-mapping; non-str keys incl. via a custom Mapping subclass; temperature<=0/NaN; empty/int oracle_hash). Proved the SIGNATURE layer is NOT the catch-net (NaN/Infinity survive json+verify → only the shape validator rejects — defense-in-depth as designed). Through a REAL route(): a phantom gate expert is structurally ignored (adjust() iterates base → ids==base ids); all-zero → _normalize_weights None → base fallback; overflow impossible (base∈[0,1] × finite ≥0 factor); every output finite ∧ ≥0 ∧ Σ=1.0 ∧ ids⊆base. The v2 seam raises GatePayloadError at construction on a NaN-bearing signed gate; gate_path-without-key_ring raises."
+    - attack: "FLOOR-DEFEAT (AX-003) — make an advisory gate drop a checksum-gated regex-oss shared span end-to-end, or break determinism"
+      broke: false
+      detail: "HOLDS. 19 hostile-gate variants + a 400-trial fuzz against the REAL FloorProjectingFusion(MoEFusionStrategy(... MoERouter(gate=hostile) ...)) — in EVERY case the floored span survived + the gated path was deterministic. Decisive V16: with min_expert_weight=0.0 (inner floor removed) AND the gate zeroing regex-oss, the inner merge GENUINELY drops the cluster (inner output []), yet the final output still carries the span via SharedLayerProjector re-injection (is_shared_floor=True) — the projector is the independent sole-survivor authority. The gate has NO payload field able to reconfigure the floor (DistilledGatePayload exposes only schema_version/gate_feature_version/oracle_hash/temperature/weights — zero overlap with shared_engine_id/projector). 2 refuter-self-identified FALSE ALARMS (not defects)."
+  sweep:
+    suite_line: "3291 passed, 15 skipped, 0 failed (exit 0; full run, 616s)"
+    sdo_verdict: "NOT_YET"
+    sdo_binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    primitives_byte_identical: true   # moe_gate_signing.py + moe.py + competitor_compare.py + floor_fusion.py + shared_layer.py
+    ruff_mypy_clean: true
+    new_issues: []
+  methodology_note: "A clean close (0 upheld) does NOT mean the close was unnecessary — it independently confirmed the verify-on-load entry-gate, the no-fabrication validator, and the advisory-floor bound under live attack (35+ forge probes / 19 floor variants / 400-trial fuzz / full file-read-path audit). The catch-net stays standing for any future control-path-artifact change."
+
+outcome:
+  invariant: >
+    DC-02 core LIVE: the runtime DistilledTopKGate (the first concrete S2-01 RoutingGate) enters the control path ONLY
+    through the fail-closed S2-05 verify-on-load boundary (AX-006); advisory per-(entity_type,expert) re-weighting that
+    can never drop a floored shared span (AX-003); absent/unverifiable/unknown ⇒ static entity_strengths softmax (NFR-026).
+    The offline producer distills the frozen XGBoost survival oracle (via a SurvivalOracle Protocol) into a compact gate
+    using RRS up-weighting + the closed-form BCE/KL-optimal compact student + temperature-softmax, stamps oracle_hash +
+    gate_feature_version, and signs gate_v1.json via the S2-05 KeyRing. Deterministic (NFR-005). xgboost optional/lazy.
+  sdo_recompute: "UNCHANGED — NOT_YET, binding canonical_claim_run=False (confirmed by the adversarial-close sweep + a fresh `pii-anon supremacy`). A swarm-routing feature writes no benchmark artifact and flips no guarantee; G1–G7 unchanged."
+  tests: "full suite 3291 passed / 15 skipped / 0 failed (exit 0; the adversarial-close sweep's fresh full run on the committed tree); 62 owned tests; A8 real-XGBoost arm RAN"
+  coverage: "87.34% (≥84); distilled_gate.py + gate_distillation.py 100% by own tests"
+  quality: "ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` (0 errors / 131 files)"
+  safety: "competitor_compare.py 7cae16c89f4c97136e1a12394dae2025 (RISK-6) + swarm_learner.py + moe_gate_signing.py + moe.py + routing/floor_fusion.py + routing/shared_layer.py byte-identical; user-WIP md5 unchanged; artifacts/benchmarks/* never written; no new HARD dependency (xgboost optional/lazy); narrow git add"
+  provisional_status: "AGENT_SIMULATED — runtime gate + verify-on-load + fallback + closed-form distillation + RRS up-weighting + oracle_hash + S2-05 signing + the real importorskip XGBoost-oracle distillation run for real in-tree against synthetic oracles/records + the NON-PRODUCTION test key; a gate distilled on real Tier-3 survival labels + real key custody are Pass-2."
+
+followups:
+  - "S2-03 rules-first early-exit: consumes RouteContext.checksum_gated + the gate's advisory signal — DEFERRED (orchestrator.py wire-in blocked on user-WIP)."
+  - "S2-04 aux-loss-free SLA selection-bias (SHOULD): nudges selection logits toward latency budgets (NFR-009/010, NOT the NFR-004 power tiers); needs a per-expert latency-cost signal (ExpertSpec.metadata) — DEFERRED to next session."
+  - "S2 sprint gate: backfill traceability-matrix S2-01 + S2-02 rows; add fr018_ prefix to S2-01's test_audit_* names."
+  - "Pass-2: a gate distilled on real Tier-3 survival labels + real signing-key custody."

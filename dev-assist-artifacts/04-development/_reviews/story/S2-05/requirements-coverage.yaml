@@ -1,0 +1,201 @@
+reviewer: requirements-coverage
+gate: story
+scope_id: S2-05
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: REQCOV-S2-05-001
+    severity: OBSERVATION
+    requirement: NFR-006
+    title: >-
+      NFR-006 provenance is protected-if-present but not schema-mandated; no
+      positive test asserts the verified payload CONTAINS a provenance/oracle stamp.
+    detail: >-
+      The story maps NFR-006 to "the gate envelope carries a provenance/oracle
+      stamp + key id". The signed bytes DO cover whatever provenance/oracle_hash
+      fields are present (the test fixture _payload() includes a `provenance`
+      block and `oracle_hash`, and the A2 mutation property at
+      tests/test_moe_gate_signing.py:180-181 tampers `provenance.trainer` /
+      `provenance.run_id` and asserts verify raises — so provenance, when present,
+      is tamper-evident and authenticity-bound). `signature.key_id` is asserted in
+      A1 (test_a1_round_trip_valid_signature_loads). However, no test asserts the
+      verified/returned payload MUST contain a populated provenance or oracle_hash
+      field, and the envelope schema (`sign`/`_require_envelope`) does not mandate
+      one — an empty-provenance gate would sign and verify cleanly. So NFR-006 is
+      satisfied at the "authenticate the stamp if present" level (which is the
+      integrity/authenticity slice this story owns), but NOT at a schema-enforced
+      "a claim-grade gate must carry provenance" level. NFR-006's requirements-doc
+      definition (row :65) is scoped to eval claim-grade numbers
+      (`canonical_claim_run==True` + provenance stamp), which is the S4 CanonicalRunGate
+      surface, not this control-path artifact — so the schema-enforcement of
+      provenance legitimately belongs to the producer (S2-02) / the S4 provenance
+      story, not the signer. Recorded as an OBSERVATION (not a gap): the story's
+      own claim ("the envelope carries a provenance stamp") is met for the
+      protect-if-present reading; adjacent producer/eval stories own the
+      "must-be-populated" enforcement.
+    suggested_owner: S2-02 (producer that emits gate_v1.json) / S4 provenance story
+  - id: REQCOV-S2-05-002
+    severity: OBSERVATION
+    requirement: NFR-015
+    title: >-
+      NFR-015 is a SHOULD in the requirements doc (row :76), surfaced for honesty;
+      the in-tree key/state-separation slice is fully verified, real custody is Pass-2.
+    detail: >-
+      requirements-document.md:76 enumerates NFR-015 as MoSCoW=SHOULD (Art 4(5)
+      proxy), not MUST. The story's `Implements` lists it without the SHOULD
+      qualifier. This does not change the coverage verdict — the substance
+      (verification requires the external key ring; the artifact alone cannot
+      self-verify) is directly pinned by test_a4_unknown_key_id_raises (an
+      attacker's self-consistent HMAC under their OWN key is rejected because the
+      key_id is absent from the ring — the ring, not the file, is the trust root)
+      and test_a7_unknown_key_file_raises on the load path. Real key custody
+      (env/secret-store/HSM/KMS) is honestly deferred to Pass-2 — an ACCEPTABLE
+      deferral per methodology, not a coverage gap: the in-tree HMAC path runs for
+      real with a clearly-labelled NON-PRODUCTION test key, and the
+      env-overridable gate_signing_key_provider seam (moe_gate_signing.py:91) is
+      the drop-in point. Surfaced only so the SHOULD-vs-MUST label and the Pass-2
+      boundary are explicit.
+    suggested_owner: dev-assist-development-executor (Pass-2 key-custody confirmation)
+  - id: REQCOV-S2-05-003
+    severity: MINOR
+    requirement: AX-002
+    title: >-
+      AX-002 cited as the determinism axiom in the story's Implements/A6 prose,
+      but AX-002 is not a canonical axiom id in the requirements doc (axiom-compliance owns the adjudication).
+    detail: >-
+      The story (line 10 `upholds AX-002`, and A6's "(NFR-005/AX-002)") leans on
+      AX-002 for determinism, but the requirements doc enumerates only
+      AX-001/AX-005/AX-006 as canonical axioms — AX-002 is not a canonical id. From
+      the coverage dimension this is NOT a missing-requirement gap: the determinism
+      SUBSTANCE the story relies on is fully backed by NFR-005 (byte-identical
+      across N=5 replays) which the story also cites and which A6 pins via
+      test_a6_replay_determinism_n5_identical_signature (N=5 -> a single distinct
+      signature.value) plus the order/whitespace-invariant + value-sensitive
+      canonical-bytes tests. The story author already self-flagged this at
+      line 74 as a non-canonical alias. Recorded as MINOR (a spec-label
+      inconsistency, not an unmapped requirement) and deferred to axiom-compliance
+      to pick spec-fix-vs-code-fix (spec-label fix expected). The verdict is not
+      blocked because the cited NFR-005 determinism requirement is fully verified.
+    suggested_owner: axiom-compliance reviewer (code-fix-vs-spec-fix adjudication)
+context_bounds_respected: true
+notes: >
+  COVERAGE VERDICT: APPROVE. All four claimed requirements (FR-018, NFR-005,
+  NFR-006, NFR-015) are fully verified by named, passing tests, OR honestly
+  deferred to Pass-2 (real key custody) — no MUST/DoD clause is left unmapped.
+  Both owned test files PASS: `python3 -m pytest tests/test_moe_gate_signing.py
+  tests/test_moe_gate_verify_on_load.py` -> 62 passed / 0 failed / 0 skipped
+  (Ed25519 optional tests RUN in-tree, not skip — cryptography 48.0.0 present, as
+  the story claims). The working-tree owned files are byte-identical to GREEN
+  commit d45a5e4 (git status --porcelain clean for the 5 owned paths). NOTE: a
+  first `pytest` invocation reported a ModuleNotFoundError/ImportError at
+  collection; this was a STALE pytest collection cache, NOT a real regression —
+  the on-disk module exists, `d45a5e4` is an ancestor of HEAD (5df2bd2), and a
+  cache-cleared re-run is fully green. The global --cov-fail-under=84 line that
+  appears when running only these 2 files is expected (a 2-file subset cannot hit
+  the repo-wide 84% floor) and is not a S2-05 finding.
+
+  REQUIREMENT -> TEST MAPPING
+  ---------------------------
+  FR-018 (the MoE-router learned gate is the protected control-path artifact;
+    verify-on-load guards the MoERouter construction/route() path):
+      - test_a7_production_seam_uses_verify_on_load_true (spies the real
+        load_verified_gate symbol; asserts the production seam passes
+        verify_on_load=True). moe.py:294-296 HARD-CODES verify_on_load=True (a
+        literal, not the parameter default) so an unsigned/tampered gate can
+        never reach route().
+      - test_a7_constructor_raises_on_tampered_gate (MoERouter pointed at a
+        tampered gate fails closed at construction — tampered gate never reaches
+        route()).
+      - test_a7_valid_file_returns_verified_payload (the happy path returns the
+        verified payload to the router).
+      - test_a8_absent_gate_router_uses_static_softmax (no-gate path -> identical
+        to plain router, NFR-026 graceful degradation).
+      VERDICT: fully covered for what THIS story claims (hardening the advisory
+      gate). The routing algorithm itself (top-k/softmax/early-exit) is
+      S2-01/S2-02 scope — out of this story's bound; not a coverage gap here.
+
+  NFR-005 (decision determinism -> canonical bytes byte-identical across replays
+    so the signature is stable):
+      - test_a6_replay_determinism_n5_identical_signature (signs the SAME payload
+        N=5 -> set of signature.value has len==1 — the replay-stability pin you
+        asked to confirm: PRESENT).
+      - test_a6_canonical_bytes_key_order_invariant + property
+        test_a6_property_canonical_bytes_order_invariant (order-invariant).
+      - test_a6_canonical_bytes_no_whitespace (compact separators; whitespace
+        cannot perturb signed bytes).
+      - test_a6_canonical_bytes_value_sensitive + the A2 8-class mutation property
+        (value-sensitive).
+      VERDICT: fully covered (order/whitespace-invariant + value-sensitive +
+      replay-stable N=5 all pinned).
+
+  NFR-015 (key/state separation -> verification requires the external key ring;
+    the artifact alone cannot self-verify):
+      - test_a4_unknown_key_id_raises (HEADLINE: an attacker who computes a
+        perfectly valid HMAC under THEIR OWN key + key_id is REJECTED with
+        "unknown key id" because the id is not in the ring — the ring, not the
+        file, is the trust root; the artifact alone cannot self-verify).
+      - test_a4_unknown_key_id_message_only_names_the_id (no-secret-leak on the
+        unknown-key path).
+      - test_a7_unknown_key_file_raises (same property on the load seam).
+      - verify() at moe_gate_signing.py:230-234 returns None from key_for() ->
+        loud raise when the key_id is out-of-ring.
+      VERDICT: fully covered for the in-tree HMAC path. Real key custody/HSM is
+      Pass-2 (ACCEPTABLE deferral, not a gap) — see REQCOV-S2-05-002. NFR-015 is a
+      SHOULD in the requirements doc.
+
+  NFR-006 (canonical-run provenance -> the signed payload carries provenance
+    fields + key_id, and a test exercises it):
+      - signed payload carries `provenance` {trainer, run_id} + `oracle_hash`
+        (test fixture _payload(), moe_gate_signing.py); the signature envelope
+        carries `signature.key_id`.
+      - test_a2_property_every_payload_mutation_raises includes mutation cases
+        ["provenance","trainer"] and ["provenance","run_id"]
+        (tests/test_moe_gate_signing.py:180-181) -> tampering provenance changes
+        the canonical bytes and verify RAISES (provenance is authenticity-bound
+        when present).
+      - test_a1_round_trip_valid_signature_loads asserts signature.key_id == "k1".
+      VERDICT: satisfied at the "authenticate the provenance/oracle stamp if
+      present" level (the integrity/authenticity slice this story owns). NOT
+      schema-enforced (no test mandates a populated provenance field; an
+      empty-provenance gate would sign+verify) — recorded as OBSERVATION
+      REQCOV-S2-05-001. NFR-006's requirements-doc definition (row :65) is scoped
+      to eval claim-grade numbers (the S4 CanonicalRunGate surface), so the
+      "must-be-populated" enforcement legitimately belongs to the producer (S2-02)
+      / the S4 provenance story — not this signer. Hence OBSERVATION, not a gap.
+
+  DESIGN SME MUST #1 (D-implementation-ready-design.md:56 — "sign + verify the
+    gate_v1.json artifact"; DC-02 control-path privilege-escalation surface):
+      FULLY MAPPED and the central spine of A1-A9 — sign+verify (A1-A2),
+      fail-loud on tamper/missing/malformed/unknown-key/retired-key (A2-A5),
+      verify-on-load fail-closed seam + production verify_on_load=True (A7),
+      absence-graceful/present-broken-raises (A8), constant-time compare +
+      no-secret-leak (A9). The DoD security clauses (no unsafe-deserialization
+      [JSON-only, AST-pinned], no subprocess, no shell-out, no network) are each
+      pinned by a named test (test_dod_no_unsafe_deserialization_import,
+      test_dod_no_subprocess_or_shell_out_import, test_dod_no_network_import,
+      test_dod_default_path_has_no_hard_crypto_import). No unmapped security-DoD
+      clause -> no MAJOR.
+
+  DEFERRALS (honest, acceptable — NOT coverage gaps):
+      - Real signing-key custody (env/secret-store/HSM/KMS): Pass-2
+        (AGENT_SIMULATED). The in-tree HMAC path runs for real with a labelled
+        NON-PRODUCTION key behind the gate_signing_key_provider seam.
+      - The optional Ed25519 asymmetric envelope: an optional `gate-signing`
+        extra; importorskip-gated. In this .venv cryptography is present so the
+        Ed25519 tests RUN (round-trip + tamper) — exceeding the skip bar. Real
+        Ed25519 key custody remains Pass-2.
+
+  SCOPE / OUT-OF-DIMENSION (deferred to sibling reviewers, not adjudicated here):
+      whether tests are well-written (code-quality); whether the constant-time
+      compare / no-secret-leak / no-unsafe-deserialization assertions are
+      semantically airtight (security-sast — PRIMARY); whether AX-006
+      least-privilege + the AX-002/NFR-005 determinism axiom labels are correctly
+      mapped (axiom-compliance — see MINOR REQCOV-S2-05-003); story->commit trace
+      integrity (traceability). The pre-existing S4-CS-01 CompetitiveSupremacyGate
+      Tier-R/Tier-C coverage note in session memory is a DIFFERENT story (S4) and
+      is NOT in this S2-05 scope.
+
+  Three findings, all OBSERVATION/MINOR, none blocking. No SHOWSTOPPER (every
+  claimed requirement has test evidence or an acceptable Pass-2 deferral), no
+  CATASTROPHIC (not a release sprint), no MAJOR (no security-DoD MUST clause is
+  unmapped). Verdict: APPROVE.

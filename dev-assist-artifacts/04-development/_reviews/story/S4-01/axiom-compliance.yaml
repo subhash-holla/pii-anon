@@ -1,0 +1,122 @@
+reviewer: axiom-compliance
+gate: story
+scope_id: S4-01
+iteration: 1
+verdict: APPROVE
+self_attestation: >
+  I independently read every changed file (deid_families.py, metrics/__init__.py,
+  scorecard.py, competitive_supremacy.py, test_deid_families.py, the G2 teeth in
+  test_competitive_supremacy.py) and the project-axioms registry. I did NOT rely
+  on the story's self-reported Evidence: I re-ran the two owned test files (80
+  pass), re-ran 9 targeted axiom guards (all green), executed an INDEPENDENT
+  non-vacuity probe of the no-merge AST scan (it DOES flag a synthetic merged
+  deid_score field), checksummed the three OFF-LIMITS files against the story's
+  claimed md5s (all three match byte-for-byte), and ran `pii-anon supremacy`
+  live to confirm the real verdict (NOT_YET / canonical_claim_run=False / G2
+  PENDING — no fabrication). Findings are my own.
+findings:
+  - id: AXIOM-S401-001
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/rating/scorecard.py:64
+    description: >
+      AX-004 backward-compat note. `SystemScorecard.privacy_score` (the historical
+      MERGED de-id field — the original structural AX-004 violation this story
+      targets) is correctly PRESERVED (RISK-1: public-API + leaderboard) and
+      documented deprecated/superseded. The no-merge scorecard guard
+      (test_a2_scorecard_has_no_merged_deid_field) explicitly EXCLUDES privacy_score
+      from its denylist as the documented legacy field, while the deid_families
+      module-level denylist (test_a2_no_merged_deid_field_in_deid_families_module)
+      INCLUDES privacy_score so the new families can never reintroduce it. The
+      AX-004 closure is therefore structural-on-the-new-surface, not yet a removal
+      of the legacy merged field. This is the correct staged path per §2/§5
+      (composite_score re-base is explicitly out of scope), but the residual
+      conflated field remains in the public schema until a future story re-bases
+      composite_score on the two distinct families. No action this story; tracked
+      as the documented deprecation path.
+    suggested_resolution: >
+      None for S4-01. When the S7 canonical schema carries the two distinct fields,
+      a successor story should re-base composite_score onto the anon/pseudo families
+      and retire privacy_score (closing the legacy half of the AX-004 conflation).
+    status: OPEN
+context_bounds_respected: true
+notes: >
+  KEY-DIMENSION VERDICT: APPROVE (0 MAJOR+). AX-004 (the headline) is saturated
+  HARD and the no-merge CI guard is NON-VACUOUS.
+
+  AX-004 (anon != pseudo, never merged) — UPHELD.
+  * DeidFamilyScores carries EXACTLY {anonymization, pseudonymization_integrity}
+    as two separate frozen sub-records (verified live via __dataclass_fields__).
+    There is NO combined/deid_score/privacy_score/merged/overall field anywhere on
+    the record (A1).
+  * The two sub-records share NO axes: AnonymizationScore = {reidentification_risk,
+    leakage, canary_exposure, irreversibility_score}; PseudonymizationIntegrityScore
+    = {unauthorized_reversal_rate, referential_integrity, collision_rate,
+    key_state_separation_ok, integrity_score}. The A7 wall test asserts neither
+    family leaks the other's fields — confirmed (zero overlap).
+  * The two scorers share no mutable state, neither imports/instantiates the other
+    (AnonymizationScorer is stateless except its own three metric instances;
+    PseudonymizationIntegrityScorer is fully stateless); the AST test
+    test_a7_two_families_do_not_import_each_other_in_a_merging_way pins this.
+  * NON-VACUITY confirmed two ways: (a) the in-tree meta-guard
+    test_a2_meta_guard_scan_is_non_vacuous flags a synthetic merged deid_score; (b)
+    my OWN independent re-implementation of the scan against a synthetic
+    DeidFamilyScores-shaped record carrying a deid_score field returned
+    offenders=['deid_score'] -> WOULD flag = True. The scan is real, not a no-op.
+  * SystemScorecard gained the two DISTINCT fields (anonymization_score,
+    pseudonymization_integrity_score), both serialized in to_dict(), with NO new
+    merged de-id field (NEW-merged denylist offenders = []). privacy_score
+    preserved (see OBSERVATION AXIOM-S401-001) — no public-API regression (A9).
+  * The G2 read seam is decoupled: competitive_supremacy.py imports NEITHER
+    SystemScorecard NOR deid_families; it reads raw per-system JSON dict fields and
+    REQUIRES BOTH family fields present-and-distinct on the claimant, so a
+    half-populated artifact -> PENDING (cannot fabricate the missing half). This
+    structurally enforces the two-family contract end-to-end.
+  * Tier-3 RRS sub-model (bayes_bt.fit_rrs_posterior, _store_state=False) stays a
+    DISTINCT posterior, consumed not changed: bayes_bt.py md5
+    c88ba8ac780957925e7c04960d19a86c byte-identical to the story claim.
+
+  AX-002 (determinism) — UPHELD. The two scorers + _g2_pseudonymization_integrity
+  contain no random/uuid/time/datetime/secrets/urandom/hash(); pure functions of
+  inputs. A8 (scorers two-runs-equal) and test_g2_is_deterministic_on_identical_
+  benchmarks pin it; both green.
+
+  AX-001 (synthetic-only) — UPHELD. Zero real-PII heuristic matches (no
+  Luhn/SSN/real-secret/AKIA patterns) in the new src + test; the only email is the
+  RFC-reserved jane.roe@example.test; the unauthorized-reversal probe uses
+  synthetic-WRONG-key-9999. No bundled corpus added.
+
+  AX-003 (recall-floor) + SDO gate integrity — UNTOUCHED / NON-REGRESSED.
+  RecallFloorVerdictGuard, the verdict state machine (_decide), the J-meter
+  (_compute_j / _guarded_rank1 / MLE-bootstrap), Tier-R∪Tier-C gating, and
+  _GUARANTEE_ORDER are unchanged in semantics; the G2 edit is a clean, additive
+  swap of _pending_guarantee('G2', ...) for _g2_pseudonymization_integrity(systems)
+  that PRESERVES the explicit pending_overrides['G2'] seam. RISK-6:
+  competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025 and elo.py md5
+  a9124ced716e79802cfd5313e5845bbe byte-identical. The gate's AST import-boundary
+  test stays scoped to {competitive_supremacy.py, competitor_tiers.py} (not
+  broadened). Changed-file set across RED..REFACTOR = exactly the 7 owned files;
+  RED 2143b6a precedes GREEN 2f69f89 (git-verified, GREEN descends from RED).
+
+  NO-FABRICATION (the critical SDO honesty check) — CONFIRMED LIVE.
+  `pii-anon supremacy` on the real smoke artifact returns: verdict=NOT_YET,
+  binding_constraint='canonical_claim_run=False (G7 certified-run gate)',
+  canonical_claim_run=false, G2=PENDING, axes_pending names 'G2<-S4-01',
+  j_source=mle-bootstrap, j_value=1.0. G2 returns None (PENDING) when the artifact
+  lacks the fields; the teeth tests prove PASS only on a conforming fixture where
+  pii-anon strictly dominates AND unauthorized-reversal=0 AND both fields present,
+  FAIL on non-dominance or unauthorized-reversal>0, and the non-vacuity meta-guard
+  flips PASS->FAIL when a competitor PI is raised above pii-anon on the SAME
+  fixture. The two-family-present requirement (test_g2_pending_when_only_one_
+  family_field_present) blocks a half-fabricated PASS.
+
+  Out-of-scope (correctly deferred to other reviewers): correctness of the
+  underlying Reid/Leakage/Canary aggregation math and the FR-009 axis formulas
+  (requirements-coverage + code-quality); the DC-08/G2-chain trace mapping
+  (traceability); NFR-014/NFR-015 attack-surface depth (security-sast). I assessed
+  ONLY axiom saturation. AX-005 and AX-006 are not triggered by this diff (no
+  detection-confidence/abstention surface; no agentic-interception code path).
+
+  One OBSERVATION (AXIOM-S401-001): privacy_score (the legacy merged field) remains
+  in the public schema as the documented deprecation path — AX-004 is closed
+  structurally on the new surface; the legacy half retires when composite_score is
+  re-based (explicitly out of scope per §5). Non-blocking.

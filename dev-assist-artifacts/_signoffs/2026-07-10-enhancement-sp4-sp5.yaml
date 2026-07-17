@@ -1,0 +1,77 @@
+# developer-assistant Sign-off — /dev-assist-signoff (dual enhancement close)
+# Schema: references/signoff-spec.md
+
+schema_version: 1
+
+signoff_id: "SO-26"
+date: "2026-07-10"
+type: "absorption_pass"                   # enhancement-close (delta path)
+
+scope:
+  stage: "06-documentation"               # furthest-completed PDLC stage — carried UNCHANGED (Y1)
+  transition: "ENHANCEMENT_CLOSE"
+  successor_stage: "n/a"
+  gate_type: "n/a"
+  scope_id: "sp4-external-validity + sp5-rate-elo"
+  kind: "enhancement"
+
+signer:
+  role: "po"
+  identity: "Subhash Holla"
+  authentication: "claude_session"
+
+content_hashes:
+  inputs:
+    - file: "dev-assist-artifacts/_enhancements/sp4-external-validity/enhancement.md"
+      sha256: "7d057ace55c01ea0aa5d2ff65122bf1b41029c21cbc8b08d6bc14501a1ec4cd5"
+    - file: "dev-assist-artifacts/_enhancements/sp5-rate-elo/enhancement.md"
+      sha256: "6d356a20668a1b089272acfabd270e4c707f22da984be764177f4f88c19d849a"
+    - file: "docs/external-validity-report.md"
+      sha256: "0c8c5b560c8cd723407695acfa3a2f1b695d22524956cd2350b25a87328c30c3"
+    - file: "src/pii_anon/engines/gliner_adapter.py"
+      sha256: "593f5103be2dfd18798d4b9655e8ad1592db222b8a50c07a09f8563bb0f04130"
+    - file: "src/pii_anon/eval_framework/rating/significance.py"
+      sha256: "e0bf9a2926021e77535600f3ed60f586c43151cd92c3f5c1b034e8440bcbb003"
+    - file: "src/pii_anon/eval_framework/rating/convergence.py"
+      sha256: "52dad1e568a5b64c8ba5efb276dc5de9163fd24717229968b5d8a52735813877"
+
+decisions_acknowledged:
+  - "sp4: zero-shot external-validity measured on 5 non-home benchmarks (ai4privacy-400k / Nemotron-PII / Gretel finance / TAB-ECHR real documents / PIIBench); relaxed F2 0.10-0.39 vs 0.89 at home; PIIBench strict F1 0.130 inside the published 8-baseline family (<0.14). The broadcast disclosure docs/external-validity-report.md is the standing gate on any best-in-class claim."
+  - "sp4: GLiNER long-document collapse fixed (400-char windowing, TAB-DEV-swept, offsets re-based, deduped); home-dev swarm regression check F2 0.8924 -> 0.8928 (no regression)."
+  - "sp4 headline follow-up FLAGGED: the swarm fusion suppresses NER-only findings (0/5 survive; dormant-meta-learner singleton cap ~0.62 < 0.85 emission bar) — the swarm's generalization channel is structurally discarded; a fusion change touches the production masking path + canonical G1 and requires its own design + mandatory close."
+  - "sp5: claim-grade bayes path activated (bayes-eval extras; first real-NUTS run, NFR-001 gate PASS on real chains); 13-player v2.2.0 tournament (first-party 1866/1866 Elo, >2-sigma above all 11 externals); claim-grade J decoded (first-party family = 1.000 of rank-1 mass; core-vs-swarm not significant)."
+  - "sp5: 5 hunt-confirmed defects fixed (NaN-blind NFR-001 gate [CATASTROPHIC]; rank-1 tie bias [J-consumer]; NUTS funnel on tied designs; shared-gold + counts-consistency ingestion); 3-round MANDATORY close: round-1 CLOSE_FAIL caught a fabrication vector the tie-split fix itself introduced -> remediated; round-3 J path 0-upheld; 571-artifact zero-regression sweep; SDO byte-identical every round (NOT_YET / J=0.2775 / all G PASS; gate md5 3b842e81 untouched)."
+  - "Residual trust boundary documented (not a defect): a fully self-consistent forged assessment artifact is observationally indistinguishable at any local validator."
+
+findings_waived:
+  - finding_id: "test_docs_discoverability::test_a2_all_relative_doc_links_resolve"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing (SO-25 waiver carried): doc links point at artifacts/benchmarks/benchmark-results.json, deleted in the user's working tree (user WIP). Unchanged scope."
+  - finding_id: "test_canonical_run::test_provenance_scope_matches_actual_sampler_used"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing dataset-rev drift (SO-25 waiver carried); control-path fix owned by the user's parallel session (task_dc3b46b5)."
+  - finding_id: "sp5-hunt: 5 PLAUSIBLE-unverified findings (verify agents lost to session limits)"
+    severity: "MAJOR (status unverified)"
+    waiver_rationale: "Honest status recorded in the sp5 enhancement record: glicko-vs-bayes rank inversion disclosure, RD=30.00 floor question, binding-J scope, assessment-CLI hands, separable-MM CIs. Deferred to a follow-up verify pass; none touches the SDO verdict path (J path independently certified 0-upheld in round 3)."
+
+linked_pivots: []
+
+next_action: |
+  Follow-ups, in priority order: (1) the swarm fusion NER-suppression design + close (the
+  external-transfer lever); (2) the general pattern fixes from sp4 (GPS-on-dates, name-pattern
+  on headers, US-only ZIP) with home regression checks; (3) the --engine flag + paired-counts
+  export on rate-elo-assessment (kills the hand-rolled mirror); (4) the 5 PLAUSIBLE-unverified
+  rating findings verify pass; (5) task_dc3b46b5 (canonical-run provenance, parallel session).
+
+narrative: |
+  Two enhancement passes closing the user's directives "ensure the library does good beyond the
+  home benchmark" and "investigate and enhance pii-rate-elo as much as we can". sp4 measured the
+  library honestly against the field's five most relevant external benchmarks under a
+  zero-shot-first discipline, published the standing disclosure that gates broadcast claims,
+  fixed the one general defect the measurement exposed (GLiNER long-document collapse), and
+  identified the structural reason the swarm does not transfer (fusion suppresses NER
+  singletons). sp5 activated the claim-grade Bayesian path end-to-end for the first time,
+  re-rated the 13-player field on v2.2.0 (first-party statistically above every external), and
+  hardened the rating stack through an adversarial hunt + a 3-round mandatory close that caught
+  and killed a fabrication vector introduced by one of its own fixes — with the SDO honest
+  verdict byte-identical throughout. Stage marker carried UNCHANGED at 06-documentation.

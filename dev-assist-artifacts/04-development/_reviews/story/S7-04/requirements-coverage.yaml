@@ -1,0 +1,33 @@
+reviewer: requirements-coverage
+story: S7-04
+gate: story
+verdict: APPROVE
+summary: >
+  Every requirement the story claims is fully verified by a named passing test
+  or explicitly Pass-2-flagged. No MUST left unverified-and-untracked: FR-026/
+  028/029 positively verified through the gate audit half + the producer's real
+  S6-02/S6-05 surface; NFR-009 is a genuine per-profile p99-bearing NUMERIC
+  ceiling with documented grounding ("NOT sub-0.24ms parity" honored — 6.2x
+  quiet headroom, sub-2s p99, non-vacuous); the R10 per-detector-class re-scope
+  is BUILD-AND-FLAGged via the detector_class seam; NFR-005 contract change
+  documented in all three places + audit-determinism POSITIVELY tested;
+  three-valued discipline intact end-to-end (computed-True supports CLAIM_GRADE;
+  computed-False binds as lowest-k; smoke stays PENDING). Targeted suites: 277
+  passed + 6 fast gate-validate tests.
+findings:
+  - id: RC-S704-01
+    severity: MINOR
+    title: FR-025 (MUST) verified by G5's 4-channel check but absent from the story header
+    disposition: REMEDIATED IN-LOOP — FR-025 added to Consumes with the S6-02 ownership note.
+  - id: RC-S704-02
+    severity: OBSERVATION
+    title: FR-028 "6 channels" vs 4-source reconciliation not echoed in this story
+    disposition: REMEDIATED IN-LOOP — reconciliation sentence added to the Consumes line.
+  - id: RC-S704-03
+    severity: OBSERVATION
+    title: n_records acceptance line should mention the 200-record timing cap
+    disposition: REMEDIATED IN-LOOP — §3 line now reads min(sampled, cap).
+offlimits_md5_ok: true
+notes: >
+  The mandatory adversarial close (gate md5 changed) is the remaining
+  downstream gate before DONE.

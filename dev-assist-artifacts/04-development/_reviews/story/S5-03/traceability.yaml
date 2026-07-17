@@ -1,0 +1,26 @@
+reviewer: traceability
+story: S5-03
+gate: story
+verdict: APPROVE  # was APPROVE_WITH_MINOR; the MAJOR remediated in-loop
+summary: >
+  Forward FR-013/NFR-013 → DC-09 → S5-03 → test_attack_mia.py chain sound. Both
+  FR/NFR exist in requirements-document.md with EXACT wording; UC-10 + DC-09
+  traces match; all 14 acceptance criteria pinned by docstring-citing G/W/T tests
+  (FR-013 via A1/A2/A3, NFR-013 via A5/A6/A7); RED (tests-only) precedes GREEN;
+  scope exactly the 3 owned files; substrate byte-identical; off-limits + the SDO
+  gate byte-identical (no SDO close). DC-09 now fully covered across S5-01/S5-02
+  (Tier-3) + S5-03 (MIA).
+findings:
+  - id: TRACE-S5-03-01
+    severity: MAJOR
+    title: Story metadata omitted the canonical provisional_status field (AGENT_SIMULATED)
+    disposition: REMEDIATED IN-LOOP (f23de77) — added the provisional_status=AGENT_SIMULATED row to the story metadata table, mirroring S5-01.md:9; the source FR-013/NFR-013/UC-10 rows are AGENT_SIMULATED. Honesty boundary was already intact in prose + # SWITCH-POINT markers; this adds the machine-readable field.
+  - id: TRACE-S5-03-02
+    severity: MINOR
+    title: traceability-matrix.md UC-10 row not yet backfilled with the S5-03 Story/Test columns
+    disposition: DEFERRED to the S5 sprint gate (consistent with the documented S5-01 backfill deferral; the UC-10 row already maps FR-013/NFR-013 + the DATA S6 Pass-2 edge).
+  - id: TRACE-S5-03-03
+    severity: OBSERVATION
+    title: FR-012 (in DC-09's FR set) correctly out of MIA scope
+    disposition: NO ACTION (FR-011/FR-012/NFR-012 = the Tier-3 half owned by S5-01/S5-02; DC-09 now complete across S5-01/02/03).
+offlimits_md5_ok: true

@@ -1,0 +1,29 @@
+reviewer: traceability
+story: S7-04
+gate: story
+verdict: APPROVE
+summary: >
+  Forward traceability sound. All four declared IDs (NFR-009 + FR-026/028/029)
+  exist in requirements-document.md with wording matching the story; each pinned
+  by docstring-cited G/W/T tests (the repo convention pins IDs in docstrings,
+  not test names). The G5 override seam mirrors G2/G4 byte-for-byte; scope stays
+  within the 7 owned files; WIP + off-limits md5 byte-identical; SO-15
+  next.immediate + the g5-code-computable deferral match exactly what was built;
+  both §2 design decisions (ceiling schema incl. the 500/1000/2000 recalibration;
+  the certification-vs-performance G5 line) documented and pinned.
+findings:
+  - id: TRACE-S704-01
+    severity: MINOR
+    title: nfr-verification-matrix.md NFR-009 row stale (still DEFERRED naming S7-04 as open successor)
+    where: dev-assist-artifacts/05-testing/03-nfr-verification/nfr-verification-matrix.md:16
+    disposition: REMEDIATED IN-LOOP — row updated to NFR-009 VERIFIED-in-tree with test evidence + the Pass-2 split.
+  - id: TRACE-S704-02
+    severity: OBSERVATION
+    title: FR-025 adjacently exercised but not in the declared Consumes set
+    disposition: REMEDIATED IN-LOOP — FR-025 added to the story Consumes line.
+notes: >
+  Cosmetic story path note (competitor_compare.py lives in the sibling
+  evaluation/ pkg) — REMEDIATED IN-LOOP. GATE-INDEPENDENT BLOCKER for DONE:
+  the MANDATORY adversarial close (gate file changed). 5/5 story-gate APPROVE is
+  necessary-but-not-sufficient.
+offlimits_md5_ok: true

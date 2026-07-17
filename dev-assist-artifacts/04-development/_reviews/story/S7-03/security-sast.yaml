@@ -1,0 +1,23 @@
+reviewer: security-sast
+story: S7-03
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 findings
+run: wf_bb94aa83-837 (2026-06-09); transcribed from the workflow structured result (the scribe wrote synthesis.md only)
+summary: >
+  Clean pass, zero findings. The fail-closed power semantics hold: an
+  unpowered PASS (a fabricated fairness claim) is structurally impossible —
+  INSUFFICIENT_POWER on 0 AND 1 powered groups (A9), domain-named
+  ValueErrors on every corrupt-input shape (empty slices, duplicate
+  language, thresholds out of range). The containment pass is monotonically
+  MORE permissive and ONLY for non-Latin keywords (A4 partition) — it can
+  add a context-boost match, never remove one; the keyword set is a module
+  constant (not artifact-injectable); context_text is the local detection
+  window. The gate writes NO artifacts and is NOT wired into
+  canonical_run.py (md5 d8f0f80e… byte-identical — the no-SDO-close
+  justification holds; the # SWITCH-POINT(CANONICAL) wire-in is explicitly
+  Pass-2 BECAUSE it would mandate the adversarial close). Off-limits md5s
+  byte-identical.
+findings: []
+context_bounds_respected: true
+offlimits_md5_ok: true

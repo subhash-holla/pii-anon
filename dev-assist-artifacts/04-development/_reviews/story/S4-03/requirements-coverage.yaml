@@ -1,0 +1,105 @@
+reviewer: requirements-coverage
+gate: story
+scope_id: S4-03
+iteration: 1
+verdict: APPROVE
+findings: []
+context_bounds_respected: true
+notes: >
+  Dimension: "are there gaps in what we've claimed?" — every claimed requirement
+  for S4-03 maps to a NAMED PASSING test; the MUST/SHOULD/COULD split matches the
+  requirements doc; nothing over-claimed. Suite (addopts-clean):
+  `pytest tests/test_selective_risk.py tests/test_competitive_supremacy.py` =>
+  92 passed, 0 failed (26.68s). (Global 84% coverage gate trips only because just
+  2 files were run in isolation — not in scope of this dimension.)
+
+
+  SEVERITY-SPLIT VERIFIED against requirements-document.md (the load-bearing
+  check for "nothing over-claimed"): FR-005=SHOULD (:15), NFR-017=SHOULD (:79),
+  NFR-018=COULD (:80), NFR-019=SHOULD (:81), NFR-020=MUST (:82), NFR-021=SHOULD
+  (:83). The story §10/Implements row labels each identically (NFR-020 "the lone
+  MUST"; NFR-017/019/021 SHOULD; NFR-018 COULD). The split is RESPECTED — no
+  SHOULD/COULD is dressed up as a MUST and the one MUST is not silently demoted.
+
+
+  REQUIREMENT -> NAMED PASSING TEST MAPPING:
+
+  - NFR-020 (the LONE MUST; AX-005; 0 bare-logit) -> A5 coverage audit, teeth
+    CONFIRMED at BOTH layers. Reporter: test_a5_coverage_is_one_when_every_finding_calibrated_with_provenance
+    (clean => 1.0, bare_logit_count=0, uncalibrated_findings=()) +
+    test_a5_coverage_drops_and_flags_bare_logit_finding (inject conf=3.7 / calibrated=False /
+    provenance=None => coverage<1.0, count=1, offender index surfaced) +
+    test_a5_provenance_less_but_in_range_still_flagged (in-range conf but provenance=None =>
+    still a breach — the provenance half has teeth too). Impl: _coverage_audit() requires
+    calibrated AND _is_probability(conf) AND bool(provenance) — NOT a no-op that always
+    reports 100%. GATE layer: test_g4_fail_when_coverage_below_one_nfr020 (coverage=0.98 =>
+    G4 FAIL even with good ECE/AURC; binding_detail names coverage/NFR-020). In _g4_*,
+    coverage<1.0 is checked FIRST in the FAIL-priority chain (line ~761) — correct
+    prioritization for the only MUST. NOT unmapped, NOT a no-op.
+
+  - NFR-017 (SHOULD; post-temp ECE ≤0.05 high-resource / ≤0.08 long-tail; ECE_post≤ECE_pre)
+    -> A1 (test_a1_per_class_ece_is_distinct_from_global_and_reuses_calibration;
+    test_a1_per_class_ece_matches_calibration_module_on_a_single_slice — proves REUSE of
+    reliability_diagram_data, not a re-derivation) + A6
+    (test_a6_post_temp_scaling_ece_never_worse_than_pre — ECE_post≤ECE_pre via a grid that
+    includes T=1.0; test_a6_well_resourced_class_meets_high_resource_threshold — 600-finding
+    perfectly-calibrated class ECE_post≤0.05 with bar=0.05, 8-finding class held to bar=0.08).
+    Both 0.05 and 0.08 bars exercised (reporter ece_threshold_for + gate
+    test_g4_long_tail_class_held_to_looser_bar: ECE 0.07 PASSES under a 0.08 per-class bar).
+
+  - NFR-019 (SHOULD; AURC + monotone risk-coverage) -> A3
+    (test_a3_aurc_lower_for_better_calibrated_class; PROPERTY-TEST
+    test_a3_risk_coverage_curve_is_monotone_non_increasing_property over 8 random corpora,
+    per-class AND global; test_a3_aurc_in_unit_interval). GATE:
+    test_g4_fail_when_risk_coverage_not_monotone (illegal high-risk-at-low-coverage row =>
+    FAIL, binding_detail contains "monoton"). Impl uses running-max monotone envelope.
+
+  - NFR-021 (SHOULD; ≥3-point abstention table at {1%,2%,5%}) -> A4
+    (test_a4_abstention_table_has_three_points_at_targets — targets==[0.01,0.02,0.05];
+    test_a4_abstention_points_consistent_with_risk_coverage_curve — looser target admits
+    ≥ coverage). GATE: test_g4_fail_when_fewer_than_three_abstention_points (2 points => FAIL).
+
+  - NFR-018 (COULD; per-class Brier + decomposition) -> A2
+    (test_a2_per_class_brier_low_for_calibrated_high_for_miscalibrated;
+    test_a2_brier_decomposition_reconciles_with_binned_brier — Murphy
+    reliability−resolution+uncertainty == binned_brier to 1e-9). Correctly a COULD; present
+    and tested, not over-claimed as a higher tier.
+
+  - FR-005 (SHOULD; the scorecard carries ECE/MCE/Brier/AURC + reliability) -> the
+    SelectiveRiskReport dataclass carries per_class_ece/ece_post/brier/brier_decomposition/
+    aurc/risk_coverage + global_ece/aurc + abstention_table + the coverage audit; scorecard.py
+    gains calibration_ece/selective_risk_aurc/calibrated_confidence_coverage (verified at
+    src/.../scorecard.py:85-87, serialized :120-123) pinned by
+    test_scorecard_calibration_fields_are_additive_and_serialized +
+    test_scorecard_calibration_fields_default_safely (existing privacy_score + S4-01
+    anon/pseudo + composite_score preserved — no public-API regression). MCE is reused from
+    metrics/calibration.py (ExpectedCalibrationError/MaximumCalibrationError both re-export-
+    checked by test_a9_calibration_module_is_consumed_unchanged_byte_identical); the
+    SelectiveRiskReport surfaces ECE not MCE — acceptable: MCE is not in any S4-03 acceptance
+    clause (A1..A9), so no coverage gap, only an OBSERVATION that the per-class MCE the
+    FR-005 prose mentions is computable-but-unsurfaced. Below finding-severity for a SHOULD.
+
+  - SDO G4 -> A7 teeth (PASS/FAIL/PENDING) all present & passing:
+    test_g4_pass_when_calibration_meets_all_thresholds (PASS);
+    test_g4_fail_when_a_class_ece_exceeds_threshold (worst class US_SSN named);
+    test_g4_fail_when_coverage_below_one_nfr020; test_g4_fail_when_fewer_than_three_abstention_points;
+    test_g4_fail_when_risk_coverage_not_monotone; test_g4_pending_when_fields_absent_never_fabricated (PENDING/None);
+    NON-VACUITY meta-guard test_g4_teeth_non_vacuous_worsening_a_class_ece_flips_pass_to_fail
+    (worsening US_SSN ECE 0.03->0.07 flips the SAME fixture PASS->FAIL); plus long-tail bar,
+    override-backward-compat, determinism, and the CLAIM_GRADE-unblock path.
+    A8 (HONEST DEFERRAL — the key anti-over-claim check):
+    test_g4_real_artifact_stays_pending_and_verdict_not_yet => on the real smoke artifact
+    (lacking the calibration fields) G4 reads PENDING (None) NOT a fabricated PASS, headline
+    verdict stays NOT_YET, binding_constraint startswith canonical_claim_run=False. The
+    _g4_* PENDING branch (lines ~696-717) fires on missing core OR missing per_class_ece/
+    coverage — three-valued, no fabrication. TRUE-on-real-data is correctly scoped to
+    Pass-2/S7 (provisional_status AGENT_SIMULATED is accurate; the synthetic in-tree teeth
+    are real, the real-data verdict is deferred-with-successor — G4<-S4-03 named while pending).
+
+  GAP SCAN (the dimension's job): no requirement claimed-for-S4-03 is unmapped; no MUST is a
+  no-op; no SHOULD/COULD is over-claimed; the one DIVERGED-adjacent item (NFR-017 long-tail
+  marked REVISE-LOOSER in the req doc) is the documented 0.08 provisional bar and is exercised
+  — not a silently-missing or falsely-PASSed threshold. Scope discipline respected (whether
+  tests are well-written -> code-quality/traceability; whether FRs semantically hold ->
+  axiom-compliance; whether NFR-017's 0.08 long-tail divergence is the right number -> SME).
+  No SHOWSTOPPER / CATASTROPHIC / MAJOR / MINOR findings. APPROVE.

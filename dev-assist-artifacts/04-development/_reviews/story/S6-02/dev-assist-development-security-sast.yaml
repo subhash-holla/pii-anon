@@ -1,0 +1,188 @@
+reviewer: dev-assist-development-security-sast
+
+scope_id: S6-02
+
+gate: story
+
+iteration: 2
+
+verdict: APPROVE
+
+findings: []
+
+resolved_findings:
+  - id: security-S6-02-01
+    severity: MAJOR
+    status: CLOSED
+    iteration_opened: 1
+    iteration_closed: 2
+    location: src/pii_anon/agentic/interception.py:195
+    title: Keyless-hash surrogate offline re-identification on the persisted G5 ledger
+    remediation_commit: 83b73bf
+    what_was_required: |
+      The default masker derived every surrogate token id from a KEYLESS blake2b
+      digest of (scope, entity_type, raw_value). In iteration 1 I DEMONSTRATED
+      offline dictionary re-identification: from the surrogate-only ledger +
+      a candidate dictionary + the low-cardinality scope/entity (no secret) I
+      recovered the synthetic raw email `jane.roe@example.test`. Because these
+      surrogates flow into the persisted G5 `InterceptionLedger.as_dict()` (a
+      shareable audit artifact + the S6-05 Sankey source), a keyless hash of
+      low-entropy PII was a weak crypto primitive for a pseudonym on a PII
+      surface. Required fix: key the surrogate (preferred), reusing the canonical
+      keyed primitive, while preserving within-key determinism.
+    how_it_was_fixed: |
+      The surrogate token id is now a KEYED HMAC-SHA256
+      (`_keyed_token_id`, line 195/217:
+      `hmac.new(surrogate_key, msg, hashlib.sha256).hexdigest()[:12]`).
+      The keyless blake2b is GONE (grep-confirmed: no blake2b/md5/sha1 anywhere
+      in the module). `FourChannelGuard` gained `surrogate_key: bytes | None =
+      None` (line 382); `None` mints a random per-instance key via
+      `secrets.token_bytes(32)` at CONSTRUCTION in `__post_init__` (line 401-405),
+      threaded into the default `_DefaultMasker(key)`. The module-level singleton
+      `_DEFAULT_MASKER` was removed (it could not carry a per-instance key).
+    independent_reverification: |
+      I RE-RAN my exact iteration-1 break-probe against the live remediated code:
+        * ATTACK 1 (the iter-1 recovery) — built a G5 ledger with the
+          secure-by-default random key, then ran the identical keyless-blake2b
+          dictionary attack over a candidate set CONTAINING the true value
+          `jane.roe@example.test`: recovered == [] (RESISTED). The same probe
+          recovered the raw value in iter-1; it now lands nothing.
+        * ATTACK 2 (wrong-key brute over a small guessed keyspace x dictionary):
+          hits == [] (RESISTED).
+        * Key-dependence: same raw value under two keys -> two different
+          surrogates (TRUE).
+        * Reproducible path: `_keyed_token_id(K1,...)` reproduces the surrogate
+          ONLY with the exact key (FR-030 byte-identical given key/scope) — TRUE.
+        * Secure-by-default: two default-constructed (no-key) guards produce
+          DIFFERENT surrogates for the same value (each mints its own random
+          key) — TRUE; so the deployed G5 ledger is non-dictionary-reversible
+          even when the operator injects nothing.
+        * Determinism reconciliation: a fixed injected key yields byte-identical
+          masked_text + records across instances — TRUE. `secrets` is
+          CONSTRUCTION-ONLY: AST of the module proves `mask` / `_keyed_token_id`
+          / `_make_surrogate` (the per-mask path) never reference `secrets`;
+          `random`/`uuid`/`time` appear nowhere.
+      Result of the re-run break-probe: MAJOR security-S6-02-01 is CLOSED.
+    no_new_crypto: |
+      No new primitive was rolled. `_keyed_token_id` is byte-for-byte the
+      canonical keyed-pseudonym construction already in the tree:
+      `hmac.new(key, msg, hashlib.sha256)` == `tokenization/providers.py:69`
+      (`DeterministicHMACTokenizer.tokenize`) == `encrypted_store.py:366/371`
+      (the blind index `HMAC(index_key, scope|token)`). Same domain-separated
+      `\x1f`-delimited message shape as the blind index. No new attack vector
+      introduced: the only new input is the construction-time key (CSPRNG via
+      `secrets`); the emitted artifact is still only the hex image of a keyed
+      digest.
+    test_pins: |
+      `test_fr026_a11_keyed_surrogate_resists_dictionary_reidentification`
+      (PASSED) is the genuine inverse of my break-probe and is NON-VACUOUS — it
+      asserts: two keys -> different surrogates (line 482); the keyless
+      dictionary guess over a candidate set containing the true value yields
+      `keyless_matches == []` (line 511, reproducing the OLD keyless construction
+      exactly); the wrong-key guess `!=` target (519); only the exact key `==`
+      target (521).
+      `test_fr026_a11_default_key_is_random_per_instance_secure_by_default`
+      (PASSED) pins two default guards -> different surrogates (line 540).
+      A9 reconciled: `test_ax002_a9_deterministic_replay` injects a fixed
+      `surrogate_key` for byte-identical replay; `test_ax002_a9_no_
+      nondeterministic_imports_on_path` bans random/uuid/time outright, allows
+      secrets/os for construction-time keying, and AST-asserts the per-mask
+      functions never reference `secrets`. Both PASSED.
+    references:
+      - src/pii_anon/tokenization/providers.py
+      - src/pii_anon/tokenization/encrypted_store.py
+      - requirements-document.md#FR-026
+      - requirements-document.md#AX-006
+
+notes: |
+  ITERATION-2 RE-REVIEW — re-review after the iteration-1 REQUEST_CHANGES
+  remediation (commit 83b73bf). One MAJOR was opened in iter-1; it is CLOSED
+  (see resolved_findings). VERDICT: APPROVE.
+
+  HEADLINE: the keyless-hash re-identification MAJOR is CLOSED, confirmed by an
+  independent RE-RUN of my own iteration-1 break-probe (which previously
+  recovered `jane.roe@example.test` with no key) — it now recovers NOTHING; the
+  surrogate is a keyed HMAC-SHA256 reusing the canonical primitive verbatim, no
+  new crypto rolled, no new vector.
+
+  ITER-1 PASS ITEMS RE-CONFIRMED against the remediated code (all still hold):
+
+  - A4 / FR-026 no-raw-PII-persist invariant STILL LOUD + CORRECTLY ORDERED.
+    `_assert_no_raw_pii` (line 442) scans masked_text + repr(rec.as_dict()) for
+    each self-declared raw value and raises `NoRawPIIPersistError` BEFORE
+    `ledger.append` and `_persist`. Live re-probe: a lying span-desync masker was
+    CAUGHT; on raise the ledger held 0 records (no leak committed). The keyed-
+    surrogate change did not alter the invariant's ordering or breadth.
+
+  - A5 / AX-006 least-privilege STILL HOLDS: a non-reversible channel never
+    touches the store (`intercept` line 428 gates `_persist` on
+    `channel in reversible_channels`). Live re-probe with
+    `reversible_channels={MEMORY}`: TRACE wrote 0 store rows; MEMORY wrote 1.
+
+  - A3 no-plaintext record/ledger STILL HOLDS: `InterceptionRecord` is
+    frozen+slots, fields are surrogate-only {channel, entity_type, surrogate,
+    span_start, span_end, scope}; `as_dict()` raw-free (live-checked). The new
+    `surrogate_key` lives on `FourChannelGuard`/`_DefaultMasker`, NOT on the
+    record/ledger — no key or raw value leaks into the G5 artifact.
+
+  - IMPORT ISOLATION (A10) STILL HOLDS: AST of the module shows top-level
+    imports = stdlib (`hashlib`, `hmac`, `re`, `secrets`, `collections`,
+    `dataclasses`, `enum`, `threading`, `typing`, `__future__`) + `pii_anon`
+    only; deep `pii_anon` imports = `pii_anon.errors` (eager) +
+    `pii_anon.tokenization.store` (lazy in `_persist`). Zero forbidden imports of
+    `eval_framework`/`attacks`/SDO gate/`orchestrator`. The newly-added `hmac` /
+    `secrets` are stdlib — no new dependency, no new egress, no import-isolation
+    regression. (The pre-existing package-root `sys.modules` co-residency of
+    `eval_framework`/`orchestrator` via `src/pii_anon/__init__.py` is unchanged
+    and remains an OBSERVATION outside this story's diff.)
+
+  - STATIC SAST on the remediation diff (added lines): CLEAN — no
+    subprocess/os.system/shell-out, no eval/exec, no pickle/marshal/yaml.load/
+    __import__ unsafe-deserialization, no hard-coded credential/api-key/password
+    shape, no SQL/NoSQL string interpolation. No `unsafe`-equivalent. WEAK-HASH:
+    the keyless blake2b is GONE; no md5/sha1/blake2b remains; the only crypto is
+    the keyed HMAC-SHA256 (a STRONG keyed primitive, correct for a pseudonym).
+
+  - DETERMINISM/secrets RECONCILIATION (the one place a re-review must be
+    careful): the RISK-4 "no secrets on the path" was relaxed to allow `secrets`
+    at CONSTRUCTION only. I verified this is sound for a security gate: (a) the
+    per-mask path is RNG-free (AST-pinned + live fixed-key byte-identical
+    replay), so the FR-030 reproducible path works with an injected key and the
+    G5 ledger is reproducible under a fixed key; (b) secure-by-default random
+    keying makes the DEFAULT ledger non-dictionary-reversible — a strict security
+    IMPROVEMENT over a fixed/keyless default. This is the correct trade and the
+    A9 tests pin both halves.
+
+  - PROTECTED-FILE INTEGRITY: 83b73bf touches EXACTLY the 3 owned files
+    (`agentic/interception.py`, `tests/test_agentic_interception.py`) + the story
+    md — nothing else. `competitor_compare.py` md5 =
+    7cae16c89f4c97136e1a12394dae2025 (OFF-LIMITS — byte-identical). The SDO gate
+    `eval_framework/evaluation/competitive_supremacy.py`, `orchestrator.py`,
+    `tests/test_moe_enhancements.py`, `tokenization/*`, and `errors.py` are NOT
+    in the commit (grep-confirmed NONE TOUCHED). `__init__.py` (the lazy
+    re-export package file) was not modified.
+
+  - GATES: agentic suite 24 passed (22 prior A1–A10/edge + 2 new A11
+    `[SECURITY-TEST]`); the 4 remediation-critical tests (A11 dictionary-
+    resistance, A11 secure-by-default, A9 fixed-key determinism, A9 AST per-mask
+    no-secrets) explicitly re-run and PASSED. (A single-file pytest run trips the
+    repo-wide `--cov-fail-under=84` addopt as expected — that is the whole-repo
+    coverage gate, not a test failure; the story-level full-suite gate is the
+    executor's evidence: 3367 passed / 16 skipped / 0 failed, coverage 87.39%.)
+
+  CARRY-FORWARD OBSERVATIONS (non-blocking, unchanged from iter-1 — no in-loop
+  action; recorded for the S6 work-stream close):
+  - BOUNDED-INVARIANT RECALL: `_assert_no_raw_pii` can only catch raw values the
+    masker self-declares via `result.records` (`_known_raw_values`). A masker
+    emitting ZERO records while leaving raw text slips past — a detection-RECALL
+    responsibility of the injected masker, not a persist-invariant defect. The
+    docstrings phrase the guarantee slightly broadly ("if any raw PII value
+    survives"); the true guarantee is "no SELF-DECLARED-masked raw value
+    survives". Acceptable boundary; a one-line docstring precision is optional.
+  - The standing adversarial-close (RECOMMENDED at the S6 work-stream close per
+    §9) remains the catch-net for independent leak/reverse/ledger-plaintext
+    attempts; this per-story security gate is necessary-but-not-sufficient.
+
+review_time_seconds: 420
+
+context_bounds_respected: true

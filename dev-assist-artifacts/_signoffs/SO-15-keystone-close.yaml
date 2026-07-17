@@ -1,0 +1,130 @@
+sign_off_id: SO-15-keystone-close
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  ★ The S7-02 KEYSTONE is DONE — the program's completion-criterion artifact. The canonical-run
+  producer (`produce_canonical_artifact`) + the fail-closed `CanonicalRunGate` are LIVE in
+  src/pii_anon/evaluation/canonical_run.py. The producer runs REAL detection (compare_competitors) at
+  representative scale and emits a CERTIFIED canonical artifact carrying the G1 per-language ε, the G2
+  distinct anon/pseudo family fields (every system, incl. competitors), the G4 calibration block, and the
+  G7 provenance stamp — all REUSING the existing in-tree scorers (deid_families / selective_risk /
+  per-language recall). The fail-closed gate sets `canonical_claim_run=True` ONLY when every required field
+  is present-and-valid. The MANDATORY adversarial close ran SEVEN ROUNDS (close-4..close-10) and uncovered
+  that the INHERITED SDO gate (competitive_supremacy.py) was DEEPLY UNSOUND — it forged the terminal
+  CLAIM_GRADE_SOTA through nearly every axis (11 holes / 5 fabrications incl. 1 CATASTROPHIC + 2
+  SHOWSTOPPERs). The final round-8 confirmatory close = RECLOSE_PASS, 0 upheld / 517 probes, both
+  fabrication refuters completed, off-limits byte-identical. The honest produced-artifact verdict is
+  NOT_YET, `canonical_claim_run=True`, binding G6 FAIL — an HONEST, draw-sensitive raw-detection axis, NOT a
+  regression (decision A). dep: S4-CS-01 SDO gate (DONE) + S4-01 deid_families (DONE) + S4-03 selective_risk
+  (DONE) + S1-03 per-language recall (DONE).
+
+stories_closed:
+  - id: S7-02
+    title: the canonical-run producer + fail-closed CanonicalRunGate (the KEYSTONE — flips G7; makes G1/G2/G4 compute) (DC-11)
+    gate: _reviews/story/S7-02/   # 5/5 APPROVE (story gate) THEN the MANDATORY adversarial close — 7 rounds, round-8 RECLOSE_PASS 0-upheld
+    implements: [FR-008, NFR-005, NFR-006]   # + makes G1/G2/G4 code-compute REAL values on a certified run; flips G7
+    upholds: [AX-001, AX-002, AX-003]
+    effect: >
+      new src/pii_anon/evaluation/canonical_run.py (the SIBLING evaluation/ pkg, NOT eval_framework/ — runs
+      detection without tainting the rating/gate import boundary): produce_canonical_artifact(seed, output_dir,
+      max_samples) orchestrating real detection + the 3 scorers + provenance + a FAIL-CLOSED CanonicalRunGate;
+      _assemble_base_payload (gate-read recall/precision/per_entity_recall/composite FRESH from
+      compare_competitors); _attach_g1_per_language_delta; _attach_g2_deid_families (every Tier-R competitor
+      carries an HONEST pseudonymization_integrity_score=0.0 — the SO-11 fix, so G2 has a real comparator);
+      _attach_g4_calibration; the case-insensitive output-path sandbox (writes ONLY artifacts/canonical/, NEVER
+      artifacts/benchmarks/*). + a thin `pii-anon canonical-run` CLI mirroring the thin `supremacy` command.
+      The producer makes the gate-read dict REAL; the gate reads it unchanged.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5 (security-sast PRIMARY + axiom-compliance + requirements-coverage + traceability + code-quality)
+  adversarial_close:
+    rounds: 7   # close-4..close-10 (committed RED->GREEN per round); plus iter-3 close-1, iter-4 close-2, iter-5 close-3 earlier
+    final_close: { run_id: wf_3239f1fa-0c4, verdict: RECLOSE_PASS, probes: 517, upheld: 0, fabrication_refuters_completed: true, null_refuters: [], offlimits_md5_ok: true }
+    holes_found_and_closed: 11   # 5 FABRICATIONS + 6 crashes/DoV — every one hardened RED->GREEN, honest-input verdict byte-identical throughout
+    fabrications_closed:
+      - "close-5 G7 provenance fail-OPEN (a truthy-but-invalid stamp forged G7 PASS -> PROVISIONAL_SOTA) -> _is_nonblank_str"
+      - "close-6 canonical_claim_run COERCION (the string 'false'/'no'/'0' coerced True) -> strict `is True` at both read sites"
+      - "★ close-7 CATASTROPHIC NaN-curve (a NaN row in risk_coverage_curve laundered a non-monotone curve monotone -> G4 PASS -> CLAIM_GRADE_SOTA) -> _risk_coverage_is_monotone validates each row via _is_finite_number"
+      - "★ close-9 SHOWSTOPPER G6 entity-coverage (a bool/+inf/huge-int per_entity_recall value counted as 'detected', inflating coverage past 0.80) -> _detected_entity_names (a detection needs a valid [0,1] score >0)"
+      - "★ close-9 SHOWSTOPPER G1 recall-floor MASK (an entity at 0.0/negative recall on the ladder masked a real ensemble miss -> forged G1 PASS) -> same _detected_entity_names"
+    crashes_closed:
+      - "close-4 unhashable element inside available_competitors / floor_checks[].metric -> _tier_status_input drops non-str names; isinstance(metric,str) guard"
+      - "close-5 CLI RecursionError on >10k-deep JSON + CanonicalRunGate.validate non-dict-payload/unhashable-scope DoV"
+      - "close-7 producer validate hostile-systems DoV (non-list systems / unhashable system-name)"
+      - "close-8 mixed-type-key sorted() DoV -> sorted(..., key=str) at the 4 artifact-keyed sites"
+      - "close-10 CLI IsADirectoryError/OSError DoV (a directory --artifact tracebacked) -> path.is_file() guard + OSError in the parse-except"
+  producer_correctness_fix:
+    - "_BENCHMARK_IGNORE leak: the producer's verbatim per_entity_recall leaked the benchmark-exclusion sentinel (a competitor 'detects' it, the ladder does not), making the close-9-honest gate read a spurious G1 FAIL on a non-entity. FIX: strip the sentinel from the EMITTED per_entity_recall ONLY (source/composite untouched -> composite/J byte-identical; G6 coverage auto-corrects 0.778->0.824). G1 now PASS; verdict UNCHANGED."
+
+decisions_acknowledged:
+  - "★ THE CLOSE IS THE ONLY RELIABLE CERTIFIER — NOT the agent's manual audit. The agent explicitly dismissed BOTH close-9 SHOWSTOPPERs as 'not a fabrication' before the close caught them. S7-02 was declared DONE ONLY on a 0-upheld close where the fabrication-pass refuter COMPLETED — never on an audit. Round-7's fabrication refuter had errored without emitting StructuredOutput; round-8 SPLIT the fabrication hunt into flat-scalar + nested-value refuters + added an explicit StructuredOutput mandate, and both completed."
+  - "★ NO-FABRICATION is the program's LOAD-BEARING invariant. EVERY artifact-value read in competitive_supremacy.py — top-level AND nested (per_entity_recall via _detected_entity_names, risk_coverage_curve rows, per_class_ece, per_class_ece_threshold via _g4_class_bar, provenance via _is_nonblank_str, canonical_claim_run via strict `is True`, scores via _finite_unit_score, deltas via _is_finite_number) — routes through a validator. A SINGLE un-validated read forges a moat-axis PASS. The systematic root cause of all 5 fabrications was an un-validated read; the NESTED reads (curve rows, per_entity_recall values) were the blind spot a top-level audit missed."
+  - "★ The honest produced-artifact verdict is NOT_YET, binding G6 FAIL — and it is NOT a regression (decision A, f2-gap-attribution.md). Old code 2761a27 is byte-identical to current HEAD at use_case=default; pii-anon WINS rank-1 COMPOSITE (0.7035>0.6643, the pii-rate-elo headline) but loses raw F2 to gliner on the current non-deterministic dataset draw (census sha 044fec59 -> current abfe651d). G6 is draw-sensitive. Do NOT 'fix' F2 and do NOT weaken G6 — continue to RC accepting honest NOT_YET."
+  - "composite_score is structurally [0,1] (a weighted avg of [0,1]-normalized components) -> the composite accessors use _finite_unit_score, NOT _is_finite_number. A stale report prescribing _is_finite_number for composite is WRONG (it would re-open phantom-dominance for a finite >1) — do NOT apply it."
+  - "G5 stays PENDING (honest) — the audit+latency _g5_* wiring is the S7-04 follow-up. With G6 honestly FAILING, a G5 PASS would NOT flip the verdict (G6 binds) — G5 is completeness, not a flip."
+  - "RISK-6 honoured: evaluation/competitor_compare.py byte-identical (md5 7cae16c89f4c97136e1a12394dae2025); competitor_tiers.py byte-identical (d9202479d84c519d5866b7d9d515c903). The producer writes ONLY artifacts/canonical/ (NEVER artifacts/benchmarks/*; the output-path sandbox is case-insensitive). Import isolation intact: the SDO gate + eval_framework/attacks/ + eval_framework/rating import nothing from swarm/moe/fusion/policy."
+
+findings_waived_or_deferred:
+  - id: full-census-G6-run (the headline Pass-2)
+    disposition: pass2-user-run
+    detail: "PROVISIONAL_SOTA / CLAIM_GRADE require a FULL-CENSUS canonical run on the CURRENT code to certify the composite/J/G6 dominance (the producer defaults max_samples=None=full dataset; ~25-48h, infeasible in one session). At feasible in-tree scale (max_samples=8..5000) the honest endpoint is NOT_YET binding on the draw-sensitive raw-F2 axis. pii-anon IS rank-1 by composite at the published 148,994-record census (pass2_full_census_reference)."
+  - id: real-tier-c-cloud-runs
+    disposition: pass2-no-keys
+    detail: "G6/G3 carry an honesty carve-out vs the runnable Tier-R competitors only; the real Tier-C cloud runs (aws-comprehend / azure-ai-language / openai-privacy-filter) need cloud keys (absent). Unrun Tier-C blocks CLAIM_GRADE (correctly -> PROVISIONAL at most)."
+  - id: real-nuts-J
+    disposition: pass2-env
+    detail: "numpyro/jax are NOT installed -> the in-tree MLE-bootstrap J the gate already owns is used (J=0.0 at representative scale; J=1.0 on the smoke artifact). The real bayes-NUTS J is Pass-2."
+  - id: g5-code-computable
+    disposition: deferred-to-S7-04
+    detail: "G5 becomes code-computable when S7-04 commits the NFR-009 numeric latency ceilings AND the gate's _g5_* method is wired (currently a _pending_guarantee placeholder). competitive_supremacy.py change => MANDATORY adversarial close. Will NOT flip the verdict (G6 binds)."
+
+sdo_verdict:
+  # Two honest verdicts — the committed smoke artifact (default `pii-anon supremacy`) vs the keystone's produced certified artifact.
+  committed_smoke_artifact:   # `pii-anon supremacy` default (artifacts/benchmarks/benchmark-results.json, read-only)
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    j_value: 1.0
+    j_source: mle-bootstrap
+    guarantees: { G1: PENDING, G2: PENDING, G3: PASS, G4: PENDING, G5: PENDING, G6: PASS, G7: FAIL }
+    note: "the smoke artifact predates the producer; it is NOT a certified canonical run. Producing one is the keystone's job."
+  produced_canonical_artifact:   # SupremacyVerdict.from_artifacts(produce_canonical_artifact(max_samples=8)) — the keystone's teeth
+    verdict: NOT_YET
+    canonical_claim_run: true   # the fail-closed CanonicalRunGate certified every required field (canonical_gate_missing=[])
+    scope: data-v2.0.0
+    binding_constraint: "G6 FAIL: core F2=0.7214 vs best Tier-R gliner F2=0.75 (ε_F=0.01); entity coverage=0.824 (>=0.80)"
+    j_value: 0.0
+    j_source: mle-bootstrap
+    guarantees: { G1: PASS, G2: PASS, G3: PASS, G4: PASS, G5: PENDING, G6: FAIL, G7: PASS }
+    note: >
+      The keystone makes G1/G2/G4 code-compute REAL PASS + flips G7 PASS on a certified run. The binding
+      constraint is now the HONEST, draw-sensitive raw-detection axis G6 (decision A — not a regression). G1
+      PASS confirms the _BENCHMARK_IGNORE fix; G5 PENDING is honest (S7-04). PROVISIONAL_SOTA needs the
+      full-census Pass-2.
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): exit 0, ~3582 passed / 15 skipped / 0 failed (+2 over close-9: the _BENCHMARK_IGNORE + close-10 RED tests)."
+  coverage: "88.56% (>= 84 gate)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` / 136 files."
+  env: "AGENT_SIMULATED on the local .venv. The producer runs REAL detection + the REAL deid_families/selective_risk/per-language-recall scorers at representative scale (max_samples) against the DATA v2.0.0 corpus (resolves in this env). The full-census run + real Tier-C + real-NUTS J are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, benchmark-diagnostics.json 47f9b116…, README.md b5cb977b…, artifacts/benchmarks/*, docs/* all match session-start baseline (S2-03 stays BLOCKED — orchestrator.py unchanged)
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903
+  sdo_gate_md5: 1f327dd7dfad55551c87a0b9c8dfe188   # competitive_supremacy.py — UNCHANGED since close-9 (close-10 is cli.py only)
+  producer_md5: e47b2752d2e88aba5182d880bc9704b7   # canonical_run.py (post _BENCHMARK_IGNORE strip)
+  nothing_under_artifacts_benchmarks: true   # the producer writes ONLY artifacts/canonical/ (produced to /tmp in tests; never committed)
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED/GREEN per fix: ea45c0e/0d776d3 (_BENCHMARK_IGNORE), a1c8ade/a4a0589 (close-10)
+  no_new_hard_dependency: true
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced canonical artifact; canonical_claim_run=False (G7) on the committed smoke artifact. NEITHER is a regression; NEITHER is 'fixable' without the full-census Pass-2 — both are honest."
+  immediate: "S7-04 — commit NFR-009 numeric latency ceilings (p50/p95/p99 per power class/profile) + wire the gate's _g5_* method (currently a _pending_guarantee placeholder). competitive_supremacy.py change => MANDATORY adversarial close. With G6 honestly FAILING, G5 PASS will NOT flip the verdict — completeness, not a flip."
+  feature_surface: "S5-02 (Tier-3 representative adversary), S5-03 (MIA representative), S6-01 (query-aware masking), S6-04 (BYO-SDK adapter), S7-01 (multimodal readers), S7-03 (multilingual fairness) — representative + Pass-2-flagged; SEQUENTIAL in the main tree (worktree parallel dispatch is UNRELIABLE here)."
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) -> packaging extras -> tag the RC -> build sdist+wheel (NOT published)."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J (numpyro/jax absent); DATA bradley_terry/canary/query-aware; Papers 1 & 2. Siblings ../pii-anon-eval-data + ../pii-anon-research-paper are FLAGGED FOLLOW-ON (code-only this run)."
+  milestone: "M4 (CODE v2) — the KEYSTONE (the certified canonical run) is LIVE. The #1 binding constraint (canonical_claim_run) is no longer unmanufacturable: the producer manufactures the certified run; the honest endpoint is NOT_YET on a draw-sensitive raw-detection axis pending the full-census Pass-2."

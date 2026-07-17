@@ -1,0 +1,14 @@
+reviewer: axiom-compliance
+story: S7-05
+gate: story
+iteration: 2
+verdict: APPROVE  # 0 findings both iterations
+runs: wf_941b38c6-52f (iter-1) -> wf_d8d3ca4e-c16 (iter-2); transcribed from the workflow structured results
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # docs + tests carry synthetic examples only
+  - { id: AX-pii-anon-002, status: NOT_TRIGGERED }  # no runtime behavior change (epilog text + docs)
+  - { id: AX-pii-anon-003, status: NOT_TRIGGERED }  # detection path untouched
+  - { id: AX-pii-anon-004, status: UPHELD }  # the FR-010 doc states the no-merge invariant verbatim and introduces no merge framing
+findings: []
+context_bounds_respected: true
+offlimits_md5_ok: true

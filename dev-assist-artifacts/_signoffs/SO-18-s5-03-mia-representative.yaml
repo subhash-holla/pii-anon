@@ -1,0 +1,96 @@
+sign_off_id: SO-18-s5-03-mia-representative
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S5-03 — the representative membership-inference adversary (LiRA-shape) + Secret-
+  Sharer + TPR@low-FPR. Completes the MIA half of the DC-09 attack surface (UC-10;
+  the Tier-3 re-id half is S5-01/S5-02). Conforms to the S5-01 MiaAttack Protocol
+  seam (membership_scores). RepresentativeMiaAttack scores membership from the
+  attacker-observable signal only (-observed_loss; de-circularized — FR-013). The
+  NFR-013 reporting machinery: tpr_at_fpr (the LiRA TPR@committed-low-FPR primitive,
+  integer-count ROC, 0.0-when-unachievable, fail-loud-domain-named on corrupt
+  input), MiaSuccessReport/score_mia_attack (TPR@FPR in {1e-3,1e-2} + AUC + a
+  Wilson CI REUSED from S5-02), canary_exposure/SecretSharerReport (Secret-Sharer),
+  MiaPowerReport/assess_mia_power (the >=128-shadow assertion). Runs under the
+  S5-04 sandbox; additive registry merge (reid_baseline + reid_tier3_representative
+  survive); all reports carry the non-strippable NFR-016 caveat. FEATURE work-stream
+  — does NOT touch competitive_supremacy.py, so NO adversarial SDO close required.
+  dep: S5-01 (DONE) + S5-04 (DONE) + S5-02 (DONE — wilson_interval reused).
+
+stories_closed:
+  - id: S5-03
+    title: representative membership-inference adversary (LiRA-shape) + Secret-Sharer + TPR@low-FPR (DC-09)
+    gate: _reviews/story/S5-03/   # 5/5 APPROVE; 1 MAJOR (provisional_status field) + substantive MINORs remediated in-loop
+    implements: [FR-013, NFR-013]   # + reuses NFR-016 (non-strippable caveat)
+    upholds: [AX-001, AX-002, NFR-016]
+    effect: >
+      new src/pii_anon/eval_framework/attacks/mia.py: MiaRecord, RepresentativeMiaAttack
+      (deterministic LiRA-shape membership scoring, de-circularized), tpr_at_fpr,
+      MiaSuccessReport/score_mia_attack, canary_exposure/SecretSharerReport,
+      MiaPowerReport/assess_mia_power, mia_attack_runner + MIA_ATTACK_REGISTRY.
+      Additive __init__ merge. The real LiRA@128 shadow training + real canary
+      splits are # SWITCH-POINT(DATA) Pass-2.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 5/5
+  adversarial_close: NOT_REQUIRED   # no competitive_supremacy.py change (gate md5 byte-identical 3b842e81…); the S5 sprint-close adversarial run is the standing catch-net for the attacks surface
+  findings_remediated_in_loop:
+    - "TRACE-S5-03-01 (traceability MAJOR): the story metadata omitted the canonical provisional_status field that the S5-01/S5-02 DC-09 siblings carry -> added provisional_status=AGENT_SIMULATED (the source FR-013/NFR-013/UC-10 rows are AGENT_SIMULATED). Honesty boundary was already intact in prose + # SWITCH-POINT markers; this added the machine-readable field."
+    - "RC-01 (requirements-coverage MINOR, = the S5-02 RC-02 lesson): tpr_at_fpr (the NFR-013 primitive) was bounds-tested but not anchored -> added an exact partial-separation anchor (==0.5) + tightened the flat fixture to ==0.0 + removed the tautological 1e-9 assertion (also resolves code-quality CQ-01's misleading comment)."
+    - "CQ-02 (code-quality MINOR): slots=True on MiaRecord but not the report dataclasses -> dropped slots=True from MiaRecord to match the sibling attacks value-object convention."
+    - "security OBS + CQ-03 OBS (two independent decode-boundary flags): _records_from_json now fails loud on a non-finite observed_loss + _gold_from_json on a non-bool gold label -> the same fail-loud-domain-named discipline as tpr_at_fpr/canary_exposure (closes the silent NaN-propagation / null->False coercion at the runner ingress; A13 extended)."
+  findings_no_action:
+    - "RC-02 (the Wilson CI rides along uncovered — beyond the NFR-013 MUST), CQ-04 (the caveat non-blank-vs-exact-string pattern, inherited from S5-01), TRACE-03 (FR-012 correctly out of MIA scope). TRACE-02 (matrix UC-10 Story/Test backfill) deferred to the S5 sprint gate per the documented S5-01 convention."
+
+decisions_acknowledged:
+  - "★ A membership-inference FEATURE flips NO SDO guarantee. The committed smoke-artifact verdict is UNCHANGED (NOT_YET / canonical_claim_run=False (G7)); the SDO gate competitive_supremacy.py is byte-identical (md5 3b842e81c3f03eafd11f9c655c1789a0). No adversarial SDO close was required."
+  - "FR-013 is an HONEST BUILD-AND-FLAG: the representative LiRA-shape adversary + Secret-Sharer + TPR@low-FPR + de-circularization are implemented + tested; the real LiRA@128 (>=128 trained shadow models on in/out splits) + the real canary in/out splits are flagged # SWITCH-POINT(DATA) Pass-2. Not silently claimed real."
+  - "NFR-013 ships an HONEST assertion-now / training-Pass-2 split: TPR@both committed FPRs + the >=128-shadow power assertion + Secret-Sharer are LIVE + tested; training the real >=128 shadows is Pass-2. tpr_at_fpr returns 0.0 (not a fabricated TPR) when no threshold achieves the target FPR."
+  - "FR-013 de-circularization is an integrity control: membership_scores(records) reads ONLY observed_loss; the gold membership lives only in score_mia_attack's gold_membership arg; A3 proves identical observed_loss -> identical score regardless of gold."
+  - "AX-001/AX-002/NFR-016 upheld: synthetic-only records; deterministic membership scoring + pure ROC/exposure math (no random/uuid/time/secrets); the non-strippable caveat REUSED (imported) from reid.py on all three reports. The attacks import-boundary + dangerous-call AST guards auto-cover mia.py (stdlib + reid + reid_tier3 + sandbox.AttackCallable only)."
+  - "The decode boundary (the sandbox runner's ingress) now fails loud on corrupt input — defense-in-depth for the Pass-2 real-data feed, consistent with the module's fail-loud-domain-named discipline."
+
+findings_waived_or_deferred:
+  - id: real-lira-128-shadow-training
+    disposition: pass2-cross-repo
+    detail: "The real LiRA@128 (>=128 trained shadow models on in/out splits) — # SWITCH-POINT(DATA); eval-data S6. The representative deterministic membership scorer + the >=128-shadow power assertion ship now."
+  - id: real-secret-sharer-canary-splits
+    disposition: pass2-cross-repo
+    detail: "The real Secret-Sharer canary in/out splits — # SWITCH-POINT(DATA); eval-data S6. The exposure metric + a representative report ship now."
+  - id: live-tpr-at-scale
+    disposition: pass2
+    detail: "The live TPR@low-FPR at real scale (against trained shadows) — the reporting machinery ships now; the real run is Pass-2."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-17. A membership-inference feature flips no guarantee; the SDO gate is byte-identical."
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): exit 0, 3739 passed / 16 skipped / 0 failed (+24 over SO-17's 3715: the S5-03 A1-A14 suite)."
+  coverage: "88.69% (>= 84 gate; mia.py >= 90% by its own tests)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 139 files."
+  env: "AGENT_SIMULATED on the local .venv. The representative adversary + the TPR@low-FPR/exposure/power machinery + the sandbox run + the import/AST guards run for REAL in-tree against SYNTHETIC records. The real LiRA@128 + canary splits are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md, benchmark-diagnostics.json, artifacts/benchmarks/*, docs/* — S2-03 stays BLOCKED
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903; reid.py/reid_tier3.py/sandbox.py/spec.py unchanged
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_module: mia.py   # the only new src file; stdlib + reid + reid_tier3 + sandbox.AttackCallable imports only
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED 32913d7 / GREEN 350b9cd / remediation f23de77
+  no_new_hard_dependency: true
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S5-03."
+  immediate: "S6-01 (query-aware masking — FR-023/FR-024; the FR-028/UC-22 6-channel vs FR-025/DC-13 4-channel reconciliation is a tracked PO item). Author via /dev-assist-story-new. NOT a control-path change -> no SDO close (unless it becomes a control-path-artifact producer/consumer)."
+  feature_surface: "then S6-04 (BYO-SDK adapter), S7-01 (multimodal readers), S7-03 (multilingual fairness) — SEQUENTIAL in the main tree."
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) -> packaging extras -> tagged RC on pdlc/sota-program -> build sdist+wheel (NOT published)."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J (numpyro/jax absent); the real Tier-3 LLM adversary + the real >=385 DATA cohort (S5-02); the real LiRA@128 + canary splits (S5-03); per-detector-class latency ceilings (S7-04 seam); the G7 _safe_repr sweep; DATA bradley_terry/canary/query-aware; Papers 1 & 2 (siblings FLAGGED FOLLOW-ON — code-only this run)."
+  milestone: "M4 (CODE v2) — the privacy attack surface is now COMPLETE in representative form: re-identification (S5-01 baseline + S5-02 Tier-3) + membership-inference (S5-03), all with the NFR-012/013 power machinery + the non-strippable caveat. The SDO verdict is UNCHANGED (a privacy-attack feature flips no guarantee); the binding constraint remains the draw-sensitive G6 raw-F2 axis pending the full-census Pass-2."

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-anon"
-version = "1.4.0"
+version = "1.7.0rc1"
 description = "OSS-first PII anonymization/pseudonymization core with integrated evaluation workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +29,9 @@ keywords = [
   "nist",
 ]
 classifiers = [
-  "Development Status :: 5 - Production/Stable",
+  # RC classifier (release-gate CQ finding): revert to "5 - Production/Stable"
+  # when the next final, non-rc release is tagged.
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
   "Intended Audience :: Science/Research",
@@ -67,11 +69,41 @@ spacy_ner = "pii_anon.engines.spacy_adapter:SpacyNERAdapter"
 stanza_ner = "pii_anon.engines.stanza_adapter:StanzaNERAdapter"
 gliner = "pii_anon.engines.gliner_adapter:GLiNERAdapter"
 
+[project.entry-points."pii_anon.rating_engines"]
+glicko-legacy = "pii_anon.eval_framework.rating.elo:PIIRateEloEngine"
+bradley-terry-mle = "pii_anon.eval_framework.rating.bradley_terry:BradleyTerryMLEEngine"
+bayes-bt = "pii_anon.eval_framework.rating.bayes_bt:BayesBTEngine"
+
+# S6-04 (FR-001/FR-002): BYO-pipeline predictors. Third-party packages
+# advertise their own Predictor under this group; the five in-tree
+# incumbents ship here so they ride the identical scoring path.
+[project.entry-points."pii_anon.byo_pipelines"]
+gliner = "pii_anon.eval_framework.byo_pipeline:gliner_predictor"
+presidio = "pii_anon.eval_framework.byo_pipeline:presidio_predictor"
+scrubadub = "pii_anon.eval_framework.byo_pipeline:scrubadub_predictor"
+spacy_ner = "pii_anon.eval_framework.byo_pipeline:spacy_ner_predictor"
+stanza_ner = "pii_anon.eval_framework.byo_pipeline:stanza_ner_predictor"
+
+# S7-01 (FR-031): native-format readers. Third-party packages advertise
+# their own NativeReader here; the five in-tree readers ship on the group.
+[project.entry-points."pii_anon.readers"]
+pdf = "pii_anon.ingestion.native_pdf:PdfTextReader"
+image = "pii_anon.ingestion.native:ImageOcrReader"
+screenshot = "pii_anon.ingestion.native:ScreenshotOcrReader"
+dicom = "pii_anon.ingestion.native:DicomReader"
+audio = "pii_anon.ingestion.native:AudioReader"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "pytest-asyncio>=0.23",
+  "hypothesis>=6.0",
+  # The test suite imports numpy at collection time (eval_framework metrics /
+  # rating tests); the LIBRARY keeps numpy optional via runtime fallbacks.
+  # <2.5: numpy 2.5+ stubs use PEP 695 `type` statements, which mypy rejects
+  # under python_version = "3.10". Lift the cap when min Python reaches 3.12.
+  "numpy>=1.24,<2.5",
   "ruff>=0.8",
   "mypy>=1.10",
   "build>=1.2",
@@ -102,8 +134,18 @@ benchmark = [
   "numpy>=1.24",
 ]
 crypto = ["cryptography>=41.0"]
+# OPTIONAL asymmetric (Ed25519) signing for the gate_v1.json control-path
+# artifact (S2-05). The DEFAULT signer/verifier is pure-stdlib HMAC-SHA256 with
+# ZERO new dependencies; this extra is needed ONLY for the optional Ed25519
+# envelope variant (lazy-imported, never a hard import on the default path).
+gate-signing = ["cryptography>=41.0"]
 cli = ["typer>=0.12", "rich>=13.0", "pyyaml>=6.0"]
 datasets = ["pii-anon-datasets>=1.0.0"]
+# S7-01 (DC-14): native-format reader backends. The PDF reader is pure-stdlib
+# (no extra); OCR + DICOM are lazy-imported and fail LOUD naming these extras
+# when absent (NFR-026 — no silent recall loss).
+ocr = ["pytesseract>=0.3", "Pillow>=10"]
+dicom = ["pydicom>=2.4"]
 swarm-ml = ["xgboost>=2.0", "scikit-learn>=1.4", "numpy>=1.24"]
 swarm-train = [
   "xgboost>=2.0",
@@ -111,6 +153,15 @@ swarm-train = [
   "numpy>=1.24",
   "datasets>=2.14",
   "tqdm>=4.66",
+]
+# Claim-grade Bayesian Bradley-Terry rating tier (bayes-bt, S3-03). NUTS sampler
+# stack — heavy, platform-specific wheels; the engine is import-safe without them
+# (lazy import) and only *sampling* requires this extra.
+bayes-eval = [
+  "numpyro>=0.13",
+  "jax>=0.4",
+  "arviz>=0.17",
+  "numpy>=1.24",
 ]
 
 [tool.setuptools]
@@ -147,6 +198,10 @@ target-version = "py310"
 
 [tool.mypy]
 python_version = "3.10"
+# Pin the typeshed platform view so the check is deterministic across CI
+# runners: POSIX-only APIs (resource, os.sysconf) are runtime-guarded for
+# Windows, but Windows-hosted mypy would flag them as attr-defined.
+platform = "linux"
 strict = true
 packages = ["pii_anon"]
 
@@ -179,7 +234,22 @@ module = [
   "xgboost.*",
   "datasets",
   "datasets.*",
+  "numpy",
+  "numpy.*",
   "pii_anon_datasets",
+  "pii_anon_datasets.*",
+  "pytesseract",
+  "PIL",
+  "PIL.*",
+  "pydicom",
+  "numpyro",
+  "numpyro.*",
+  "jax",
+  "jax.*",
+  "jaxlib",
+  "jaxlib.*",
+  "arviz",
+  "arviz.*",
 ]
 ignore_missing_imports = true
 

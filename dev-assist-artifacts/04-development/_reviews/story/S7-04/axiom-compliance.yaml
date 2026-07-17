@@ -1,0 +1,28 @@
+reviewer: axiom-compliance
+story: S7-04
+gate: story
+verdict: APPROVE
+axioms_in_scope:
+  - { id: AX-pii-anon-001, upheld: true }  # synthetic-only (example.test email + 555-prefix phones; timing on the sanctioned benchmark draw; emitted artifact surrogate-only, asserted)
+  - { id: AX-pii-anon-002, upheld: true }  # audit half keyed-deterministic + compared byte-identical; latency = the NFR-005-sanctioned exclusion scoped EXACTLY to latency_summary+timestamp_utc; gate-read composite/J untouched (zero diff matches); no-fabrication extends to every nested G5 value incl. the 10**5000 digit-limit DoV
+  - { id: AX-pii-anon-003, upheld: true }  # recall-floor seam untouched; only behaviour-preserving detail formatting in G1/G4
+  - { id: AX-pii-anon-006, upheld: true }  # FourChannelGuard runs reversible_channels=frozenset() (TRACE never reverses); persist stamp EARNED via raise-on-survival; gate requires ALL FOUR channels + strict is-True
+findings:
+  - id: AXC-S704-01
+    severity: OBSERVATION
+    title: Synthetic-PII surrogate pool is inline literals, not a declared generator
+    where: src/pii_anon/evaluation/canonical_run.py (_G5_SYNTH_* literals)
+    recommendation: >
+      None required — values are unambiguously synthetic (RFC 6761 .test TLD;
+      NANP 555 prefix). If a project-wide synthetic pool is later centralized,
+      route these through it.
+checks_run:
+  - "Honest-verdict live: smoke artifact -> NOT_YET / canonical_claim_run=False / G5 PENDING with byte-stable successor string in axes_pending"
+  - "_PENDING_SUCCESSORS['G5'] byte-identical 8adeef2..HEAD"
+  - "Override seam caller-kwarg-only, g2/g4 idiom exact"
+  - "Off-limits md5 byte-identical; import boundary green; targeted suites 277 passed + canonical_run exit 0"
+offlimits_md5_ok: true
+notes: >
+  Clean APPROVE. SCOPE BOUNDARY: this dimension does not certify the gate's
+  broader fabrication-soundness — the MANDATORY adversarial close follows per
+  §9/§12 and the standing catch-net rule.

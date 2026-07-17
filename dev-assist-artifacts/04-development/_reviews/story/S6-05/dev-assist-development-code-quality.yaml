@@ -1,0 +1,127 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S6-05
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S6-05-01
+    severity: MINOR
+    location: tests/test_agentic_leakage_sankey.py:509
+    description: |
+      `test_ax001_a10_in_tree_payloads_are_inert_synthetic` (lines 495–518) contains
+      `import builtins as _b` inside the function body (line 509), which is redundant
+      because `builtins` is already imported at the module top-level (line 35). The
+      function accesses `builtins.__import__` on line 502 using the top-level name, then
+      re-imports the same module as `_b` four lines later and uses `_b` for the mutation
+      and restoration. The two names refer to the same module object, so the test is
+      correct, but the in-function import is an unnecessary PLC0415-class pattern (not
+      caught by the default ruff rule set but would fire under `ruff check --select
+      PLC0415`). It also makes the code harder to read: a reviewer must confirm that
+      `real_import` captured before the alias and `_b.__import__` set inside `try`/
+      `finally` are operating on the same object. The sibling test
+      `test_fr029_a10_in_tree_payloads_without_datasets_extra` solves the same problem
+      more cleanly using `monkeypatch.setattr(builtins, "__import__", _no_datasets)`.
+    suggested_resolution: |
+      Remove the `import builtins as _b` line (509) and replace the `_b` references
+      with the top-level `builtins` name that is already imported. Alternatively,
+      convert the test to use `monkeypatch: pytest.MonkeyPatch` exactly as
+      `test_fr029_a10_in_tree_payloads_without_datasets_extra` does — that is the
+      idiomatic, safer pattern and eliminates the try/finally boilerplate:
+        monkeypatch.setattr(builtins, "__import__", _no_datasets)
+
+  - id: code-quality-S6-05-02
+    severity: MINOR
+    location: src/pii_anon/agentic/leakage_sankey.py:314
+    description: |
+      `_ZERO_WIDTH` is assigned as a raw invisible Unicode literal `"\xe2\x80\x8b"`
+      (U+200B ZERO WIDTH SPACE) with no inline comment identifying the codepoint. In
+      most editors and in diff output the assignment reads as `_ZERO_WIDTH = ""` — an
+      empty string — which makes the payload set look like a bug (a no-op transform).
+      The `_homoglyph()` and `base64` transforms above are readable at a glance; only
+      this one requires a byte-level inspection to understand.
+    suggested_resolution: |
+      Replace the invisible literal with an escape sequence and add a brief comment:
+        _ZERO_WIDTH = "​"  # U+200B ZERO WIDTH SPACE (strip to recover)
+      This makes the intent unambiguous in editors, diffs, and code review without
+      any behaviour change.
+
+notes: |
+  **TDD discipline — STRICT mode, RED-before-GREEN confirmed.**
+  - RED commit `9b6b3c3`: only `tests/test_agentic_leakage_sankey.py` + the story file
+    added (`git show --name-status 9b6b3c3`). `git ls-tree 9b6b3c3 --
+    src/pii_anon/agentic/leakage_sankey.py` is empty (module absent). The commit
+    message explicitly records `ModuleNotFoundError` failure.
+  - GREEN commit `5b35a12`: production module added; tests pass.
+  - REFACTOR `5d34c11`: 6 additive edge tests only, no production change.
+  - REFACTOR/remediation `d23ca23`: symmetry fix (`intent_tags` path parity); sound
+    and behaviour-preserving. The DATA branch already reported `INTENT_TAGS` (which
+    never includes the `_DIRECT_PROBE_TAG`); the in-tree branch now explicitly filters
+    via `tag != _DIRECT_PROBE_TAG` using the shared constant. Result confirmed live:
+    `_load_payloads()` in-tree path returns `('base64', 'homoglyph', 'zero_width')`;
+    DATA path (when active) returns `('base64', 'ocr', 'zero_width')` — both exclude
+    `'direct'`. The `n_payloads` counter correctly includes the direct probe (4 rows
+    vs 3 intent tags), pinned by `test_fr029_edge_intent_tags_name_only_obfuscation_transforms`.
+
+  **Lint / type cleanliness.**
+  - `ruff check src/pii_anon/agentic/leakage_sankey.py src/pii_anon/agentic/__init__.py
+    tests/test_agentic_leakage_sankey.py` → All checks passed (re-run confirmed).
+  - `mypy src/pii_anon` → Success: no issues found in 135 source files.
+  - `mypy src/pii_anon --strict` → Success: no issues found in 135 source files.
+  - The lazy optional-dep import on line 389 carries
+    `# type: ignore[import-untyped]  # noqa: PLC0415` in the correct order (mypy
+    directive precedes noqa; both mypy invocations confirmed clean).
+
+  **Idiomatic patterns.**
+  - `SankeyEdge`, `LeakageSankey`, `InjectionResistanceReport` are all
+    `@dataclass(frozen=True, slots=True)` — correct Python idiom for value objects;
+    frozen enforcement confirmed by test and live check.
+  - `as_dict()` return type is `dict[str, object]` — appropriate for a renderer shape
+    that mixes `list[dict[str,str]]` and `list[dict[str,object]]`. Mypy clean under
+    both invocations.
+  - `_HOMOGLYPH_MAP` is a module-level `dict[str, str]` constant (not a `frozendict` /
+    `MappingProxyType`), but this is acceptable for an internal helper — the map is
+    never exposed in the public API.
+  - `counts_by_channel()` returns `dict[str, dict[str, int]]` (only non-zero channels
+    appear); `as_dict()` always emits all 6 nodes regardless of sparsity — both
+    behaviours are explicitly pinned by tests.
+
+  **In-tree INERT payload set readability.**
+  - The base64 and homoglyph transforms are readable at a glance.
+  - The zero-width-space literal is the only invisible-character concern (finding
+    code-quality-S6-05-02 above — MINOR).
+  - The `_direct_exfiltration_probe()` helper function and `_DIRECT_PROBE_TAG` constant
+    cleanly encapsulate the scaffold; the comments are unusually thorough and explain
+    the asymmetry clearly.
+
+  **Scope discipline.**
+  `git diff e569761..HEAD --name-only` (filtered to src/ and tests/) returns exactly
+  the three owned files: `src/pii_anon/agentic/__init__.py`,
+  `src/pii_anon/agentic/leakage_sankey.py`, `tests/test_agentic_leakage_sankey.py`.
+  `agentic/interception.py` md5 `7c306f41205c7bab38d907a4f29cee82` — byte-identical,
+  consumed read-only. No scope creep.
+
+  **Docstrings.**
+  All five public `__all__` items (`SankeyEdge`, `LeakageSankey`, `build_leakage_sankey`,
+  `InjectionResistanceReport`, `score_injection_resistance`) carry complete docstrings
+  with parameter/return documentation. Module-level docstring covers both surfaces,
+  the non-circular security invariant, channel-model reconciliation, determinism, and
+  isolation. Private helpers (`_classify_survivor`, `_homoglyph`, `_zero_width`,
+  `_in_tree_payloads`, `_load_payloads`, `_direct_exfiltration_probe`) all have
+  docstrings explaining their contract.
+
+  **Test count and FR/AX ID discipline.**
+  29 test functions confirmed. Every test name embeds an FR or AX prefix
+  (fr028_, fr029_, ax001_, ax002_) — satisfying the FR/NFR-ID-in-test-name requirement.
+
+  **`__init__.py` additive re-exports.**
+  The PEP 562 `__getattr__` dispatch correctly partitions the new names into
+  `_LEAKAGE_SANKEY_NAMES` and delegates to `leakage_sankey`. `__dir__` returns
+  `sorted(__all__)`. `TYPE_CHECKING` guard includes the new imports. All five new
+  names resolve correctly at runtime (live-verified).
+
+review_time_seconds: 780
+
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

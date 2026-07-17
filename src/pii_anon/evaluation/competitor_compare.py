@@ -880,6 +880,61 @@ def _core_detector(
     return detect
 
 
+def _canonical_swarm_detector(
+    *,
+    engines: list[Any] | None = None,
+    **_ignored: Any,
+) -> Callable[[BenchmarkRecord], list[LabelSpan]]:
+    """Benchmark detector for ``pii-anon-swarm`` using the CANONICAL production
+    swarm wiring — ``build_fusion("swarm")`` (FloorProjectingFusion + the 4-layer
+    SwarmFusionStrategy) over the native ``_swarm_pool`` (regex-oss with
+    ``eval_cross_type_arbitration`` + native gliner/presidio/scrubadub at their
+    real per-finding confidences).
+
+    Replaces the prior ``_ensemble_detector`` (MoEFusionStrategy + flat-0.85
+    competitor confidence) routing, which was a measurement bug: scoring THAT path
+    as ``pii-anon-swarm`` reported F1 ~0.610 instead of the canonical swarm's
+    ~0.875 — the value the tournament/production path (``build_fusion("swarm")``)
+    actually achieves. See docs/superpowers/specs/2026-06-14-swarm-precision-v2-design.md.
+
+    The pool self-manages engine availability (a missing/broken optional engine is
+    skipped, never fatal), so this does not need ``_ensemble_detector``'s
+    fallback/native-competitor kwargs; they are accepted and ignored for call-site
+    compatibility. ``engines`` is injectable for fast/deterministic tests.
+    """
+    from pii_anon.eval_framework.first_party import _swarm_pool
+    from pii_anon.fusion import build_fusion
+    from pii_anon.types import EngineFinding
+
+    pool = list(engines) if engines is not None else _swarm_pool()
+    fusion = build_fusion("swarm", weights={}, min_consensus=1)
+    default_language = "en"
+
+    def detect(record: BenchmarkRecord) -> list[LabelSpan]:
+        language = record.language or default_language
+        pooled: list[EngineFinding] = []
+        for engine in pool:
+            try:
+                pooled.extend(engine.detect({"text": record.text}, {"language": language}))
+            except Exception:
+                _log.debug("canonical swarm: an engine failed on record %s", record.record_id)
+        rows: list[LabelSpan] = []
+        for f in fusion.merge(pooled):
+            start, end = f.span_start, f.span_end
+            # bool is an int subclass — reject explicitly (mirror first_party guard).
+            if isinstance(start, bool) or isinstance(end, bool):
+                continue
+            if not isinstance(start, int) or not isinstance(end, int):
+                continue
+            etype = _normalize_entity_type(str(f.entity_type))
+            if etype == "_BENCHMARK_IGNORE":
+                continue
+            rows.append((record.record_id, etype, start, end))
+        return rows
+
+    return detect
+
+
 def _ensemble_detector(
     *,
     use_case: str,
@@ -1586,12 +1641,10 @@ def _core_system_worker(spec: _CoreEvalSpec) -> SystemBenchmarkResult:
     _silence_worker_noise()
     system_name = spec.system_name
     if system_name == "pii-anon-swarm" and spec.evaluation_track == "detect_only":
-        # Ensemble path: run each competitor natively, fuse via MoE
-        detector: Callable[[BenchmarkRecord], list[LabelSpan]] | None = _ensemble_detector(
-            use_case=spec.use_case,
-            allow_fallback_detectors=spec.allow_fallback_detectors,
-            require_native_competitors=spec.require_native_competitors,
-        )
+        # Canonical swarm path: native _swarm_pool fused via build_fusion("swarm").
+        # (Was the MoE _ensemble_detector — a measurement bug that scored the swarm
+        # at F1 ~0.610 instead of its true ~0.875; see the v2 design spec.)
+        detector: Callable[[BenchmarkRecord], list[LabelSpan]] | None = _canonical_swarm_detector()
     elif spec.evaluation_track == "detect_only":
         detector = _core_detector(
             use_case=spec.use_case,
@@ -1859,6 +1912,7 @@ def _evaluate_system(
             f"{label}: computing per-record F1 scores ({len(records)} records)"
         )
     per_record_f1_scores: list[float] = []
+    per_record_counts: list[tuple[int, int, int]] = []
     preds_by_record: dict[str, list[LabelSpan]] = {}
     labels_by_record: dict[str, list[LabelSpan]] = {}
     for span in all_predictions:
@@ -1872,16 +1926,21 @@ def _evaluate_system(
         rec_p = _safe_div(rec_tp, len(rec_preds))
         rec_r = _safe_div(rec_tp, len(rec_labels))
         per_record_f1_scores.append(_safe_div(2.0 * rec_p * rec_r, rec_p + rec_r))
+        per_record_counts.append((rec_tp, len(rec_preds), len(rec_labels)))
 
-    # Bootstrap 95% confidence interval for F1.
+    # Bootstrap 95% confidence interval for the *micro* F1 (the reported point
+    # estimate). Cluster-bootstraps whole records and recomputes the pooled micro
+    # F1 on each resample, so the interval is consistent with `f1` above. Using
+    # the per-record F1 mean would instead yield a macro CI that can exclude the
+    # micro point.
     if progress_hook:
         progress_hook(
             f"{label}: computing bootstrap 95% CI (2K iterations, "
-            f"{len(per_record_f1_scores)} samples)"
+            f"{len(per_record_counts)} records)"
         )
     from pii_anon.eval_framework.evaluation.aggregation import MetricAggregator
-    f1_ci_lower, f1_ci_upper = MetricAggregator.compute_confidence_intervals(
-        per_record_f1_scores,
+    f1_ci_lower, f1_ci_upper = MetricAggregator.compute_micro_f1_confidence_interval(
+        per_record_counts,
         confidence_level=0.95,
         n_bootstrap=2000,
     )
@@ -2348,17 +2407,14 @@ def _evaluate_profile(
             )
         )
 
-        # Ensemble core evaluation — runs each competitor detector natively
-        # then fuses ALL findings through MoE.  This guarantees the ensemble
-        # never misses a detection any individual engine found (union + weighted vote).
+        # Canonical swarm evaluation — the native _swarm_pool fused via
+        # build_fusion("swarm") (the production/tournament path). Replaces the prior
+        # MoE _ensemble_detector wiring, which mis-scored the swarm (F1 ~0.610 vs
+        # its true ~0.875). See docs/superpowers/specs/2026-06-14-swarm-precision-v2-design.md.
         systems.append(
             _evaluate_system(
                 "pii-anon-swarm",
-                _ensemble_detector(
-                    use_case=profile,
-                    allow_fallback_detectors=allow_fallback_detectors,
-                    require_native_competitors=require_native_competitors,
-                ),
+                _canonical_swarm_detector(),
                 reason=None,
                 records=records,
                 warmup_samples=warmup_samples,
@@ -2822,35 +2878,24 @@ def _compute_statistical_tests(
         "confidence_level": 0.95,
     }
 
-    # Per-system CI summary.
+    # Per-system CI summary. Reuse the micro-F1 CI computed at evaluation time
+    # (compute_micro_f1_confidence_interval) so the interval is consistent with
+    # the micro f1 reported as the point estimate. Re-bootstrapping per_record_f1
+    # here would instead yield a *macro* (per-record-mean) CI that can exclude
+    # the micro point.
     if progress_hook:
         progress_hook(
-            f"statistical tests: computing bootstrap CIs for {len(available)} systems "
-            f"(2K iterations each)"
+            f"statistical tests: collecting micro-F1 CIs for {len(available)} systems"
         )
-    system_cis: dict[str, dict[str, float]] = {}
-    for idx, sys in enumerate(available, start=1):
-        if progress_hook:
-            progress_hook(
-                f"  bootstrap CI [{idx}/{len(available)}]: {sys.system} "
-                f"({len(sys.per_record_f1)} samples, 2K iterations)"
-            )
-        ci_lower, ci_upper = MetricAggregator.compute_confidence_intervals(
-            sys.per_record_f1,
-            confidence_level=0.95,
-            n_bootstrap=2000,
-        )
-        system_cis[sys.system] = {
+    system_cis: dict[str, dict[str, float]] = {
+        sys.system: {
             "f1": round(sys.f1, 6),
-            "f1_ci_lower": round(ci_lower, 6),
-            "f1_ci_upper": round(ci_upper, 6),
+            "f1_ci_lower": round(sys.f1_ci_lower, 6),
+            "f1_ci_upper": round(sys.f1_ci_upper, 6),
             "samples": sys.samples,
         }
-        if progress_hook:
-            progress_hook(
-                f"  bootstrap CI [{idx}/{len(available)}]: {sys.system} done — "
-                f"F1={sys.f1:.4f} [{ci_lower:.4f}, {ci_upper:.4f}]"
-            )
+        for sys in available
+    }
     result["system_confidence_intervals"] = system_cis
 
     # Pairwise significance tests — core vs. each competitor.

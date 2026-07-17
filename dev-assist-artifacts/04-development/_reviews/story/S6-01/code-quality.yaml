@@ -1,0 +1,44 @@
+reviewer: code-quality
+story: S6-01
+gate: story
+verdict: APPROVE  # was REQUEST_CHANGES (5 MINOR, 0 MAJOR); all remediated/dispositioned in-loop (753c90d)
+summary: >
+  ruff clean; mypy clean under BOTH the canonical invocation and --strict (140
+  files); 12 tests pass. TDD RED→GREEN confirmed (3c459aa tests-only precedes
+  b0ac07e). Scope exactly the 3 owned files (additive __init__; orchestrator.py
+  md5 == baseline, untouched). Module docstring + all public symbols documented.
+  The REQUEST_CHANGES was driven entirely by 5 MINORs (no MAJOR) — all addressed.
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    title: dead 'e-mail' alias (un-tokenisable under [a-z0-9]+)
+    disposition: REMEDIATED IN-LOOP (753c90d) — removed; added a comment that synonyms must be _TOKEN_RE-producible.
+  - id: code-quality-story-02
+    severity: MINOR
+    title: synonym dict rebuilt per call
+    disposition: REMEDIATED IN-LOOP (753c90d) — hoisted to the module-level _ENTITY_SYNONYMS constant (same as axiom OBS-2).
+  - id: code-quality-story-03
+    severity: MINOR
+    title: _decisions test helper untyped
+    disposition: REMEDIATED IN-LOOP (753c90d) — annotated (gate, candidates: list[MaskCandidate], query: str) -> dict[str, QueryAwareDecision].
+  - id: code-quality-story-04
+    severity: MINOR
+    title: A8/A9 rate assertions loose (not exact)
+    disposition: REMEDIATED IN-LOOP (753c90d) — exact anchors (= RC-01).
+  - id: code-quality-story-05
+    severity: MINOR
+    title: test names do not embed the FR ID
+    disposition: NO ACTION (house convention) — the repo pins FR/NFR IDs in test DOCSTRINGS + the module docstring, not test names; the 4 sibling attack test files (reid/reid_tier3/mia) all use acceptance-ID names; renaming only S6-01 would make it the outlier. Prior reviewers dispositioned the identical finding NO-ACTION.
+  - id: code-quality-story-06
+    severity: OBSERVATION
+    title: shared-token entity-alias collision (address/security) undocumented
+    disposition: REMEDIATED IN-LOOP (753c90d) — documented in the _entity_aliases docstring as a known heuristic limitation closed at the # SWITCH-POINT(DATA) seam.
+  - id: code-quality-story-07
+    severity: OBSERVATION
+    title: no Examples docstring blocks on the public surface
+    disposition: NO ACTION (S8 contributor-readiness follow-on; non-blocking at the story gate).
+offlimits_md5_ok: true
+notes: >
+  Post-remediation the verdict converts to APPROVE (the reviewer noted "after
+  remediation, on track for APPROVE with no structural rework"). No SDO close
+  needed (competitive_supremacy.py unchanged).

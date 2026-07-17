@@ -2,6 +2,12 @@ from .providers import AESSIVTokenizer, DeterministicHMACTokenizer, TokenRecord,
 from .store import InMemoryTokenStore, SQLiteTokenStore, TokenMapping, TokenStore
 from .key_manager import KeyManager, KeyVersion
 from .reidentification import ReidentificationAuditEntry, ReidentificationService
+from .encrypted_store import (
+    EncryptedSQLiteTokenStore,
+    EnvelopeKeyProvider,
+    KeyEnvelope,
+    StaticTestKeyProvider,
+)
 
 __all__ = [
     "TokenizerProvider",
@@ -16,4 +22,8 @@ __all__ = [
     "KeyVersion",
     "ReidentificationService",
     "ReidentificationAuditEntry",
+    "EncryptedSQLiteTokenStore",
+    "EnvelopeKeyProvider",
+    "KeyEnvelope",
+    "StaticTestKeyProvider",
 ]

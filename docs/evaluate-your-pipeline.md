@@ -63,7 +63,7 @@ Predictor = Callable[[str], Iterable[tuple[str, int, int]]]
   - `start`/`end` are 0-indexed, half-open offsets into the input string.
   - `entity_type` is a non-empty string. Common names (`PERSON_NAME`,
     `EMAIL_ADDRESS`, `US_SSN`, etc.) match our taxonomy — see
-    [TAXONOMY](../../pii-anon-eval-data/TAXONOMY.md).
+    [TAXONOMY](https://github.com/subhash-holla/pii-anon-eval-data/blob/main/TAXONOMY.md).
 - **Extra tuple elements** are ignored. A detector that returns
   `(type, start, end, confidence)` will work fine.
 - **Malformed spans** — out-of-bounds offsets, empty entity types, reversed
@@ -246,6 +246,123 @@ report; the `--artifact-dir` output gives you stable files for CI gating.
 
 ---
 
+## Package your detector as an SDK plugin (entry-point discovery)
+
+You don't have to pass `--predictor` paths around. A package can
+**advertise** its predictor under the `pii_anon.byo_pipelines` entry-point
+group and be discovered with zero pii-anon edits:
+
+```toml
+# your package's pyproject.toml
+[project.entry-points."pii_anon.byo_pipelines"]
+my-detector = "my_pkg.detector:predict"
+```
+
+```python
+from pii_anon.eval_framework import BYOPipelineRegistry
+
+registry = BYOPipelineRegistry()
+names = registry.discover_entrypoint_pipelines()   # ['my-detector', ...]
+predictor = registry.get("my-detector")
+```
+
+Discovery rules:
+
+- Targets must be **callables** (module-level functions are the canonical
+  shape). Classes are not instantiated at discovery time.
+- Discovery **never raises** — a broken or absent package is skipped and
+  the rest are returned (graceful degradation), so an optional dependency
+  can never break callers that enumerate pipelines.
+- Discovery resolves function objects only; **no model is loaded** until a
+  predictor is actually called.
+- Returning `True`/`False` as span offsets is rejected by the in-tree
+  bridges; your own predictor should likewise return real `int` offsets
+  (`bool` is an `int` subclass in Python and would otherwise coerce to
+  `1`/`0`).
+
+The five in-tree incumbents (`gliner`, `presidio`, `scrubadub`,
+`spacy_ner`, `stanza_ner`) ship under this same group — your detector and
+the incumbents are discovered, registered, and scored identically. The CLI
+composes with this too, with zero shims:
+
+```bash
+pii-anon rate-elo --predictor pii_anon.eval_framework.byo_pipeline:presidio_predictor
+```
+
+---
+
+## Incumbents are scored on the identical path
+
+`evaluate_incumbent` scores an in-tree incumbent through the **same
+function** (`evaluate_external_system`) that scores your detector — it
+contains no scoring logic of its own, so there is no "house path" for
+incumbents and a different path for you:
+
+```python
+from pii_anon.eval_framework import (
+    INCUMBENT_SYSTEMS,            # ('gliner', 'presidio', 'scrubadub', 'spacy_ner', 'stanza_ner')
+    evaluate_incumbent,
+    build_identical_path_leaderboard,
+    incumbent_predictor,
+)
+
+# One incumbent, same path / same knobs as evaluate_external_system:
+result = evaluate_incumbent("presidio", max_records=2_000)
+
+# Apples-to-apples board: any mix of incumbents and your systems,
+# every row produced by the same evaluator over the same dataset:
+board, results = build_identical_path_leaderboard(
+    {
+        "presidio": incumbent_predictor("presidio"),
+        "my-detector": my_detector,
+    },
+    max_records=2_000,
+)
+print(board.to_markdown())
+```
+
+Notes:
+
+- The incumbent adapters use each engine's pii-anon integration
+  (`pii_anon.engines.*`). Engines whose native dependency is missing fall
+  back to their built-in degraded behavior — install the engine package
+  (e.g. `presidio-analyzer`) for native-strength numbers.
+- **The committed baseline artifact uses a different (legacy) path.** The
+  rows in `artifacts/benchmarks/benchmark-results.json` were produced by
+  the frozen legacy comparison (overlap matching over the benchmark
+  dataset), while the identical path uses strict span matching over the
+  eval dataset — so identical-path incumbent numbers will legitimately
+  differ from the committed artifact rows. The identical path pins *how
+  all future scoring happens*, not retroactive artifact parity. Avoid
+  mixing rows from the two paths in one table; `build_identical_path_leaderboard`
+  is the unmixed alternative.
+
+---
+
+## Certify a run: `canonical-run` + `supremacy`
+
+Leaderboard numbers are *comparative*; certified claims go through the SDO
+(state-of-the-art dominance objective) machinery:
+
+```bash
+# Produce the certified evaluation artifact (fail-closed CanonicalRunGate:
+# every guarantee field validated; fabricated/malformed values are rejected).
+# Writes <output-dir>/canonical-run.json.
+pii-anon canonical-run --output-dir ./certified
+
+# Read the CompetitiveSupremacyGate verdict + the binding constraint.
+pii-anon supremacy --artifact ./certified/canonical-run.json
+# -> verdict: NOT_YET | PROVISIONAL_SOTA | CLAIM_GRADE_SOTA, plus per-guarantee
+#    G1..G7 statuses and the single binding constraint.
+```
+
+`supremacy` is non-blocking by default (always exit 0); with
+`--canonical-claim` it exits 1 unless the verdict is `CLAIM_GRADE_SOTA` —
+the only mode where a non-supreme result is a hard failure. The honest
+current verdict on the committed smoke artifact is `NOT_YET`.
+
+---
+
 ## Reading the results
 
 Example output:
@@ -354,7 +471,7 @@ The dataset (`pii-anon-datasets` ≥ v1.3.0) ships per-record
 `behavioral_signals`, `re_identification_resistance_score`, and a 4th
 anonymized variant (`anonymized_llm_sanitized`) so you can drive this
 evaluation locally. See the
-[CHANGELOG](../../pii-anon-eval-data/CHANGELOG.md) for schema details.
+[CHANGELOG](https://github.com/subhash-holla/pii-anon-eval-data/blob/main/CHANGELOG.md) for schema details.
 
 ---
 
@@ -368,6 +485,55 @@ evaluation locally. See the
 | `predictor produced zero successful predictions` | Your callable raised on every record. Set `on_error="raise"` to see the exception. |
 | Elo doesn't change no matter what I do | You're running against the full baseline — composite differences are small. Use a larger `max_records` or pass a custom `CompositeConfig` with sharper weights. |
 | Leaderboard shows me last with throughput=12,328,743,903 | You returned zero predictions, so latency ≈ 0 and throughput saturates. This is a healthy sanity check — a predictor that does nothing ranks last. |
+
+---
+
+## The external assessment (pii-anon-eval-data baselines)
+
+pii-anon and pii-anon-swarm are registered as ordinary detectors in the
+sibling [pii-anon-eval-data](https://github.com/subhash-holla/pii-anon-eval-data) benchmark's
+`baselines` harness — the SAME strict-span evaluation that scores AWS
+Comprehend, GCP DLP, Azure, GLiNER, Presidio and the other public detectors.
+Nothing is special-cased: the adapters wrap the public
+`first_party_predictor()` seam (`pii_anon.eval_framework.byo_pipeline`) and
+project native labels onto the benchmark's canonical 63-type taxonomy.
+
+Reproduce the full leaderboard (from the eval-data repo; cloud detector
+results merge from stored artifacts — no API spend):
+
+```bash
+# 1. score the first-party systems on the official test split
+python -m pii_anon_datasets.cli baselines \
+  --detectors pii_anon,pii_anon_swarm --split test --languages en \
+  --out results/baselines/first-party
+
+# 2. merge with the stored 10-detector run into one ranked table
+python -m pii_anon_datasets.cli baselines \
+  --merge results/baselines/first-party/*/baseline_results.json \
+          results/baselines/_partial-all-10/baseline_results.json \
+  --out results/baselines/tier1-en-12
+```
+
+Tuning discipline: detection iteration happens on the **dev** split only;
+the test split is reserved for reported runs (eval-integrity AX).
+
+### Rating all players: `pii-anon rate-elo-assessment`
+
+The merged artifact feeds the pii-rate-elo tournament directly (from this
+repo):
+
+```bash
+pii-anon rate-elo-assessment \
+  --assessment-results ../pii-anon-eval-data/results/baselines/tier1-en-12/baseline_results.json \
+  --artifact-dir artifacts/ratings/tier1-en-12
+```
+
+Every gold-supported entity type is a match field; every player pair plays
+each field once through the `PIIRateEloEngine`. The report carries the Elo
+leaderboard with rating deviations and 95% CIs, the pairwise-significance
+matrix, per-system strongest/weakest entity types, and an explicit
+axis-disclosure block (detection + coverage come from the artifact; latency,
+throughput and Tier-3 are never invented for systems that lack them).
 
 ---
 

@@ -1,0 +1,122 @@
+reviewer: traceability
+gate: story
+scope_id: S4-03
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: TRACE-S4-03-001
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:24
+    description: >
+      Forward-trace backfill is partial. Matrix row 24 (UC-04 calibration)
+      already lists FR-005 + NFR-017/018/019/021, but does NOT yet name the
+      implementing story S4-03, does not list NFR-020 on the calibration row
+      (NFR-020 appears only on row 34 against the interception cluster), and
+      carries a stale evidence cell `DATA:stats/calibration.py (S4 done)` that
+      points at a non-existent path (the reporter shipped as
+      eval_framework/metrics/selective_risk.py + the SDO G4 hook in
+      competitive_supremacy.py). No S4-03/DC-10 → test/code row exists. The
+      matrix backfill is the documented sprint-gate responsibility, mirroring
+      the S2-05 / S5-04 / S6-03 / S4-CS-01 / S4-01 precedent (those stories'
+      rows are likewise not yet present in this matrix).
+    suggested_resolution: >
+      Defer to the sprint-4 gate: add an S4-03 forward-trace row mapping
+      DC-10 / FR-005 / NFR-017,018,019,020,021 → selective_risk.py +
+      _g4_calibration_selective_risk → tests/test_selective_risk.py (21) +
+      the 15 G4 tests in tests/test_competitive_supremacy.py; put NFR-020 on
+      the calibration row; correct the stale `stats/calibration.py` evidence
+      cell. Non-blocking for the story gate.
+    status: DEFERRED-TO-SPRINT-GATE
+  - id: TRACE-S4-03-002
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-4/S4-03-calibration-selective-risk.md:10
+    description: >
+      The story labels AX-002 as "(determinism)". The canonical registry
+      (00-axioms/project-axioms.yaml) names AX-pii-anon-002
+      "deterministic-reproducible-pseudonymization", whose body explicitly
+      carries a "replay-determinism flavor" — so AX-002 is a real canonical
+      axiom and the determinism shorthand is defensible; A9's determinism
+      substance is additionally pinned by NFR-005 (byte-identical N=5 replay).
+      Note: an older note in S2-05 (line 74) asserted AX-002 was "not a
+      canonical axiom id"; that note is stale w.r.t. the current registry,
+      which does define AX-pii-anon-002. No action required for tracing
+      fidelity; flagged only so axiom-compliance can reconcile the S2-05
+      label-precedent if it wishes.
+    status: OPEN
+context_bounds_respected: true
+notes: >
+  CHAIN VERDICT: faithful — APPROVE. All declared IDs exist in
+  requirements-document.md with status matching the story's claims:
+  FR-005 (row 15, SHOULD), NFR-017 (row 79, SHOULD), NFR-018 (row 80, COULD),
+  NFR-019 (row 81, SHOULD), NFR-020 (row 82, MUST — "the lone MUST", correct),
+  NFR-021 (row 83, SHOULD). Axioms exist in 00-axioms/project-axioms.yaml:
+  AX-005 = AX-pii-anon-005 calibrated-uncertainty-and-auditable-abstention
+  (the headline), AX-002 = AX-pii-anon-002 deterministic-reproducible-
+  pseudonymization (replay-determinism flavor), AX-001 = AX-pii-anon-001
+  synthetic-only-no-real-PII. Provisional_status AGENT_SIMULATED is consistent
+  with the source: DC-10 is not a DIVERGED DC, no DIVERGED cascade applies;
+  the in-tree reporter + G4 teeth run for real against synthetic fixtures while
+  a TRUE G4-on-real-data verdict is honestly gated to the S7 canonical run
+  (PENDING-on-missing-fields, no fabrication) — the simulated/real boundary is
+  drawn correctly.
+
+  DESIGN TRACE RESOLVES: DC-10 (D-implementation-ready-design.md:20) reads
+  exactly "Calibration & selective-risk reporter (per-class ECE/Brier/AURC +
+  abstention) | FR-005, NFR-017/018/019/020/021" — byte-for-byte the FR/NFR set
+  the story claims. SDO G4 chain resolves in code: the
+  `_pending_guarantee("G4", …)` hardcoded placeholder is REPLACED by the pure
+  `_g4_calibration_selective_risk(systems)` (competitive_supremacy.py:331-333,
+  def at :661); `_PENDING_SUCCESSORS["G4"]` (:136) now reads
+  "G4←S4-03 (calibration / selective-risk reporter)"; the G4 NFR bars are
+  named constants (:101 ECE 0.05 high-resource / :102 0.08 long-tail / :103 ≥3
+  abstention points / :104 coverage=1.0 the MUST). The lone surviving
+  `_pending_guarantee("G4", …)` at :331 is the preserved backward-compat
+  override seam (an explicit pending_overrides['G4'] still wins), explicitly
+  documented in the story (§2 line 26 + Evidence line 73 + the
+  test_g4_override_still_honoured_for_backward_compat test) — NOT a leftover
+  placeholder; this is faithful.
+
+  A1-A9 → TEST MAP (every acceptance maps to >=1 named test; IDs embedded in
+  docstrings):
+  A1 (per-class ECE / NFR-017) -> test_a1_per_class_ece_is_distinct_from_global_and_reuses_calibration,
+    test_a1_per_class_ece_matches_calibration_module_on_a_single_slice;
+  A2 (Brier + decomp / NFR-018) -> test_a2_per_class_brier_low_for_calibrated_high_for_miscalibrated,
+    test_a2_brier_decomposition_reconciles_with_binned_brier;
+  A3 (AURC + monotone risk-coverage / NFR-019) -> test_a3_aurc_lower_for_better_calibrated_class,
+    test_a3_risk_coverage_curve_is_monotone_non_increasing_property, test_a3_aurc_in_unit_interval;
+  A4 (abstention >=3pt at {1%,2%,5%} / NFR-021) -> test_a4_abstention_table_has_three_points_at_targets
+    (asserts targets == [0.01, 0.02, 0.05]), test_a4_abstention_points_consistent_with_risk_coverage_curve;
+  A5 (calibrated-confidence-coverage / NFR-020 MUST) -> test_a5_coverage_is_one_when_every_finding_calibrated_with_provenance,
+    test_a5_coverage_drops_and_flags_bare_logit_finding (teeth: 0.9091, flags index 10),
+    test_a5_provenance_less_but_in_range_still_flagged;
+  A6 (post-temp-scaling ECE / NFR-017) -> test_a6_post_temp_scaling_ece_never_worse_than_pre,
+    test_a6_well_resourced_class_meets_high_resource_threshold;
+  A7 (G4 PASS/FAIL/PENDING teeth) -> test_g4_pass_when_calibration_meets_all_thresholds,
+    test_g4_fail_when_a_class_ece_exceeds_threshold, test_g4_fail_when_coverage_below_one_nfr020,
+    test_g4_fail_when_fewer_than_three_abstention_points, test_g4_fail_when_risk_coverage_not_monotone,
+    test_g4_pending_when_fields_absent_never_fabricated,
+    test_g4_teeth_non_vacuous_worsening_a_class_ece_flips_pass_to_fail, test_g4_long_tail_class_held_to_looser_bar;
+  A8 (real-artifact stays NOT_YET) -> test_g4_real_artifact_stays_pending_and_verdict_not_yet
+    (asserts G4 passed is None + Verdict.NOT_YET + binding canonical_claim_run=False),
+    test_g4_successor_label_names_s4_03_when_pending;
+  A9 (import-boundary + determinism / AX-002 + AX-001) -> test_a9_reporter_is_deterministic_on_identical_inputs,
+    test_a9_selective_risk_has_no_detection_layer_imports,
+    test_a9_calibration_module_is_consumed_unchanged_byte_identical, test_g4_is_deterministic_on_identical_benchmarks.
+  Each NFR ID is embedded in >=1 test docstring (grep-confirmed in both files);
+  test bodies are semantically aligned with their claimed IDs (no name/body
+  mismatch). Owned-test counts match the story Evidence (test_selective_risk.py
+  21 tests = 19 reporter + 2 scorecard; 15 G4 tests added to
+  test_competitive_supremacy.py, 56->71).
+
+  No two stories contend for these IDs: S4-01 owns G2 (FR-006/009/010 family),
+  S4-CS-01 owns the gate machine; S4-03 is the sole claimant of FR-005 + the
+  G4 axis. Parent epic E4 present. Dependencies: "none hard" (the reused
+  metrics/calibration.py + the LIVE SDO gate from S4-CS-01 DONE + the S4-01 G2
+  pattern in REVIEW) — no dependency-on-not-DONE problem for the story-gate
+  chain. No deferred/renamed/consolidated FR referenced. Two findings only:
+  TRACE-S4-03-001 (matrix backfill, MINOR, deferred to sprint gate per the
+  established S2-05/S5-04/S6-03/S4-CS-01/S4-01 precedent) and TRACE-S4-03-002
+  (AX-002 label observation). Neither blocks: the FR/NFR -> Story -> Test -> DC
+  chain is complete and faithful. Read-only; no files other than this YAML
+  written. Self-attestation: independent review, no coordination with other
+  reviewers.

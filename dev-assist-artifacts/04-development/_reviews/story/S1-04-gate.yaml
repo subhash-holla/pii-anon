@@ -1,0 +1,20 @@
+gate: story
+story: S1-04-hypothesis-property-migration
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: "Sprint-1-close verification workflow wftzms2fs + independent re-verification."
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED 3949d23 precedes GREEN 28a0e04; ruff + mypy --strict clean. hypothesis>=6.0 added to the dev extra ONLY (pyproject otherwise untouched). @composite span strategy + @settings(max_examples=400, derandomize=True) for deterministic CI."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "NFR-011 property infra. The projector superset-invariant property test migrated from random.Random(42) to @given (400 examples, 0 falsifying). The 5 example unit tests + determinism test unchanged (1:1 migration; file holds 7 tests before and after)."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: "AX-002 determinism preserved (derandomize=True). AX-003 superset invariant now property-checked via hypothesis."
+conditional_reviewers_skipped: [security-sast, performance, requirements-coverage, accessibility, contributor-experience]
+findings: []
+followups:
+  - "The SEAM-level seeded property test in test_floor_fusion_wiring.py (random.Random(1602)) was a separate test NOT in S1-04 scope; it was migrated to @given + the stale docstring fixed by S1-05 CLEANUP (f940df2), closing the sprint-gate traceability MINOR."

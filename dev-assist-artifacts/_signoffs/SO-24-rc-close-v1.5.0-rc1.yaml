@@ -1,0 +1,65 @@
+sign_off_id: SO-24-rc-close-v1.5.0-rc1
+date: 2026-06-09
+type: rc-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  The PDLC SOTA program RC CLOSE — v1.5.0rc1, LOCAL-ONLY. Closes the arc the
+  program opened at SO-01 (2026-05-30): all feature stories DONE (S1-S7; 30
+  evidenced stories; S2-03 alone DEFERRED-blocked on the protected user-WIP
+  orchestrator — tracked, not program work), Stage-6 Documentation COMPLETE
+  (verdict DOCUMENTED), the release gate APPROVE (iter-1 REQUEST_CHANGES with a
+  real program-wide traceability-debt MAJOR -> remediated -> iter-2 6/6 APPROVE,
+  0 MAJOR/MINOR), version 1.4.0 -> 1.5.0rc1 (+ the Beta classifier), the
+  annotated tag v1.5.0-rc1 created LOCAL-ONLY via the new guarded `make rc-tag`,
+  and sdist+wheel BUILT AND VERIFIED — NOT published anywhere.
+
+release_verdict: SHIP-WITH-CAVEATS
+caveats:
+  - "SDO verdict NOT_YET — binding G6 raw-detection-F2 non-inferiority FAIL (F2 0.7214 vs 0.75 on the certified artifact; draw-sensitive; attributed to evaluation methodology, not a code regression). G1/G2/G3/G4/G5/G7 ALL PASS, zero pending. This RC claims honest machinery, not the crown."
+  - "All program cohort research is AGENT_SIMULATED (never real-user); the Pass-2 roadmap is tracked in the backfilled traceability matrix + the SO ledger."
+  - "Representative-vs-Pass-2 splits tracked per story: real Tier-3/MIA adversaries, real OCR/DICOM/ASR extraction, corpus-scale fairness + per-modality benchmarks, the ORCH-blocked wire-ins (S2-03 class), full-census G6 (the headline Pass-2)."
+  - "FR-032-native + FR-034-corpus remain OPEN MUST-board rows flagged representative-this-sprint (the S7-01 carry-forward) — not marked fully-verified."
+  - "The ocr/dicom extras are version-floored (not pinned): pip-audit was CLEAN at RC time (pillow 12.2.0 / pydicom 3.0.2 / pytesseract 0.3.13); re-audit the resolved closure at actual publish time."
+
+release_gate:
+  evidence: _reviews/release/v1.5.0-rc1/   # synthesis.md per iteration; run wf_3d7f1f9f-8d8 (iter-1) -> wf_1a96f012-592 (iter-2)
+  iter1: "REQUEST_CHANGES — 1 MAJOR (the canonical traceability-matrix was never backfilled program-wide: every story gate deferred the Story/Test columns to sprint gates that never ran) + 6 MINOR (no rc-push guard; S6-03's FR-027 in Implements without a test pin; the stale Stage-5 NFR matrix; dual NFR-001 numbering; the Production/Stable classifier on an rc; 3 D102 docstrings) + 14 OBS."
+  remediation: "fc31ee6 — the 65-row FR/NFR -> Story -> Test -> DC backfill (50 honestly pinned to DONE stories + ls-verified test files; 15 honestly recorded unclaimed/Pass-2/DATA-owned — honesty over completeness) + a Status Change Log; the Stage-5 NFR matrix supersession banner + 17 evidence-backed flips (6 stay DEFERRED); the guarded `make rc-tag` target (prints the NEVER-PUSH warning); FR-027 descoped to Deferred(Pass-2); the NFR-001 supersession note; the 3 docstrings. The classifier flip rode the version-bump commit per the reviewer's own timing."
+  iter2: "6/6 APPROVE — 0 SHOWSTOPPER/CATASTROPHIC/MAJOR/MINOR; 6 OBS (all carry-forwards/confirmations: keep the user-WIP benchmark mods OUT of the rc [the committed artifacts are the verdict-stable canonical set — verified: all six profile floor verdicts byte-identical committed-vs-WIP]; the extras-floors publish-time note; AX-003/AX-005 saturated in-tree with corpus-scale = the DATA-pillar Pass-2; no perf regression — the only .py change was 3 docstrings; PERF-RC-01 verified closed)."
+
+rc_mechanics:
+  version: "1.5.0rc1 (pyproject; was 1.4.0 — never tagged; CHANGELOG [1.5.0-rc.1] section added; classifier '4 - Beta' with the revert-at-final note)"
+  bump_commit: e7aed04
+  tag: "v1.5.0-rc1 — annotated, created via `make rc-tag` (the guarded target); LOCAL-ONLY VERIFIED: git ls-remote --tags origin shows zero v1.5.0-rc1 refs. NEVER push it — release.yml auto-publishes any pushed v*-rc* tag to TestPyPI."
+  artifacts:
+    wheel: "dist/pii_anon-1.5.0rc1-py3-none-any.whl — 0.608 MB (<= the 1.5 MB budget); ZERO test files inside (verified); sha256 618c4249f2020ab935c8c484ee631f43eaeed51452452f388eb57156ca38a871"
+    sdist: "dist/pii_anon-1.5.0rc1.tar.gz — sha256 0687d6a0b1d74e1687637af9796cb89b75ff6dd839f9c73147f7cf3fe69c9f72"
+  twine_check: "PASSED (both)"
+  published: false   # NOT uploaded anywhere; no tag pushed; branch pushes remain safe without --tags
+
+quality_at_close:
+  suite: "full xdist EXIT=0 @ 88.87% coverage (3816 collected = 3800 passed / 16 skipped / 0 failed) at the pre-bump HEAD; the bump is metadata-only (version sourced from package metadata — no code pins; the EP-sensitive suites re-verified green post-bump + post-editable-refresh)."
+  gates: "ruff clean (src+tests); mypy clean BOTH modes (144 files); make perf EXIT=0; make cli-smoke EXIT=0; make docs-smoke EXIT=0 (newly real since S7-05)."
+  pip_audit: "the ocr/dicom extras closure CLEAN (throwaway-venv, 2026-06-09)."
+  stage6: "DOCUMENTED (6/6 deliverables; 0 orphans across 51 IDs; API-matches-code post the D4 CATASTROPHIC fabrication catch + retry-1 close)."
+
+safety:
+  user_wip_md5_unchanged: true   # END-TO-END: orchestrator.py 0afc6deed62bbd0653ae1051b723bace, test_moe_enhancements.py 910e9cd66ad6e38c7bb64a9c51ecb1cb, docs/pii-rate-elo-value.md 89cc6d03…, docs/benchmark-summary.md e575a730…, README.md + benchmark artifacts — all byte-identical to session start; NONE staged into any program commit
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitive_supremacy.py 3b842e81c3f03eafd11f9c655c1789a0; canonical_run.py d8f0f80e113c3b5d59c06d0b5fd36fac
+  no_adversarial_close_required: "this session's stories touched no control-path artifact producer/consumer (per-story security-sast confirmations); the standing rule remains for any future competitive_supremacy.py / canonical_run.py / gate_v1.json change"
+
+session_ledger: >
+  This session (2026-06-09/10) closed: S6-04 (SO-20, 5/5 first-pass), S7-01
+  (SO-21, iter-2 after the zip-bomb MAJOR), S7-03 (SO-22, 5/5 first-pass),
+  S7-05 (SO-23, iter-2 after the phantom-filename MAJOR), Stage-6 Documentation
+  (DOCUMENTED, after the D4 CATASTROPHIC fabricated-contract catch), the
+  release gate (iter-2 6/6 after the traceability-debt MAJOR), and the RC
+  build. The gates caught FIVE real defects this session that authors missed —
+  the catch-net keeps earning its keep.
+
+next:
+  pass2_horizon: "full-census G6 (the headline); real Tier-C cloud runs; real-NUTS J; the real Tier-3 LLM adversary + >=385 DATA cohort; real LiRA@128 + canary splits; the query-aware DATA scorer + learned model; the S6-04 ORCH/DATA seams; real OCR/DICOM/ASR + span-level coords; corpus per-modality benchmarks + OS-matrix certification; the corpus fairness number + the CANONICAL fairness wire-in [MANDATES the adversarial SDO close]; the orchestrator wire-ins when the user-WIP clears (S2-03 + the router pre-filter + the pii-anon-itself predictor + reader capabilities); Papers 1 & 2 (sibling repos)."
+  publish_path: "when publishing for real: re-run pip-audit on the resolved closure; push the branch FIRST, then (and only deliberately) the tag — the rc tag routes to TestPyPI, a final tag to PyPI; revert the classifier at final 1.5.0."
+  program_state: "M4 (CODE v2) COMPLETE. The PDLC is formally closed for this release (Stage 6 DOCUMENTED + the RC ceremony done). Subsequent releases re-enter at the appropriate stage."

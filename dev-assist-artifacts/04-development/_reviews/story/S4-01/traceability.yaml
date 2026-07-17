@@ -1,0 +1,132 @@
+reviewer: traceability
+gate: story
+scope_id: S4-01
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: TRACE-S401-001
+    severity: MINOR
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md
+    description: >
+      No story-keyed S4-01 row binds the claimed IDs (FR-006/009/010, NFR-014/015)
+      to the new in-tree test evidence (tests/test_deid_families.py +
+      the G2 block in tests/test_competitive_supremacy.py). The matrix already
+      carries the UC-05/07/08 requirement row (line 25: FR-006/FR-009/FR-010 |
+      NFR-014/NFR-015) and design carries DC-08 (D-implementation-ready-design.md:18),
+      so the FR/NFR -> Story chain is documented at the requirement+design level;
+      only the Story -> Test backfill row is absent. This mirrors the established
+      S2-05 / S5-04 / S6-03 / S4-CS-01 precedent (none added a per-story matrix row
+      at the story gate).
+    suggested_resolution: >
+      Defer to the Sprint-4 gate matrix refresh: add one S4-01 row mapping
+      FR-006/009/010 + NFR-014/015 (+ DC-08, SDO G2) to the named tests, consistent
+      with prior sprint-gate backfill practice. No story-gate action required.
+    status: DEFERRED-TO-SPRINT-GATE
+  - id: TRACE-S401-002
+    severity: OBSERVATION
+    location: dev-assist-artifacts/00-axioms/project-axioms.yaml vs S4-01 story / tests
+    description: >
+      The story and tests cite the short axiom forms AX-004 / AX-002. The canonical
+      axioms file keys them as AX-pii-anon-004 (anonymization-pseudonymization-separation)
+      and AX-pii-anon-002 (deterministic-reproducible-pseudonymization). The short
+      forms are the established project shorthand (cross-walked in MANIFEST.md:134 and
+      used in requirements-document.md:92), so both IDs resolve to a canonical home;
+      this is not a tracing defect, recorded only for cross-reviewer clarity. Axiom
+      semantic adequacy is axiom-compliance's dimension.
+    suggested_resolution: >
+      None required. Optionally annotate the canonical long-form ID once in the story
+      header for first-time pickup; cosmetic.
+    status: OPEN
+context_bounds_respected: true
+notes: >
+  Scope: forward FR/NFR -> Story -> Test -> DC traceability for S4-01. Read-only;
+  no production/spec files altered. Verdict APPROVE — the chain is faithful and
+  in-tree.
+
+  ID EXISTENCE (requirements-document.md): FR-006 (line 16, MUST), FR-009 (line 20,
+  MUST), FR-010 (line 21, MUST), NFR-014 (line 75, MUST), NFR-015 (line 76, SHOULD)
+  — all present; the story's wording matches each row verbatim. AX-004 and AX-002
+  resolve to the canonical 00-axioms/project-axioms.yaml (AX-pii-anon-004
+  anonymization-pseudonymization-separation @ line 96; AX-pii-anon-002
+  deterministic-reproducible-pseudonymization @ line 43); short forms cross-walked in
+  MANIFEST.md:134. No declared ID is missing or deferred-to-v0.2+ (no SHOWSTOPPER).
+
+  DESIGN TRACE: DC-08 (D-implementation-ready-design.md:18) = "Distinct anon-vs-pseudo
+  scoring families (no-merge, CI guard test) -> FR-006/009/010, NFR-014/015" — exact
+  match to the story's Implements set. Test-ledger item "Distinct-family CI guard (no
+  merged de-id field)" present (design Verification section). SDO G2 chain RESOLVES:
+  doc-comment competitive_supremacy.py:29 (PENDING <- S4-01 scorers); successor label
+  _PENDING_SUCCESSORS["G2"] @ :121; the _pending_guarantee("G2", ...) placeholder is
+  REPLACED — :311 now calls _g2_pseudonymization_integrity(systems); pure three-valued
+  function implemented :526-605 (PASS/FAIL/PENDING, no fabrication). Tier-3 RRS seam
+  (bayes_bt.fit_rrs_posterior) consumed-not-changed (byte-identical per story Evidence;
+  out of my dimension to re-verify md5 — axiom/code-quality own that).
+
+  ID -> TEST mapping (names embed the IDs in docstrings; functions named per acceptance):
+    FR-006 -> test_a1_two_distinct_family_subrecords_no_merged_field,
+              test_a1_no_api_returns_a_single_combined_deid_number (deid_families)
+    FR-009 -> test_referential_integrity_100_when_consistent_mapping,
+              test_collision_rate_detects_two_plaintexts_sharing_one_surrogate,
+              test_empty_inputs_are_safe_defensive_defaults (deid_families)
+    FR-010 -> test_a2_no_merged_deid_field_in_deid_families_module,
+              test_a2_scorecard_has_no_merged_deid_field,
+              test_a7_two_families_do_not_import_each_other_in_a_merging_way (deid_families)
+    NFR-014 -> test_a3_unauthorized_reversal_zero_on_correct_key_path,
+               test_a3_unauthorized_reversal_has_teeth_wrong_key_succeeding_fails,
+               test_a3_wrong_key_that_fails_to_reverse_is_not_unauthorized (deid_families);
+               test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant (competitive_supremacy)
+    NFR-015 -> test_a4_artifact_alone_rejoin_is_flagged_fail_when_no_external_secret,
+               test_a4_external_secret_required_passes_key_state_separation (deid_families)
+    AX-004 -> test_a2_* (no-merge AST guard incl. non-vacuous meta-guard
+              test_a2_meta_guard_scan_is_non_vacuous + positive-separateness
+              test_a2_positive_separateness_both_families_addressable),
+              test_a7_anonymization_score_carries_no_pseudonymization_field
+    AX-002 -> test_a8_scorers_are_deterministic_on_identical_inputs,
+              test_g2_is_deterministic_on_identical_benchmarks
+
+  ACCEPTANCE A1-A9 -> named tests (each maps to >=1; verified by docstring A-tags):
+    A1 -> test_a1_two_distinct_family_subrecords_no_merged_field; test_a1_no_api_returns_a_single_combined_deid_number
+    A2 -> test_a2_no_merged_deid_field_in_deid_families_module; test_a2_meta_guard_scan_is_non_vacuous;
+          test_a2_positive_separateness_both_families_addressable; test_a2_scorecard_has_no_merged_deid_field;
+          test_a8_deid_families_imports_nothing_from_detection_layers
+    A3 -> test_a3_unauthorized_reversal_zero_on_correct_key_path;
+          test_a3_unauthorized_reversal_has_teeth_wrong_key_succeeding_fails;
+          test_a3_wrong_key_that_fails_to_reverse_is_not_unauthorized
+    A4 -> test_a4_artifact_alone_rejoin_is_flagged_fail_when_no_external_secret;
+          test_a4_external_secret_required_passes_key_state_separation
+    A5 -> test_g2_pass_when_pii_anon_pi_strictly_dominates_and_no_unauthorized;
+          test_g2_fail_when_present_but_not_dominant;
+          test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant;
+          test_g2_pending_when_fields_absent_never_fabricated;
+          test_g2_pending_when_only_one_family_field_present;
+          test_g2_teeth_non_vacuous_neutering_dominance_flips_pass_to_fail
+    A6 -> test_g2_real_artifact_stays_pending_and_verdict_not_yet;
+          test_g2_successor_label_names_s4_01_when_pending;
+          test_g2_pending_when_fields_absent_never_fabricated (shared A5/A6)
+    A7 -> test_a7_anonymization_score_carries_no_pseudonymization_field;
+          test_a7_two_families_do_not_import_each_other_in_a_merging_way
+    A8 -> test_a8_deid_families_imports_nothing_from_detection_layers;
+          test_a8_scorers_are_deterministic_on_identical_inputs;
+          test_g2_is_deterministic_on_identical_benchmarks
+    A9 -> test_a9_scorecard_preserves_privacy_score_and_adds_two_distinct_fields;
+          test_a9_scorecard_defaults_preserve_existing_leaderboard_shape
+  No acceptance clause is unmapped (no CATASTROPHIC: every claimed MUST has named test evidence).
+
+  PROVISIONAL_STATUS cascade: story = AGENT_SIMULATED. Source DC-08 is not marked
+  DIVERGED, so the DIVERGED cascade does not apply; AGENT_SIMULATED is the honest
+  state because the scorers + no-merge guard + G2 PASS/FAIL/PENDING run for real
+  in-tree against SYNTHETIC fixtures while a TRUE G2-on-real-data verdict is gated on
+  the S7 canonical run (Pass-2). Consistent with §9/§12/Evidence and the A6 invariant
+  (real-artifact verdict stays NOT_YET, G2 PENDING-on-missing-fields, no fabricated
+  PASS) — no provisional_status mismatch (no MAJOR on that axis).
+
+  Findings: TRACE-S401-001 MINOR (traceability-matrix S4-01 backfill row) deferred to
+  the Sprint-4 gate per S2-05/S5-04/S6-03/S4-CS-01 precedent; TRACE-S401-002 OBSERVATION
+  (axiom short-form vs canonical long-form — resolves, cosmetic). Out-of-dimension and
+  deferred to sibling reviewers: test-body semantic adequacy & threshold-meeting
+  (requirements-coverage / axiom-compliance), the known S4-CS-01 §5 Tier-R-half CLAIM_GRADE
+  predicate inconsistency (carried in axiom/coverage dimensions, untouched by S4-01), and
+  byte-identical md5 attestations (code-quality / axiom-compliance). Self-attested
+  independent: built the ID->test and A1-A9 mappings directly from requirements-document.md,
+  project-axioms.yaml, D-implementation-ready-design.md, competitive_supremacy.py, and the
+  two test files before reading the story's self-reported Evidence.

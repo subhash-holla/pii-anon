@@ -1,0 +1,98 @@
+sign_off_id: SO-14-phase-b-core-g5-audit
+date: 2026-06-04
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  Phase-B core: the three SDO G5 AUDIT inputs are LIVE in code — S6-02 (4-channel least-privilege
+  interception + no-raw-PII-persist), S5-01 (ReidAttack protocol + deterministic baseline + the attacks
+  import-boundary CI test), and S6-05 (leakage-Sankey + prompt-injection exfiltration resistance). Together
+  they are the agentic + re-identification audit surface the S7 canonical run consumes for G5's audit half
+  (the latency half is S7-04). Each passed the canonical 5-reviewer story gate; each had its substantive
+  findings remediated/polished in-loop. The SDO verdict is UNCHANGED — NOT_YET, binding
+  canonical_claim_run=False — these are FEATURE modules that write no benchmark artifact and flip no
+  guarantee on their own (G5 stays PENDING until the S7 canonical run emits the audit+latency fields and the
+  gate's _g5_* method is wired). dep: S5-04 sandbox substrate (DONE) + S6-03 AEAD store (DONE).
+
+stories_closed:
+  - id: S6-02
+    title: 4-channel least-privilege interception + no-raw-PII-persist (DC-13)
+    gate: _reviews/story/S6-02/synthesis.md   # 5/5 APPROVE (iter-2); 1 MAJOR (keyless-surrogate re-id) remediated
+    commits: { red: f47aa05, green: 88319bd, refactor: fab9b1e, remediation: 83b73bf }
+    implements: [FR-025, FR-026, AX-006, AX-002, AX-001]
+    effect: "new src/pii_anon/agentic/ package: AgentChannel{PROMPT,MEMORY,TOOL_IO,TRACE}, InterceptionRecord (no plaintext field), FourChannelGuard (_assert_no_raw_pii RAISES on leak; reversible channels persist surrogate→surrogate via the S6-03 AEAD store; TRACE never reverses by default — AX-006), InterceptionLedger (the G5 audit artifact). The surrogate is a KEYED HMAC-SHA256 (secure-by-default random per-instance key; injectable for the FR-030 reproducible path) — the iter-1 keyless-BLAKE2b was demonstrably dictionary-reversible. Built in a (stale-base) worktree, self-healed, ff-merged, remediated in-tree."
+  - id: S5-01
+    title: ReidAttack protocol + baseline re-identification body + attacks import-boundary test (DC-09)
+    gate: _reviews/story/S5-01/synthesis.md   # 5/5 APPROVE; 3 code-quality MINOR polished post-APPROVE
+    commits: { red: 59b8404, green: 68c5d67, refactor: 9aa39bc, polish: e569761 }
+    implements: [NFR-016, AX-001, AX-002]   # + the FR-011/FR-013 protocol foundation (real Tier-3=S5-02, real MIA=S5-03 = Pass-2)
+    effect: "new eval_framework/attacks/reid.py: @runtime_checkable ReidAttack + MiaAttack Protocols + BaselineDeterministicReidAttack (weighted-Jaccard, total-order ranking, AX-002) + score_reid_attack + reid_attack_runner (allow-listed, runs via run_attack_under_sandbox) + ReidSuccessMetrics with the non-strippable ANTI_ANONYMITY_CAVEAT (NFR-016, survives the sandbox export path). + the standing attacks import-boundary CI test (attacks ⊄ swarm/moe/fusion/policy). Re-done in the main tree after a worktree mis-allocation refused the parallel dispatch."
+  - id: S6-05
+    title: agentic leakage-Sankey + prompt-injection exfiltration resistance (DC-13)
+    gate: _reviews/story/S6-05/synthesis.md   # 5/5 APPROVE; 2 code-quality MINOR + 2 OBS polished post-APPROVE
+    commits: { red: 9b6b3c3, green: 5b35a12, refactor: [5d34c11, d23ca23], polish: 216a44c }
+    implements: [FR-028, FR-029, AX-002, AX-001]
+    effect: "new agentic/leakage_sankey.py: LeakageSankey (a 6-node flow graph: 4 source channels + blocked/leaked sinks; per-source-channel counts; non-circular — a leaked edge needs a verbatim survival of caller-supplied ground-truth, NEVER re-detection) + InjectionResistanceReport + score_injection_resistance (DATA build_payloads when the datasets extra is present, else an in-tree INERT base64/homoglyph/zero-width fallback; ASR vs benign-task-success). Consumes the S6-02 ledger."
+
+work_stream_gate_summary:
+  stories: 3
+  all_5_reviewer_gates: APPROVE
+  blocking_majors_remediated:
+    - "S6-02: keyless-BLAKE2b surrogate was dictionary-reversible (the G5 ledger wasn't de-identified) → keyed HMAC-SHA256 surrogate; the security reviewer re-ran its own break-probe → resists."
+  substantive_minors_polished:
+    - "S5-01: tightened REID_ATTACK_REGISTRY type → AttackCallable; single candidate_set_size cast; SAFETY note on the import-time sandbox-registry merge."
+    - "S6-05: explicit U+200B literal; DATA-path injection determinism property test; .strip() survivor guard."
+
+decisions_acknowledged:
+  - "The agentic G5 audit surface (interception ledger + leakage-Sankey + injection resistance) + the re-identification audit surface (ReidAttack baseline + non-strippable caveat) are LIVE in code — the FEATURE half of G5. They write no benchmark artifact; G5 becomes code-computable only when the S7 canonical run emits the audit+latency fields AND the gate's _g5_* method is wired (a tracked follow-up, analogous to S4-01/S4-03 for G2/G4)."
+  - "S6-02's no-raw-PII-persist (FR-026/AX-006) is enforced by a loud post-mask invariant; the auditable G5 ledger is genuinely de-identified (keyed surrogate). S5-01's NFR-016 anti-anonymity caveat is non-strippable through the full sandbox export path."
+  - "FR-011/FR-013 are HONESTLY a protocol foundation in S5-01 (the real Tier-3 LLM adversary = S5-02 Pass-2; the real LiRA@128 MIA = S5-03 Pass-2, DATA canary absent) — never over-claimed as discharged."
+  - "★ The worktree-isolated parallel-dispatch mechanism mis-allocated both worktrees to a STALE base (a prior session's .claude/worktrees/). One executor self-healed (ff to the right base, did the work, clean ff-merge); the other correctly REFUSED. The mechanism is UNRELIABLE in this environment → all remaining stories run SEQUENTIALLY in the main tree."
+  - "RISK-6 honoured: evaluation/competitor_compare.py byte-identical (md5 7cae16c89f4c97136e1a12394dae2025); the SDO gate competitive_supremacy.py NOT touched by any of the 3 stories; the S5-04 sandbox.py/spec.py + S6-03 encrypted_store.py + reidentification.py byte-identical (consumed read-only)."
+
+findings_waived_or_deferred:
+  - id: channel-taxonomy-4-vs-6 (S6-05)
+    disposition: spec-reconciliation-pass2-or-PO
+    detail: "FR-028 + UC-22 name 6 SOURCE channels (prompt/retrieval/tool/memory/output/trace); FR-025 + DC-13 specify 4 (the frozen AgentChannel). S6-05's 4-source/6-node Sankey faithfully implements the binding DC-13; widening to 6 SOURCE channels requires widening interception (S6-02/FR-025) — a PO/Pass-2 decision. retrieval+output leakage are NOT covered in v1. The leakage-Sankey channel set is extensible (derives from AgentChannel)."
+  - id: TRACE-matrix-backfill (S6-02 + S5-01 + S6-05 + standing S2)
+    disposition: deferred-to-sprint-gate
+    detail: "traceability-matrix.md forward Story/Test rows for S6-02 (FR-025/026/UC-20), S5-01 (NFR-016/UC-09), S6-05 (FR-028/029/UC-22-23), batched with the standing S2-01/02/04/05 + S4/S5-04 backfills."
+  - id: mappingproxy-immutability-hardening (S5-01)
+    disposition: deferred-to-S5-adversarial-close
+    detail: "ReidSuccessMetrics.as_outcome() + the import-time DEFAULT_ATTACK_REGISTRY merge return/mutate plain mutable dicts (a caller could strip the caveat from THEIR copy; the source object + exported AttackResult.outcome are non-strippable). Optional MappingProxyType hardening — probed at the S5 work-stream adversarial close."
+  - id: gate-is_finite_number-overflow (carried from SO-13)
+    disposition: deferred-to-S7-keystone-adversarial-close
+    detail: "The SDO gate's _is_finite_number shares the math.isfinite-on-unbounded-int gap (fail-loud crash, not a fabrication-pass). Harden as fabrication-vector #11 during the S7 canonical-run producer's MANDATORY adversarial close."
+
+sdo_verdict:
+  verdict: NOT_YET   # recomputed fresh via `pii-anon supremacy`; UNCHANGED
+  binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+  j_value: 1.0
+  j_source: mle-bootstrap
+  guarantees: { G1: PENDING, G2: PENDING, G3: PASS, G4: PENDING, G5: "PENDING<-S5/S6", G6: PASS, G7: FAIL }
+  note: >
+    The G5 audit FEATURES (S6-02/S5-01/S6-05) are now LIVE, but G5 stays PENDING — it becomes code-computable
+    only when the S7 canonical run emits the audit+latency fields AND the gate's _g5_* method reads them. The
+    #1 binding constraint is unchanged: the S7 canonical run (canonical_claim_run=True). NEXT: the ★ S7-02
+    keystone (emit G1/G2/G4/G7 from existing scorers → PROVISIONAL_SOTA; G5 PENDING until S7-04 latency + the
+    _g5_* wiring).
+
+quality:
+  suite: "3422 passed / 16 skipped / 0 failed (the S6-05 polish HEAD). Cumulative new owned-file cases: S6-02 24, S5-01 34, S6-05 30."
+  coverage: "87.55% (>= 84 gate); new modules: agentic/interception.py 100%, eval_framework/attacks/reid.py 100%, agentic/leakage_sankey.py 98%."
+  lint_type: "ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` / 135 files."
+  env: "AGENT_SIMULATED on the local .venv (pii_anon_datasets IS installed → S6-05's DATA payload path runs by default; cryptography IS installed → S6-02's AEAD store runs). Live-agent runtimes + real Tier-3/MIA runs are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, artifacts/benchmarks/*, README.md, docs/* all match session-start baseline
+  competitor_compare_byte_identical: true   # md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6)
+  byte_identical_preserved: "the SDO gate competitive_supremacy.py NOT touched; sandbox.py/spec.py (S5-04) + encrypted_store.py (S6-03) + reidentification.py consumed read-only, unchanged"
+  recall_floor_intact: true   # none of the 3 stories touch the detection/fusion/floor path
+  narrow_git_add_only: true
+  no_new_hard_dependency: true   # stdlib + the existing crypto/datasets optional extras
+
+next:
+  binding_objective: "★ S7-02 the canonical-run producer (canonical_claim_run=True) — emit G1 per-language ε + G2 anon/pseudo family fields + G4 calibration fields + G7 provenance from the EXISTING scorers (deid_families/selective_risk/per-language recall) → flips G7 + makes G1/G2/G4 compute real PASS → PROVISIONAL_SOTA. + the CanonicalRunGate (fail-closed) + the SO-11 contract test (competitors carry pseudonymization_integrity_score) + the MANDATORY adversarial close (incl. fabrication-vector #11, the _is_finite_number OverflowError hardening)."
+  deferred_features: "G5 code-computable (S7-04 latency ceilings + the gate _g5_* wiring) ; the remaining S5-02 (Tier-3 representative) / S5-03 (MIA representative) / S6-01 (query-aware heuristic) / S6-04 (BYO-SDK) — representative builds + Pass-2 flags; S7-01 (multimodal readers) ; S7-03 (multilingual fairness) ; S7-05 (docs)."
+  milestone: "M4 (CODE v2) advances — the agentic + re-identification G5 AUDIT surface is LIVE; the keystone (the canonical run) is next + is buildable now."

@@ -1,0 +1,143 @@
+reviewer: dev-assist-development-requirements-coverage
+
+scope_id: S6-05
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: coverage-S6-05-01
+    severity: MINOR
+    location: dev-assist-artifacts/04-development/02-stories/sprint-6/S6-05-leakage-sankey-injection-resistance.md:51
+    description: |
+      FR-028 (MUST) traces to UC-22, and UC-22 names the leakage-Sankey channel
+      taxonomy EXPLICITLY (04-use-cases.md:32): "per-channel leak counts
+      (prompt/retrieval/tool/memory/output/trace)" — six SOURCE channels. FR-028's
+      "leakage-Sankey, 6 channels" is therefore the UC-22 taxonomy, not an arbitrary
+      node count. S6-05 implements the per-channel accounting over the FOUR S6-02
+      AgentChannel sources (PROMPT/MEMORY/TOOL_IO/TRACE) + the {blocked, leaked}
+      sinks — a 6-NODE graph, but only a 4-SOURCE taxonomy. The two UC-22 sources
+      NOT covered are `retrieval` and `output`.
+
+      The per-channel-count INTENT of FR-028 is genuinely met and verified for the 4
+      implemented sources: A1 (test_fr028_a1_blocked_edges_sum_to_intercepted_total)
+      pins blocked edges summing to the ledger total; A4
+      (test_fr028_a4_blocked_edge_per_masked_record_on_its_channel) pins
+      counts_by_channel() per source incl. the negative (TRACE absent when no
+      record); A2 (test_fr028_a2_leaked_edge_when_known_value_survives_outbound)
+      pins counts_by_channel()[PROMPT][LEAKED]==1 on the correct source channel; A5
+      (test_fr028_a5_as_dict_renderer_shape_six_nodes +
+      _links_aggregate_per_channel_target) pins the renderer shape + per-channel
+      link aggregation. counts_by_channel() is directly exercised. The module is
+      genuinely extensible — _SOURCE_CHANNELS derives from AgentChannel, so a wider
+      source set plugs in without a module change (leakage_sankey.py:99).
+
+      The COVERAGE concern is narrow and procedural: the story §5 defers the wider
+      taxonomy ("widening the agent-channel source taxonomy beyond the S6-02 4
+      channels ... that's a documented follow-up") but names NO successor story
+      handle. A grep across all sprint-6/7 stories finds no story that adds the
+      `retrieval`/`output` sources, so the deferral is unscheduled. This is a
+      deferral-without-named-successor, not a silent gap (the story flags it openly
+      in §Traces + §5), and the WIDER-VS-NARROWER channel-taxonomy RULING is owned
+      by the traceability reviewer (per this reviewer's out-of-scope boundary and
+      the story §9 division of labour). Flagged here as the coverage-side hook so it
+      is not lost.
+    suggested_resolution: |
+      Either (a) record an explicit successor-story handle for the UC-22
+      `retrieval`+`output` source channels (e.g. an S7 / post-MVP follow-up id) in
+      story §5 and in the traceability matrix forward-row for FR-028, so the
+      deferral is scheduled rather than open-ended; OR (b) defer to the traceability
+      reviewer's ruling that the 4-source/6-node reading satisfies FR-028's
+      per-channel-count intent for the MVP, in which case annotate FR-028's
+      traceability row that the UC-22 6-channel taxonomy is partially covered
+      (4/6 sources) with the residual two sources logged as a known follow-up. No
+      production change is required to clear this finding — the per-channel
+      mechanism is fully implemented and tested; only the deferral's successor
+      handle is missing.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-028
+      - dev-assist-artifacts/01-discovery/04-use-cases.md#UC-22
+      - dev-assist-artifacts/04-development/02-stories/sprint-6/S6-05-leakage-sankey-injection-resistance.md#Traces
+
+notes: |
+  COVERAGE VERDICT: APPROVE. Both in-scope MUSTs are fully verified-in-tree at the
+  story's planned (AGENT_SIMULATED) bar; no silent gap. The single finding is a
+  MINOR procedural one (an unscheduled deferral of the UC-22 wider source taxonomy)
+  and the substantive RULING on it belongs to the traceability reviewer.
+
+  Per-MUST coverage assessment (claimed-vs-verified):
+
+  FR-028 (per-channel agentic leakage counts — leakage-Sankey — MUST, UC-22):
+  VERIFIED-IN-TREE for the 4-source/6-node reading. The per-channel leakage
+  accounting MECHANISM is genuinely tested, not asserted:
+    - A1 blocked edges sum to intercepted total: blocked_total == len(records())
+      (test_fr028_a1_blocked_edges_sum_to_intercepted_total).
+    - A4 blocked edge per record on its channel, via counts_by_channel(), incl. the
+      negative that a record-free channel carries NO count
+      (test_fr028_a4_blocked_edge_per_masked_record_on_its_channel).
+    - A5 renderer shape: as_dict() -> {"nodes":[...6...],"links":[...]}, links carry
+      per-(source,target) aggregated counts, JSON round-trips without leaking the raw
+      value (test_fr028_a5_as_dict_renderer_shape_six_nodes +
+      ..._links_aggregate_per_channel_target — a 2-span channel surfaces ONE link of
+      value 2).
+    - counts_by_channel() exercised directly (A2, A4) — the FR-028 per-channel
+      dict {channel: {blocked, leaked}} is the load-bearing accounting and it is
+      pinned.
+    - The leaked half is non-circular by construction and pinned A2/A3 (a leaked
+      edge only when a caller-supplied known_value survives; no survivor => 0 leaks;
+      an email-SHAPED-but-undeclared token => 0 leaks; empty known_values => 0).
+    Residual: only 4 of UC-22's 6 named sources are present (see finding 01).
+
+  FR-029 (prompt-injection exfiltration resistance: ASR vs benign-task-success —
+  MUST, UC-23): FULLY VERIFIED-IN-TREE. No gap.
+    - A7 ASR == 0.0 when the guard masks everything
+      (test_fr029_a7_asr_zero_when_guard_masks_everything).
+    - A8 ASR > 0.0 on a leaking guard, detected by the scorer's OWN caller-known-
+      value scan over masked_text (not a re-detection); plus ASR in [0,1] AND
+      strictly higher than the masking guard's
+      (test_fr029_a8_asr_positive_when_guard_leaks_a_raw_value +
+      ..._asr_is_a_unit_interval_rate).
+    - A9 benign-task-success tracked and == 1.0 for a well-behaved guard
+      (test_fr029_a9_benign_task_success_tracked) — the over-redaction half of the
+      "ASR vs benign-task-success" pairing is present.
+    - >=3 transform intents (base64 / homoglyph / zero_width) on the in-tree INERT
+      fallback with the datasets extra forced absent
+      (test_fr029_a10_in_tree_payloads_without_datasets_extra).
+    - The `direct` verbatim-exfiltration probe makes the ASR boundary meaningful (a
+      competent guard MUST mask the verbatim synthetic value; a leaky guard passes
+      it) and is HONESTLY excluded from intent_tags on BOTH the DATA and in-tree
+      paths, so the reported transform taxonomy never over-claims — pinned by
+      test_fr029_edge_intent_tags_name_only_obfuscation_transforms (n_payloads >
+      len(intent_tags)). The d23ca23 remediation that introduced this symmetry is a
+      coverage-honesty improvement, not a regression.
+    - PROMPT-channel scoping (guard.intercept(channel=PROMPT)) is consistent with
+      PROMPT-injection resistance / UC-23 — not a coverage gap.
+
+  PASS-2 / is_representative HONESTY (confirmed, not an over-claim): the
+  leakage-Sankey over the REAL S6-02 InterceptionLedger, the leaked-vs-blocked flow
+  accounting, and the injection-resistance scoring over INERT synthetic payloads ALL
+  run for REAL in-tree (29 tests pass). Only the live-agent runtime + real
+  transcript-residual leakage are deferred (InjectionResistanceReport.is_representative
+  defaults True; pinned by test_fr029_injection_report_defaults_is_representative_true).
+  The MECHANISM is verified in-tree; the live RUNTIME is the only deferred slice. The
+  AGENT_SIMULATED provisional_status is NOT DIVERGED (source DC-13 is AGENT_SIMULATED
+  per the S6-02 traceability cascade) — no DIVERGED Pass-2-commitment obligation
+  applies to this gate.
+
+  Evidence base: S6-05 acceptance module run clean (PYTHONPATH=src pytest
+  tests/test_agentic_leakage_sankey.py -> 29 passed). Read-only consumption of the
+  S6-02 surface confirmed: interception.py md5 7c306f41205c7bab38d907a4f29cee82,
+  orchestrator.py 0afc6deed62bbd0653ae1051b723bace, competitor_compare.py
+  7cae16c89f4c97136e1a12394dae2025, test_moe_enhancements.py
+  910e9cd66ad6e38c7bb64a9c51ecb1cb — all byte-identical to the story's claims.
+
+  Out-of-scope for this dimension (routed to siblings, noted not adjudicated):
+  the non-circular-leak SECURITY proof and the ASR scorer semantics -> security-sast
+  (PRIMARY); AX-001 INERT + AX-002 determinism + import isolation -> axiom-compliance;
+  the 4-vs-6 channel-taxonomy RULING -> traceability; test wording/structure ->
+  code-quality.
+
+review_time_seconds: 1500
+
+context_bounds_respected: true

@@ -1,0 +1,31 @@
+reviewer: requirements-coverage
+story: S5-02
+gate: story
+verdict: APPROVE  # was APPROVE_WITH_MINORS; both MINORs remediated in-loop (b3efaa9)
+summary: >
+  All 14 acceptance criteria (A1-A14) have ≥1 passing test (30 cases post-remediation,
+  0 failed). Every MUST in scope is verified-or-honestly-BUILD-AND-FLAGged with a
+  tracked Pass-2 successor: FR-011 (representative QIC+BSL adversary now; real
+  LLM/DATA = SWITCH-POINT Pass-2 — NOT silently claimed); NFR-012 (Wilson CI +
+  2-rung 385/897 ladder assertion-machinery now; real ≥385 cohort DATA-blocked +
+  tracked via traceability-matrix S6 blocking dep); NFR-016 (non-strippable caveat,
+  A9). FR-011 A2 stronger-than-baseline verified live as a genuine BSL-signal
+  consequence, not a rigged fixture.
+findings:
+  - id: RC-S5-02-01
+    severity: MINOR
+    title: FR-012 "non-stationarity" sub-clause neither covered nor explicitly deferred
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — story §5 now explicitly defers non-stationarity to Pass-2 with the real DATA cohort (FR-012 is a SHOULD; circularity + contamination controlled now).
+  - id: RC-S5-02-02
+    severity: MINOR
+    title: A6 Wilson interval pinned shape/bounds but not anchored to a reference value
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — added test_a6_wilson_interval_matches_textbook_reference pinning wilson_interval(2,10) == (0.0566809, 0.5098432).
+  - id: RC-S5-02-03
+    severity: OBSERVATION
+    title: FR-011 BUILD-AND-FLAG is honestly scoped (the SWITCH-POINT markers are real)
+    disposition: NO ACTION (informational; NFR-013 full-power MIA is the adjacent S5-03 coverage delta).
+offlimits_md5_ok: true
+notes: >
+  No MUST left unverified-and-untracked. No DIVERGED FR/NFR in scope (NFR-012 is
+  PERSONA-CONDITIONAL-accepted with the 385/897 refinement, implemented verbatim).
+  No SDO close required (competitive_supremacy.py untouched).

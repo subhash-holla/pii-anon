@@ -1,0 +1,207 @@
+# S6-03 — encrypt the token store at rest (reversible-pseudonymization vault, AEAD-at-rest)
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. One iteration.
+gate: story
+scope_id: S6-03
+final_iteration: 2
+date: 2026-06-01
+aggregate_verdict: APPROVE   # iter-2 final. iter-1 was 5/5 APPROVE; the adversarial close returned a completeness-FAIL (no upheld confidentiality break) → iter-2 closed the gaps + re-gated APPROVE.
+
+# ── ITER-2 AMENDMENT (adversarial-close-driven) ──────────────────────────────────────────────
+# The iter-1 5-reviewer gate (below) returned 5/5 APPROVE, and the adversarial close (wqhzndsp3) confirmed
+# the CORE confidentiality + fail-loud guarantees HOLD (not-plaintext-on-disk, KEK/DEK-never-on-disk,
+# single-byte-tamper raises, wrong-KEK get raises, determinism, anon≠pseudo wall — all re-verified, NO break).
+# But the completeness critic returned FAIL on test-parity + two non-confidentiality integrity gaps:
+iter2_adversarial_close:
+  trigger: "Workflow wqhzndsp3 — completeness=FAIL (no upheld confidentiality refutation; S6-03 plaintext-recovery + integrity refuters both broken=false)."
+  gaps_closed:
+    - id: REQCOV-S603-PARITY
+      severity: substantive (unverified DoD §12 clauses)
+      description: "DoD §12 (d) no-unsafe-deserialization / (e) no-subprocess/shell-out / (g) random-96-bit-nonce-no-reuse were TRUE by construction but had ZERO committed tests (vs S2-05's 4 AST sink tests + S5-04's 8)."
+      remediation: "FIX-A: committed AST sink-scan test (mirrors the strengthened S5-04 matcher incl. getattr/import_module indirection) + non-vacuity meta-guard + json-only-serializer pin + nonce-distinctness (60 puts + 50 re-puts all distinct)."
+      status: REMEDIATED-AND-REVERIFIED
+    - id: SEC-S603-AAD-COLUMNS
+      severity: integrity-hardening (NOT a confidentiality/forgery break — each surfaced only the row's OWN genuine plaintext)
+      description: "scope_index + expires_at were NOT in the AEAD AAD, so a raw sqlite3 UPDATE could mis-bucket a row's list_by_scope audit-enumeration (scoped get stayed blind-index-bound, not foolable) or resurrect a logically-expired row."
+      remediation: "FIX-B: AAD now binds key_id|blind_index|version|scope_index|expires_at (None as a distinct canonical sentinel); all read paths decrypt BEFORE the TTL short-circuit (a tampered-then-expired row fails loud, can't be masked by TTL). scope_index-relocation + expires_at-extend/NULL now raise TokenStoreIntegrityError; legitimate rows still decrypt."
+      status: REMEDIATED-AND-REVERIFIED
+    - id: REQCOV-S603-WRONGKEK
+      severity: SHOULD (NFR-015 consistency)
+      description: "Under a wrong KEK, scoped get() raised but list_by_scope() returned [] silently."
+      remediation: "FIX-C: list_by_scope now fails loud (via _raise_if_unreversible, no lock re-acquire) when rows exist but no key unwraps; genuinely-empty scope still []; count() no-scope stays a documented deliberate raw COUNT(*) (cardinality already leaked by file size) + pinned test."
+      status: REMEDIATED
+  reclose:
+    workflow: wy3urfrhc
+    result: "reclose_pass=true; S6-03 re-refuter all_closed (scope_index-relocation/expires_at-tamper/wrong-KEK-list_by_scope all RAISE; not-plaintext-on-disk + single-byte-tamper + determinism + legit-rows + rewrap_all all still hold); security-sast re-review APPROVE (0 new MAJOR+); integration PASS."
+    suite: "3097 passed / 15 skipped / 9 deselected / 0 failed (exit 0)"
+    coverage: "86.85% (≥84); encrypted_store.py 100%"
+    quality: "ruff clean; mypy --strict clean / 127 files"
+    owned_tests: "72 (iter-1 55 + iter-2 +17)"
+    tdd: "RED d949fab (5 behaviour pins fail on iter-1 code: 4 FIX-B + 1 FIX-C) → GREEN de98c68 → docs bec26fd; RED-before-GREEN git-confirmed"
+    aad_format_prerelease: "EncryptedSQLiteTokenStore is a NEW never-released class (commit 1f91c8a predates no release tag); the AAD-format change is migration-free; AAD helpers have zero callers outside the owned file+test (self-contained)."
+  iter2_observations_accepted:   # security-sast, non-blocking, pre-existing, NOT confidentiality/reversal breaks; Pass-2 hardening notes
+    - "created_at is outside the AAD (a raw UPDATE can forge it) but it gates nothing (not key selection / TTL / bucketing) — purely an audit timestamp."
+    - "Post-rotation mixed-key partial-read: reopening with a provider that unwraps only the newer key id silently OMITS older-key rows from list_by_scope (results non-empty → fail-loud guard skipped). Part of the dual-version rotation-grace model; omits rows, NEVER reveals wrong plaintext."
+  iter2_reviewers_carried: >
+    Re-reviewed security-sast (PRIMARY) → APPROVE on the AAD-fold + the FIX-A parity tests + FIX-C; requirements-coverage
+    re-confirmed via the integration sweep (new_tests_present=true — the committed AST + nonce tests exist and pass).
+    code-quality re-confirmed via integration (RED-before-GREEN git-verified, ruff + mypy clean, scope-disciplined — only
+    encrypted_store.py + its test touched). traceability / axiom-compliance iter-1 APPROVE carried forward (no FR/NFR/trace
+    change; the fixes strengthen AX-006 no-raw-PII-persist + NFR-014/015 integrity; AX-002/AX-004 not regressed). Mirrors the S4-CS-01 iter-2 pattern.
+# ── end iter-2 amendment ; the iter-1 record (which stands, with the gaps noted above) follows ──
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add)
+  - code-quality
+  - security-sast          # PRIMARY (security MUST: crypto + persistence/load path)
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:      "b67befd  # test: pin FR-019/FR-026/NFR-014/NFR-015 encrypted token vault (A1–A9) — module absent"
+  green:    "1f91c8a  # feat: EncryptedSQLiteTokenStore (AEAD-at-rest token vault)"
+  refactor: "36358f0  # refactor: dedup row-encode/row-write helpers (behaviour-identical)"
+  review:   "efbeecd  # docs: IN_PROGRESS → REVIEW (DoD + Evidence)"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor b67befd 1f91c8a → true; RED fails on ModuleNotFoundError: pii_anon.tokenization.encrypted_store
+  off_limits_byte_identical: "store.py, providers.py, reidentification.py, key_manager.py, pii_anon/__init__.py — ALL git diff --quiet UNCHANGED and absent from the b67befd^..36358f0 range (verified by 3 reviewers + orchestrator)"
+
+owned_files:
+  new: [src/pii_anon/tokenization/encrypted_store.py, tests/test_encrypted_store.py]
+  additive: [src/pii_anon/errors.py (TokenStoreIntegrityError(TokenizationError)), src/pii_anon/tokenization/__init__.py (append-only __all__ exports)]
+
+reviewers:
+  - reviewer: security-sast      # PRIMARY
+    verdict: APPROVE
+    notes: >
+      Independently verified (not just re-read claims): A2 raw-.db byte scan + per-column dump — synthetic
+      plaintext / token / "EMAIL_ADDRESS" ABSENT, value columns BLOB ciphertext. AEAD correct: AESGCM default,
+      fresh CSPRNG 96-bit nonce per encryption (standalone harness: 50/50 distinct nonces, no reuse). DEK
+      envelope-wrapped → neither KEK nor DEK on disk (incl. _keys envelope). Tamper (single-byte + @given 120-ex
+      property + row-relocation AAD mismatch) + wrong-KEK BOTH fail loud via TokenStoreIntegrityError; tampered
+      row on the scope-less _get_scan path RAISES (no silent-skip). Adjudicated design note #1 (post-lookup
+      _raise_if_unreversible guard cleanly separates absent→None from wrong-key→raise; satisfies A4/NFR-015) and
+      #2 (AAD binds key_id‖blind_index‖version; blind_index=HMAC(scope‖token) is injective per (scope,token) so
+      relocation-equivalent — independent cut-and-paste swap raises). No unsafe-deserialization (json over an
+      explicit field dict), no subprocess/shell-out/process-spawn, no eval/exec, no network, no hard-coded real
+      key (synthetic KEKs confined to tests/). No new dependency (pyproject delta is sibling-story). 0 MAJOR+.
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED-before-GREEN git-confirmed; RED touches only test+story; REFACTOR single-file behaviour-identical.
+      ruff All-checks-passed on the 4 owned files (46 pre-existing scripts/*.py errors out of scope, none owned).
+      mypy --strict Success / 124 files. 55 owned tests pass. encrypted_store.py 100% (285 stmts/52 branches,
+      0 missed). Every public symbol docstringed; the 3 optional-dep `type: ignore` lines mirror providers.py:13.
+      Scope-disciplined (5 byte-identical files unchanged). 2 non-blocking MINOR (see findings).
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      FR-026/AX-006 → A2 not-plaintext-on-disk (+ BLOB-ciphertext). NFR-014 → A3 tamper (unit+property+relocation)
+      + A4 wrong-key, fail-loud at _decrypt_payload InvalidTag→raise. NFR-015 (SHOULD, "advances") → A4 +
+      rewrapped-db-decrypts-only-under-new-key + _raise_if_unreversible (hand-traced: empty live-keys → None for
+      absent, re-raise for unreversible — correct absent/wrong-key split). FR-019 → A5 rotation + rewrap_all +
+      list_key_ids() audit + envelope-stores-only-wrapped_dek. FR-027 (SHOULD) HONESTLY DEFERRED (scope-as-session
+      -key today; ergonomics a follow-up) — not falsely claimed. No unmapped MUST/DoD clause.
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      Declared IDs all exist (FR-019:31 MUST, FR-026:39 MUST, NFR-014:75 MUST, NFR-015:76 SHOULD, FR-027:40 SHOULD).
+      Design trace resolves: DC-04:14, DC-13:23/49, SME Security MAJOR #2 :56, test-ledger "Token-store-encrypted-
+      at-rest test" :69. A1–A9 each map to ≥1 named test; test names embed fr_019/fr_026/nfr_014/nfr_015/ax_002/
+      ax_004 (greppable). provisional_status AGENT_SIMULATED correctly marked (Pass-2 KMS honesty). 1 MINOR
+      (matrix backfill) DEFERRED-TO-SPRINT-GATE per the S2-05/S4-CS-01 precedent.
+  - reviewer: axiom-compliance
+    verdict: APPROVE   # 0 findings
+    notes: >
+      All 5 axioms verified against the live diff + git history. AX-006 (headline, no-raw-PII-persist) UPHELD:
+      every sensitive field AEAD-encrypted, scope/token only as keyed HMAC blind indexes, key access in-process
+      only (zero process-spawn/shell-invocation — the "subprocess"/"shell-out" hits are docstring prose declaring
+      absence). AX-001 UPHELD (synthetic PII + synthetic test KEK in tests/ only; no key bytes in src/). AX-002
+      UPHELD (surrogate is the unchanged upstream DeterministicHMACTokenizer; random nonce does not perturb it;
+      A6 pins identical-token + identical-plaintext end-to-end). AX-004 UPHELD (imports nothing from
+      anonymizer/evaluation/scoring — evaluation/ exists so the guard forbids a real path; A7 reversible-only
+      surface, no anon-score attr). AX-003 NOT_APPLICABLE (zero detection/floor/router code in the range).
+      domain_packs:[] → no pack-extension catalog merged.
+
+findings:
+  - id: SAST-S603-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    location: src/pii_anon/tokenization/encrypted_store.py (module docstring) + S6-03 §2/§5
+    description: >
+      Documented conscious residual: the keyed blind index HMAC(index_key, scope‖token) reveals EQUALITY of
+      (scope,token) pairs (needed for O(1) lookup). Equality over derived pseudonyms, NOT PII; index_key is
+      DEK-derived and never persisted, so a .db-only attacker cannot compute it. A no-equality-leak deployment
+      can flip to the documented decrypt-and-scan (O(n)) switch-point. No breach.
+  - id: SAST-S603-OBS-2
+    severity: OBSERVATION
+    status: REVIEWER-ERROR-CORRECTED
+    location: S6-03 Evidence (cryptography version string)
+    description: >
+      security-sast flagged the Evidence string "cryptography 48.0.0" as possibly wrong (it measured 44.0.3).
+    remediation: >
+      Orchestrator verified ground truth directly in the .venv: `python3 -c "import cryptography;
+      print(cryptography.__version__)"` → 48.0.0. The Evidence is ACCURATE; the reviewer's 44.0.3 reading came
+      from a non-.venv interpreter probe. No Evidence change needed. (Both ≥41 satisfy the [crypto] extra; the
+      AEAD primitives are advisory-clean on both.)
+  - id: CQ-S603-MINOR-1
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: src/pii_anon/tokenization/encrypted_store.py:208 (_new_aead -> Any)
+    description: >
+      `_new_aead` returns AESGCM | ChaCha20Poly1305 which share no exported Protocol/ABC in `cryptography`, so
+      `Any` is the narrowest mypy-strict-clean type; codebase convention asks for a brief justifying comment.
+    disposition: >
+      Non-blocking polish (reviewer rated advisory). The `Any` is structurally unavoidable and call-sites use
+      typed .encrypt/.decrypt. Optional 1-line comment can land at the S6 sprint gate; not a substantive defect.
+  - id: CQ-S603-MINOR-2 / TRACE-recurring
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: tests/test_encrypted_store.py (+ tests/test_moe_gate_*.py from S2-05)
+    description: >
+      A recurring cross-story convention finding: some test names use acceptance-clause / robustness names rather
+      than embedding the FR/NFR ID (the repo's test_fr_NNN_ convention). IDs are present in docstrings + class
+      names + (here) many test names are already fr_019/fr_026-prefixed.
+    disposition: >
+      Advisory; the trace chain is faithful (traceability APPROVE). Not forcing a bulk rename. Candidate for a
+      batch test-naming cleanup at the S2/S6 sprint gate. (Cross-reviewer pattern shared with S2-05 CQ-S205-MINOR-1.)
+  - id: TRACE-S603-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md (FR-019/NFR-014/NFR-015 :32, FR-026/AX-006 :34)
+    description: "S6-03 Story/Test columns not yet backfilled (matrix defers DC/Story/Test to Stages 3-5)."
+    disposition: "Acceptable at story gate; backfill at the S6 sprint gate — mirrors S2-05 / S4-CS-01."
+  - id: REQCOV-S603-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "AAD-bound `version` int not independently tamper-tested, but a version flip lands on the identical AAD-mismatch→raise path that row-relocation already proves. Not a coverage hole for the MUST."
+  - id: REQCOV-S603-OBS-2
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "FR-027 (SHOULD) session-pseudonym ergonomics follow-up has no named successor-story id. Acceptable for a SHOULD at a story gate; worth a sprint-plan line so it isn't silently dropped."
+
+cross_reviewer_patterns:
+  - pattern: "honest Pass-2 / no-over-claim boundary"
+    raised_by: [security-sast, requirements-coverage, traceability, axiom-compliance]
+    detail: "Four reviewers independently affirm real KMS/HSM/OS-keyring custody is correctly Pass-2 behind the EnvelopeKeyProvider seam (StaticTestKeyProvider stand-in); FR-027 honestly deferred; nothing claimed as real-KMS."
+  - pattern: "test-name FR/NFR-ID greppability"
+    raised_by: [code-quality]
+    detail: "Recurring with S2-05 CQ-S205-MINOR-1; non-blocking, batch-cleanup candidate at the sprint gate."
+
+outcome:
+  invariant: >
+    The reversible-pseudonymization token vault now persists every sensitive field under AEAD (AESGCM default,
+    ChaCha20Poly1305 selectable), per-row fresh 96-bit nonce, AAD-bound rows (relocation-resistant), an
+    envelope-wrapped DEK (KEK never on disk), a keyed blind-index for O(1) lookup, key rotation + rewrap_all, and
+    fail-loud TokenStoreIntegrityError on InvalidTag (tamper / wrong-key / row-relocation all raise; absent token
+    → None). Additive EncryptedSQLiteTokenStore(TokenStore) — the plaintext-leaking SQLiteTokenStore + providers/
+    reidentification/key_manager + pii_anon/__init__ stay byte-identical; orchestrator unchanged (it already
+    accepts any TokenStore). Discharges SME Security MUST #2 (FR-026/AX-006 cleartext hole closed).
+  tests: "full suite 2993 passed / 15 skipped / 9 deselected / 0 failed (exit 0); 55 owned tests passed"
+  coverage: "86.55% (≥84); encrypted_store.py 100%; errors.py 100%"
+  quality: "ruff clean (owned); mypy --strict 0 errors / 124 files"
+  safety: "5 byte-identical files unchanged; user-WIP md5 unchanged; narrow git add only; NO new dependency (cryptography>=41.0 already in [crypto]); no orchestrator edit"
+  provisional_status: "AGENT_SIMULATED — AEAD round-trip / tamper / not-on-disk / wrong-key / rotation / determinism run for real in .venv (cryptography 48.0.0) against a synthetic test KEK; real external key custody (cloud KMS/HSM/OS keyring) is Pass-2 (never simulated as real)."
+
+followups:
+  - "Feeds the SDO G5 sub-condition: S4-CS-01 reads a key-custody/interception presence flag from S6 (auditable key rotation present)."
+  - "S6 sprint gate: backfill traceability-matrix S6-03 Story/Test columns; add a sprint-plan line for the FR-027 session-pseudonym ergonomics follow-up; optional _new_aead justifying comment + batch test-naming cleanup."
+  - "Pass-2: real KMS/HSM/OS-keyring custodian behind EnvelopeKeyProvider; a one-shot SQLiteTokenStore→EncryptedSQLiteTokenStore .db migration utility (non-goal here)."

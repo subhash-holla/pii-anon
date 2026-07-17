@@ -115,3 +115,34 @@ def test_cli_main_importerror_path(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert "CLI dependencies are not installed" in str(exc.value)
+
+
+def test_supremacy_deeply_nested_artifact_does_not_traceback(
+    runner, tmp_path: Path
+) -> None:
+    """[SECURITY-TEST] S7-02 final close: a deeply-nested JSON artifact made ``json.loads`` raise
+    ``RecursionError`` (NOT a ``JSONDecodeError``), bypassing the CLI's JSON-parse catch ⇒ a raw
+    RecursionError traceback out of the shipped ``supremacy`` command. The CLI must emit a clean
+    error + non-zero exit, never leak a RecursionError."""
+    app = create_app()
+    deep = tmp_path / "deep.json"
+    deep.write_text("[" * 60000 + "1" + "]" * 60000, encoding="utf-8")
+    result = runner.invoke(app, ["supremacy", "--artifact", str(deep)])
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, RecursionError)
+
+
+def test_supremacy_directory_artifact_does_not_traceback(
+    runner, tmp_path: Path
+) -> None:
+    """[SECURITY-TEST] S7-02 close-10: a DIRECTORY artifact path passes the CLI's
+    ``path.exists()`` guard (a directory exists) but ``path.read_text()`` raises
+    ``IsADirectoryError`` — a subclass of ``OSError`` NOT in the JSON-parse except tuple
+    ``(json.JSONDecodeError, RecursionError)`` — so it leaked a raw traceback out of the
+    shipped ``supremacy`` command. The CLI must emit a clean error + non-zero exit, never
+    leak an OSError/IsADirectoryError. (Mirror of the deeply-nested RecursionError case
+    above; ``tmp_path`` is itself a directory.)"""
+    app = create_app()
+    result = runner.invoke(app, ["supremacy", "--artifact", str(tmp_path)])
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, (IsADirectoryError, OSError))

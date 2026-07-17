@@ -1,0 +1,35 @@
+reviewer: requirements-coverage
+story: S7-01
+gate: story
+iteration: 2
+verdict: APPROVE  # 0 MAJOR/MINOR; OBSERVATIONS are tracked carry-forwards
+runs: wf_44f8b3ae-51b (iter-1) -> wf_2d10a313-630 (iter-2); transcribed from the workflow structured results
+summary: >
+  Every in-scope MUST behavior has a named passing anchor at the story's
+  planned representative bar; every deferral carries a tracked successor
+  seam. FR-031 REAL (uniform Iterator[IngestRecord] across the five
+  modalities); FR-032 split honest (text round-trip REAL+pinned A12; native
+  reconstruction supports_reconstruction=False, Pass-2); FR-033
+  representative (page-granular source_coords, # SWITCH-POINT(COORDS));
+  FR-034 representative harness (A10, # SWITCH-POINT(DATA)); FR-035
+  teeth-proven gate (A11 degraded-reader FAIL); NFR-026 LOUD degradation
+  (A7/A8). FR-037/NFR-022 (SHOULD) deferred-with-tracking.
+findings:
+  - id: requirements-coverage-story-01
+    severity: OBSERVATION
+    location: story provisional_status + §5
+    description: FR-037/NFR-022 OS-matrix certification deferred to Pass-2 with the benchmark-layer machinery noted; no MUST gated on it.
+    suggested_resolution: List the portability-certification successor in the Sprint-7 Tier coverage snapshot as deferred-with-successor.
+    disposition: CARRY-FORWARD to the sprint snapshot.
+  - id: requirements-coverage-story-02
+    severity: OBSERVATION
+    location: native.py supports_reconstruction defaults; tests A10/A12
+    description: >
+      FR-032 (native reconstruction) and FR-034 (corpus-scale recall) are
+      satisfied at the REPRESENTATIVE bar only — both must remain open
+      MUST-board rows with named Pass-2 successors; do not mark either
+      fully-verified at the release gate on S7-01 alone.
+    suggested_resolution: Keep FR-032-native + FR-034-corpus open on the MUST board flagged representative-this-sprint.
+    disposition: CARRY-FORWARD to the MUST board / release gate.
+context_bounds_respected: true
+offlimits_md5_ok: true

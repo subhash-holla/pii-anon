@@ -1,0 +1,248 @@
+{
+ "synthesis": {
+  "candidates": [
+   {
+    "rank": 1,
+    "title": "Title-Case-phrase PERSON_NAME FP suppression stack (field-label position veto + common-word filter + evidence requirement)",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "ai4privacy-400k",
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "tab-echr",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "Single largest precision lever, present in 5/5 datasets: 369 (ai4p, ~40% of strict FPs) + 5,906 (nemotron, 71% of all FPs) + 8,270 (gretel, 71% of all FPs) + 680 (TAB) + 364 (home) = ~15,589 vanilla strict FPs, plus ~965 adjacent ORG-heading FPs (gretel 637 industry-noun headings, nemotron 328 org-on-headers) if the same heading/label-position veto is shared. Home benefits directly (364 of its 1,019 FPs are this class).",
+    "implementation_sketch": "Three stacked suppressors in the capitalized-run PERSON recognizers: (a) field-label position veto \u2014 reject a Title-Case phrase immediately followed by ':' or '|', or wrapped in markdown '**'/heading markers (pairs with candidate 11's structure pass, or cheap local char checks); (b) common-English-word filter \u2014 reject when ALL tokens sit in a corpus-frequency list (derivable from public prose or upstream TRAIN splits, never test gold); (c) start-of-run stopword/determiner/role-noun guard ('The Court', 'On', 'United States District') + require a given-name-lexicon or honorific evidence token for context-free bare bigrams. Share the heading/list-position veto with the ORGANIZATION industry-noun pattern.",
+    "risk": "This is a masking-path suppressor, so the failure direction is under-masking real names that happen to be common words ('Summer Rose'); mitigate by requiring label-position OR all-tokens-common rather than either alone, and keep the given-name-lexicon override. Gate on the home floor: home R must stay >= 0.9022 (expected net home gain since 364 home FPs are this class and home gold names are conventional). Not an eval-time-only drop \u2014 intrinsic detector precision rule, sp2 leak-direction rule satisfied but the residual under-mask risk must be documented in the assurance report."
+   },
+   {
+    "rank": 2,
+    "title": "Per-(engine,type) single-engine acceptance in swarm fusion (replace the blanket SEMANTIC_TYPES corroboration gate)",
+    "kind": "swarm-fusion",
+    "datasets_hit": [
+     "ai4privacy-400k",
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "tab-echr",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "Largest measured recall headroom in the program: TAB union counterfactual regex\u222agliner\u222apresidio lifts relaxed R 0.091\u21920.582 and F2 \u22480.10\u2192\u22480.55 (7,160 gold); ai4privacy gliner pre-fusion matches 597/1436 gold but only 298 survive (\u2248300 reachable spans thrown away); gretel prose probe loses 152/780 gliner-matched gold post-fusion (street_address-dominant \u2014 attacks the 726-span largest gretel FN class); nemotron probe discards 26 IoU-1.0 gold hits per 30 records; home discards 30 incl. conf 0.93\u20130.95 findings.",
+    "implementation_sketch": "In src/pii_anon/swarm.py Layer 4: replace the blanket SEMANTIC_TYPES corroboration gate (corroboration_min=2 / meta>=0.85, structurally unreachable because the logistic fallback caps single-engine non-regex meta_score at sigmoid(2*ds_conf-1.5)<=0.62) with per-(engine,type) acceptance priors: admit single-engine gliner PERSON_NAME/STREET_ADDRESS/DATE_OF_BIRTH/USERNAME/PHONE above per-type confidence thresholds derived from dev/TRAIN alone-precision (gliner PERSON alone-P 0.911 TAB / 0.393 ai4p); keep gating gliner-only PASSWORD (alone-P 0.10, 302 preds/30 hits). Add post-fusion plausibility gates for admitted ML findings: word-boundary span starts (fixes mid-word 'Col<<leen Redding>>'), calendar-valid dates (fixes DATE_TIME on '1526-32-18-49'), alphabetic-word requirement for LOC-typed findings (fixes 46 home LOC-on-base64/EIN FPs). Keep FloorProjectingFusion untouched.",
+    "risk": "Precision crater if acceptance is blanket rather than per-(engine,type) \u2014 the ai4privacy PASSWORD evidence is the cautionary case. Floor invariant holds by construction (FloorProjectingFusion still re-injects the regex floor, so swarm >= vanilla). Direction is additive recall = safe over-masking on the production path (no sp2 leak-direction concern). Thresholds must be tuned on dev/TRAIN splits only. Home gate re-run mandatory (home swarm already carries +67 FPs; the plausibility gates should net-reduce them)."
+   },
+   {
+    "rank": 3,
+    "title": "Labeled-field value extractor: shared tolerant cue-to-value bridge + label-wins type arbitration + cue-capture hygiene",
+    "kind": "new-capability",
+    "datasets_hit": [
+     "ai4privacy-400k",
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "tab-echr",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "~2,570 FNs + ~500 FPs across 5/5 datasets from one shared component: nemotron 614 adjacency-broken + 701 cue/value-class-narrow + 111 DOB-cue = 1,426; ai4p 121 bare-numeric-after-label + labeled-card/date subsets \u2248 200; gretel 218 keyword-gated ID types; TAB 328 docket 'no. NNNNN/YY' + 149 'born in YYYY'; home \u2248250 (encoded-in-labeled-field 63, DOB-cue 38, config credentials 23, income 33, phone-over-labeled-account 68, tax-id arbitration 27). FP side: nemotron 192 cue-captures-label-word, gretel 124 + ai4p 39 + home 9 username common-word grabs.",
+    "implementation_sketch": "One shared cue\u2192value bridge used by ALL cue-gated patterns: tolerate inline markdown ('**','__'), copula/preposition tokens (is|was|of), appositive commas, XML tags, quotes, and config key:value forms between cue and value; enforce word boundary after the cue token (kills 'Patient Id<<entification>>'); widen value classes behind a strong cue to generic alphanumeric-with-dashes with dictionary-word veto and digit-required shapes for id types; field-label lexicon \u2192 entity type with 'label wins' arbitration over bare-format readings (fixes phone-over-account, tax-id-as-national-id, passport-context bare-9-digit, and types base64/percent-decoded values from the label not the shape). Cue-synonym inventories derived from upstream TRAIN splits (nemotron TRAIN must be downloaded \u2014 only the test parquet is local) and public field-name vocabularies, never test gold or generator templates.",
+    "risk": "Additive recall = safe leak direction; type-override changes labels, not coverage, so masking is preserved either way. Precision bounded by the keyword gate; the hygiene half (word boundaries, value-shape vetoes) is a masking-path suppressor and needs the home floor check. Anti-template guard: cue lexicons from TRAIN/public sources only."
+   },
+   {
+    "rank": 4,
+    "title": "Adapter label plumbing: PresidioAdapter native-label normalization + GLiNERAdapter label-set extension (organization, location/city, occupation)",
+    "kind": "swarm-fusion",
+    "datasets_hit": [
+     "tab-echr",
+     "gretel-finance-multilingual",
+     "ai4privacy-400k",
+     "nemotron-pii"
+    ],
+    "expected_impact": "Cheapest change with the widest reach: presidio solo already scores TAB relaxed R=0.530 (DATETIME 0.918 \u2192 attacks the 2,240-span prose-date class; LOC 0.678 \u2192 487 toponyms; PERSON 0.692; NRP 0.234 \u2192 501 demographics) and ZERO of it survives because its labels never normalize; gliner emits zero city/location findings on ai4p (119-span class) and zero organization findings anywhere (gretel 594 + TAB 421+526 + nemotron 294 + home 95 org FNs have no ML channel at all). With both engines emitting ORG/LOC, cross-engine corroboration (count>=2) passes even under today's gate \u2014 standalone value before candidate 2 lands.",
+    "implementation_sketch": "PresidioAdapter: add a native-label normalization map (PERSON\u2192PERSON_NAME, LOCATION\u2192LOCATION, DATE_TIME\u2192DATE_TIME, NRP\u2192NATIONALITY, ORG\u2192ORGANIZATION) so presidio findings key into PRED_MAP, corroborate gliner instead of splitting the type vote, and survive emission. GLiNERAdapter (src/pii_anon/engines/gliner_adapter.py): add 'organization'/'company', 'location'/'city', and 'occupation' to _PII_LABELS + _LABEL_MAP \u2014 config-level edits. While in the adapter, verify the window-offset anchoring bug evidenced by the mid-word 'Col<<leen Redding>>' span (tests/test_gliner_windowing_sp4.py seam).",
+    "risk": "More ML findings entering fusion grows the FP surface wherever fusion admits them \u2014 measure per-type and sequence before candidate 2's acceptance-policy change. Home floor invariant unaffected (purely additive channel; floor projection intact). No leak-direction concern (additive)."
+   },
+   {
+    "rank": 5,
+    "title": "Natural-language + locale date grammar and DOB-cue promotion",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "tab-echr",
+     "gretel-finance-multilingual",
+     "ai4privacy-400k",
+     "nemotron-pii",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "~2,670 FNs across 5/5: TAB 2,240 prose dates (79-82% of ALL its DATETIME gold) + 149 'born in YYYY'; gretel 74 day-first/legal/tz forms; ai4p 59 ordinal/textual DOBs; nemotron 111 DOB-behind-markdown; home 38 cue-adjacent ISO DOBs. Also converts nemotron's 158 date-on-date_of_birth FPs into TPs.",
+    "implementation_sketch": "Add a month-name date family to DATE_TIME/DATE: day-Month-year ('27 May 1994'), Month-year, 'Month d, yyyy', ordinal 'Nth of Month' and legal '1st day of January, 2023', date ranges, and 'yyyy-mm-dd hh:mm:ss TZ'. DOB-cue window promotion: re-type DATE_ISO/DATE_TIME to DATE_OF_BIRTH when a birth cue ('born', 'DOB', 'date of birth') is within ~30 chars or the value sits in a DOB-labeled field (rides candidate 3's bridge for markdown-broken cues); uncued dates keep the existing honest drop.",
+    "risk": "Low: promotion is strictly cue-gated so the ambiguous-date honest-projection discipline stays. Boundary lesson from gretel's presidio evidence \u2014 strip leading stopwords/determiners from date spans ('no later than March 20, 2023') to avoid manufacturing FP+FN pairs. No leak-direction issue (additive)."
+   },
+   {
+    "rank": 6,
+    "title": "Name grammar and span hygiene: Unicode token classes, honorific/rank+initial forms, salutation/role-token strip, document-level mention propagation",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "ai4privacy-400k",
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "tab-echr",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "~2,600 combined FN+FP across 5/5: TAB 402 initial-truncation ('Mr E.' vs 'Mr E. Abrahamson') + 81 rank+initial + 145 prose names (28 diacritic, 5 all-caps) + ~731 boundary-echo FPs; gretel 483 name-shape (87 non-ASCII, 52 ALL-CAPS, 15 hyphenated, 136 single-token); nemotron 468 single-token labeled/appositive names; ai4p 78 salutation-absorbed FPs + share of 207 rare-name FNs; home 150 bare coreferent mentions + 50 FN/64 FP boundary absorption.",
+    "implementation_sketch": "Unicode letter classes (diacritics, internal hyphen/apostrophe joins) replacing ASCII [A-Z][a-z]+; 'Title? Initial. Surname' continuation incl. ALL-CAPS and diacritic surnames; honorific/rank+initial grammar ('Mr X.', 'Corporal G'); salutation/honorific strip-list + leading role-token stoplist (Email/User/Contact/Employees) at span starts; ALL-CAPS name path gated to labeled/party fields (SWIFT :50K:/:59: handled by candidate 3's tag gating); stop capitalized runs bleeding across role nouns ('Commission', 'Delegate'); document-level mention-propagation second pass \u2014 index accepted PERSON_NAME tokens, re-scan for standalone token/honorific+surname mentions (pure additive pass).",
+    "risk": "Mention propagation trades FNs for FPs on corpora with inconsistent mention-level gold (home's own gold-noise note) \u2014 flag to the eval-data owner before tuning against it. Single-token acceptance must stay lexicon/label/greeting-gated or it re-opens the Title-Case FP front that candidate 1 is closing. Salutation-strip must align with per-corpus honorific conventions (home gold sometimes includes 'Ms. Sanchez' \u2014 pick one convention, normalize at eval adapter)."
+   },
+   {
+    "rank": 7,
+    "title": "Numeric-identifier guard and validator bundle (GPS plausibility, left-prefix guard, bare-9-digit gating, IMEI/Amex, IBAN mod-97, BIC country check, honeypot demotion)",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "tab-echr",
+     "ai4privacy-400k",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "~2,050 FPs across 5/5, each guard spec-derivable: GPS-family 1,095 (nemotron 377 on dd/mm-and-ratings, gretel 662 on money amounts at P=0.013, TAB 36 on article numbers, home 20 on slash-dates over DOB gold); document-serial-as-phone 76; IMEI-as-card 56; bare-9-digit SSN ~300 (ai4p 43 + gretel 187 + nemotron customer-ids); digit-run-inside-larger-identifier 231; digit cross-label 71; IBAN 21 + SWIFT_BIC 19; 9 home honeypots.",
+    "implementation_sketch": "GPS: require >=3 decimal places on both components OR a coordinate cue/hemisphere/degree marker; drop '/' as a separator; reject currency-prefixed and date-embedded candidates; add the hemisphere-suffixed format ('40.7234 N, 123.1235 W') the FN side needs. Left-boundary guard: reject numeric candidates glued to '[A-Z]{2,}-' prefixes or whose leading group parses as 20YY MM. Bare-9-digit SSN: require 3-2-4 separators or positive SSN context; negative-context vetoes (IMEI/passport/SKU/serial/room/routing). Constrain 15-digit PANs to Amex IINs (34/37). IBAN mod-97 + country whitelist; BIC positions 5-6 against ISO-3166 + keyword-or-bank-prefix requirement. Honeypot 'not a(n) <type>' parentheticals: confidence DEMOTION surfaced to policy, never a silent drop on the masking path (sp2 leak-direction rule).",
+    "risk": "All masking-path suppressors \u2014 bounded because every guard is checksum/spec-based rather than statistical, but each needs a home-floor regression check (home nets positive: slash-date-as-coordinates alone is 20 home FPs plus 20 recovered DOB FNs). The honeypot rule is the one sp2-sensitive item: implement as demotion/report-side, exactly per the recorded leak-direction showstopper."
+   },
+   {
+    "rank": 8,
+    "title": "Organization/institution capability: contextual cue grammar + person/place/org family arbitration",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "tab-echr",
+     "gretel-finance-multilingual",
+     "nemotron-pii",
+     "home-v2.2.0",
+     "ai4privacy-400k"
+    ],
+    "expected_impact": "~1,930 FNs (gretel 594 suffixless/ALL-CAPS orgs, TAB 421 unmodeled institutions + 526 institutions eaten by the person heuristic, nemotron 294, home 95) plus ~760 FPs from the same mechanism's FP face (TAB 667 institution-as-person, ai4p 95 family confusion) \u2014 one arbitration fix credits both ledger lines. ML channel arrives via candidate 4; this is the regex/arbitration arm.",
+    "implementation_sketch": "Institution-keyword arbitration in the existing eval_cross_type_arbitration seam: a capitalized run containing Court/Ministry/Board/Commission/Directorate/University/Hospital/Agency demotes PERSON_NAME and emits ORGANIZATION. Employment/party/provider cue grammar: 'at/against/v./Provider:/Employer:/CARRIER:/Issued by:' governs the org reading of a capitalized phrase and outranks person. Grammar widening: comma-before-suffix ('Lines, Inc.'), '&/and Sons|Associates' internal markers, ALL-CAPS org after party-role labels. Corporate-suffix arbitration drops org-shaped spans from person output. Preposition/residence-verb arbitration (in/at, 'resides in') sends places to LOCATION not GIVENNAME.",
+    "risk": "Arbitration flips labels on spans that get masked either way \u2014 leak-safe. Over-demotion could cost person recall on institution-word surnames ('Bank', 'Church'); keep the keyword list institutional and require the keyword to head or tail the phrase. Cross-dataset regression on all 5 plus home gate before accepting."
+   },
+   {
+    "rank": 9,
+    "title": "Geo gazetteer + location granularity subtypes (city/state/county/country)",
+    "kind": "new-capability",
+    "datasets_hit": [
+     "nemotron-pii",
+     "tab-echr",
+     "ai4privacy-400k"
+    ],
+    "expected_impact": "~1,540 FNs: nemotron 712 state/county/country spans currently unreachable by taxonomy + part of 220 bare address components; TAB 487 bare toponyms (LOC relaxed recall today 0.022); ai4p 119 place-name gaps. Same gazetteer suppresses the county-as-person FP family ('Hays County', 'Angels Camp' as GIVENNAME) feeding candidates 1 and 8.",
+    "implementation_sketch": "Public-source gazetteer packs (countries, US states, counties, GB/US towns) as high-precision lexicon patterns; split the single LOCATION native into city/state/county/country subtypes with projection-map updates in the eval adapters; preposition/residence-verb context arbitration for person-vs-place; pairs with candidate 4's gliner 'location' label so prose toponyms outside the gazetteer still have an ML channel.",
+    "risk": "Gazetteer FPs on person-named places and place-named people \u2014 context arbitration required, not bare lexicon firing (the sp3 label-gating lesson for categorical types applies). Taxonomy split touches the native label census \u2014 FR-040-style label-gating discipline and adapter re-mapping needed; no leak-direction issue (additive)."
+   },
+   {
+    "rank": 10,
+    "title": "Address grammar rework: evidence-gated open grammar (suffixless recall + year-guard precision)",
+    "kind": "vanilla-pattern",
+    "datasets_hit": [
+     "gretel-finance-multilingual",
+     "nemotron-pii",
+     "ai4privacy-400k",
+     "tab-echr"
+    ],
+    "expected_impact": "~1,370 spans: gretel 726 suffixless-topographic addresses (its largest FN class; 1,573/2,194 full-split gold have no listed suffix) + nemotron 220 bare components + ai4p 44 street-name-only spans, PLUS 377 TAB FPs from the same house-number branch being simultaneously too loose ('1997 the Regional Court') \u2014 which also releases 331 TAB DATETIME FNs the bad match consumes.",
+    "implementation_sketch": "Rebuild the house-number branch as evidence-gated: house-number + 1-4 capitalized tokens accepted only with at least one of {street-type lexeme, unit/floor/Apt/Suite tail, postcode/city comma-structured tail, address-label context}; explicitly reject when the number parses as a 4-digit year followed by a determiner. Street-suffix-anchored street-grain sub-span emission (Road/Lane/Close/Drive) alongside the composite; '<street>, <City>, <ST> <5-digit>' composite emitting city/state/zip sub-spans (pairs with candidates 9 and 12).",
+    "risk": "The gretel-loosen vs TAB-tighten tension is the core design risk \u2014 the evidence-gate resolves it on paper but demands regression on all 5 datasets plus the home floor (home addresses are conventional, low risk). Additive on recall, and the year-guard is a precision fix on a provably wrong branch."
+   },
+   {
+    "rank": 11,
+    "title": "Offset-preserving document-structure + Unicode normalization pre-pass (markdown/table awareness; confusable/invisible/encoded recovery generalized to all classes)",
+    "kind": "new-capability",
+    "datasets_hit": [
+     "nemotron-pii",
+     "gretel-finance-multilingual",
+     "home-v2.2.0",
+     "ai4privacy-400k"
+    ],
+    "expected_impact": "Substrate multiplier for candidates 1 and 3 rather than a standalone count: nemotron alone has 2,627 header/label-position FPs and 291 markdown-broken labeled-value FNs that this pass makes cheaply detectable; gretel's table/markdown registers and home's config forms same. Direct home adversarial recovery: 161 spans (invisible-char 73, encoded-in-labeled-field 63, homoglyph 20, OCR-confusable 5) by generalizing the sp3 five-type recovery to ALL entity classes.",
+    "implementation_sketch": "Extend the existing sp3 offset-preserving strip seam into a shared pre-pass before all engines: (a) structure pass \u2014 strip '**'/'__'/heading markers with offset re-projection and expose field-label-vs-value and table-cell/column-header position signals to recognizers; (b) Unicode pass \u2014 UTS#39 confusable skeleton, zero-width/bidi strip, base64/percent decode for labeled fields (typing from the label per candidate 3), OCR digit-letter map extended to SSN/checksummed digit positions ('8earer' precedent). All spec-derivable mechanisms, no dataset lexicons.",
+    "risk": "Offset re-projection bugs corrupt emitted spans \u2014 this touches masking-path integrity and needs the strongest test discipline of any candidate (adversarial-close per the SDO catch-net rule if it touches producer paths). Impact counts overlap candidates 1/3 \u2014 do not double-book. The Unicode half's mined counts are home-only; it qualifies via the domain-general-capability arm of the bar (obfuscation robustness, spec-derivable), not cross-dataset counts."
+   },
+   {
+    "rank": 12,
+    "title": "Eval-harness scoring adapters: component sub-span emission, one-to-many projection, nested containment credit, declared-type scoring row",
+    "kind": "eval-harness",
+    "datasets_hit": [
+     "nemotron-pii",
+     "ai4privacy-400k",
+     "gretel-finance-multilingual",
+     "tab-echr"
+    ],
+    "expected_impact": "~2,200+ booked FN/FP pairs that are measurement artifacts, not detection failures: token-split name gold (nemotron 901 FN + 418 FP, ai4p 139+123, gretel ~116) where the correct full-name detection scores as FP+FN simultaneously; ipv6-as-ipv4 and fax-as-phone projection (~250 across nemotron/gretel); nested IP-in-URL (28); gretel's 45.3%-of-FPs partial-annotation mass gets an honest per-declared-type metrics row; TAB gets an entity-level row beside its maskability score.",
+    "implementation_sketch": "Detector-side (convention-neutral, additive): emit given/family sub-spans alongside the full-name span, and absorb attached ALLCAPS scheme prefixes (MRN-/INV-) into identifier spans. Eval-side in the external_eval adapters: one-to-many pred_map support (IP_ADDRESS\u2192{ipv4,ipv6}, PERSON_NAME\u2192{name,first_name,last_name}, PHONE\u2192{phone,fax}); nested-span containment credit; per-record declared-type scoring row for gretel; dual-row reporting (strict conventional + adapted) \u2014 never replace the strict row.",
+    "risk": "sp2 leak-direction rule is the governing constraint: every one of these lives eval/report-side or is additive detector output; nothing here may condition production masking on eval configuration. Honesty risk is overstating gains \u2014 mitigate by always publishing the unadapted strict row alongside."
+   },
+   {
+    "rank": 13,
+    "title": "Layer-3 calibration re-fit with per-(engine,type) reliability features (prose-domain coverage)",
+    "kind": "swarm-retrain-feature",
+    "datasets_hit": [
+     "tab-echr",
+     "ai4privacy-400k",
+     "gretel-finance-multilingual",
+     "nemotron-pii",
+     "home-v2.2.0"
+    ],
+    "expected_impact": "Trained-path alternative/complement to candidate 2, addressing the same measured discard mass: the logistic fallback caps single-engine non-regex meta_score at sigmoid(2*ds_conf-1.5)<=0.62 (below the 0.85 override), and the trained ds_params/temperature/informativeness in ~/.pii_anon/swarm push prose-engine scores under the 0.50 emission threshold \u2014 so even a 0.95-confidence gliner finding dies. Reachable mass identical to candidate 2's counterfactuals (TAB F2 \u22480.10\u2192\u22480.55 union bound).",
+    "implementation_sketch": "Re-fit the DS/calibration parameters on a prose-heavy dev mixture (dev/TRAIN splits only) with per-(engine,type) reliability features so calibrated confidence, not a hand threshold, decides single-engine emission; add engine-alone-precision priors as model features. Only pursue if candidate 2's policy-level priors prove too coarse in Phase-B measurement.",
+    "risk": "Recorded precedent says meta-learner training was NOT worth it (floor-locked to core) \u2014 the mined evidence changes the question (calibration is now the identified discard mechanism), but sequencing discipline applies: policy fix (candidate 2) first, retrain second. Training data must be dev/TRAIN only (leak rule); floor invariant re-verified and the full home gate + adversarial-close re-run after any producer-path calibration change."
+   }
+  ],
+  "swarm_channel_evidence": "Every miner independently measured the same channel loss: pool engines find gold that fusion then discards, on all five datasets. ai4privacy-400k: GLiNER pre-fusion relaxed-matches 597/1436 gold spans (1,520 mapped preds; alone P=0.393/R=0.416) but only 298 survive SwarmFusionStrategy \u2014 per-label hit_pre\u2192survived: GIVENNAME 150\u219263, TELEPHONENUM 74\u219242, DATEOFBIRTH 44\u21929, STREET 40\u21927, USERNAME 43\u21929, PASSWORD 30\u21924, CREDITCARDNUMBER 24\u219211, IDCARDNUM 15\u21920, DRIVERLICENSENUM 16\u21925; gliner ALONE dominates the fused swarm on both precision and recall on this prose set. Nemotron (30-record probe): 69/124 gliner findings (56%) absent from the fused output, 26 of the discarded spans hitting reachable gold at IoU 1.0 \u2014 labeled passwords ('**Temporary Password:** b9M!k7Lp#5nXz3'), usernames (zakaria.ramos), born-on DOBs, single-token first names \u2014 precisely the top regex FN classes. Gretel (150-record prose probe, 780 gold): 152 gold spans gliner matched were LOST post-fusion (sampled 60: street_address 44, name 13), sitting directly on the largest gretel FN class (726 suffixless addresses); gliner's surviving contribution is boundary precision (strict name +691 tp full-split). TAB/ECHR (all 127 judgments): fusion discards 442/892 (49.6%) of gliner's gold-matching PERSON findings despite gliner alone P=0.911 (PERSON relaxed R 0.755 vs pipeline 0.447); presidio solo reaches relaxed R=0.530 (DATETIME 0.918, LOC 0.678, PERSON 0.692, NRP 0.234) and ZERO survives \u2014 verified on doc 0 that 63 presidio + 5 gliner findings in yields a fused output of exactly the 29 regex findings; union counterfactual regex\u222agliner\u222apresidio: relaxed R 0.091\u21920.582, P 0.171\u21920.452, F2 \u22480.10\u2192\u22480.55. HOME: 30 gold spans raw gliner finds are absent post-fusion, including conf 0.95 ('Johann Sebastian von Hohenberg') and conf 0.93 (ISO DOB) \u2014 confidence alone cannot clear the gate. Mechanism, located in src/pii_anon/swarm.py Layers 3-4: (a) the SEMANTIC_TYPES corroboration gate (corroboration_min=2, meta>=0.85 override) is structurally unreachable for single-engine non-regex candidates because the logistic fallback caps meta_score at sigmoid(2*ds_conf-1.5)<=0.62; (b) emission_threshold=0.50 kills most single-engine non-semantic candidates (IDCARDNUM 15\u21920); (c) Layer-3 trained calibration (~/.pii_anon/swarm ds_params/temperature/informativeness) pushes prose-engine scores under threshold; (d) PresidioAdapter emits PERSON/LOCATION/DATE_TIME/NRP verbatim with no native-label normalization, so presidio both splits the type vote and cannot corroborate gliner; (e) FloorProjectingFusion re-injects only regex spans, locking the swarm to the regex floor on prose; (f) GLiNERAdapter._PII_LABELS carries no location/city, organization, or occupation label, so entire gold families (ai4p CITY, gretel/TAB/nemotron ORG, nemotron occupation/demographics) have zero ML channel regardless of fusion. Alone-precision priors for Phase-B threshold design: gliner PERSON 0.911 (TAB) vs 0.393 (ai4p overall); gliner PASSWORD 0.10 (302 preds/30 hits \u2014 must stay gated). Where ML findings DO pass, the measured FP cost is boundary/plausibility, not existence: gretel +364 (gliner name fragments at hyphen/initial boundaries, presidio date phrase-extents), nemotron +42 (DATE_TIME on malformed ids like '1526-32-18-49'; mid-word-anchored 'Col<<leen Redding>>' \u2014 a window-offset anchoring bug to check in gliner_adapter.py), home +67 (46 NER LOC labels on base64/EIN opaque fragments). Phase-B should therefore combine per-(engine,type) single-engine acceptance priors + presidio label normalization + gliner label-set extension + post-fusion plausibility/boundary gates (word-boundary span starts, calendar-valid dates, alphabetic-word requirement for LOC), with FloorProjectingFusion untouched so the home floor invariant holds by construction. TAB probe artifacts: scratchpad mine_tab.py / engine_probe.py / gliner_discarded.json under /private/tmp/claude-501/-Users-subhashholla-Development-pii-anonymize-pseudonymize-pii-anon-core-pii-anon-code/a02504b7-c72d-487f-bb5b-7d1686e50fcc/scratchpad/.",
+  "dropped_as_nongeneral": [
+   "ai4privacy TAXNUM-vs-SOCIALNUM same-surface collisions (18 FN + 19 FP per detector): gold-structural \u2014 identical SSN surface '181-01-0747', undecidable in-format",
+   "ai4privacy scrambled non-Luhn / 17-19-digit CREDITCARDNUMBER golds (~15): gold noise; a correct Luhn validator cannot and should not reach them (the labeled subset is recovered honestly by candidate 3)",
+   "ai4privacy BUILDINGNUM standalone house-number type (62): single-benchmark span convention \u2014 a bare house-number entity would be noise-positive in production, stays disclosed-unreachable",
+   "ai4privacy misc gold-noise strata (~4-6% of FN mass, ~5% of FP mass): month/2-digit DOB golds ('May/18'), list-valued single spans, template residue '[ USERNAME_35 ]', semantically-wrong-slot placeholders",
+   "nemotron blank-placeholder and label-text-as-value gold (19): underscore runs and 'Temporary Password' header text annotated as PII values \u2014 gold noise",
+   "nemotron unreachable-type taxonomy adds (time/date_time/customer_id/unique_id/http_cookie/employment_status/language/blood_type, 1,060): single-benchmark taxonomy scope; candidate 3's labeled-field capture picks up the labeled subset (customer_id also in gretel) without minting new native types",
+   "nemotron generic-URL type (500): single-benchmark convention \u2014 URL_WITH_PII is a deliberate semantic subset; adding a plain-URL type is a product-scope decision, not a mined defect",
+   "nemotron fax-as-phone (84+84) and ipv4/ipv6 projection splits: label-projection convention; handled eval-side by candidate 12's one-to-many maps, no detector change \u2014 the values are already masked correctly",
+   "gretel partial-annotation-by-design FP mass (45.3% of all FPs, 5,254/11,601 vanilla): gold limited to each record's declared pii_types \u2014 real unlabeled PII scores as FP; addressed only as candidate 12's declared-type scoring row, never tuned against",
+   "gretel template placeholders as gold ('[Tenant's Full Name]', '______________', 'MM/DD/YYYY'; ~200 full-split, 62 sampled): unfindable by design \u2014 gold noise",
+   "gretel role/description nouns labeled name/company ('safety inspector', 'customer service department'; ~85 full-split): gold noise",
+   "TAB all-annotator-NO_MASK entity hits (913): task-definition mismatch \u2014 document-level maskability judgment, not span detection; a doc-level maskability layer is out of this cycle's scope, reported beside an entity-level row instead",
+   "TAB free-standing bare years (153) and spelled-out person/event counts (~175 'fifteen others'): identifying-force requires document-level reasoning; pattern-chasing would be precision-suicidal",
+   "TAB MISC catch-all (454) and union-of-annotators duplicate-type slots (446 slots, 6.2% of gold): taxonomy/annotation structure \u2014 no native honestly corresponds to 'any other identifying description'",
+   "TAB DURATION expressions (205) and bare monetary amounts (292, with home's income-label subset going to candidate 3 instead): quasi-identifier maskability is a policy/doc-level decision; single-dataset for the bare-amount type \u2014 deferred",
+   "TAB honorific-inclusion boundary convention (357): absorbed by relaxed matching \u2014 scoring convention, do not chase (the initial-truncation half IS real and lives in candidate 6)",
+   "TAB 1-2-letter periodless PERSON gold and the mis-anchored sentence-initial 'A' (~33 spans): annotation noise floor (~1-2% of PERSON gold), unreachable by any precision-safe detector",
+   "HOME pseudonymous @handles by paired-profile design (46): corpus-design convention \u2014 masking a pseudonym is safe over-masking; annotation-policy question filed to the dataset owner",
+   "HOME gold under-annotation (~202 FPs/detector, ~20%): repeat mentions, all MAC addresses in audit_log, 'NN-year-old' ages, facility names \u2014 gold noise, filed to the eval-data owner as a mention-completeness generator pass",
+   "HOME Luhn-invalid credit cards (3) and area-666 SSN (1): the generator emits invalid instruments; the validators are correct \u2014 reported, not chased",
+   "HOME typed-format value under generic label (23: notary-license-as-DL, report-tag-as-employee-id): flagged template-specific by the miner \u2014 generator convention, explicitly not pattern-chased per the no-template-anchor rule",
+   "HOME docket-vs-case sibling split (10): corpus labeling convention between two sibling native types; alias at the projection layer only if TRAIN counts confirm interchangeability",
+   "HOME masked-tail span convention (12-16 swarm FPs): last-4-only gold convention vs whole-masked-span emission \u2014 post-fusion span normalization noted, but the convention itself is single-corpus"
+  ]
+ },
+ "miners": [
+  {
+   "dataset": "ai4privacy-400k validation/1en via ds_ai4privacy400k.py (seeded common.subsample SEED=20260710, cap 1200 -> 1200 records, 1436 gold spans; rates cross-check the recorded 5000-record runs: van strict R 0.170 vs 0.1675, swm 0.200 vs 0.1987)",
+   "fn": 14,
+   "fp": 9
+  },
+  {
+   "dataset": "nemotron \u2014 nvidia/Nemotron-PII test split (locale=us, 50,000 records), seeded 1200-record subsample via common.subsample(SEED=20260710); both detectors run zero-shot; failure sets mined under the relaxed criterion (same mapped label, IoU>=0.5, greedy 1:1). Totals: vanilla tp=3306 fp=8306 fn=6966; swarm tp=3311 fp=8348 fn=6961. Only the test parquet is local \u2014 any lexicon/threshold proposed below must be derived from the upstream TRAIN split (not yet downloaded).",
+   "fn": 14,
+   "fp": 11
+  },
+  {
+   "dataset": "gretelai/synthetic_pii_finance_multilingual (English_test) via ds_gretel.py \u2014 seeded subsample(SEED=20260710) cap=1200 of 2891; relaxed matching (IoU>=0.5 same mapped label). Sample-level relaxed: vanilla tp=2697 fp=11601 fn=2563 (P=0.189 R=0.513); swarm tp=2809 fp=11973 fn=2451 (P=0.190 R=0.534) \u2014 matches the recorded full-split runs. KEY REFRAME of the briefing question: the FP spray is NOT concentrated in the structured formats \u2014 fixed-field docs (SWIFT/MT940/BAI/FIX/EDI/CSV/XBRL/FpML/ISDA) hold only 13.9% of FPs and actually score HIGHER precision (P=0.210 R=0.410) than prose/forms (P=0.185 R=0.538). The precision killer is corpus-wide: 71% of ALL FPs are PERSON_NAME on Title-Case financial vocabulary. The structured formats instead drive the RECALL side (ALL-CAPS values, bare tag values, single-token CSV cells).",
+   "fn": 8,
+   "fp": 9
+  },
+  {
+   "dataset": "TAB/ECHR echr_test via ds_tab.py \u2014 all 127 real court judgments, 7160 gold spans (union-of-annotators maskable set); scored strict + relaxed(IoU>=0.5 same-label) per common.py; mechanism mining joined at strict with tier diagnostics (boundary/partial/label-confusion/missed)",
+   "fn": 13,
+   "fp": 7
+  },
+  {
+   "dataset": "HOME corpus (pii-anon-eval-data v2.2.0) DEV split, language=en \u2014 1200 seeded records (SEED=20260710, common.subsample) of 15510; strict exact scoring against LABEL_MAP-projected native predictions. Measured on this sample: vanilla P=0.8735 R=0.9022 F2=0.8963 (tp=7039 fp=1019 fn=763); swarm P=0.8669 R=0.9063 F2=0.8981 (tp=7071 fp=1086 fn=731).",
+   "fn": 17,
+   "fp": 15
+  }
+ ]
+}

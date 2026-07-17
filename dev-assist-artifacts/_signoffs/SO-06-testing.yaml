@@ -1,0 +1,25 @@
+signoff_id: SO-06-testing
+date: "2026-05-30"
+type: stage-transition          # Testing stage COMPLETE (produced the release-readiness verdict)
+stage_transition: "05-Testing → Documentation"
+policy: po-required
+signer: AGENT_SIMULATED
+project: pii-anon (pii-anon-code, library pillar)
+
+inputs:
+  - dev-assist-artifacts/05-testing/release-readiness-report.md
+  - dev-assist-artifacts/05-testing/03-nfr-verification/nfr-verification-matrix.md
+  - dev-assist-artifacts/05-testing/02-architecture/test-architecture.md
+
+verdict:
+  shipped: "SHIP-WITH-CAVEATS — recall-floor foundation (DC-01 SharedLayerProjector): real, 7/7 green incl. 2000-case property test, mypy --strict clean, non-regressing, discharges FR-016/NFR-011/AX-003 by construction. Caveat: production wiring into both fusion strategies is the immediate successor (S1-02)."
+  deferred: "DEFER — full 4-theme redesign (~29 stories S1-02..S7; several block on eval-data S6). 22 NFRs DEFERRED-with-successor; 0 FAIL."
+  nfr_tally: "2 VERIFIED + 2 PARTIAL + 22 DEFERRED + 0 FAIL"
+
+caveats:
+  - "Published benchmark numbers remain a 50-sample smoke run (canonical_claim_run=False) -> PROVISIONAL until canonical run (S7) + significance repair (S3-04)."
+  - "Security MUST stories gate agentic/attacks rollout: gate-artifact signing (S2-05), token-store encryption-at-rest (S6-03), attack-harness sandbox (S5-04)."
+
+pass2: "All requirements AGENT_SIMULATED. Latency + Tier-3 re-id thresholds require real-data Pass-2 before claim-grade; no agent-simulated cohort may substitute (methodology invariant). a11y = N/A (Python API + CLI)."
+
+next: "Documentation: consolidate the PDLC journey + update user-facing docs (surface distinct anon-vs-pseudo APIs FR-010; update docs/evaluate-your-pipeline.md; fix recall-floor docs; document routing/ module; mark benchmark numbers PROVISIONAL) + feed Paper 1/2. Then resume the program from S1-02 + the eval-integrity critical path."

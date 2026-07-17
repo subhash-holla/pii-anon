@@ -1,9 +1,11 @@
-"""Tests for new PII entity types: IPv6, URL_WITH_PII, AGE, DATE_TIME, MEDICAL_LICENSE.
+"""Tests for new PII entity types: IPv6, URL_WITH_PII, AGE, DATE_TIME, NPI_NUMBER, DEA_NUMBER.
 
 Covers detection, validation, confidence scoring, and edge cases for each type.
 """
 
 from __future__ import annotations
+
+import pytest
 
 from pii_anon.engines.regex_adapter import RegexEngineAdapter
 from pii_anon.engines.regex import validators
@@ -339,7 +341,7 @@ class TestDATETIMEDetection:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MEDICAL_LICENSE (NPI and DEA) Detection
+# NPI_NUMBER and DEA_NUMBER Detection
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -363,9 +365,8 @@ class TestNPIDetection:
             {"text": "NPI: 1234567893"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
-        # May or may not pass validation depending on Luhn
-        assert isinstance(npis, list)
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
+        assert len(npis) == 1
 
     def test_npi_format_detection(self) -> None:
         """10-digit Luhn-valid NPI with 'national provider' keyword should be detected."""
@@ -375,7 +376,7 @@ class TestNPIDetection:
             {"text": "national provider identifier 1234567893"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
         assert len(npis) >= 1
 
     def test_npi_without_context(self) -> None:
@@ -385,8 +386,62 @@ class TestNPIDetection:
             {"text": "1234567890"},
             {"language": "en"},
         )
-        npis = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        npis = [f for f in findings if f.entity_type == "NPI_NUMBER"]
         assert len(npis) == 0
+
+    def test_npi_emits_npi_number_label(self) -> None:
+        """NPI detections carry the NPI_NUMBER label the eval corpus uses.
+
+        Corpus truth labels NPIs as NPI_NUMBER (15,160 spans in DATA v2);
+        the eval map has no NPI_NUMBER->MEDICAL_LICENSE alias.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. base_confidence=0.88; is_valid_npi('2906399474')=True
+          2. valid_confidence is None, so the `or` short-circuits to base_confidence=0.88.
+             (Note: the `or` idiom means a hypothetical valid_confidence=0.0 would also be
+             ignored — use non-zero values.)
+          3. context_type='MEDICAL_LICENSE' triggers adjust_confidence;
+             CONTEXT_WORDS['MEDICAL_LICENSE'] contains 'npi'; text 'NPI: 2906399474'
+             → token 'npi' in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: min(CONFIDENCE_CAP=0.99, 0.88 + 0.10) = min(0.99, 0.98) = 0.98
+
+        Note: NPI '2906399475' (corpus representative) is Luhn-invalid; without an
+        invalid_confidence fallback the validator suppresses it (skip=True → 0 emissions).
+        '2906399474' (corrected last digit) is Luhn-valid and exercises the label path.
+        The skip-on-invalid behaviour is a concern: many corpus NPIs may be Luhn-invalid
+        (mirroring the old DEA skip-on-invalid that zeroed recall); reported as a concern
+        but validator semantics are not changed in this task.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "NPI: 2906399474"}, {"language": "en"})
+        npi = [f for f in findings if f.entity_type == "NPI_NUMBER"]
+        assert len(npi) == 1
+        assert not [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        assert npi[0].confidence == pytest.approx(0.98, abs=1e-9)
+
+    def test_npi_invalid_luhn_still_emits_at_reduced_confidence(self) -> None:
+        """A corpus-real NPI with a failing Luhn check emits at 0.80 exactly.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. invalid_confidence=0.70 returned by _run_validator (the generic-validator path in _run_validator)
+          2. context_type="MEDICAL_LICENSE" triggers adjust_confidence (line ~529)
+          3. CONTEXT_WORDS["MEDICAL_LICENSE"] contains "npi"; text "NPI: 2906399475"
+             → token "npi" in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: min(CONFIDENCE_CAP=0.99, 0.70 + 0.10) = 0.80
+
+        Luhn verification: is_valid_npi('2906399475') == False (luhn_checksum('808402906399475')
+        returns False); '2906399474' (last digit corrected) is Luhn-valid and is used by the
+        valid-path test above.
+
+        Corpus NPIs are mostly Luhn-invalid; skipping them zeroed recall (mirroring the
+        old DEA skip-on-invalid). Format+context is still strong signal; the Luhn check
+        upgrades confidence rather than gating emission.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "NPI: 2906399475"}, {"language": "en"})
+        npi = [f for f in findings if f.entity_type == "NPI_NUMBER"]
+        assert len(npi) == 1
+        assert npi[0].confidence == pytest.approx(0.80, abs=1e-9)
 
 
 class TestDEADetection:
@@ -415,7 +470,7 @@ class TestDEADetection:
             {"text": "DEA number: AB1234563"},
             {"language": "en"},
         )
-        deas = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        deas = [f for f in findings if f.entity_type == "DEA_NUMBER"]
         assert len(deas) >= 1
 
     def test_dea_without_context(self) -> None:
@@ -425,7 +480,7 @@ class TestDEADetection:
             {"text": "AB1234563"},
             {"language": "en"},
         )
-        deas = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        deas = [f for f in findings if f.entity_type == "DEA_NUMBER"]
         assert len(deas) == 0
 
     def test_dea_invalid_checksum(self) -> None:
@@ -445,8 +500,56 @@ class TestDEADetection:
             {"text": "DEA registration AB1234563"},
             {"language": "en"},
         )
-        deas = [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+        deas = [f for f in findings if f.entity_type == "DEA_NUMBER"]
         assert len(deas) >= 1
+
+    def test_dea_emits_dea_number_label(self) -> None:
+        """DEA detections carry the DEA_NUMBER label the eval corpus uses.
+
+        Corpus truth labels DEA registrations as DEA_NUMBER (9,283 spans in
+        DATA v2). Emitting MEDICAL_LICENSE double-penalizes: one FP + one FN.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "DEA: MP5912274"}, {"language": "en"})
+        dea = [f for f in findings if f.entity_type == "DEA_NUMBER"]
+        assert len(dea) == 1
+        assert not [f for f in findings if f.entity_type == "MEDICAL_LICENSE"]
+
+    def test_dea_invalid_checksum_still_emits_at_reduced_confidence(self) -> None:
+        """A format-valid DEA with a failing checksum emits at 0.80 exactly.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. invalid_confidence=0.70 returned by _run_validator (line ~701 in regex_adapter.py)
+          2. context_type="MEDICAL_LICENSE" triggers adjust_confidence (line ~529)
+          3. CONTEXT_WORDS["MEDICAL_LICENSE"] contains "dea"; text "DEA: JS7964296"
+             → token "dea" in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: 0.70 + 0.10 = 0.80
+
+        Corpus DEA values are mostly checksum-invalid (JS7964296: check digit
+        9 != 6); skipping them zeroed recall. Format+context is still strong
+        signal; the checksum upgrades confidence rather than gating emission.
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "DEA: JS7964296"}, {"language": "en"})
+        dea = [f for f in findings if f.entity_type == "DEA_NUMBER"]
+        assert len(dea) == 1
+        assert dea[0].confidence == pytest.approx(0.80, abs=1e-9)
+
+    def test_dea_valid_checksum_upgrades_confidence(self) -> None:
+        """A checksum-valid DEA (MP5912274) emits at 0.99 exactly.
+
+        Confidence derivation (code path: regex_adapter._run_validator → context boost):
+          1. valid_confidence=0.93 returned by _run_validator (line ~699 in regex_adapter.py)
+          2. context_type="MEDICAL_LICENSE" triggers adjust_confidence (line ~529)
+          3. CONTEXT_WORDS["MEDICAL_LICENSE"] contains "dea"; text "DEA: MP5912274"
+             → token "dea" in ±50-char window → CONTEXT_BOOST=+0.10 applies
+          4. Final: min(CONFIDENCE_CAP=0.99, 0.93 + 0.10) = min(0.99, 1.03) = 0.99
+        """
+        adapter = RegexEngineAdapter()
+        findings = adapter.detect({"text": "DEA: MP5912274"}, {"language": "en"})
+        dea = [f for f in findings if f.entity_type == "DEA_NUMBER"]
+        assert len(dea) == 1
+        assert dea[0].confidence == 0.99
 
 
 # ═══════════════════════════════════════════════════════════════════════════

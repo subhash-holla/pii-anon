@@ -1,0 +1,36 @@
+signoff_id: SO-07-sprint1
+date: "2026-05-31"
+type: sprint-close              # Development Sprint-1 (recall-floor foundation) COMPLETE
+work_stream: "04-Development / Sprint-1 (Epic E1, DC-01 recall-floor)"
+policy: po-required
+signer: AGENT_SIMULATED
+project: pii-anon (pii-anon-code, library pillar)
+
+stories_completed: [S1-01, S1-02, S1-03, S1-04, S1-05]
+inputs:
+  - dev-assist-artifacts/04-development/02-stories/sprint-1/   (5 story files, all DONE)
+  - dev-assist-artifacts/04-development/_reviews/story/        (S1-01..S1-05 gate yamls)
+  - dev-assist-artifacts/04-development/_reviews/sprint/S1-gate.yaml
+  - "Sprint-1-close verification workflow wftzms2fs (11 agents: 6 reviewer dimensions + 5 adversaries)"
+
+decisions_acknowledged:
+  - "Recall-floor is now LIVE BY CONSTRUCTION on the production fusion path: FloorProjectingFusion wraps swarm + mixture_of_experts at the build_fusion seam (S1-02). The standalone S1-01 projector is wired in."
+  - "Per-language recall-floor ε-gate (ε<=0.005) added with a TEETH-verified regression guard (S1-03)."
+  - "Property coverage migrated to hypothesis @given (S1-04 + the seam test in S1-05 cleanup); hypothesis>=6.0 in the dev extra."
+  - "Swarm now propagates language on emission (S1-05) — fixes a pre-existing multilingual mislabel the floor exposed; restores per-language fairness correctness (NFR-024/025)."
+
+gate:
+  sprint_gate: "REQUEST_CHANGES (1 MAJOR) -> remediated by S1-05 -> APPROVE (re-verified)."
+  adversarial: "0/5 refutations upheld — floor-live, determinism, zero-regression, ε-gate-teeth, import-hygiene all held under code-running attack."
+  tests: "full suite 2690 passed / 12 skipped / 0 failed; coverage 86.22% (>=84 gate); ruff + ​mypy --strict clean."
+
+findings_waived: []   # the MAJOR was fixed, not waived; 2 MINORs closed; 26 OBSERVATIONs are non-blocking (logged in S1-gate.yaml)
+
+invariants_preserved:
+  - "AX-003 recall-floor by construction (now LIVE, both modes, multilingual, deterministic)."
+  - "No public-API regression; ~2,548 baseline tests + new tests all green."
+  - "User's unrelated uncommitted WIP (orchestrator.py + test_moe_enhancements.py) byte-identical (md5-verified) throughout — never staged."
+
+epistemic_honesty: "AGENT_SIMULATED execution against a real local venv (real pytest/ruff/mypy). Benchmark numbers remain PROVISIONAL (50-sample smoke). Latency + Tier-3 thresholds still require real-data Pass-2."
+
+next: "S3 eval-integrity critical path — S3-01 RatingEnginePort (typing.Protocol) + RatingEngineRegistry (entry-point group pii_anon.rating_engines) + glicko-legacy facade + AST import-boundary CI test (rating imports nothing from swarm/moe/fusion/policy). Then S3-02 (MLE-BT temp-local MM, DATA-S6-blocked) / S3-03 (bayes-bt NUTS) / S3-04 (coherent significance)."

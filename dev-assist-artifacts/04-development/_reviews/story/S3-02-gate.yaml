@@ -1,0 +1,121 @@
+gate: story
+story: S3-02-bradley-terry-mle
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: >
+  Canonical 5-reviewer story gate (code-quality + axiom-compliance + traceability +
+  security-sast + requirements-coverage, per select-reviewer-set.sh) dispatched in
+  parallel over the S3-02 diff (42a16cf..HEAD), PLUS dev-assist-development-executor
+  TDD evidence and orchestrator independent verification (live contract/discovery,
+  commit-scope, callers-untouched, full-suite, user-WIP md5). Initial aggregate was
+  APPROVE with one MINOR (code-quality-story-01); the MINOR was remediated in-loop
+  (RED 623fe3f -> GREEN 5286273 -> REFACTOR b0d9e8d -> docs e497eb9) and independently
+  re-verified, so the gate closes clean.
+tdd_evidence:
+  red: d959032
+  green: d965930
+  refactor: 725f9e7
+  review: cc5c1ea
+  minor_remediation: { red: 623fe3f, green: 5286273, refactor: b0d9e8d, docs: e497eb9 }
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED d959032 precedes GREEN d965930 (RED commit has only the test + story doc; genuine
+      ModuleNotFoundError collection failure). ruff All-checks-passed; mypy src/pii_anon
+      (strict) Success 116 files; BT file 22->28 passed. Pure-stdlib (math/random/warnings/.elo).
+      Seam markers # SWITCH-POINT(S6) + # DAVIDSON(S3-04) present. Numerical soundness verified:
+      sigmoid +/-20 clamp (no exp overflow), sum-to-zero ~1.7e-16, BT stationarity residual <5.2e-9,
+      _percentile edge-cases handled. Scope: exactly the owned files; elo.py + callers 0-line diff.
+    findings:
+      - id: code-quality-story-01
+        severity: MINOR
+        status: REMEDIATED
+        location: "src/pii_anon/eval_framework/rating/bradley_terry.py (_fit_mm / run_round_robin)"
+        detail: >
+          _fit_mm could exhaust max_iter (1000) WITHOUT converging on near-separable soft designs
+          (>=6 systems, large composite gaps) and pass silently while the spec §3 claimed
+          'convergence reached in <= max_iter'. Ratings stayed finite/monotone/correct-ordering so
+          functional tests passed, but a caller could not distinguish a converged from an
+          unconverged fit — load-bearing because this engine feeds the SDO J-meter.
+        remediation: >
+          Convergence is now OBSERVABLE: for/else idiom in _fit_mm; read-only properties
+          last_fit_converged / last_fit_iterations; module-level BradleyTerryConvergenceWarning
+          (UserWarning, exported) emitted ONLY on non-convergence with n_systems+delta+max_iter;
+          story §3 corrected to the honest claim. Live-verified: easy 3-system -> converged=True
+          iters=39 no-warning; 6-system large-gap -> converged=False iters=1000 warned=True,
+          ratings finite+strictly-monotone. +6 tests; zero warning leaks across the suite.
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      Import-isolation (D-EVAL DECISION 2 / S3-05): test_rating_import_boundary.py GREEN over the new
+      file; AST walk -> imports = {__future__, math, random, .elo} only (zero swarm/moe/fusion/policy;
+      zero numpy/scipy/jax/numpyro). AX-002 determinism: two-run byte-identical ratings+rd+history;
+      equal composites -> equal rating (no dict/set-order leak); seeded bootstrap CIs byte-identical;
+      theta identical under reordered input. Structural non-interference: zero detection-side coupling;
+      elo/port/registry byte-identical. AX-001 synthetic-only: no real-PII-shaped values in new files.
+    findings:
+      - severity: OBSERVATION
+        detail: "AX-005 calibrated-uncertainty governs the DETECTION layer, not the eval rating layer; noted so S3-04's significance->verdict surface keeps a too-close-to-call band rather than forcing a binary sign when CIs overlap. No change requested."
+      - severity: OBSERVATION
+        detail: "Forward note: when the S6 eval-data BT primitive swap lands, re-run the import-boundary test after the adapter swap (a thin cross-repo adapter may add an import edge the current FORBIDDEN_ROOTS set doesn't cover)."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-003 + NFR-002 + NFR-003 + NFR-026 all exist in requirements-document.md and are pinned by
+      ID-embedded tests whose bodies assert the actual clauses (structural Protocol via __mro__ check;
+      BT stationarity fixed-point <1e-6; point-in-CI; rank<->CI coherence lo_X>hi_Y implies point[X]>point[Y];
+      sorted dual-tier discovery). Design trace faithful: D-EVAL DECISION 2 names bradley-terry-mle as
+      the literal middle tier. Scope HONEST: does NOT claim NFR-001/MCMC (deferred S3-03) or Davidson
+      ties (deferred S3-04, # DAVIDSON marker). Dependency S3-01 confirmed DONE.
+    findings:
+      - severity: MINOR
+        status: NOTED
+        detail: "Matrix bookkeeping: traceability-matrix.md homes NFR-002/003 under UC-03/FR-004 (coherent significance), while S3-02 claims them under FR-003 scoped as the frequentist FOUNDATION (paired-bootstrap), deferring by-construction joint-posterior coherence to S3-03/04. Honest labeling; recommend a matrix annotation row at the sprint/epic gate. Non-blocking."
+      - severity: MINOR
+        status: NOTED
+        detail: "Story metadata table lacks an explicit provisional_status field; source DCs (DC-06/07) are not DIVERGED so no cascade triggers; AGENT_SIMULATED posture is consistent. Recommend adding provisional_status: AGENT_SIMULATED for cascade clarity. Non-blocking."
+      - severity: OBSERVATION
+        detail: "S3-03/S3-04 story files not yet authored; the NFR-001/Davidson deferrals are forward references — confirm the deferral landing-zones when those stories are written."
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: >
+      Entry-point load path is IDENTICAL to S3-01 glicko-legacy and the pii_anon.engines registry
+      (metadata.entry_points().select + ep.load() + HARD isinstance(RatingEnginePort) gate +
+      blanket exception-swallow per NFR-026) -> no new trust surface; target is a first-party class
+      registered via a pyproject row (not a git=URL). bradley_terry.py: zero eval/exec/subprocess/
+      unsafe-deserialization/network-egress/file-write/secret patterns. random.Random(seed) is
+      statistical (bootstrap resampling, seeded for AX-002) — correct primitive, no security decision
+      gated on it. No PII handling (operates on dict[str,float] system->composite). registry/port/elo untouched.
+    findings:
+      - severity: OBSERVATION
+        detail: "entry-point ep.load() trust anchor is the installed package set (standard Python entry-point threat model, already accepted at S3-01); any future third-party dist advertising into pii_anon.rating_engines would auto-load — workspace/threat-model (W8) concern, not per-story."
+      - severity: OBSERVATION
+        detail: "PRNG-for-statistics at bradley_terry.py:362,368 — correct (seedable determinism), not a crypto context."
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      Every §3 GWT bullet maps to a concrete passing test (22->28 passed). Deferred-with-successor all
+      carried honestly and named in BOTH story and source: NFR-001 MCMC -> S3-03; Davidson ties ->
+      S3-04 (# DAVIDSON seam); eval-data BT primitive -> SWITCH-POINT(S6) (independently confirmed
+      stats/bradley_terry.py genuinely absent). No MUST criterion lacks a pinning test or tracked
+      successor. Untouched-files claim verified (elo/leaderboard/scorecard/port/registry empty diff).
+    findings:
+      - severity: OBSERVATION
+        detail: "Story §3 prose shorthand paired_bootstrap(B, seed) vs real keyword-only signature paired_bootstrap(records, b, *, seed); tests call the real signature. Tighten §3 wording at next doc touch."
+      - severity: OBSERVATION
+        detail: "Claim-grade methods fit_paired/fit_records/paired_bootstrap are engine-only (not on the port) — correct for swappability; S3-04 should pin the record-level paired-outcome shape it derives from per_record_f1 against this engine so the cross-story handoff stays covered."
+      - severity: OBSERVATION
+        detail: "Evidence is AGENT_SIMULATED (local .venv py3.12.12); Pass-2 real-CI confirmation is a tracked orchestrator commitment, not a DIVERGED MUST."
+conditional_reviewers_note: "requirements-coverage + security-sast fired per select-reviewer-set.sh (entry-point load path + NFR-coverage breadth)."
+cross_reviewer_patterns:
+  - "Two reviewers (traceability, requirements-coverage) independently flag the SAME forward-handoff: S3-04 must pin the record-level paired-outcome shape + close the NFR-002 by-construction-coherence deferral. Carried as an explicit S3-04 acceptance input."
+outcome:
+  tests: "full suite 2727 passed / 12 skipped / 0 failed; coverage 86.34% (>=84); ruff + mypy --strict (src/pii_anon, 116 files) clean."
+  invariant: "Second rating-ladder tier (bradley-terry-mle) LIVE behind the RatingEnginePort: structural conformance (isinstance True, zero call-site changes), MM/Hunter-2004 fit, paired-bootstrap CIs (frequentist significance foundation), graceful dual-tier discovery, AX-002 deterministic, import-isolated, convergence now observable. elo.py + 7 callers byte-identical."
+  safety: "User WIP (orchestrator.py + test_moe_enhancements.py + benchmarks/* + README + docs) md5-identical to session baseline throughout; only narrow owned-file git add used."
+followups:
+  - "S3-03 bayes-bt (NumPyro NUTS = claim-grade default; hard NFR-001 convergence gate R-hat<=1.01 & ESS>=400/param & 0 divergences; bayes-eval optional extra)."
+  - "S3-04 coherent significance BY CONSTRUCTION (one joint posterior; record-level paired outcomes from per_record_f1; Davidson tie term) — MUST pin the engine-only fit_paired/paired_bootstrap shape (cross-reviewer joint signal) and close the NFR-002 by-construction-coherence deferral."
+  - "Sprint/epic gate: add the traceability-matrix annotation row (NFR-002/003 frequentist foundation @S3-02 vs by-construction coherence @S3-03) + provisional_status field."

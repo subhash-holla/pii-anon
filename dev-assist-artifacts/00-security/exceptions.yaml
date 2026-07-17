@@ -1,0 +1,16 @@
+# Security Exceptions — project-local waivers for sensitive-data patterns
+#
+# Consulted by the sensitive-data scan hook, pre-push hook (if installed), and
+# /dev-assist-validate --sensitive-data.
+#
+# Discipline:
+#   - "Convenience" is NEVER a valid rationale.
+#   - Every exception cites a sign-off (SO-NN).
+#   - Reviewed at every sprint gate.
+#
+# NOTE: pii-anon is a PII library. Its tests/fixtures contain synthetic PII BY
+# DESIGN (per axiom AX-pii-anon-001). When a real-PII leakage pattern set is
+# authored in development, the scan must distinguish synthetic-generator output
+# (allowed) from real-PII leakage (blocked) — not blanket-waive test directories.
+
+exceptions: []

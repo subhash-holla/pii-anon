@@ -1,0 +1,38 @@
+reviewer: code-quality
+story: S5-02
+gate: story
+verdict: APPROVE
+summary: >
+  ruff clean; mypy clean under BOTH the canonical invocation and --strict (138
+  files); 30 tier3 + 2 import-boundary tests pass. TDD RED→GREEN confirmed
+  (3c9d58b tests-only precedes 2ccf348). Scope exactly the 3 owned files
+  (additive __init__ merge {**REID, **TIER3}; reid/sandbox/spec untouched). Wilson
+  math verified correct (n=0 guard, symmetry 1e-9, brackets the estimate, clamp).
+  A2 fixture is a genuine QIC+BSL signal (not a tautology). NFR-016 caveat
+  non-strippable + re-asserted on both ReidPowerCell and ReidPowerLadder.
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    title: RepresentativeTier3ReidAttack.attack() (public conformance point) had no docstring
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — one-paragraph docstring stating the param contract, empty-candidates abstain, and the margin commit/abstain rule.
+  - id: code-quality-story-02
+    severity: MINOR
+    title: _targets_from_json / _personas_from_json (security-relevant decoders) had no docstrings
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — docstrings mirroring the reid.py "no unsafe-deserialization / never constructs objects named in data" convention.
+  - id: code-quality-story-03
+    severity: MINOR
+    title: score_reid_attack lazily imported inside the runner (no circular hazard)
+    disposition: REMEDIATED IN-LOOP (b3efaa9) — moved to the top-level reid import block.
+  - id: code-quality-story-04
+    severity: OBSERVATION
+    title: _decode_object_array / _string_tuple re-implemented locally (reid.py byte-identical)
+    disposition: NO ACTION (sound YAGNI trade-off, documented; extract a shared helper module only if a third module needs them).
+  - id: code-quality-story-05
+    severity: OBSERVATION
+    title: test names use the acceptance-ID scheme + docstring FR/NFR citations
+    disposition: NO ACTION (the repo house convention).
+offlimits_md5_ok: true
+notes: >
+  Zero SHOWSTOPPER/CATASTROPHIC/MAJOR. The 3 MINORs (per-API docstrings + the
+  import-clarity fix) were remediated in the same iteration. No SDO close needed
+  (competitive_supremacy.py unchanged).

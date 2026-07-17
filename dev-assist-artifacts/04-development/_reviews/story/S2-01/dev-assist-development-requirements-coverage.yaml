@@ -1,0 +1,240 @@
+reviewer: dev-assist-development-requirements-coverage
+scope_id: S2-01
+gate: story
+verdict: APPROVE
+
+# Dimension: requirements coverage + honesty of scope.
+# Central question (per dispatch): FR-018 is a MUST that bundles four
+# capabilities (learned-routing + span-dedup + selective-activation +
+# early-exit). This story ships ONLY the seam (feature-conditioned route() +
+# the RoutingGate Protocol + the v2 construction path), deferring the gate BODY
+# to S2-02, early-exit to S2-03, SLA bias to S2-04. Verdict: the partial
+# coverage is HONESTLY scoped and NOT over-claimed. Every A1-A9 acceptance maps
+# to a named, passing, non-vacuous test (34/34 owned tests pass). FR-018 is NOT
+# claimed fully discharged. NFR-026 (A8) and NFR-005 (A9) are genuinely tested.
+# The build_fusion gate_path/key_ring/top_k seam is honestly disclosed.
+
+findings:
+  - id: coverage-S2-01-01
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-01-widen-route-and-construction-seam.md:10
+    description: |
+      NFR-026 is labelled MoSCoW=SHOULD in the requirements doc
+      (requirements-document.md:89, "Optional-dependency graceful degradation"),
+      but the story's `Implements` row lists NFR-026 without the SHOULD
+      qualifier (it qualifies FR-018's slice and NFR-005, but presents NFR-026
+      flatly). This is a label nuance, NOT a coverage gap: the substance NFR-026
+      requires for this seam ("runs on shared layer, 0 unhandled exceptions, no
+      silent recall loss") is directly and non-vacuously pinned by A8
+      (test_nfr026_no_gate_runs_pure_static_softmax_no_exceptions asserts
+      router.gate_payload is None and every representative entity routes via the
+      pure static softmax summing to 1.0) plus the structural default
+      (MoERouter.__init__ gate=None, moe.py:407 gate_payload defaults None and is
+      set ONLY when gate_path is supplied) and
+      test_nfr026_gate_none_is_never_consulted. The "no gate => static softmax"
+      default is genuinely the structural default and genuinely tested. Surfaced
+      only so the SHOULD-vs-flat label is explicit; does not change the verdict.
+    suggested_resolution: |
+      Optionally annotate NFR-026 in the `Implements` row as MoSCoW=SHOULD for
+      label parity with how FR-018's slice scoping is qualified. No code change.
+      Non-blocking.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-026
+
+  - id: coverage-S2-01-02
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-2/S2-01-widen-route-and-construction-seam.md:53
+    description: |
+      The named successor stories that carry the deferred FR-018 sub-capabilities
+      (S2-02 DistilledTopKGate gate body; S2-03 rules-first Depth-1 early-exit;
+      S2-04 aux-loss-free SLA bias) are referenced in the header, the `Implements`
+      row, `Blocks`, and §5 Non-goals, but are NOT yet authored as story files
+      under dev-assist-artifacts/04-development/02-stories/sprint-2/ (only S2-01
+      and S2-05 exist there today). This is NOT an over-claim and NOT a coverage
+      gap at the story gate: the deferral targets are REAL planned epic work, not
+      invented placeholders — they are enumerated in the sprint-2 row of the
+      development-log (development-log.md:17: "S2-02 DistilledTopKGate + offline
+      distillation trainer · S2-03 rules-first Depth-1 early-exit (orchestrator
+      hook) · S2-04 aux-loss-free SLA bias"), which exactly matches the story's
+      deferral chain. Recorded so the epic/sprint gate can confirm these
+      successors are scaffolded before E2 closes (the successor-story existence
+      check is an epic-gate, not story-gate, concern).
+    suggested_resolution: |
+      No action required at the story gate. At the E2 epic gate, confirm S2-02 /
+      S2-03 / S2-04 story files exist and each claims its slice of FR-018, so the
+      MUST is verified-or-deferred-with-existing-successor end to end.
+    references:
+      - dev-assist-artifacts/04-development/development-log.md#sprint-2
+      - dev-assist-artifacts/02-requirements/requirements-document.md#FR-018
+
+notes: |
+  COVERAGE + SCOPE-HONESTY VERDICT: APPROVE. No SHOWSTOPPER / CATASTROPHIC /
+  MAJOR. Two OBSERVATIONs (label parity; successor-story scaffolding deferred to
+  the epic gate), neither blocking.
+
+  --- FR-018 (MUST) partial-coverage honesty: PASS (the load-bearing check) ---
+  FR-018 (requirements-document.md:30) is a MUST bundling four capabilities:
+  learned-routing + span-dedup + selective-activation + early-exit. This story
+  ships ONLY the learned-routing SEAM. It is NOT over-claimed — the deferral is
+  disclosed unambiguously in EVERY load-bearing place:
+    * Header (line 3): "This story lands the seam ... NO routing-behaviour change
+      ships in this story (the gate is S2-02)."
+    * `Implements` row (line 10): FR-018 explicitly qualified — "this story ships
+      the *learned-routing seam* ... the gate body, dedup, early-exit, activation
+      are successor stories S2-02/03/04." FR-018 is NOT claimed fully discharged.
+    * Intent (line 21): "ships the seam only ... with zero routing-behaviour
+      change."
+    * RISK-5 (line 36): "seam-only story ... no in-tree implementation that
+      alters routing ... S2-02 DistilledTopKGate is the first real gate."
+    * §5 Non-goals (lines 53-57): gate body -> S2-02; early-exit -> S2-03; SLA
+      bias -> S2-04 — each deferred sub-capability named with its successor.
+  Program-level ground truth corroborates: the traceability matrix
+  (traceability-matrix.md:31) records FR-018 -> UC-15 with NO "done" marker
+  (unlike FR-005/006 which carry "(done)"/"(S4 done)") — "— (CODE-local; swarm
+  prior-art)". This story does NOT flip FR-018 to verified anywhere. The deferral
+  chain maps EXACTLY to the planned E2 breakdown (development-log.md:17). Honest
+  partial coverage of a multi-part MUST with named, planned successors — the
+  textbook honestly-scoped case. (Calibration: the prior S2-05 coverage reviewer
+  treated the same FR-018-is-a-bundle situation as OBSERVATION-level, not a gap.)
+
+  --- A1-A9 acceptance -> named, passing, NON-VACUOUS test map (34/34 PASS) ---
+  Run: PYTHONPATH=src .venv/bin/python -m pytest tests/test_moe_router_seam.py
+  tests/test_fusion_construction_seam.py  => 34 passed, 0 failed.
+  (The whole-tree coverage "FAIL 21%" on the scoped 2-file run is an artifact of
+  cov measuring the entire src tree from two files; the FULL-suite coverage is
+  documented at 87.17% >= 84%, and I independently confirmed ruff clean + mypy
+  clean (129 files, fresh cache) on the owned surface.)
+
+    A1 (route() widened, context-aware, backward-compatible) ->
+      test_fr018_route_no_context_is_byte_identical_to_static_base
+      test_fr018_route_accepts_routecontext_kwarg_no_typeerror
+      test_fr018_context_keyed_cache_does_not_collide
+      test_nfr026_route_on_default_registry_matches_recorded_reference
+      NON-VACUOUS: A1 asserts byte-identity against an INDEPENDENT softmax oracle
+      (_independent_static_softmax, re-derived from the spec, NOT importing the
+      production route) — fails on any drift from the mathematical definition.
+
+    A2 (no-regression on existing call sites) ->
+      test_fr018_route_all_identical_to_independent_oracle
+      test_nfr005_moefusion_merge_unaffected_by_widening
+      NON-VACUOUS: route_all() output is compared element-wise to the independent
+      oracle for every default-registry entity; MoEFusionStrategy.merge (the
+      moe.py:489 bare-entity_type call site) is exercised end-to-end.
+
+    A3 (RoutingGate Protocol + advisory plug) ->
+      test_fr018_routinggate_is_runtime_checkable (isinstance True for duck-typed
+        adjust(); isinstance False for object() — both directions)
+      test_fr018_gate_adjust_invoked_with_static_base (asserts adjust called
+        EXACTLY once with (entity_type, context, base); asserts the boosted
+        expert's post-weight strictly exceeds its base weight — real effect, not
+        smoke)
+      test_nfr026_gate_none_is_never_consulted
+      test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol
+
+    A4 (advisory scope bounded: a gate cannot defeat the floor) ->
+      test_ax003_hostile_gate_cannot_drop_floored_shared_span
+      NON-VACUOUS: runs the REAL FloorProjectingFusion(MoEFusionStrategy(...
+      gate=_HostileZeroingGate(victim="regex-oss") ...)) pipeline on a
+      checksum-gated US_SSN shared span and asserts the span SURVIVES with
+      shared_floor provenance / regex-oss engine — the floor re-injects post
+      fusion (FR-016/AX-003 preserved). routing/floor_fusion.py +
+      routing/shared_layer.py confirmed byte-identical (md5 unchanged).
+
+    A5 (gate-output validation: determinism/safety) ->
+      test_nfr005_nan_gate_output_never_propagates (NaN gate -> finite, >=0,
+        sum=1.0)
+      test_nfr005_negative_gate_output_never_propagates
+      test_nfr005_unnormalized_gate_output_is_renormalized
+      + 5 REFACTOR edge tests on the shared _normalize_weights helper
+        (empty->[]; +inf->None; -inf->None; all-nonpositive->None;
+        negative-clamp+renormalize order-preserving) — pins the single
+        normalizer the static path and the gate validator both use (no drift).
+
+    A6 (v2 construction seam, v1 untouched) ->
+      test_fr018_register_v2_factory_receives_populated_buildspec (asserts the
+        FusionBuildSpec carries mode/weights/min_consensus/entity_weights/
+        iou_threshold AND has gate_path/key_ring/top_k)
+      test_fr018_fusion_buildspec_is_frozen
+      test_fr018_v1_register_fusion_strategy_unchanged_and_constructs
+      test_fr018_v1_factory_signature_is_positional_weights_min_consensus
+      test_fr018_v2_does_not_shadow_builtin_modes
+      INDEPENDENT CONFIRM: v1 symbols byte-identical pre/post —
+      "CustomFusionFactory = Callable[[dict[str, float], int], FusionStrategy]"
+      and "def register_fusion_strategy(mode: str, factory: CustomFusionFactory)"
+      unchanged (only line numbers shifted by the additive insert). RISK-1 holds.
+
+    A7 (available_fusion_modes()/build_fusion() drift guard) ->
+      test_audit_single_source_builtin_modes_constant_exists
+      test_audit_every_advertised_builtin_mode_is_constructible
+      test_audit_drift_guard_is_non_vacuous_unadvertised_branch_caught (META:
+        injects a bogus mode into _BUILTIN_FUSION_MODES and asserts build_fusion
+        RAISES FusionError — proves the guard is not vacuous)
+      test_audit_drift_guard_catches_constructable_but_unadvertised (META: drops
+        mixture_of_experts from the constant and asserts it still constructs but
+        is no longer advertised — the reverse drift direction)
+      test_audit_swarm_mode_is_advertised_and_constructible
+      test_audit_unknown_mode_still_raises_fusionerror
+      REAL LATENT-DRIFT CLOSED (positive coverage delta): pre-story
+      available_fusion_modes() advertised 5 builtins and OMITTED "swarm", yet
+      build_fusion HAD a `mode == "swarm"` branch (verified at 4ba234f^
+      fusion.py:514) — a genuine constructible-but-unadvertised drift. The
+      single-source _BUILTIN_FUSION_MODES (now 6 entries incl. swarm) closes it;
+      available_fusion_modes() now honestly returns one MORE entry than before.
+      This is a real improvement, NOT a backward-compat break, and is honestly
+      disclosed in the test docstring + Evidence ("plus the closed swarm latent
+      drift"). This directly discharges the D5 "register the new mode in BOTH
+      places" SME MAJOR with teeth.
+
+    A8 (NFR-026 graceful-degradation default) ->
+      test_nfr026_no_gate_runs_pure_static_softmax_no_exceptions
+      NON-VACUOUS: asserts router.gate_payload is None (the attribute exists at
+      moe.py:407 and defaults None, set only when gate_path supplied — confirmed)
+      and that every representative entity routes via the pure static softmax
+      with no exception and sum-to-1.0. The "no gate" path is the structural
+      default and is genuinely the only path exercised on the production fusion
+      build (RISK-5). NFR-026 graceful-degradation default GENUINELY TESTED.
+
+    A9 (determinism, NFR-005/AX-002) ->
+      test_ax002_route_deterministic_for_same_entity_and_context (two route()
+        calls on the SAME (entity_type, context) with a fixed gate are equal)
+      test_ax002_routecontext_is_frozen_and_hashable (hashable as a cache key;
+        mutation raises dataclasses.FrozenInstanceError)
+      test_ax002_routecontext_default_is_empty_features
+      NFR-005 determinism GENUINELY TESTED. Corroborated: no random/uuid/time/
+      secrets imports in moe.py/fusion.py; the widened cache key (entity_type,
+      context) is order-stable; RouteContext.features is a tuple-of-pairs (not a
+      dict) for hashability + immutability.
+
+  --- build_fusion gate_path/key_ring hardcoded-None seam: HONESTLY DISCLOSED ---
+  In build_fusion's v2-consult block, the assembled FusionBuildSpec sets
+  gate_path=None, key_ring=None, top_k=3 (fusion.py). This is NOT a hidden gap:
+  (1) build_fusion's PUBLIC signature genuinely does not expose gate_path /
+  key_ring / top_k (confirmed: only mode/weights/min_consensus/entity_weights/
+  iou_threshold) — so there is nothing to source them FROM yet without widening
+  the public API; (2) the inline comment states it explicitly: "gate_path /
+  key_ring default to None, top_k to the builtin default — they are carried, not
+  yet sourced from build_fusion's public signature, keeping it stable." The
+  FusionBuildSpec CARRIES the fields (so the carrier is forward-compatible for
+  S2-02) while the wiring-in is deferred. This is a seam-now / wire-in-S2-02
+  deferral honestly disclosed, exactly as the dispatch asked me to verify — not
+  an over-claim.
+
+  --- No silently-missing MUST slice / no over-claim ---
+  No MUST in this story's scope is claimed-but-unverified. FR-018's only
+  in-scope slice (the seam) is fully verified by A1-A7; the other three slices
+  are explicitly deferred-with-named-successor (S2-02/03/04, all planned in the
+  development-log). NFR-026 and NFR-005 are MUST/SHOULD slices this story does
+  own and are genuinely tested (A8/A9). No over-claim detected.
+
+  --- Untouched / no-regression corroboration (independently verified) ---
+  Diff (4ba234f^..b38f65a) touched ONLY src/pii_anon/{moe,fusion}.py + the two
+  new test files. md5 confirmed byte-identical for orchestrator.py
+  (0afc6deed62bbd0653ae1051b723bace), tests/test_moe_enhancements.py
+  (910e9cd66ad6e38c7bb64a9c51ecb1cb), routing/floor_fusion.py
+  (39f325bd61b152fd3e6b00b0995e524b), routing/shared_layer.py
+  (929c18b12da5fab0ede98f0c577b9579), evaluation/competitor_compare.py
+  (7cae16c89f4c97136e1a12394dae2025) — all matching the Evidence section.
+
+review_time_seconds: 1140
+
+context_bounds_respected: true

@@ -1,0 +1,102 @@
+sign_off_id: SO-19-s6-01-query-aware-masking
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S6-01 — the query-aware masking gate (FR-023, UC-19) + a representative FR-024
+  bound. When PII is processed in service of a query, the gate decides per detected
+  span retain-vs-mask: it is SUBTRACTIVE-ON-MASK (DC-13) and DEFAULTS TO MASK,
+  retaining a span ONLY on a positive reason-stamped relevance signal (the query
+  names an alias of the entity type, or the query tokens overlap the span surface).
+  The dangerous error (false-retention = leaking a query-irrelevant span) cannot
+  occur by default — over-redaction is the safe error. Shipped as a STANDALONE,
+  pure policy primitive (src/pii_anon/policy/query_aware.py, alongside router.py):
+  the orchestrator router-pre-filter wire-in (DC-13 "intercept + mask in
+  policy/router before engines/prompt assembly") is BLOCKED on the protected
+  user-WIP orchestrator.py (the S2-03 block) → Pass-2; the real DATA query-aware
+  scorer + learned relevance model are eval-data S5 Pass-2. A representative FR-024
+  bound (over-redaction-rate + false-retention-rate vs the mask-all baseline) ships
+  in-tree. FEATURE work-stream — does NOT touch competitive_supremacy.py, so NO
+  adversarial SDO close required.
+
+stories_closed:
+  - id: S6-01
+    title: query-aware masking gate (retain query-relevant PII, mask the rest) + a representative over-redaction/false-retention bound (DC-13)
+    gate: _reviews/story/S6-01/   # 4/5 APPROVE + code-quality REQUEST_CHANGES (5 MINOR, 0 MAJOR) -> all remediated/dispositioned -> APPROVE
+    implements: [FR-023]   # + a representative FR-024 (real DATA scorer Pass-2)
+    upholds: [AX-001, AX-002, AX-006]   # AX-006-adjacent: privacy-safe default-to-mask
+    effect: >
+      new src/pii_anon/policy/query_aware.py: QueryAwareMaskingGate.decide
+      (subtractive-on-mask, default-to-mask, deterministic; retains only on a
+      positive reason-stamped signal — entity-alias OR surface-token match) +
+      MaskCandidate/QueryAwareDecision + QueryAwareBoundReport/score_query_aware_bound
+      (the representative FR-024 over-redaction/false-retention bound vs the mask-all
+      baseline; fail-loud on a length mismatch) + the module-level _ENTITY_SYNONYMS.
+      Additive policy/__init__ re-exports. The orchestrator wire-in is # SWITCH-POINT(ORCH)
+      Pass-2; the real DATA scorer + learned model are # SWITCH-POINT(DATA) Pass-2.
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # 4/5 APPROVE + code-quality REQUEST_CHANGES (5 MINOR, 0 MAJOR) remediated -> APPROVE
+  adversarial_close: NOT_REQUIRED   # no competitive_supremacy.py change (gate md5 byte-identical 3b842e81…)
+  findings_remediated_in_loop:
+    - "RC-01 / CQ-04 (the recurring S5-02 RC-02 / S5-03 RC-01 exact-rate lesson): A8/A9 now pin EXACT integer-count rates (baseline over-redaction 1/3 + n_query_relevant_gold 1; gate over-redaction 0.0 + baseline 0.5), not bounds."
+    - "RC-02: the synonym-only retention path (a distinct FR-023 signal) was untested -> added test_a3_retains_via_synonym_only_alias (US_SSN via 'social security')."
+    - "CQ-01: removed the dead 'e-mail' alias (un-tokenisable under [a-z0-9]+) + a comment that synonyms must be _TOKEN_RE-producible."
+    - "CQ-02 / axiom-OBS-2: hoisted _ENTITY_SYNONYMS to a module-level constant (no per-call alloc; the Pass-2 per-span wire-in benefits)."
+    - "CQ-03: type-annotated the _decisions test helper."
+    - "CQ-06: documented the shared-token entity-alias collision (address/security) as a known heuristic limitation closed at the # SWITCH-POINT(DATA) seam."
+  findings_dispositioned:
+    - "security-sast SEC-01 (MINOR, common-word surface-collision false-retention) + SEC-02 (OBS, homoglyph) + axiom AX-005 (OBS, no calibrated abstention band): story §5 Pass-2 notes — all privacy-safe-direction, deferred to the DATA scorer/learned model per the PRIMARY reviewer's explicit recommendation (a stop-word filter without a corpus risks mis-masking a legitimately-queried person)."
+    - "CQ-05 (FR-IDs in test names): NO ACTION — the repo house convention is acceptance-ID test names + docstring FR citations (the 4 sibling attack test files reid/reid_tier3/mia all use it); prior reviewers dispositioned the identical finding NO-ACTION."
+    - "CQ-07 (Examples docstring blocks): NO ACTION — S8 contributor-readiness follow-on; TRACE-OBS (matrix backfill) deferred to the S6 sprint gate."
+
+decisions_acknowledged:
+  - "★ A masking-gate FEATURE flips NO SDO guarantee. The committed smoke-artifact verdict is UNCHANGED (NOT_YET / canonical_claim_run=False (G7)); the SDO gate competitive_supremacy.py is byte-identical (md5 3b842e81c3f03eafd11f9c655c1789a0). No adversarial SDO close was required."
+  - "★ The S2-03 orchestrator-block discipline held: the gate ships as a STANDALONE pure primitive; the DC-13 router-pre-filter wire-in (intercept + mask before prompt assembly) requires the protected user-WIP orchestrator.py and is honestly flagged # SWITCH-POINT(ORCH) Pass-2. orchestrator.py byte-identical (0afc6deed62bbd0653ae1051b723bace). Re-check its md5 each session; land the wire-in when the WIP clears."
+  - "The headline privacy invariant (AX-006-adjacent): default-to-mask is enforced STRUCTURALLY (fail-closed — no control-flow path retains a span without a positive reason-stamped signal), confirmed under live adversarial probing (empty/whitespace/punct/symbol/NBSP/zero-width queries all mask everything). false-retention (the leak) is the bounded-dangerous error; over-redaction is the safe error; the mask-all baseline carries false-retention 0 by construction."
+  - "FR-023 is implemented + tested; the representative FR-024 bound ships with the real DATA scorer + learned relevance model honestly flagged # SWITCH-POINT(DATA) Pass-2 (eval-data S5). Both are SHOULDs; neither silently claimed real."
+  - "AX-001/AX-002 upheld: synthetic-only spans/queries; deterministic pure decide + bound (no random/uuid/time/secrets); the entity-alias map + token regex are fixed module constants. The standalone primitive imports nothing from swarm/moe/fusion/orchestrator."
+
+findings_waived_or_deferred:
+  - id: orchestrator-router-pre-filter-wire-in
+    disposition: pass2-blocked-on-user-wip
+    detail: "The DC-13 router-pre-filter wire-in (call the gate in policy/router before engines/prompt assembly) requires the protected orchestrator.py (the S2-03 block class). # SWITCH-POINT(ORCH); land when the orchestrator user-WIP clears."
+  - id: real-data-query-aware-scorer
+    disposition: pass2-cross-repo
+    detail: "The real DATA query-aware scorer (FR-024 bound vs the curated UC-19 corpus with CIs) + a learned relevance model — # SWITCH-POINT(DATA); eval-data S5. The in-tree representative gate + bound ship now."
+  - id: common-word-surface-collision-hardening
+    disposition: pass2
+    detail: "The representative surface-token signal can over-retain on a common-word/name token collision (security-sast SEC-01) — a bounded false-retention on the privacy-safe side of the default-mask floor; the fix (a stop-word filter + the FR-024 false-retention-rate metric at corpus scale) belongs to the Pass-2 DATA scorer, not the in-tree representative gate."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-18. A masking-gate feature flips no guarantee; the SDO gate is byte-identical."
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): exit 0, 3751 passed / 16 skipped / 0 failed (+12 over SO-18's 3739: the S6-01 A1-A11 + synonym suite)."
+  coverage: "88.73% (>= 84 gate; query_aware.py >= 90% by its own tests)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 140 files."
+  env: "AGENT_SIMULATED on the local .venv. The gate decision logic + the subtractive/default-mask invariant + the representative FR-024 bound run for REAL in-tree against SYNTHETIC spans + queries. The real DATA scorer + learned model + the orchestrator wire-in are Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee… (S2-03 stays BLOCKED + the S6-01 wire-in stays Pass-2), test_moe_enhancements.py 910e9cd6…, README.md, benchmark-diagnostics.json, artifacts/benchmarks/*, docs/*
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c89f4c97136e1a12394dae2025; competitor_tiers.py d9202479d84c519d5866b7d9d515c903; policy/router.py + the substrate unchanged
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_module: policy/query_aware.py   # stdlib-only (re + collections.abc + dataclasses); nothing from swarm/moe/fusion/orchestrator
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED 3c459aa / GREEN b0ac07e / remediation 753c90d
+  no_new_hard_dependency: true
+
+next:
+  binding_constraint: "G6 FAIL (raw-detection F2 non-inferiority, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S6-01."
+  immediate: "S6-04 (BYO-SDK adapter — FR-019/the bring-your-own detector adapter). Author via /dev-assist-story-new. NOT a control-path change -> no SDO close (unless it becomes a control-path-artifact producer/consumer)."
+  feature_surface: "then S7-01 (multimodal readers), S7-03 (multilingual fairness) — SEQUENTIAL in the main tree. (S5-02/03 + S6-01 DONE; S6-04/S7-01/S7-03 remain of the SO-15 feature list.)"
+  rc_close: "Stage-6 Documentation (distinct anon/pseudo APIs + vanilla-vs-swarm positioning) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET) -> packaging extras -> tagged RC on pdlc/sota-program -> build sdist+wheel (NOT published)."
+  pass2_followons: "★ full-census G6 run on current code (headline); real Tier-C cloud runs; real-NUTS J; the real Tier-3 LLM adversary + >=385 DATA cohort (S5-02); the real LiRA@128 + canary splits (S5-03); the query-aware DATA scorer + learned model + the orchestrator router-pre-filter wire-in (S6-01); per-detector-class latency (S7-04 seam); the G7 _safe_repr sweep; Papers 1 & 2."
+  milestone: "M4 (CODE v2) — the agentic privacy surface advances: the query-aware masking gate (FR-023) joins the complete representative attack surface (re-id S5-01/02 + MIA S5-03). The SDO verdict is UNCHANGED; the binding constraint remains the draw-sensitive G6 raw-F2 axis pending the full-census Pass-2."

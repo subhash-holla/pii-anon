@@ -1,0 +1,22 @@
+reviewer: security-sast
+story: S6-04
+gate: story
+iteration: 1
+verdict: APPROVE  # 0 findings
+run: wf_1fe5c271-7f5 (review-gate workflow, 2026-06-09; transcribed from the workflow result — scribe failed before writing files)
+summary: >
+  Clean security pass, zero findings. The entry-point loading surface follows
+  the standing Python entry-points trust model (same as pii_anon.engines /
+  pii_anon.rating_engines): enumeration never executes targets beyond
+  ep.load(); classes are NOT instantiated at discovery; non-callables are
+  skipped fail-closed; register() refuses non-callables with TypeError.
+  Lazy engine construction cannot be triggered by discovery (A2 pins the
+  empty cache). No secrets / network / filesystem writes in byo_pipeline.py —
+  the module writes NO artifacts (NOT a control-path-artifact producer; the
+  no-SDO-close justification holds). bool-is-int span rejection verified
+  (A4): int(True) can never become a phantom offset through the bridge.
+  Off-limits md5s byte-identical at HEAD: orchestrator.py 0afc6dee…,
+  competitor_compare.py 7cae16c8…, competitive_supremacy.py 3b842e81….
+findings: []
+context_bounds_respected: true
+offlimits_md5_ok: true

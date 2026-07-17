@@ -1,0 +1,114 @@
+reviewer: axiom-compliance
+gate: story
+scope_id: S2-05
+iteration: 1
+verdict: APPROVE
+
+findings:
+  - id: AXIOM-S205-001
+    severity: OBSERVATION
+    location: dev-assist-artifacts/02-requirements/requirements-document.md (FR/NFR axiom-annotation rows; inline AX-cites at lines 39/82/87)
+    description: >
+      Adjudication of the executor's flagged contract deviation. The executor noted
+      the requirements-document FR-trace subset cites only AX-001/AX-005/AX-006 inline
+      and asked whether the story's AX-002 (determinism) citation is canonical. It IS
+      canonical: AX-002 (deterministic-reproducible-pseudonymization) is enumerated in
+      project-axioms.yaml:42 AND in the MANIFEST "Active axioms (6)" note
+      (MANIFEST.md:133 — "deterministic-pseudonymization (AX-002)"). The requirements-doc
+      inline AX-cites are a per-row FR-annotation convenience, NOT the authoritative
+      axiom registry, so the omission of AX-002 there does not de-canonicalize it. The
+      determinism substance the story leans on is ALSO independently backed by NFR-005
+      (requirements-document.md:64 — "byte-identical artifacts across N=5 replays"),
+      which A6 pins. The story's AX-002 + NFR-005 dual citation is therefore valid and
+      consistent. NO spec-label fix is required (the executor's "spec-label fix expected"
+      premise is superseded — AX-002 is real). This OBSERVATION only notes the optional
+      improvement that the requirements-doc determinism rows (e.g. NFR-005) could
+      cross-reference AX-002 for discoverability; non-blocking, out of S2-05 scope.
+    suggested_resolution: >
+      No code or story change. Optionally (separate doc hygiene, not this story):
+      add an "(AX-002)" annotation to the NFR-005 row in requirements-document.md so the
+      determinism axiom is discoverable from the FR/NFR table the same way AX-001/005/006
+      are. The story file's contract-deviation note (line 74) may be relaxed from
+      "non-canonical alias / spec-label fix expected" to "AX-002 is canonical (registry +
+      MANIFEST); substance dual-backed by NFR-005".
+    status: OPEN
+
+context_bounds_respected: true
+
+notes: >
+  STORY-gate axiom-compliance review of S2-05 (sign + verify gate_v1.json), iteration 1,
+  read-only. Reviewed the four axiom dimensions in scope against the actual diff
+  (S2-05's own commits RED 2640fdc / GREEN d45a5e4 / REFACTOR 04cf3c7), not just the
+  story prose.
+
+  AX-006 (least-privilege / control-path authentication) — UPHELD; this is the core
+  axiom the story discharges and it is discharged fail-closed BY CONSTRUCTION.
+  (1) MoERouter.__init__ (moe.py:291-296) admits a learned gate ONLY through
+  load_verified_gate(gate_path, key_ring=key_ring, verify_on_load=True) — the True is
+  HARD-WIRED at the construction seam, not threaded from a caller-controllable flag, and
+  the constructor raises ValueError if gate_path is given without a key_ring (no
+  trust-rootless load). (2) load_verified_gate (moe.py:73-98) is fail-closed: absent ->
+  None (graceful NFR-026 static-softmax); present-but-unverifiable -> GateSignatureError;
+  malformed-JSON under verify_on_load -> GateSignatureError; it NEVER returns the unsigned
+  content on the verifying path. (3) verify() (moe_gate_signing.py:209-242) has NO
+  payload-returning branch on any failure: malformed-envelope (_require_envelope),
+  unsupported-scheme, unknown/retired key_id, non-base64 sig, and HMAC mismatch each RAISE
+  before the single terminal `return payload`. The ring (not the file) is the trust root —
+  an attacker's self-consistent HMAC under their own key_id is rejected
+  (test_a4_unknown_key_id_raises). A tampered gate provably cannot reach route()
+  (test_a7_constructor_raises_on_tampered_gate); the production seam is pinned to
+  verify_on_load=True by a behavioural spy (test_a7_production_seam_uses_verify_on_load_true);
+  the verify_on_load=False escape hatch is opt-in, defaulted True
+  (test_a7_default_verify_on_load_is_true), and documented offline-tooling-only. Absence is
+  the only graceful path; present-and-broken != absent (test_a8_present_but_broken_raises_not_fallback).
+  This is exactly the least-privilege posture AX-006 demands: a control-path input that
+  steers expert selection is authenticated before it can influence routing, and cannot
+  broaden capability via a poisoned file.
+
+  AX-002 (determinism) — UPHELD. canonical_gate_bytes (moe_gate_signing.py:105-119) uses
+  json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False).encode("utf-8") —
+  deterministic, key-order/whitespace invariant, value-sensitive. Replay-stability pinned
+  at N=5 (test_a6_replay_determinism_n5_identical_signature, identical signature.value over
+  5 signs) plus order-invariance unit + hypothesis property tests (A6). The signature is
+  computed over exactly these canonical bytes, so determinism is what makes the signature
+  stable across replays — the determinism axiom and the AX-006 integrity control are
+  mutually reinforcing here. Executor's flagged deviation adjudicated in AXIOM-S205-001:
+  AX-002 IS canonical (registry + MANIFEST), no spec-label fix needed.
+
+  AX-001 (no real PII / no real secret in fixtures) — UPHELD. Every fixture payload is
+  synthetic (oracle_hash = obvious repeated-hex literal; fabricated expert ids like
+  gliner-compatible/presidio-compatible; PERSON_NAME/EMAIL_ADDRESS as type labels, not real
+  persons). The signing key is b"S2-05-NON-PRODUCTION-TEST-KEY-DO-NOT-USE-IN-PROD" — an
+  obvious dummy, asserted NON-PRODUCTION (test_key_provider_is_a_non_production_dummy;
+  moe_gate_signing.py:78-83 comments label it NEVER a production secret). No real credential
+  or real personal data committed. Real key custody (env/secret-store/HSM/KMS) is correctly
+  deferred to Pass-2 behind the env-overridable gate_signing_key_provider seam
+  (moe_gate_signing.py:91-102) — methodology-honest, not agent-simulated as real.
+
+  AX-003 (ensemble-recall-floor-guarantee) NON-REGRESSION — UPHELD. S2-05's own three
+  commits touch ONLY moe_gate_signing.py (new), moe.py (additive seam), errors.py,
+  pyproject.toml, and the two new test files; the diff over 2640fdc~1..04cf3c7 contains NO
+  edit to the recall-floor / SharedLayerProjector / shared-layer / shared-expert path (the
+  floor matches visible in the full branch diff originate from S1/S4 stories, not S2-05).
+  performance_floor keeps its default True and its pre-existing behaviour unchanged; the
+  only moe.py change is additive keyword-only params (gate_path/key_ring) + an additive
+  loader. Critically, the verified gate_payload is STORED-ONLY (moe.py:290 init, :294
+  assignment) and consumed by NOTHING in route()/route_all() — the gate is genuinely
+  ADVISORY and this story hardens its authentication WITHOUT wiring it into routing, so it
+  cannot drop a Shared span or regress the by-construction floor (which the S1
+  SharedLayerProjector still wraps regardless of gate validity, per story Notes line 48).
+  The additive-only / no-public-API-regression contract is pinned
+  (test_no_gate_constructor_signature_unchanged, test_no_gate_router_behaviour_unchanged,
+  test_a8_absent_gate_router_uses_static_softmax).
+
+  Independence self-attestation: I read the project axiom registry, the story, the new
+  module (moe_gate_signing.py), both new test files, the moe.py loader+constructor+route
+  bodies, and isolated S2-05's own commits to verify the diff scope. Findings are my own
+  judgement against the 6-axiom registry; I did not defer to the executor's self-report and
+  in fact overturned the premise of its flagged deviation (AX-002 is canonical, not a
+  non-canonical alias). Out-of-scope deferrals: cryptographic-primitive correctness /
+  constant-time / no-secret-leak / no-unsafe-deserialization / no-subprocess / no-shell-out
+  / no-network rigor -> security-sast (PRIMARY); FR/NFR mapping completeness ->
+  requirements-coverage + traceability; code style -> code-quality. APPROVE: 0 MAJOR+
+  (1 OBSERVATION). The story remains correctly blocked at REVIEW pending the other four
+  reviewers per its DoD line 62.

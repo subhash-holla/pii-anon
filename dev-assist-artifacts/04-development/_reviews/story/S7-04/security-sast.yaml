@@ -1,0 +1,38 @@
+reviewer: security-sast
+story: S7-04
+gate: story
+verdict: APPROVE
+summary: >
+  STRONG APPROVE. The no-fabrication invariant is upheld comprehensively — no
+  fabricated G5 PASS or crash producible across the full hostile-shape matrix
+  (latency, audit, ceiling, run_metadata, nested-container garbage). Every
+  artifact value (top-level + nested) routes through a validator; the
+  tighten-only latency bar cannot be loosened; the PENDING-vs-FAIL boundary is
+  fail-closed (a breach in one half outranks missing-shape in the other);
+  no_raw_pii_persist=True is EARNED (intercept_all raises on survival — no
+  swallow path); no raw synthetic PII or surrogate tokens leak into the emitted
+  artifact; audit_summary byte-deterministic same-seed. The _safe_repr/_safe_names
+  hardening closes the int->str digit-limit DoV without truncation-abuse
+  (truncated reprs feed DETAIL strings only, never a comparison). The
+  certification/performance split (validate step-7 audit-integrity bars vs
+  SDO-gate latency ceiling) creates no escalation path. Off-limits md5
+  byte-identical; producer writes only artifacts/canonical/; imports
+  boundary-isolated; ruff + mypy clean; targeted suites green (285 + 19 passed).
+findings:
+  - id: SEC-1
+    severity: OBSERVATION
+    title: G7 detail string retains {culprit!r} while G1/G4 sibling sites were upgraded to _safe_repr
+    where: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py:1804
+    evidence: >
+      culprit is either _CORE_SYSTEM (constant) or a system name already
+      shape-normalised to str by _systems_by_name — not artifact-triggerable on
+      honest JSON; outside the S7-04 commit range; not regressed by this story.
+    recommendation: >
+      Optionally route culprit through _safe_repr in a future control-path touch
+      for symmetry. No change required for S7-04. TRACKED on the Pass-2 sweep list.
+offlimits_md5_ok: true
+notes: >
+  MANDATORY NEXT STEP per story §12 and the SDO catch-net rule:
+  competitive_supremacy.py was modified, so the adversarial close (bar=0 upheld,
+  fabrication refuters MUST complete) is REQUIRED before S7-04 is DONE. This
+  story-gate APPROVE is necessary-but-not-sufficient.

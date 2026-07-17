@@ -1,0 +1,137 @@
+# Canonical Reviewer Output (YAML) — developer-assistant Development
+# security-sast reviewer (PRIMARY) — story gate S2-02 iteration 1.
+# gate_v1.json is a CONTROL-PATH / privilege-escalation artifact; this dimension is the headline.
+
+reviewer: dev-assist-development-security-sast
+
+scope_id: S2-02
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: security-S2-02-01
+    severity: OBSERVATION
+    location: src/pii_anon/fusion.py:728
+    description: |
+      The wired "distilled_moe" v2 factory _build_distilled_moe fails CLOSED when
+      spec.gate_path is set but spec.key_ring is None by raising a generic
+      `ValueError("distilled_moe gate_path requires a key_ring for verify-on-load")`.
+      The behaviour is correct and is pinned by
+      test_distilled_moe_factory_gate_path_without_key_ring_fails_closed, and it
+      mirrors the existing byte-identical MoERouter construction seam
+      (moe.py:409) exactly — so this is consistent-with-precedent, not a
+      regression. The only reason it is logged at all: ValueError is a broad
+      builtin, so a future caller wrapping build_fusion in a wide
+      `except (ValueError, ...)` could in principle mask the fail-closed signal.
+      No current breach — the fail-closed path is exercised and the floor wrap is
+      always applied (AX-003), so the gate stays advisory regardless.
+    suggested_resolution: |
+      Optional / non-blocking: if a future refactor introduces broad ValueError
+      handling around the v2 factory, consider a dedicated misconfiguration
+      exception type (or reuse GatePayloadError-style specificity) so the
+      gate_path-without-key_ring fail-closed signal cannot be swallowed by an
+      unrelated except clause. Keep parity with the moe.py:409 seam if changed.
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-02-distilled-topk-gate.md
+      - requirements.md#AX-006
+      - requirements.md#NFR-026
+
+  - id: security-S2-02-02
+    severity: OBSERVATION
+    location: src/pii_anon/routing/distilled_gate.py:216
+    description: |
+      The direct `DistilledTopKGate(payload)` constructor (and the
+      `DistilledGatePayload(...)` dataclass) remain importable. Adjudication:
+      this is NOT a verify-on-load bypass and NOT a privilege-escalation surface.
+      `DistilledTopKGate.__init__` accepts an already-validated
+      DistilledGatePayload and reads NO file; the dataclass's sanctioned
+      construction path is `from_payload`, which validates shape and is invoked
+      ONLY at distilled_gate.py:280 inside `load_distilled_gate`, downstream of
+      `load_verified_gate(..., verify_on_load=True)`. A grep over src/ confirms
+      exactly one `DistilledTopKGate(` call site (the verified one) and zero
+      `verify_on_load=False` tokens anywhere in src/. The direct constructor is
+      reachable only from already-executing in-process code that owns the process
+      — directly analogous to S2-05's adjudicated `verify_on_load=False` offline-
+      tooling escape. An attacker who can call this constructor in-process has
+      already achieved code execution, against which an artifact-signature
+      boundary offers no additional protection. Logged for the audit trail only.
+    suggested_resolution: |
+      No change required. The verify-on-load boundary is the correct and
+      sufficient control for the file-reading threat model. (If desired purely
+      for defence-in-depth documentation, the module docstring at lines 10-15
+      already states the constraint explicitly.)
+    references:
+      - dev-assist-artifacts/04-development/02-stories/sprint-2/S2-02-distilled-topk-gate.md
+      - requirements.md#AX-006
+
+notes: |
+  HEADLINE (RISK-1 / AX-006 — control-path artifact): PASS, with non-vacuous proof.
+  (1) Verify-on-load is MANDATORY on every file-reading path. The sole file->gate
+      construction path is load_distilled_gate -> moe.load_verified_gate(path,
+      key_ring=..., verify_on_load=True) with an explicit `True` AST constant
+      (distilled_gate.py:277). grep over src/: ZERO `verify_on_load=False`. The
+      fusion.py::_build_distilled_moe production wiring uses load_distilled_gate
+      (no bypass) and fails CLOSED when gate_path is set with key_ring=None
+      (ValueError, fusion.py:728) — never silently skips. The direct
+      DistilledTopKGate(payload) constructor reads no file and is reachable only
+      from in-process code that owns the process (adjudicated above, finding 02).
+
+  (2) Fail-closed semantics — CONFIRMED + tested non-vacuously (all 62 owned tests
+      pass, coverage-gate noise aside; A8 importorskip RAN against xgboost 3.2.0,
+      0 skips). Tampered weight byte => GateSignatureError (A1, byte flipped
+      post-signing). Unknown/retired key => GateSignatureError (A1, match="unknown
+      key id"; backed by verify() moe_gate_signing.py:234 — the ring is the trust
+      root even for a self-consistent attacker HMAC). Verified-but-malformed =>
+      GatePayloadError (A9, correctly-signed envelope missing `weights`). Absent
+      artifact => None static-softmax fallback (A2). present-but-broken != absent
+      is explicitly pinned in both load_verified_gate and the A9 load test.
+
+  (3) No unsafe sinks — CONFIRMED. AST/grep of distilled_gate.py + gate_distillation.py
+      + the fusion.py additive block: ZERO unsafe-deserialization, ZERO subprocess,
+      ZERO shell-out, ZERO dynamic-eval, ZERO dynamic-import, ZERO network sinks.
+      The single getattr is `getattr(oracle, "model_bytes", None)` — a literal-name
+      attribute probe on an in-process object, NOT attacker-controlled dispatch.
+      emit_signed_gate writes JSON only (json.dumps, sort_keys, compact separators).
+      distilled_gate.py imports no xgboost; gate_distillation.py imports no xgboost
+      at module top level (A10 AST test walks tree.body only — the SurvivalOracle
+      Protocol decouples it).
+
+  (4) Signing correctness — CONFIRMED. emit_signed_gate -> KeyRing.sign_payload ->
+      sign() = HMAC-SHA256 over canonical_gate_bytes(payload) with the CURRENT key
+      only. verify() uses hmac.compare_digest (constant-time; not a timing oracle)
+      and rejects unknown key id. _is_finite_number rejects bool (Python bool is an
+      int subclass) so no True->1.0 weight coercion (A9 bool-weight + bool-temperature
+      + bool-schema_version tests). Round-trip emit->load verifies (A7); re-emit is
+      byte-identical (A7). Only the S2-05 NON-PRODUCTION test key + synthetic records
+      — no real secret / no PII (AX-001).
+
+  (5) AST no-unverified-construction guard — CONFIRMED NON-VACUOUS. Independent
+      mutation probe: the guard catches a `verify_on_load=False` mutant (substring
+      AND AST-constant), a non-True constant mutant, AND an OMITTED-kwarg mutant
+      (default-off risk). Three-layered, real teeth — not a tautology.
+
+  (6) Byte-identical pinned files — CONFIRMED. evaluation/competitor_compare.py md5
+      7cae16c89f4c97136e1a12394dae2025 (exact manifest match); swarm_learner.py
+      79fcb1779c9601767c6f62340868b035; moe_gate_signing.py c85741765eb34b9a7860ff5e4844fe07;
+      moe.py 1ba0bea31ee9dab1a26a401784f50b1e. None appear in
+      `git diff --name-only 7e9882a^..6184def` (7 owned files only: errors.py,
+      fusion.py, routing/__init__.py, routing/distilled_gate.py,
+      routing/gate_distillation.py, tests/test_distilled_gate.py,
+      tests/test_gate_distillation.py). orchestrator.py + tests/test_moe_enhancements.py
+      not in range.
+
+  errors.py change is additive-only (GatePayloadError; GateSignatureError and all
+  prior content byte-identical). AX-003 advisory-floor preserved (A4 + the two v2
+  factory floor tests prove a gate zeroing regex-oss for US_SSN still yields a
+  surviving shared_floor-marked span via SharedLayerProjector re-injection).
+
+  RECOMMENDATION: the story's standing adversarial-close catch-net (control-path
+  artifact, bar=0) is appropriate post-APPROVE per SO-10/SO-11 methodology; this
+  story-gate APPROVE is necessary-but-not-sufficient for that catch-net, which the
+  orchestrator should still run.
+
+review_time_seconds: 720
+
+context_bounds_respected: true

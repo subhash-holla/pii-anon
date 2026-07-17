@@ -1,0 +1,761 @@
+[
+{
+"text": "Record for David Sanchez, Genetic Data: HTT CAG-repeat expansion (42), contact david.sanchez8@mail.com. [#a9-GENE-en-27]",
+"art9_gold": [
+[
+40,
+69,
+"GENETIC_DATA",
+"HTT CAG-repeat expansion (42)"
+]
+]
+},
+{
+"text": "Record for Patricia Taylor, Sexual Orientation: heterosexual, contact patricia.taylor62@protonmail.com. [#a9-SEXU-en-7]",
+"art9_gold": [
+[
+48,
+60,
+"SEXUAL_ORIENTATION",
+"heterosexual"
+]
+]
+},
+{
+"text": "Record for Lisa Gonzalez, Sexual Orientation: pansexual, contact lisa.gonzalez22@mail.com. [#a9-SEXU-en-11]",
+"art9_gold": [
+[
+46,
+55,
+"SEXUAL_ORIENTATION",
+"pansexual"
+]
+]
+},
+{
+"text": "Record for Nancy Wright, Genetic Data: CFTR ΔF508 homozygous, contact nancy.wright92@hotmail.com. [#a9-GENE-en-30]",
+"art9_gold": [
+[
+39,
+60,
+"GENETIC_DATA",
+"CFTR ΔF508 homozygous"
+]
+]
+},
+{
+"text": "Record for Sandra Gonzalez, Trade Union Membership: UAW Local 600, contact sandra.gonzalez18@outlook.com. [#a9-TRAD-en-3]",
+"art9_gold": [
+[
+52,
+65,
+"TRADE_UNION_MEMBERSHIP",
+"UAW Local 600"
+]
+]
+},
+{
+"text": "Record for Dorothy Brown, Genetic Data: Factor V Leiden carrier, contact dorothy.brown65@aol.com. [#a9-GENE-en-17]",
+"art9_gold": [
+[
+40,
+63,
+"GENETIC_DATA",
+"Factor V Leiden carrier"
+]
+]
+},
+{
+"text": "Record for Carol Lewis, Trade Union Membership: IG Metall, contact carol.lewis14@gmail.com. [#a9-TRAD-en-0]",
+"art9_gold": [
+[
+48,
+57,
+"TRADE_UNION_MEMBERSHIP",
+"IG Metall"
+]
+]
+},
+{
+"text": "Record for Nancy Thompson, Genetic Data: MTHFR C677T heterozygous, contact nancy.thompson3@aol.com. [#a9-GENE-en-4]",
+"art9_gold": [
+[
+41,
+65,
+"GENETIC_DATA",
+"MTHFR C677T heterozygous"
+]
+]
+},
+{
+"text": "Record for Linda Clark, Sexual Orientation: heterosexual, contact linda.clark87@gmail.com. [#a9-SEXU-en-23]",
+"art9_gold": [
+[
+44,
+56,
+"SEXUAL_ORIENTATION",
+"heterosexual"
+]
+]
+},
+{
+"text": "Record for Barbara Scott, Trade Union Membership: NUT member, contact barbara.scott11@protonmail.com. [#a9-TRAD-en-26]",
+"art9_gold": [
+[
+50,
+60,
+"TRADE_UNION_MEMBERSHIP",
+"NUT member"
+]
+]
+},
+{
+"text": "Record for Amanda Lopez, Trade Union Membership: NUT member, contact amanda.lopez46@gmail.com. [#a9-TRAD-en-23]",
+"art9_gold": [
+[
+49,
+59,
+"TRADE_UNION_MEMBERSHIP",
+"NUT member"
+]
+]
+},
+{
+"text": "Record for Margaret Miller, Trade Union Membership: IG Metall, contact margaret.miller99@fastmail.com. [#a9-TRAD-en-33]",
+"art9_gold": [
+[
+52,
+61,
+"TRADE_UNION_MEMBERSHIP",
+"IG Metall"
+]
+]
+},
+{
+"text": "Record for Michelle Scott, Trade Union Membership: CGT, contact michelle.scott88@icloud.com. [#a9-TRAD-en-12]",
+"art9_gold": [
+[
+51,
+54,
+"TRADE_UNION_MEMBERSHIP",
+"CGT"
+]
+]
+},
+{
+"text": "Record for Kenneth Martinez, Genetic Data: CFTR ΔF508 homozygous, contact kenneth.martinez75@fastmail.com. [#a9-GENE-en-25]",
+"art9_gold": [
+[
+43,
+64,
+"GENETIC_DATA",
+"CFTR ΔF508 homozygous"
+]
+]
+},
+{
+"text": "Record for Melissa Hill, Genetic Data: APOE ε4/ε4 genotype, contact melissa.hill11@icloud.com. [#a9-GENE-en-22]",
+"art9_gold": [
+[
+39,
+58,
+"GENETIC_DATA",
+"APOE ε4/ε4 genotype"
+]
+]
+},
+{
+"text": "Record for Linda Nguyen, Genetic Data: 23-marker STR profile, contact linda.nguyen2@protonmail.com. [#a9-GENE-en-6]",
+"art9_gold": [
+[
+39,
+60,
+"GENETIC_DATA",
+"23-marker STR profile"
+]
+]
+},
+{
+"text": "Record for Elizabeth Harris, Genetic Data: Factor V Leiden carrier, contact elizabeth.harris10@aol.com. [#a9-GENE-en-10]",
+"art9_gold": [
+[
+43,
+66,
+"GENETIC_DATA",
+"Factor V Leiden carrier"
+]
+]
+},
+{
+"text": "Record for Kevin Moore, Trade Union Membership: NUT member, contact kevin.moore66@protonmail.com. [#a9-TRAD-en-7]",
+"art9_gold": [
+[
+48,
+58,
+"TRADE_UNION_MEMBERSHIP",
+"NUT member"
+]
+]
+},
+{
+"text": "Record for Carol Allen, Sexual Orientation: queer, contact carol.allen64@protonmail.com. [#a9-SEXU-en-4]",
+"art9_gold": [
+[
+44,
+49,
+"SEXUAL_ORIENTATION",
+"queer"
+]
+]
+},
+{
+"text": "Record for Elizabeth Brown, Trade Union Membership: IG Metall, contact elizabeth.brown35@icloud.com. [#a9-TRAD-en-18]",
+"art9_gold": [
+[
+52,
+61,
+"TRADE_UNION_MEMBERSHIP",
+"IG Metall"
+]
+]
+},
+{
+"text": "Record for Melissa Gonzalez, Sexual Orientation: pansexual, contact melissa.gonzalez40@protonmail.com. [#a9-SEXU-en-17]",
+"art9_gold": [
+[
+49,
+58,
+"SEXUAL_ORIENTATION",
+"pansexual"
+]
+]
+},
+{
+"text": "Record for Susan Perez, Trade Union Membership: UAW Local 600, contact susan.perez48@mail.com. [#a9-TRAD-en-2]",
+"art9_gold": [
+[
+48,
+61,
+"TRADE_UNION_MEMBERSHIP",
+"UAW Local 600"
+]
+]
+},
+{
+"text": "Record for Kimberly Lewis, Genetic Data: HLA-B*57:01 positive, contact kimberly.lewis11@protonmail.com. [#a9-GENE-en-31]",
+"art9_gold": [
+[
+41,
+61,
+"GENETIC_DATA",
+"HLA-B*57:01 positive"
+]
+]
+},
+{
+"text": "Record for James Davis, Genetic Data: CFTR ΔF508 homozygous, contact james.davis60@protonmail.com. [#a9-GENE-en-24]",
+"art9_gold": [
+[
+38,
+59,
+"GENETIC_DATA",
+"CFTR ΔF508 homozygous"
+]
+]
+},
+{
+"text": "Record for Andrew Robinson, Sexual Orientation: lesbian, contact andrew.robinson17@gmail.com. [#a9-SEXU-en-19]",
+"art9_gold": [
+[
+48,
+55,
+"SEXUAL_ORIENTATION",
+"lesbian"
+]
+]
+},
+{
+"text": "Record for Christopher King, Trade Union Membership: AFL-CIO affiliate, contact christopher.king58@icloud.com. [#a9-TRAD-en-21]",
+"art9_gold": [
+[
+53,
+70,
+"TRADE_UNION_MEMBERSHIP",
+"AFL-CIO affiliate"
+]
+]
+},
+{
+"text": "Record for Amanda Walker, Trade Union Membership: Unite the Union, contact amanda.walker8@hotmail.com. [#a9-TRAD-en-5]",
+"art9_gold": [
+[
+50,
+65,
+"TRADE_UNION_MEMBERSHIP",
+"Unite the Union"
+]
+]
+},
+{
+"text": "Record for Betty White, Trade Union Membership: SEIU Local 1000, contact betty.white95@gmail.com. [#a9-TRAD-en-8]",
+"art9_gold": [
+[
+48,
+63,
+"TRADE_UNION_MEMBERSHIP",
+"SEIU Local 1000"
+]
+]
+},
+{
+"text": "Record for James Harris, Sexual Orientation: pansexual, contact james.harris82@zoho.com. [#a9-SEXU-en-26]",
+"art9_gold": [
+[
+45,
+54,
+"SEXUAL_ORIENTATION",
+"pansexual"
+]
+]
+},
+{
+"text": "Record for James Allen, Genetic Data: rs53576 GG genotype, contact james.allen67@protonmail.com. [#a9-GENE-en-20]",
+"art9_gold": [
+[
+38,
+57,
+"GENETIC_DATA",
+"rs53576 GG genotype"
+]
+]
+},
+{
+"text": "Record for Donna Martin, Sexual Orientation: gay, contact donna.martin57@aol.com. [#a9-SEXU-en-15]",
+"art9_gold": [
+[
+45,
+48,
+"SEXUAL_ORIENTATION",
+"gay"
+]
+]
+},
+{
+"text": "Record for Lisa Thomas, Genetic Data: BRCA1 c.68_69delAG pathogenic variant, contact lisa.thomas9@protonmail.com. [#a9-GENE-en-8]",
+"art9_gold": [
+[
+38,
+75,
+"GENETIC_DATA",
+"BRCA1 c.68_69delAG pathogenic variant"
+]
+]
+},
+{
+"text": "Record for Sarah Davis, Trade Union Membership: IG Metall, contact sarah.davis46@zoho.com. [#a9-TRAD-en-22]",
+"art9_gold": [
+[
+48,
+57,
+"TRADE_UNION_MEMBERSHIP",
+"IG Metall"
+]
+]
+},
+{
+"text": "Record for George Scott, Genetic Data: HLA-B*57:01 positive, contact george.scott45@yahoo.com. [#a9-GENE-en-3]",
+"art9_gold": [
+[
+39,
+59,
+"GENETIC_DATA",
+"HLA-B*57:01 positive"
+]
+]
+},
+{
+"text": "Record for Linda Davis, Genetic Data: rs53576 GG genotype, contact linda.davis89@icloud.com. [#a9-GENE-en-7]",
+"art9_gold": [
+[
+38,
+57,
+"GENETIC_DATA",
+"rs53576 GG genotype"
+]
+]
+},
+{
+"text": "Record for Betty Hernandez, Genetic Data: BRCA1 c.68_69delAG pathogenic variant, contact betty.hernandez46@yahoo.com. [#a9-GENE-en-5]",
+"art9_gold": [
+[
+42,
+79,
+"GENETIC_DATA",
+"BRCA1 c.68_69delAG pathogenic variant"
+]
+]
+},
+{
+"text": "Record for Patricia Walker, Trade Union Membership: AFL-CIO affiliate, contact patricia.walker57@protonmail.com. [#a9-TRAD-en-6]",
+"art9_gold": [
+[
+52,
+69,
+"TRADE_UNION_MEMBERSHIP",
+"AFL-CIO affiliate"
+]
+]
+},
+{
+"text": "Record for Michael Smith, Sexual Orientation: queer, contact michael.smith36@zoho.com. [#a9-SEXU-en-32]",
+"art9_gold": [
+[
+46,
+51,
+"SEXUAL_ORIENTATION",
+"queer"
+]
+]
+},
+{
+"text": "Record for George Thompson, Sexual Orientation: gay, contact george.thompson6@gmail.com. [#a9-SEXU-en-33]",
+"art9_gold": [
+[
+48,
+51,
+"SEXUAL_ORIENTATION",
+"gay"
+]
+]
+},
+{
+"text": "Record for Melissa Davis, Trade Union Membership: SEIU Local 1000, contact melissa.davis41@yahoo.com. [#a9-TRAD-en-11]",
+"art9_gold": [
+[
+50,
+65,
+"TRADE_UNION_MEMBERSHIP",
+"SEIU Local 1000"
+]
+]
+},
+{
+"text": "Record for Steven Harris, Sexual Orientation: pansexual, contact steven.harris34@protonmail.com. [#a9-SEXU-en-28]",
+"art9_gold": [
+[
+46,
+55,
+"SEXUAL_ORIENTATION",
+"pansexual"
+]
+]
+},
+{
+"text": "Record for Betty Lee, Genetic Data: rs53576 GG genotype, contact betty.lee44@zoho.com. [#a9-GENE-en-33]",
+"art9_gold": [
+[
+36,
+55,
+"GENETIC_DATA",
+"rs53576 GG genotype"
+]
+]
+},
+{
+"text": "Record for Paul Johnson, Genetic Data: CFTR ΔF508 homozygous, contact paul.johnson65@zoho.com. [#a9-GENE-en-28]",
+"art9_gold": [
+[
+39,
+60,
+"GENETIC_DATA",
+"CFTR ΔF508 homozygous"
+]
+]
+},
+{
+"text": "Record for Robert Wright, Sexual Orientation: asexual, contact robert.wright58@hotmail.com. [#a9-SEXU-en-20]",
+"art9_gold": [
+[
+46,
+53,
+"SEXUAL_ORIENTATION",
+"asexual"
+]
+]
+},
+{
+"text": "Record for Dorothy Hill, Genetic Data: APOE ε4/ε4 genotype, contact dorothy.hill73@gmail.com. [#a9-GENE-en-26]",
+"art9_gold": [
+[
+39,
+58,
+"GENETIC_DATA",
+"APOE ε4/ε4 genotype"
+]
+]
+},
+{
+"text": "Record for Daniel Clark, Sexual Orientation: gay, contact daniel.clark68@hotmail.com. [#a9-SEXU-en-21]",
+"art9_gold": [
+[
+45,
+48,
+"SEXUAL_ORIENTATION",
+"gay"
+]
+]
+},
+{
+"text": "Record for Timothy Hill, Genetic Data: HLA-B*57:01 positive, contact timothy.hill64@yahoo.com. [#a9-GENE-en-18]",
+"art9_gold": [
+[
+39,
+59,
+"GENETIC_DATA",
+"HLA-B*57:01 positive"
+]
+]
+},
+{
+"text": "Record for Joseph Flores, Trade Union Membership: AFL-CIO affiliate, contact joseph.flores83@fastmail.com. [#a9-TRAD-en-27]",
+"art9_gold": [
+[
+50,
+67,
+"TRADE_UNION_MEMBERSHIP",
+"AFL-CIO affiliate"
+]
+]
+},
+{
+"text": "Record for Barbara Anderson, Sexual Orientation: lesbian, contact barbara.anderson46@icloud.com. [#a9-SEXU-en-8]",
+"art9_gold": [
+[
+49,
+56,
+"SEXUAL_ORIENTATION",
+"lesbian"
+]
+]
+},
+{
+"text": "Record for Brian Brown, Trade Union Membership: AFL-CIO affiliate, contact brian.brown59@yahoo.com. [#a9-TRAD-en-13]",
+"art9_gold": [
+[
+48,
+65,
+"TRADE_UNION_MEMBERSHIP",
+"AFL-CIO affiliate"
+]
+]
+},
+{
+"text": "Record for John Robinson, Trade Union Membership: CGT, contact john.robinson75@gmail.com. [#a9-TRAD-en-16]",
+"art9_gold": [
+[
+50,
+53,
+"TRADE_UNION_MEMBERSHIP",
+"CGT"
+]
+]
+},
+{
+"text": "Record for Matthew Robinson, Trade Union Membership: Unite the Union, contact matthew.robinson55@mail.com. [#a9-TRAD-en-9]",
+"art9_gold": [
+[
+53,
+68,
+"TRADE_UNION_MEMBERSHIP",
+"Unite the Union"
+]
+]
+},
+{
+"text": "Record for Brian Lopez, Sexual Orientation: queer, contact brian.lopez24@gmail.com. [#a9-SEXU-en-25]",
+"art9_gold": [
+[
+44,
+49,
+"SEXUAL_ORIENTATION",
+"queer"
+]
+]
+},
+{
+"text": "Record for John Anderson, Trade Union Membership: Unite the Union, contact john.anderson76@fastmail.com. [#a9-TRAD-en-28]",
+"art9_gold": [
+[
+50,
+65,
+"TRADE_UNION_MEMBERSHIP",
+"Unite the Union"
+]
+]
+},
+{
+"text": "Record for Linda Harris, Sexual Orientation: queer, contact linda.harris4@protonmail.com. [#a9-SEXU-en-3]",
+"art9_gold": [
+[
+45,
+50,
+"SEXUAL_ORIENTATION",
+"queer"
+]
+]
+},
+{
+"text": "Record for Emily Scott, Genetic Data: Factor V Leiden carrier, contact emily.scott49@outlook.com. [#a9-GENE-en-2]",
+"art9_gold": [
+[
+38,
+61,
+"GENETIC_DATA",
+"Factor V Leiden carrier"
+]
+]
+},
+{
+"text": "Record for Donald Ramirez, Trade Union Membership: UAW Local 600, contact donald.ramirez2@aol.com. [#a9-TRAD-en-32]",
+"art9_gold": [
+[
+51,
+64,
+"TRADE_UNION_MEMBERSHIP",
+"UAW Local 600"
+]
+]
+},
+{
+"text": "Record for Richard Nguyen, Sexual Orientation: gay, contact richard.nguyen19@fastmail.com. [#a9-SEXU-en-27]",
+"art9_gold": [
+[
+47,
+50,
+"SEXUAL_ORIENTATION",
+"gay"
+]
+]
+},
+{
+"text": "Record for Mark Davis, Genetic Data: BRCA1 c.68_69delAG pathogenic variant, contact mark.davis32@yahoo.com. [#a9-GENE-en-29]",
+"art9_gold": [
+[
+37,
+74,
+"GENETIC_DATA",
+"BRCA1 c.68_69delAG pathogenic variant"
+]
+]
+},
+{
+"text": "Record for Mark Sanchez, Trade Union Membership: CGT, contact mark.sanchez27@aol.com. [#a9-TRAD-en-30]",
+"art9_gold": [
+[
+49,
+52,
+"TRADE_UNION_MEMBERSHIP",
+"CGT"
+]
+]
+},
+{
+"text": "Record for Jennifer Martin, Genetic Data: Factor V Leiden carrier, contact jennifer.martin36@protonmail.com. [#a9-GENE-en-19]",
+"art9_gold": [
+[
+42,
+65,
+"GENETIC_DATA",
+"Factor V Leiden carrier"
+]
+]
+},
+{
+"text": "Record for Dorothy Brown, Genetic Data: BRCA1 c.68_69delAG pathogenic variant, contact dorothy.brown84@fastmail.com. [#a9-GENE-en-13]",
+"art9_gold": [
+[
+40,
+77,
+"GENETIC_DATA",
+"BRCA1 c.68_69delAG pathogenic variant"
+]
+]
+},
+{
+"text": "Record for Susan Gonzalez, Genetic Data: BRCA1 c.68_69delAG pathogenic variant, contact susan.gonzalez31@yahoo.com. [#a9-GENE-en-16]",
+"art9_gold": [
+[
+41,
+78,
+"GENETIC_DATA",
+"BRCA1 c.68_69delAG pathogenic variant"
+]
+]
+},
+{
+"text": "Record for Barbara Lee, Sexual Orientation: lesbian, contact barbara.lee20@outlook.com. [#a9-SEXU-en-29]",
+"art9_gold": [
+[
+44,
+51,
+"SEXUAL_ORIENTATION",
+"lesbian"
+]
+]
+},
+{
+"text": "Record for Betty Robinson, Trade Union Membership: UAW Local 600, contact betty.robinson44@aol.com. [#a9-TRAD-en-20]",
+"art9_gold": [
+[
+51,
+64,
+"TRADE_UNION_MEMBERSHIP",
+"UAW Local 600"
+]
+]
+},
+{
+"text": "Record for Matthew Lee, Genetic Data: APOE ε4/ε4 genotype, contact matthew.lee48@gmail.com. [#a9-GENE-en-23]",
+"art9_gold": [
+[
+38,
+57,
+"GENETIC_DATA",
+"APOE ε4/ε4 genotype"
+]
+]
+},
+{
+"text": "Record for Linda Thomas, Genetic Data: CFTR ΔF508 homozygous, contact linda.thomas63@outlook.com. [#a9-GENE-en-11]",
+"art9_gold": [
+[
+39,
+60,
+"GENETIC_DATA",
+"CFTR ΔF508 homozygous"
+]
+]
+},
+{
+"text": "Record for John Perez, Trade Union Membership: NUT member, contact john.perez99@fastmail.com. [#a9-TRAD-en-15]",
+"art9_gold": [
+[
+47,
+57,
+"TRADE_UNION_MEMBERSHIP",
+"NUT member"
+]
+]
+},
+{
+"text": "Record for Dorothy Perez, Trade Union Membership: NUT member, contact dorothy.perez83@aol.com. [#a9-TRAD-en-25]",
+"art9_gold": [
+[
+50,
+60,
+"TRADE_UNION_MEMBERSHIP",
+"NUT member"
+]
+]
+}
+]

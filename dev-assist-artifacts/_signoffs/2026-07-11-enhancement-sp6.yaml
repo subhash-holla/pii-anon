@@ -1,0 +1,75 @@
+# developer-assistant Sign-off — /dev-assist-signoff (enhancement close)
+# Schema: references/signoff-spec.md
+
+schema_version: 1
+
+signoff_id: "SO-27"
+date: "2026-07-11"
+type: "absorption_pass"                   # enhancement-close (delta path)
+
+scope:
+  stage: "06-documentation"               # furthest-completed PDLC stage — carried UNCHANGED (Y1)
+  transition: "ENHANCEMENT_CLOSE"
+  successor_stage: "n/a"
+  gate_type: "n/a"
+  scope_id: "sp6-general-capabilities"
+  kind: "enhancement"
+
+signer:
+  role: "po"
+  identity: "Subhash Holla"
+  authentication: "claude_session"
+
+content_hashes:
+  inputs:
+    - file: "dev-assist-artifacts/_enhancements/sp6-general-capabilities/enhancement.md"
+      sha256: "547cdac4122e8fc81a622a23511ebae15022ef7a46d48ba6724f92db674e8893"
+    - file: "src/pii_anon/swarm.py"
+      sha256: "bca5a6e7d7041d65ed31efe57661f4ddcde0ff9ff13106288228181fc317e200"
+    - file: "src/pii_anon/engines/presidio_adapter.py"
+      sha256: "b1700b6aeda241f01b071bfcec710b1a0851bd7f71d0cf7659a3ac8e3a68b1e4"
+    - file: "src/pii_anon/engines/gliner_adapter.py"
+      sha256: "22c90fefe486305cae92cf880da48aaedd2d8fcf662a2c95f5b19737a3358ea6"
+    - file: "docs/external-validity-report.md"
+      sha256: "983c671e8dc6a42b1d94819a0efeab79fc1a2d3f54677dfae91ba7ca79d6c3de"
+
+decisions_acknowledged:
+  - "Phase-A cross-dataset mining (6 miners + synthesis; piibench miner lost to a server error): 13 candidates all hitting 4-5 datasets, 24-item dropped-as-non-general list. Headline: fusion discarded pool findings worth relaxed-recall 0.091->0.582 on TAB (union counterfactual); presidio solo TAB R=0.530 with ZERO surviving."
+  - "The swarm NER channel opened via: presidio label normalization (whitelist-audited: 6 masking gains, zero inversions), gliner label extension + window-start alignment + boundary snap, shared NER span hygiene at both adapters, and the per-type single-engine acceptance reading RAW engine confidence, with SwarmConfig.anonymization_profile() as the documented quasi-identifier workload profile."
+  - "Measured: home dev vanilla F2 0.8916->0.8927 and swarm 0.8928->0.8952 (BOTH improved; +350 TP/+266 FP); externals (default) all 5 datasets improved (gretel +5.0pp to 0.439; TAB +3.7pp); TAB anonymization profile 0.491 relaxed / 0.432 strict (~4.9x pre-sp6, ~90% of the union counterfactual)."
+  - "★ The MANDATORY close ran 3 rounds (~10,900 probes) and caught what eval numbers could not: (round 1) the GPS pattern narrowing was a PRODUCTION LEAK (floor-sourced '41, -87' pairs unmasked — the sp2 showstopper class; reverted, precision drop moved eval-only) AND the acceptance channel was INERT in production (temperature scaling + a non-production test engine id — the interim 'zero-cost pass' claim was retracted); (round 2) the presidio MEDICAL_LICENSE remap was a SECOND leak inversion on the non-swarm fusion paths (reverted; the inversion CLASS pinned) + the 10**400 bar overflow; (round 3) CLOSE_PASS 0-upheld, channel proven non-vacuously live, AX-003 floor 0 violations, differential leak probe zero losses."
+  - "GPS date-fragment precision fix relocated to _drop_undecimaled_gps under eval_cross_type_arbitration (eval-only, sp2 discipline)."
+  - "SDO gate + canonical producer byte-identical throughout (md5 3b842e81...); verdict NOT_YET / J=0.2775 / all G PASS unchanged."
+
+findings_waived:
+  - finding_id: "test_docs_discoverability::test_a2_all_relative_doc_links_resolve"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing (SO-25/SO-26 waiver carried): doc links to the user-WIP-deleted benchmark artifact."
+  - finding_id: "test_canonical_run::test_provenance_scope_matches_actual_sampler_used"
+    severity: "MAJOR"
+    waiver_rationale: "Pre-existing dataset-rev drift; control-path fix owned by the user's parallel session (task_dc3b46b5)."
+  - finding_id: "swarm._build_candidate huge-int confidence OverflowError"
+    severity: "MINOR"
+    waiver_rationale: "PRE-EXISTING at HEAD (verified byte-identical crash pre-sp6); outside the sp6 remediation surface; fail-loud, no silent leak. Flagged as background task task_935f23f3."
+
+linked_pivots: []
+
+next_action: |
+  The next tranche (evidence preserved in the sp6 record): mining candidates 1 (Title-Case
+  suppression for the REGEX engine), 3 (labeled-field cue-to-value bridge, ~2,570 FNs), 5-11
+  (date/name/ORG/address grammars, structure pre-pass), 12 (eval-harness projection adapters),
+  and 13 (per-(engine,type) reliability features — the shaped path into meta-learner retraining,
+  now with a proven-live channel to feed). Plus task_935f23f3 (pre-existing overflow) and the
+  eval-data external_eval harness README.
+
+narrative: |
+  sp6 closed the user's directive to use the external datasets plus the home benchmark to derive
+  general improvements to both offerings. The evidence-first pipeline (6-dataset failure mining →
+  generality bar → design → measure → mandatory close) produced the largest capability gain of the
+  program: the swarm's NER channel, previously discarded by three independent mechanisms, now
+  contributes on every measured corpus — with the home benchmark improving simultaneously, and the
+  document-anonymization workload served by an explicit, separately-reported profile that reaches
+  0.49 relaxed F2 on real court judgments (from 0.10). The 3-round adversarial close caught two
+  leak-direction inversions and an inert-feature illusion that the evaluation numbers alone
+  actively concealed — the program's integrity apparatus, not the leaderboard, is what made these
+  changes safe to ship. Stage marker carried UNCHANGED at 06-documentation.

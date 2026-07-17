@@ -1,0 +1,93 @@
+reviewer: code-quality
+gate: story
+scope_id: S2-05
+iteration: 1
+verdict: APPROVE
+
+findings:
+  - id: code-quality-story-01
+    severity: MINOR
+    location: "tests/test_moe_gate_signing.py, tests/test_moe_gate_verify_on_load.py"
+    description: >
+      Test function names use acceptance-criteria prefixes (test_a1_, test_a2_, …,
+      test_a9_) rather than the codebase's established fr_NNN / nfr_NNN convention
+      (106 tests across the repo use that pattern — e.g. test_fr_016_ in
+      test_shared_layer_projector.py). FR-018 / NFR-005 / NFR-006 / NFR-015 IDs
+      are called out only in module-level docstrings and story § references, not
+      embedded in the test names themselves. The acceptance criteria are traceable
+      through the A-prefix, but the naming deviates from the established repo
+      style.
+    suggested_resolution: >
+      Rename tests to embed the implementing FR/NFR IDs, e.g.
+      test_fr018_nfr005_a1_round_trip_valid_signature_loads,
+      test_nfr006_a6_replay_determinism_n5_identical_signature, etc. The A-prefix
+      may be retained as a suffix or infix alongside the FR/NFR ID for story-level
+      clarity. Alternatively, if the project chooses to standardise on A-prefixed
+      acceptance IDs for this story family, document that as the new convention and
+      apply it consistently. This is advisory — all acceptance criteria are reachable
+      via the docstrings; it does not block correctness or security.
+    status: OPEN
+
+notes: >
+  TDD evidence: confirmed — RED commit 2640fdc contains only the two test files
+  + story-md (no source); `git checkout 2640fdc && pytest` reproduced
+  ModuleNotFoundError on pii_anon.moe_gate_signing and ImportError on
+  GateSignatureError — exactly the expected RED. GREEN 2640fdc -> d45a5e4 adds the
+  production source; REFACTOR 04cf3c7 is source-only (moe_gate_signing.py alone,
+  behaviour-identical). Chain is chronologically correct and narrow.
+
+  Lint/type/build: `ruff check` on all 5 owned files returned "All checks passed!".
+  `ruff check src/ tests/` returned "All checks passed!" — no owned files appear in
+  any ruff output. `mypy src/pii_anon` (default strict profile as configured in
+  pyproject.toml) returned "Success: no issues found in 123 source files". Zero
+  warnings.
+
+  Owned test pass count: 62 passed / 0 failed (split: 47 in
+  test_moe_gate_signing.py, 15 in test_moe_gate_verify_on_load.py). Coverage
+  failure on the isolated run is the global 84% threshold triggered by running a
+  subset; full-suite coverage (86.26%) meets the threshold as claimed.
+
+  Idiomatic patterns: moe_gate_signing.py mirrors the codebase's hmac.new(key, msg,
+  hashlib.sha256).digest() idiom (cf. tokenization/providers.py:69). Every public
+  symbol (gate_signing_key_provider, canonical_gate_bytes, KeyRing, sign, verify,
+  sign_ed25519, verify_ed25519, load_verified_gate, GateSignatureError) carries a
+  complete docstring. Private helpers _require_envelope and _decode_signature_value
+  also carry docstrings. All module-level docstrings include design rationale,
+  threat-model prose, and Pass-2 caveats. Types are complete (no bare Any on
+  production return paths; Any used only where the envelope input is genuinely
+  untyped with a docstring comment explaining it).
+
+  Scope discipline: the full diff 2640fdc~1..04cf3c7 touches exactly
+  [S2-05-sign-verify-gate.md, pyproject.toml, errors.py, moe.py,
+  moe_gate_signing.py, test_moe_gate_signing.py, test_moe_gate_verify_on_load.py]
+  — all are story §8 owned files. git status --short shows only the pre-existing
+  user-WIP M files (orchestrator.py, test_moe_enhancements.py, README.md,
+  artifacts/benchmarks/*, benchmark-diagnostics.json, docs/benchmark-summary.md)
+  and untracked .claude/ and docs/pii-rate-elo-value.md — none of these appear in
+  the story diff. Scope discipline passes.
+
+  Security-specific observations (out-of-scope for this dimension but recorded
+  for completeness): hmac.compare_digest asserted by both source inspection and
+  behavioural spy (test_a9_compare_digest_is_actually_called). Error messages
+  assert no key bytes / no correct-HMAC material (test_a9_error_messages_leak_no_
+  secret_on_tamper). AST pins confirm: no unsafe-deserialization module, no
+  subprocess / shell-out / os.system / os.popen, no network modules imported. The
+  optional cryptography import is lazy (inside sign_ed25519 / verify_ed25519
+  function bodies) — AST-pinned to not appear at module top-level. The
+  _TEST_HMAC_KEY literal contains the string NON-PRODUCTION and is documented as a
+  dummy; no real secret is committed. Security-SAST is the primary owner of these
+  findings.
+
+  No unwrap()/expect()/non-null-assertion patterns (Python context: no unchecked
+  .get() on production paths without guards; all KeyError / missing-key paths
+  explicitly handled and raise GateSignatureError). No dead code. No dev
+  dependency imported at runtime.
+
+  One pre-existing contract deviation was noted in the story evidence (§74): the
+  story cites AX-002 as a determinism axiom but the canonical axiom list has only
+  AX-001/AX-005/AX-006; the determinism substance is fully backed by NFR-005 which
+  is also cited and exercised. This is not a code-quality issue — it is a
+  spec-label inconsistency deferred to axiom-compliance to adjudicate.
+
+review_time_seconds: 312
+context_bounds_respected: true

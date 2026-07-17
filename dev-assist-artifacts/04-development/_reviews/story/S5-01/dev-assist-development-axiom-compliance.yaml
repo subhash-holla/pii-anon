@@ -1,0 +1,103 @@
+reviewer: dev-assist-development-axiom-compliance
+
+scope_id: S5-01
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: axiom-S5-01-01
+    severity: OBSERVATION
+    location: src/pii_anon/eval_framework/attacks/reid.py:148
+    description: |
+      NFR-016 (AX adjacency) — `ReidSuccessMetrics.as_outcome()` returns a plain
+      MUTABLE `dict`, so the non-strippable anti-anonymity caveat is non-strippable
+      from the SOURCE object (frozen dataclass; `__post_init__` refuses blank, A6
+      proven; the method re-emits `caveat` on every call) but a downstream caller
+      could `del outcome["caveat"]` on the returned mapping after the fact
+      (verified live: `del o["caveat"]` succeeds while `m.as_outcome()` still
+      re-emits it). For S5-01's surface the MUST is satisfied: every exported
+      metric the library itself emits carries the caveat, and the sandbox-exported
+      artifact (`AttackResult.outcome`) carries it intact at emission. This is a
+      hardening observation, not a violation — the axiom is upheld at every point
+      the library controls.
+    suggested_resolution: |
+      Optional Pass-2 hardening only (do NOT block S5-01): return an immutable view
+      from `as_outcome()` (e.g. `types.MappingProxyType(dict(...))`) so the caveat
+      cannot be removed even from a copy of the exported mapping, closing the
+      non-strippability guarantee end-to-end at the artifact boundary. Track on the
+      S5-02 protocol-consumer story where the real Tier-3 adversary serialises
+      outcomes.
+    references:
+      - dev-assist-artifacts/00-axioms/project-axioms.yaml#AX-pii-anon-001
+      - dev-assist-artifacts/04-development/02-stories/sprint-5/S5-01-reid-attack-protocol.md#RISK-5
+
+notes: |
+  Axiom slice for S5-01 (ReidAttack protocol + deterministic baseline, DC-09).
+  Verdict APPROVE — all axioms this story turns on are upheld; one non-blocking
+  OBSERVATION on caveat-mutability hardening. domain_packs is empty in
+  developer-assistant.yaml — no reviewer pack-extensions to merge. Reviewed the
+  S5-01-OWNED surface only (`eval_framework/attacks/reid.py`, additive
+  `attacks/__init__.py`, `tests/test_attack_reid_protocol.py`,
+  `tests/test_attacks_import_boundary.py`); independent verification, not
+  test-trust.
+
+  AX-002 (determinism) — HEADLINE, UPHELD. AST ground truth (re-derived, not the
+  in-suite guard): reid.py imports ONLY {__future__, json, collections.abc,
+  dataclasses, typing} — ZERO random/uuid/time/secrets, ZERO dynamic-eval /
+  subprocess / shell-out call sites. The ranking is a genuine TOTAL order:
+  candidates iterated `sorted(..., key=persona_id)` (ASC) and only a STRICTLY
+  greater similarity displaces the incumbent, so equal-similarity ties resolve to
+  the lexicographically-smaller persona_id (A4 ties + candidate-permutation pass).
+  A9 confirmed NON-VACUOUS: inspected sandbox `AttackResult` — its structure has
+  NO wall-clock field at all (fields = attack_id, outcome, terminated_for_budget,
+  audit; all compare=True), so equality genuinely excludes timing and two
+  sandboxed runs compare equal at runtime.
+
+  AX-001 (synthetic-only) — UPHELD. Real-PII heuristic scan (Luhn-valid cards,
+  SSN pattern, email, phone-like) over all three new files: ZERO hits. Fixtures
+  are coarse category/city quasi-identifier tokens (cardiology/boston/oncology/
+  denver/...) — no real natural-person data, no real secret/key/network target.
+  The ANTI_ANONYMITY_CAVEAT text itself re-states AX-001 scoping.
+
+  Attacks import-isolation invariant — UPHELD (hard CI-guarded axiom). The new
+  test_attacks_import_boundary.py is a faithful AST adaptation of
+  test_rating_import_boundary.py: identical FORBIDDEN_ROOTS {pii_anon.swarm,
+  pii_anon.moe, pii_anon.fusion, pii_anon.policy}, identical absolute-import AST
+  walk, plus a "reid.py must be scanned" no-op guard (A10). reid.py's own imports
+  comply. Both the new boundary test AND the package-wide A11/A8 guards in
+  test_attack_sandbox.py now scan reid.py (scanned>=3) — all green (34 S5-01
+  cases + the 2 package-wide guards pass on re-run).
+
+  AX-003 (recall-floor) adjacency — CONFIRMED OUT OF SCOPE. My CATASTROPHIC-
+  default reviewer_hook (routing/early-exit must not suppress a shared-expert
+  finding) is NOT engaged: the owned diff touches only eval_framework/attacks/ +
+  two test files; nothing in swarm/moe/fusion/recall-floor/detection. Correctly an
+  eval-attack surface, not the detection path.
+
+  AX-005 (auditable abstention) adjacency — UPHELD (also my hook). The baseline's
+  abstain outcome (guessed_persona_id=None, excluded from the precision
+  denominator) is reachable + tested (A3, two cases); abstention is honest and
+  auditable.
+
+  Off-limits byte-identity re-verified vs the story's pinned md5s: orchestrator.py
+  0afc6deed62bbd0653ae1051b723bace, test_moe_enhancements.py
+  910e9cd66ad6e38c7bb64a9c51ecb1cb, competitor_compare.py
+  7cae16c89f4c97136e1a12394dae2025, sandbox.py 1c60b03ef1464f88112d9d814d59d6a1,
+  spec.py bd452e05236137109c650815a648c622 — all match. competitive_supremacy.py
+  and artifacts/benchmarks/* NOT touched in range. Registry merge verified live:
+  reid_baseline + the dotted runner are in DEFAULT_ATTACK_REGISTRY and the S5-04
+  reconstruction runner survives the additive merge.
+
+  SCOPE NOTE (not an S5-01 finding): the dispatched range 0bb61b4..HEAD also
+  contains S6-02 files (src/pii_anon/agentic/interception.py,
+  tests/test_agentic_interception.py, the S6-02 story). Those are OUTSIDE S5-01's
+  declared "Files owned" and belong to S6-02's gate (which engages AX-006
+  least-privilege interception, owned by security-sast). They touch no S5-01
+  axiom; I scoped this review to S5-01's owned surface per the dispatch and did
+  not adjudicate them here.
+
+review_time_seconds: 540
+
+context_bounds_respected: true

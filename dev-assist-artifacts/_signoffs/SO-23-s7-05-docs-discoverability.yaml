@@ -1,0 +1,92 @@
+sign_off_id: SO-23-s7-05-docs-discoverability
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S7-05 — docs discoverability [DOCS MUST], the LAST feature story. Closes the
+  three D6 SME Docs MAJORs: (1) the distinct anonymization-vs-pseudonymization
+  APIs are surfaced (NEW docs/anonymization-vs-pseudonymization.md — the two
+  scorer families, the AX-004 no-merge invariant verbatim, vanilla-vs-swarm
+  positioning); (2) docs/evaluate-your-pipeline.md is current (the S6-04 SDK
+  group + the certify-a-run section: canonical-run -> supremacy, copy-paste-
+  runnable after the gate catch); (3) the recall-floor doc verified live +
+  completed with the FloorProjectingFusion mention. Plus: the docs index links
+  every non-generated doc; api-reference carries the PDLC SOTA program-surfaces
+  section (9 headline symbols); the CLI epilog points at the surfaces (help
+  text only); and tests/test_docs_discoverability.py is the STANDING TEETH —
+  index completeness, zero broken links, doc-content pins, headline-symbol
+  discoverability, the supremacy-example path pin, CLI-help pins. BONUS: fixed
+  the PRE-EXISTING broken `make docs-smoke` (stale notebook path from before
+  v1.1 — the quickstart notebook now actually executes in CI-equivalent runs).
+
+stories_closed:
+  - id: S7-05
+    title: docs discoverability [DOCS MUST] — program surfaces + teeth (D6 SME Docs MAJORs + FR-010 surface)
+    gate: _reviews/story/S7-05/   # iter-1 REQUEST_CHANGES (1 MAJOR) -> remediated 5f825b6 -> iter-2 5/5 APPROVE (0 MAJOR/MINOR / 8 OBS)
+    implements: []   # no numbered FR for discoverability itself — the authority chain is the dev-log [DOCS MUST] tag + the D6 SME Docs MAJORs; FR-010's SURFACE is what gets documented (FR-010 itself was implemented by S4-01)
+    upholds: [AX-001, AX-004]
+    effect: >
+      NEW docs/anonymization-vs-pseudonymization.md; docs/README.md index
+      (+recall-floor, +the FR-010 doc, enriched rows); api-reference program-
+      surfaces section; evaluate-your-pipeline certify-a-run section; additive
+      cli.py epilog; Makefile docs-smoke fix (implicit owned file — the A9
+      precondition); tests/test_docs_discoverability.py (A1-A7 standing teeth).
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # iter-1 REQUEST_CHANGES -> iter-2 5/5 APPROVE
+  adversarial_close: NOT_REQUIRED   # docs + help text; no control-path change
+  findings_remediated_in_loop:
+    - "★ requirements-coverage MAJOR-1 (iter-1): the certify-a-run example was NOT copy-paste-runnable — step-2 read ./certified/benchmark-results.json, a file the canonical-run producer NEVER writes (the sole emission is <output-dir>/canonical-run.json: canonical_run.py:1275, cli.py:908); verbatim execution raised BadParameter; the A5 substring teeth could not catch a wrong path. FIX (5f825b6): the real path + a comment naming the emitted file + A5 TIGHTENED (any certified-dir supremacy example must end canonical-run.json) — iter-2 counterfactually proved the teeth bite (the old phantom path assert-FAILS)."
+    - "code-quality OBS (pre-existing): recall-floor.md now names FloorProjectingFusion (routing/floor_fusion.py:59) as the fusion-path applier."
+  findings_dispositioned:
+    - "security-sast OBS (positive): EVERY security-adjacent doc claim verified accurate against source — token-store AEAD semantics, supremacy exit semantics (cli.py:865-866), canonical-run fail-closed, deid_families no-merge verbatim, native-reader capability honesty + the real bounded-FlateDecode ceiling, fairness-gate fail-closed. Docs do not overstate code."
+    - "security-sast OBS (iter-1, resolved): the orchestrator.py md5 'staleness' was a measurement-frame artifact — working-tree user-WIP 0afc6dee… vs committed blob 4a837c52…, BOTH unchanged; stories touched neither (empty diffs across the full story range)."
+    - "code-quality OBS: Makefile recorded as an implicit owned file (the docs-smoke fix was the A9 precondition; zero source-behavior impact)."
+    - "traceability OBS: the matrix carries no per-story rows program-wide (FR->component grained — established convention); FR-010 already traced."
+
+decisions_acknowledged:
+  - "★ The gate caught a REAL docs-accuracy defect (the phantom artifact filename) that the substring teeth could not — and the remediation upgraded the teeth so the CLASS of defect (example-path drift) is now test-caught. This is the [DOCS MUST] story doing exactly what it exists for."
+  - "★ docs-smoke was broken at HEAD since before the program (the Makefile referenced notebooks/llm_pipeline_quickstart.ipynb, which never existed in git — the repo ships notebooks/quickstart.ipynb since v1.0.0). Fixed with the venv python + the real path; the quickstart notebook now actually executes. The release gate's local bar regains a real signal."
+  - "The user-WIP docs are byte-identical (root README untouched; docs/pii-rate-elo-value.md 89cc6d03…; docs/benchmark-summary.md e575a730…) — excluded from the index requirement AND the link sweep BY DESIGN (the story is forbidden from editing them; their links cannot gate it)."
+  - "The discoverability teeth are STANDING: a future program surface that ships undocumented (headline symbol absent, index gap, broken link, phantom CLI example path) fails tests/test_docs_discoverability.py — not a reviewer's memory."
+
+findings_waived_or_deferred:
+  - id: stage6-documentation-compile
+    disposition: next-step
+    detail: "S7-05 is the in-repo docs surface; Stage-6 Documentation (the D1-D6 compile into dev-assist-artifacts/06-documentation/) is the program-level close that follows immediately."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-22. Docs flip no guarantee."
+
+quality:
+  suite: "full xdist on the GREEN state: EXIT=0 @ 88.87% (3816 collected = 3800 passed / 16 skipped; +7 over SO-22's 3809). The remediation (5f825b6) is docs+test-assertion-only — re-verified by the owned 7/7 + ruff; iter-2 reviewers re-verified independently."
+  coverage: "88.87% (>= 84 gate)."
+  lint_type: "ruff clean; mypy clean BOTH modes (144 files)."
+  smokes: "make docs-smoke EXIT=0 (the notebook executes — newly real); make cli-smoke EXIT=0."
+  env: "AGENT_SIMULATED on the local .venv."
+
+safety:
+  user_wip_md5_unchanged: true   # working-tree orchestrator.py 0afc6dee… + test_moe_enhancements.py 910e9cd6… + root README + docs/pii-rate-elo-value.md 89cc6d03… + docs/benchmark-summary.md e575a730… + benchmark artifacts — none staged, byte-identical
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c8…; competitor_tiers.py d9202479…; canonical_run.py d8f0f80e…
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED e573243 / GREEN 8c9cec3 / remediation 5f825b6
+  no_new_hard_dependency: true
+
+content_hashes:
+  story_file: b039fa9aae6eed18c4ce0be044e5b283ace43076861281079a90c9c417d25dea
+  fr010_doc: d214c67fda0cda8214aa41123e0841f719036482e7777667ff86bc07616925c2
+  teeth_tests: 2e23dc091b4166377a6fe22792a1675855e87e4dd10d3236050f924b4c11ffe6
+
+next:
+  binding_constraint: "G6 FAIL (raw-F2, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED."
+  immediate: "★ ALL FEATURE STORIES DONE (S1-S7 actionable surface complete; S2-03 stays orchestrator-blocked). NEXT = the RC close: Stage-6 Documentation (the D1-D6 compile -> dev-assist-artifacts/06-documentation/) -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET; pip-audit the ocr/dicom extras) -> version 1.4.0->1.5.0rc1 + CHANGELOG -> tag v1.5.0-rc1 LOCAL ONLY (NEVER push tags — release.yml auto-publishes any pushed tag) -> make build + twine-check + package-size (sdist+wheel NOT published) -> final RC sign-off."
+  pass2_followons: "the standing list (full-census G6 headline + real Tier-C + real-NUTS J + real adversaries + ORCH/DATA seams + real OCR/DICOM/ASR + corpus fairness + the CANONICAL fairness wire-in [SDO close] + Papers 1 & 2)."
+  milestone: "M4 (CODE v2) COMPLETE pending the RC ceremony."

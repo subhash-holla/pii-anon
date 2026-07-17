@@ -1,0 +1,98 @@
+reviewer: dev-assist-development-code-quality
+scope_id: S2-01
+gate: story
+verdict: APPROVE
+
+findings:
+  - id: code-quality-S2-01-01
+    severity: MINOR
+    location: tests/test_moe_router_seam.py:408
+    description: |
+      Typo in test function name: `test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol`
+      has `routingate` (missing `g`). The surrounding names all spell `RoutingGate` correctly; this
+      is an accidental keystroke omission, not a deliberate abbreviation.
+    suggested_resolution: |
+      Rename to `test_fr018_routinggate_protocol_is_a_fusionstrategy_independent_symbol`
+      (insert the missing `g`). No behaviour change needed.
+
+  - id: code-quality-S2-01-02
+    severity: MINOR
+    location: tests/test_fusion_construction_seam.py:150-225
+    description: |
+      The six `test_audit_*` test functions (A7 drift-guard tests) do not embed a
+      `fr_NNN` or `nfr_NNN` requirement ID in their names, unlike every other test
+      in both owned files (which consistently prefix `fr018_`, `nfr005_`, `nfr026_`,
+      `ax002_`, `ax003_`). The audit tests trace to FR-018 / DC-02 / D5 per the
+      story's §3 A7 cell. The omission breaks the naming convention that lets grep
+      quickly find coverage for a specific FR.
+    suggested_resolution: |
+      Rename e.g.:
+        test_audit_single_source_builtin_modes_constant_exists
+          → test_fr018_audit_single_source_builtin_modes_constant_exists
+        test_audit_every_advertised_builtin_mode_is_constructible
+          → test_fr018_audit_every_advertised_builtin_mode_is_constructible
+      (and so on for the remaining four). The prefix `test_fr018_audit_` signals both the
+      FR and the [AUDIT] tag.
+
+notes: |
+  TDD evidence (strict discipline, git-evidenced):
+    - RED commit 4ba234f: test files ONLY (two new .py; 0 production files). Collection
+      ImportError on the missing seam symbols is the correct RED state.
+    - merge-base check: `git merge-base --is-ancestor 4ba234f fb591a5` → exit 0
+      (RED is ancestor of GREEN). RED-before-GREEN confirmed.
+    - GREEN commit fb591a5: production files only (moe.py +166 lines, fusion.py +134
+      lines). 29 owned tests pass.
+    - REFACTOR commit b38f65a: test file only (+37 lines, 5 _normalize_weights edge
+      tests). Total owned: 34 pass.
+
+  Scope discipline: `git diff --stat 4ba234f^..b38f65a` touches exactly the 4 owned
+  files (src/pii_anon/moe.py, src/pii_anon/fusion.py, tests/test_moe_router_seam.py,
+  tests/test_fusion_construction_seam.py). Zero scope creep.
+
+  Off-limits files confirmed byte-identical:
+    - src/pii_anon/orchestrator.py: md5 0afc6deed62bbd0653ae1051b723bace (user-WIP, matches)
+    - tests/test_moe_enhancements.py: md5 910e9cd66ad6e38c7bb64a9c51ecb1cb (user-WIP, matches)
+    - src/pii_anon/evaluation/competitor_compare.py: md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6, matches)
+    - src/pii_anon/routing/floor_fusion.py: md5 39f325bd61b152fd3e6b00b0995e524b (AX-003, matches)
+    - src/pii_anon/routing/shared_layer.py: md5 929c18b12da5fab0ede98f0c577b9579 (AX-003, matches)
+    - v1 symbols `CustomFusionFactory` + `register_fusion_strategy` in fusion.py:
+      byte-identical (RISK-1 preserved).
+
+  Lint / type gates (re-run, all clean):
+    - `ruff check src/ tests/` → All checks passed.
+    - `.venv/bin/mypy src/pii_anon` (canonical, pyproject strict) → 0 issues, 129 files.
+    - `.venv/bin/python -m mypy src/pii_anon --strict` (explicit) → 0 issues, 129 files.
+      No np.ndarray/generics needed; no disallow_any_generics hit.
+
+  Owned tests (34): `PYTHONPATH=src pytest tests/test_moe_router_seam.py tests/test_fusion_construction_seam.py --no-cov` → 34 passed (exit 0).
+
+  Additive + inert discipline confirmed:
+    - `context=None` / `gate=None` path is byte-identical to the pre-story static
+      softmax (A1/A2 property tests with independent oracle; route_all + MoEFusionStrategy.merge
+      call sites both use bare entity_type and are untouched).
+    - `RouteContext` is @dataclass(frozen=True); hashable; mutations raise FrozenInstanceError.
+    - `RoutingGate` is @runtime_checkable Protocol; no production implementation ships here.
+    - `_normalize_weights`: re-normalizes clamped gate output or returns None (fallback to base)
+      — NaN/negative weights can never propagate downstream. The ±inf→None and
+      all-non-positive→None edge-case branches are covered by REFACTOR tests.
+    - `FusionBuildSpec` is frozen (mutation raises FrozenInstanceError; A6 test verifies).
+    - A7 non-vacuous drift guard: two monkeypatched meta-checks (advertised-but-unconstructable
+      + constructable-but-unadvertised) confirm the guard has real teeth.
+    - A4 hostile-gate test runs the REAL FloorProjectingFusion(MoEFusionStrategy(gate=hostile))
+      pipeline; the shared US_SSN span survives.
+
+  `build_fusion` docstring missing `iou_threshold` parameter entry (fusion.py:559/576).
+  This omission predates S2-01 (confirmed via `git show 4ba234f^:src/pii_anon/fusion.py`);
+  S2-01 did not widen `build_fusion`'s signature. Not a new S2-01 finding; noting as
+  an OBSERVATION for the pre-existing doc debt.
+
+  No `unwrap()`/`expect()` or non-null-assertion patterns. No `any` without justification
+  (the `Any | None` on `FusionBuildSpec.key_ring` has a justifying comment avoiding
+  import cycle). No new runtime dev-dependency imports on production paths. Import
+  boundary intact (no eval_framework/attacks/SDO gate imports from moe.py or fusion.py).
+
+review_time_seconds: 840
+context_bounds_respected: true
+
+discipline_mode: strict
+tdd_evidence: red-before-green-confirmed

@@ -1,0 +1,29 @@
+reviewer: traceability
+story: S5-02
+gate: story
+verdict: APPROVE
+summary: >
+  Forward FR/NFR → story → test → DC chain sound. FR-011/FR-012/NFR-012 (+ reused
+  NFR-016) exist in requirements-document.md with matching wording; each pinned by
+  a docstring-citing G/W/T test (the repo pins IDs in docstrings, not test names):
+  FR-011 via A2 (QIC+BSL stronger-than-baseline), FR-012 via A3 (margin-abstain) +
+  A13 (de-circularization), NFR-012 via A6 (Wilson) + A7/A8 (≥385/≥897 ladder),
+  NFR-016 via A9. DC-09 trace accurate + honestly partial (S5-02 = the Tier-3 half;
+  the MIA/LiRA half is S5-03). UC-09 trace present (matrix row 27). Scope within the
+  3 owned files; reid/sandbox/spec byte-identical; SDO gate untouched (no SDO close).
+  Pass-2 SWITCH-POINT markers honest. RED precedes GREEN.
+findings:
+  - id: TRACE-S5-02-01
+    severity: OBSERVATION
+    title: traceability-matrix.md UC-09 row is requirement-keyed (no story-level S5-02 row)
+    disposition: NO ACTION (consistent with the S5-01/S5-04 convention; the UC-09 row + external_refs already encode the chain + the DATA S6 blocking dep).
+  - id: TRACE-S5-02-02
+    severity: OBSERVATION
+    title: DC-09 spans Tier-3 AND LiRA@128 MIA; S5-02 builds only the Tier-3 half
+    disposition: NO ACTION (honest partial-DC fulfilment; FR-013/NFR-013 = S5-03; confirm DC-09 full coverage at the epic gate).
+offlimits_md5_ok: true
+notes: >
+  competitive_supremacy.py 3b842e81… UNCHANGED, competitor_compare.py 7cae16c8…,
+  orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6… — all byte-identical.
+  Verdict APPROVE; the FR semantic-correctness + Wilson numerical-correctness calls
+  belong to requirements-coverage + code-quality (both also APPROVE).

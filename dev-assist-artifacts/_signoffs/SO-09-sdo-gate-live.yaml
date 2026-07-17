@@ -1,0 +1,80 @@
+sign_off_id: SO-09-sdo-gate-live
+date: 2026-06-01
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  Eval-integrity → SOTA-Dominance-Objective arc CLOSED. S3-04 (coherent significance
+  BY CONSTRUCTION + the rank_one_probability J primitive + Davidson ties) and S4-CS-01
+  (the CompetitiveSupremacyGate — the program's optimization function + completion
+  criterion) are both DONE and green in-tree. The SDO is now a first-class,
+  code-computable gate: `pii-anon supremacy` prints exactly one verdict
+  {CLAIM_GRADE_SOTA|PROVISIONAL_SOTA|NOT_YET} + the single binding constraint every run.
+
+stories_closed:
+  - id: S3-04
+    title: coherent significance BY CONSTRUCTION + record-level paired outcomes + Davidson ties
+    gate: _reviews/story/S3-04-gate.yaml   # 5-reviewer APPROVE; 2 traceability-hygiene MINOR remediated in-loop
+    commits: { red: 9238350, green: 57dbb4f, refactor: 52e8b46, review: 7a95477, minor_remediation: d4330b3, done: edcN/A }
+    implements: [FR-004, NFR-002, NFR-003-feeds, FR-010, AX-004, AX-002]
+  - id: S4-CS-01
+    title: CompetitiveSupremacyGate (the SDO objective; program completion criterion)
+    gate: _reviews/story/S4-CS-01-gate.yaml   # 6-reviewer APPROVE @ iter-2; 1 MAJOR remediated in-loop
+    commits:
+      iter1: { red: 512311b, green: b8c9d9b, refactor: 27ce89a, review: 88ba8e2 }
+      iter2: { red: c407f52, green: 4a04d0f, refactor: 719df4b, docs: efe14fc, doc_minors: 17efdb8 }
+    implements: [FR-007, FR-008, NFR-006, "SDO-J", AX-003-RecallFloorVerdictGuard]
+  - id: convergence.py-mypy-followup
+    note: "separate maintenance commit edc7ecc — np.floating[Any] stub-drift (S3-03 follow-up); restored package mypy --strict clean; behaviour-identical."
+
+decisions_acknowledged:
+  - "Coherence is BY CONSTRUCTION: point/CI/sign/verdict derive from ONE joint-posterior difference vector, so the three significance statements cannot disagree (eliminates elo.py:243/542/561 in the claim-grade path; elo.py stays byte-identical as glicko-legacy)."
+  - "J = significance.rank_one_probability over the bayes joint posterior; in-tree MLE-bootstrap fallback (bradley_terry.paired_bootstrap_draws) labelled j_source=mle-bootstrap until a bayes-eval run exists (Pass-2)."
+  - "RecallFloorVerdictGuard (AX-003) is implemented (not deferred): a recall-floor-breaching system can never top-rank; keyed on recall-specific signals with the latency-driven ensemble floor_pass deliberately carved out (latency is G5, a separate NFR)."
+  - "CLAIM_GRADE gated on (Tier-R ∪ Tier-C) all RUN-or-WAIVED-with-reason (§5); unrun Tier-R gliner2 caps at PROVISIONAL."
+  - "RISK-6 honoured: evaluation/competitor_compare.py byte-identical (its _COMPETITOR_META.keys() drives the run/expected-competitor set); the Tier-R/Tier-C registry lives entirely in the new competitor_tiers.py."
+  - "Non-blocking CI report (exit 0); --canonical-claim is the only mode where a non-supreme result hard-fails (exit 1) — guards the claim-emission path."
+
+findings_waived_or_deferred:
+  - id: TRACE-S4CS01-MINOR-2
+    disposition: deferred-to-S4-sprint-gate
+    detail: "traceability-matrix S4-CS-01 Story/Test backfill + SDO-amendment Status-Change-Log row (matrix fills DC/Story/Test in Stages 3-5)."
+  - id: REQCOV-S304-OBS-1
+    disposition: tracked-successor
+    detail: "NFR-003 (SHOULD) >=1000-replicate empirical CI coverage study — S3-02 / eval-data S5 territory; S3-04 only feeds the paired set."
+  - id: AXIOM-S304-OBS-1 / AXIOM-S4CS01-OBS-1
+    disposition: optional-hardening
+    detail: "in-tree Posterior-dataclass field-contract test (no numpyro); teeth-test verdict-assertion hardening. Non-blocking."
+
+sdo_verdict:
+  verdict: NOT_YET
+  binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+  j_value: 1.0
+  j_source: mle-bootstrap
+  verification: "quadruple-verified — pii-anon supremacy CLI + from-scratch hand-recompute + iter-2 axiom-compliance reviewer reproduction + requirements-coverage reviewer reproduction (all agree)."
+  guarantees: { G1: PENDING, G2: "PENDING<-S4-01", G3: PASS, G4: "PENDING<-S4-03", G5: "PENDING<-S5/S6", G6: PASS, G7: FAIL }
+  honesty_boundary:
+    tier_r_run: [gliner, presidio, scrubadub]
+    tier_r_unrun: [gliner2]
+    tier_c_unrun: [openai-privacy-filter, azure-ai-language, aws-comprehend]
+    openai_raw_f1_carveout: "G6 measures non-inferiority vs runnable Tier-R only; a cited Tier-C raw-F1 (OpenAI ~0.96) > pii-anon does NOT fail G6."
+
+quality:
+  suite: "2876 passed / 15 skipped / 0 failed (exit 0)"
+  coverage: "86.17% (>= 84 gate); gate modules 94% / 99%"
+  lint_type: "ruff clean; mypy --strict 0 errors / 122 files"
+  env: "AGENT_SIMULATED on the local .venv (numpyro/jax/arviz NOT installed → bayes-J + real-NUTS + Tier-C are Pass-2/importorskip)."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py, test_moe_enhancements.py, artifacts/benchmarks/*, benchmark-diagnostics.json, README.md, docs/* all match session-start baseline
+  narrow_git_add_only: true
+  elo_py_and_nonowned_callers_byte_identical: true
+  competitor_compare_byte_identical: true   # md5 7cae16c89f4c97136e1a12394dae2025
+  base_deps_pydantic_only: true
+
+next:
+  binding_objective: "S7 canonical run (canonical_claim_run=True) — THE binding constraint toward CLAIM_GRADE."
+  immediate: "security MUSTs — S2-05 (sign+verify gate_v1.json), S6-03 (encrypt token store at rest), S5-04 (sandbox attack harness)."
+  guarantee_completion: "S4-01 → G2; S4-03 → G4; recompute the SDO verdict at each landing."
+  milestone: "M4 (CODE v2) advances — eval-integrity + the SDO optimization function are LIVE."

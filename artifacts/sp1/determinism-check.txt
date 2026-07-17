@@ -1,0 +1,17 @@
+SP1 draw qualification (N=10000, seed=8314, post-Track-A)
+Determinism: two same-seed runs byte-identical modulo latency_p50_ms: True
+Entity-mix qualification (touched types, >=30 truth spans required):
+  DEA_NUMBER: truth_spans=156 (OK)
+  NPI_NUMBER: truth_spans=265 (OK)
+  DRIVERS_LICENSE: truth_spans=351 (OK)
+  LICENSE_PLATE: truth_spans=307 (OK)
+  NATIONAL_ID: truth_spans=1071 (OK)
+  US_SSN: truth_spans=1474 (OK)
+  PHONE_NUMBER: truth_spans=4471 (OK)
+  BANK_ACCOUNT: truth_spans=1062 (OK)
+  PERSON_NAME: truth_spans=18992 (OK)
+  EMAIL_ADDRESS: truth_spans=9757 (OK)
+  BAR_NUMBER: truth_spans=208 (OK)
+  ORGANIZATION: truth_spans=1801 (OK)
+  CREDIT_CARD: truth_spans=551 (OK)
+micro: {'precision': 0.92936, 'recall': 0.896031, 'f2': 0.902504}

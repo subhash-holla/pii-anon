@@ -1,0 +1,160 @@
+reviewer: requirements-coverage
+gate: story
+scope_id: S4-01
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: RC-S401-001
+    severity: OBSERVATION
+    title: "FR-009 Art-4(5) axis is satisfied via the key/state-separation proxy, not an EDPB-legal verdict (in line with NFR-015 framing)"
+    requirement: FR-009
+    where: "src/pii_anon/eval_framework/metrics/deid_families.py:124 (key_state_separation_ok); tests/test_deid_families.py::test_a4_artifact_alone_rejoin_is_flagged_fail_when_no_external_secret + ::test_a4_external_secret_required_passes_key_state_separation"
+    note: >
+      FR-009 lists "Art-4(5)" as one of the five axes. It is mapped here to the
+      engineering proxy key_state_separation_ok (artifact-alone re-join = FAIL),
+      which is exactly how the requirements doc frames NFR-015 ("Art 4(5) proxy")
+      and how the SME caveat in requirements-document.md:110 carries it. This is a
+      correct and honest mapping, not a gap — recorded only so the reviewer chain
+      knows the axis is a proxy, never a legal determination. No action required at
+      the story gate.
+  - id: RC-S401-002
+    severity: OBSERVATION
+    title: "FR-010 'no merge PATH' is enforced at the score-record/scorecard surface; it does not (and need not, this story) repeal the legacy privacy_score field"
+    requirement: FR-010
+    where: "tests/test_deid_families.py::test_a2_scorecard_has_no_merged_deid_field; src/pii_anon/eval_framework/rating/scorecard.py:64 (privacy_score preserved)"
+    note: >
+      The no-merge guard denies NEW merged de-id field/method names
+      (deid_score/combined_deid_score/etc.) on both DeidFamilyScores and
+      SystemScorecard, and explicitly excludes the historical privacy_score as the
+      documented-deprecated backward-compat field (RISK-1). FR-010 'no merge
+      path/field' is therefore satisfied for the two NEW distinct families; the
+      story honestly scopes privacy_score's eventual re-basing to a future story
+      (§5). Note for traceability: the guard's denylist is name-based, so a
+      future merged field under a name not on the denylist would not be caught —
+      acceptable for this story's surface (meta-guard proves non-vacuity on
+      deid_score), flagged only as forward awareness.
+context_bounds_respected: true
+notes: >
+  DIMENSION: "are there gaps in what we've claimed?" — every MUST clause S4-01
+  claims is mapped to a NAMED PASSING test; zero unmapped MUST clauses found.
+  Suite re-run in-tree: `python3 -m pytest tests/test_deid_families.py
+  tests/test_competitive_supremacy.py` -> 80 passed / 0 failed / 0 skipped
+  (matches the story's claimed 22 + 58 GREEN owned-test counts). The 3 honesty
+  teeth (real-artifact-PENDING, fields-absent-PENDING, neuter-flips-PASS->FAIL)
+  re-run in isolation -> 3 passed; the real benchmark artifact
+  (artifacts/benchmarks/benchmark-results.json) EXISTS, so the real-artifact test
+  EXECUTED (not skipped).
+
+  REQUIREMENT -> NAMED-PASSING-TEST MAP (all green):
+
+  FR-010 / AX-004 (enforce anon vs pseudo distinct — NO merge path/field), A2
+  no-merge CI guard:
+    - test_a2_no_merged_deid_field_in_deid_families_module (AST denylist scan of
+      deid_families.py, ZERO merged names)
+    - test_a2_meta_guard_scan_is_non_vacuous (NON-VACUOUS: a synthetic deid_score
+      field IS flagged — teeth confirmed)
+    - test_a2_positive_separateness_both_families_addressable (positive: exactly
+      {anonymization, pseudonymization_integrity})
+    - test_a2_scorecard_has_no_merged_deid_field (SystemScorecard carries the two
+      distinct fields, no NEW merged field; privacy_score excluded as documented
+      deprecated)
+    - test_a1_two_distinct_family_subrecords_no_merged_field +
+      test_a1_no_api_returns_a_single_combined_deid_number (record exposes no
+      combined/deid_score/merged/overall field or callable)
+    - test_a7_two_families_do_not_import_each_other_in_a_merging_way (AST: neither
+      scorer instantiates the other's Score class)
+    - test_a7_anonymization_score_carries_no_pseudonymization_field (cross-family
+      field-leak audit, both directions)
+  GUARD IS NON-VACUOUS — confirmed via the meta-guard above.
+
+  FR-006 / FR-009 (pseudonymization integrity as a structurally distinct 5-axis
+  family). PseudonymizationIntegrityScorer computes the FR-009 axes and they are
+  tested:
+    - axis 1 unauthorized-reversal (NFR-014): test_a3_* (3 tests, below)
+    - axis 2 referential-integrity: test_referential_integrity_100_when_consistent_mapping
+    - axis 3 collision: test_collision_rate_detects_two_plaintexts_sharing_one_surrogate
+      (TEETH — distinct plaintexts, same surrogate -> collision_rate > 0)
+    - axis 4 key/state-separation (NFR-015 / Art-4(5) proxy): test_a4_* (2 tests)
+    - axis 5 derived integrity_score: exercised across the A3/A4 paths (zeroed on
+      unauthorized-reversal or separation breach)
+    - empty-input safety: test_empty_inputs_are_safe_defensive_defaults
+    - FR-006 "distinct family" structural distinctness: the A1/A2/A7 distinctness
+      tests above. The scorer aggregates the EXISTING Reid/Leakage/Canary metrics
+      for the anon family (test_anonymization_clean_output_has_low_reidentification_risk
+      + test_anonymization_leaky_output_raises_reidentification_risk — TEETH:
+      leaky output raises reid-risk).
+
+  NFR-014 (unauthorized-reversal = 0; referential integrity = 100%):
+    - test_a3_unauthorized_reversal_zero_on_correct_key_path (rate==0 under correct
+      key; unauthorized_reversal_ok True)
+    - test_a3_unauthorized_reversal_has_teeth_wrong_key_succeeding_fails (TEETH:
+      wrong-key-that-succeeds -> rate>0 -> axis FAILS — NON-VACUOUS)
+    - test_a3_wrong_key_that_fails_to_reverse_is_not_unauthorized (correct
+      rejection is NOT counted)
+    - referential=100%: test_referential_integrity_100_when_consistent_mapping
+      (==1.0). G2-side teeth: test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant
+      (binding detail names "reversal").
+  TEETH CONFIRMED.
+
+  NFR-015 (key/state separation — artifact-alone re-join FAILs):
+    - test_a4_artifact_alone_rejoin_is_flagged_fail_when_no_external_secret
+      (artifact_alone_rejoinable=True -> key_state_separation_ok False)
+    - test_a4_external_secret_required_passes_key_state_separation (False ->
+      separation OK). Both directions pinned.
+  CONFIRMED.
+
+  SDO G2 completion (A5 teeth + A6 honest deferral):
+    - A5 PASS: test_g2_pass_when_pii_anon_pi_strictly_dominates_and_no_unauthorized
+      (fixture has 3 REAL competitors @ pi=0.60, pii-anon @ 0.95 -> strict
+      dominance is real, not vacuous)
+    - A5 FAIL (not dominant): test_g2_fail_when_present_but_not_dominant
+    - A5 FAIL (NFR-014): test_g2_fail_when_unauthorized_reversal_nonzero_even_if_dominant
+    - A5 PENDING (both fields absent): test_g2_pending_when_fields_absent_never_fabricated
+    - A5 PENDING (half-populated): test_g2_pending_when_only_one_family_field_present
+      (anonymization_score absent -> PENDING; no fabrication of the missing half)
+    - A5 META-GUARD non-vacuous: test_g2_teeth_non_vacuous_neutering_dominance_flips_pass_to_fail
+      (competitor_pi 0.60->0.99 flips PASS->FAIL on the SAME fixture)
+    - A5 determinism (AX-002): test_g2_is_deterministic_on_identical_benchmarks
+    - A5 unblock: test_g2_pass_unblocks_claim_grade_with_all_else_satisfied
+    - backward-compat override seam: test_g2_override_still_honoured_for_backward_compat
+  A6 HONEST DEFERRAL (NOT a falsely-claimed PASS):
+    - test_g2_real_artifact_stays_pending_and_verdict_not_yet — on the REAL smoke
+      artifact G2 reads PENDING (None), verdict NOT_YET, binding
+      canonical_claim_run=False. EXECUTED (artifact present, not skipped).
+    - test_g2_successor_label_names_s4_01_when_pending — gate still names S4-01 as
+      successor while PENDING.
+  The story honestly scopes a TRUE-on-real-data G2 as Pass-2/S7 (the canonical run
+  must emit anonymization_score + pseudonymization_integrity_score into the
+  benchmark artifact). The G2 placeholder at competitive_supremacy.py:307 is now a
+  pure three-valued _g2_pseudonymization_integrity(systems); provisional_status
+  AGENT_SIMULATED is correctly declared. CONFIRMED — honest deferral, not a
+  fabricated PASS.
+
+  AX-002 determinism: test_a8_scorers_are_deterministic_on_identical_inputs +
+  test_g2_is_deterministic_on_identical_benchmarks. Import-boundary (A8):
+  test_a8_deid_families_imports_nothing_from_detection_layers (AST). A9
+  backward-compat: test_a9_scorecard_preserves_privacy_score_and_adds_two_distinct_fields
+  + test_a9_scorecard_defaults_preserve_existing_leaderboard_shape — privacy_score
+  preserved + serialized, two new fields additive, legacy to_dict keys intact.
+
+  UNMAPPED-MUST SCAN: FR-006, FR-009, FR-010 (all MUST), NFR-014 (MUST) all map to
+  named passing tests above. NFR-015 is a SHOULD in the requirements doc
+  (requirements-document.md:76) — the story labels it NFR-015 and it is fully
+  covered regardless. ZERO unmapped MUST clauses -> no MAJOR. AX-004 (the headline)
+  is fully fenced by a NON-VACUOUS guard.
+
+  OUT-OF-SCOPE for this story gate (not counted against S4-01): the
+  Tier-R/Tier-C CLAIM_GRADE predicate-vs-_decide consistency note from S4-CS-01
+  memory concerns competitive_supremacy.py's verdict machine, which S4-01 leaves
+  untouched (RISK-3) — it is a traceability/axiom concern owned by S4-CS-01, not a
+  coverage gap introduced by S4-01.
+
+  DIVERGED + Pass-2: requirements-document.md R10 shows 0 DIVERGED among the 6
+  stress-tested NFRs; NFR-014/015 carry no DIVERGED provisional_status, so no
+  Pass-2 cross-check obligation is unmet here. The TRUE-on-real-data G2 verdict is
+  separately Pass-2/S7-gated (canonical run), which the story declares honestly.
+
+  SELF-ATTESTATION: read-only review; I read the story, the requirements doc, both
+  test files, deid_families.py, the _g2_ implementation, scorecard.py fields, and
+  the benchmark fixtures; I re-ran the suite. No files were modified other than
+  this review YAML.

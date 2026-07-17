@@ -1,0 +1,156 @@
+reviewer: dev-assist-development-traceability
+
+scope_id: S5-01
+
+gate: story
+
+verdict: APPROVE
+
+findings:
+  - id: traceability-S5-01-01
+    severity: OBSERVATION
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:27
+    description: |
+      Forward-trace backfill owed (NOT yet due at story gate — by design).
+      traceability-matrix.md carries ZERO S5-01 references (grep -c 'S5-01' = 0).
+      The UC-09 row (line 27: "FR-011, FR-012 | NFR-012, NFR-016") has no Story
+      column (S5-01) and no Test column populated, and NFR-016 is not yet
+      annotated as SATISFIED-by-S5-01. The UC-10 row (line 28, FR-013) likewise
+      lacks the S5-01 MiaAttack-seam note.
+      This is correctly OBSERVATION, not MAJOR: the matrix header (line 3)
+      states verbatim "DC/Story/Test columns fill in Stages 3-5" — the Story/Test
+      columns are a sprint-level artifact, so an empty per-story row at the
+      STORY gate is by-design, not a defect. Per dispatch, this is to be batched
+      with the standing S2/S6 matrix-deferral and discharged at the S5 sprint gate.
+    suggested_resolution: |
+      At the S5 sprint gate, backfill the matrix: UC-09 row -> Story `S5-01`
+      (NFR-016 SATISFIED; FR-011 FOUNDATION-only, real Tier-3 -> S5-02) + Test
+      column (`test_nfr016_a6_*`, `test_fr011_a1_*`); UC-10 row -> S5-01 MiaAttack
+      seam declared (FR-013 FOUNDATION-only, real LiRA@128 MIA -> S5-03) +
+      `test_fr013_a1_mia_attack_protocol_seam_is_runtime_checkable`. Keep the
+      `external_refs` DATA/PAPER edges. Batch with the S2/S6 deferral.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-016
+      - dev-assist-artifacts/02-requirements/traceability-matrix.md#UC-09
+
+  - id: traceability-S5-01-02
+    severity: OBSERVATION
+    location: dev-assist-artifacts/04-development/02-stories/sprint-5/S5-01-reid-attack-protocol.md:10
+    description: |
+      AX-001 (synthetic-only) is claimed in the `Implements` field ("upholds
+      AX-001 (synthetic)") but has no dedicated `test_ax001_*` acceptance test in
+      the A1-A11 list; it is asserted only as a module-docstring narrative
+      (tests/test_attack_reid_protocol.py:25 "AX-001: every persona/target here is
+      SYNTHETIC"). This is acceptable for the traceability dimension: AX-001 is an
+      axiom upheld BY CONSTRUCTION (all fixtures synthetic) and its testable
+      surface is NFR-024 ("0 SHOWSTOPPER/CATASTROPHIC findings", repo-wide), owned
+      by the cross-cutting axiom-compliance + security-sast reviewers per the
+      story's §9 reviewer set — not a per-story unit assertion. Flagged so the
+      axiom-compliance reviewer can confirm construction-only satisfaction
+      suffices; no test-name-to-ID gap exists for the FR/NFR chain.
+    suggested_resolution: |
+      No change required for the traceability chain. Optionally (axiom-compliance
+      reviewer's call) add a `test_ax001_*` asserting fixtures carry no real-PII
+      markers, or leave AX-001 to the cross-cutting NFR-024 gate. Deferring to
+      axiom-compliance.
+    references:
+      - dev-assist-artifacts/02-requirements/requirements-document.md#NFR-024
+
+notes: |
+  FORWARD-TRACEABILITY CHAIN (FR/NFR -> Story -> Test -> DC) — VERIFIED CLEAN.
+
+  (1) NO PHANTOM IDs. Every declared ID resolves in source-of-truth:
+      - NFR-016 -> requirements-document.md:77 "Non-strippable re-id caveat |
+        100% exported privacy artifacts carry the anti-anonymity caveat | eval |
+        MUST" — matches the story's `Implements` claim verbatim.
+      - FR-011 -> requirements-document.md:22 "Real Tier-3 LLM-adversary re-id
+        (RRS/QIC/BSL), de-circularized | UC-09 | eval | MUST".
+      - FR-013 -> requirements-document.md:24 "Full-power MIA (LiRA@128 +
+        Secret-Sharer), TPR@low-FPR | UC-10 | eval | MUST".
+      - DC-09 -> D-implementation-ready-design.md:19 "`attacks/` package: real
+        Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA | FR-011/012/013,
+        NFR-012/013 | eval". (The story's secondary ":58" citation resolves to the
+        Eval-MAJOR bullet "Tier-3 de-circularization lives in `attacks/` (DC-09)"
+        — present, exact-line drift is cosmetic, not a phantom.)
+      - AX-001 / AX-002 are legitimate program axioms; UC-09 is a real use-case
+        (requirements-document.md:22). No SHOWSTOPPER (no non-existent-ID claim).
+      - finding-pattern #11 cleared: FR-011/FR-013/NFR-016 are in-scope MUSTs, NOT
+        deferred-to-v0.2.
+
+  (2) EVERY CLAIMED REQUIREMENT HAS >=1 PINNING TEST; names embed the right ID;
+      semantics match the ID (no pattern-#9 name/body mismatch):
+      - NFR-016: test_nfr016_a6_metrics_carry_anti_anonymity_caveat_by_default,
+        test_nfr016_a6_constructing_with_blank_caveat_is_refused[3 params],
+        test_nfr016_a6_caveat_cannot_be_stripped_post_construction,
+        test_nfr016_a6_as_outcome_always_carries_caveat,
+        test_nfr016_a8_runner_returns_mapping_outcome,
+        test_nfr016_a5_score_reid_attack_uses_integer_counts (+ zero-div). Bodies
+        assert caveat == ANTI_ANONYMITY_CAVEAT, refuse blank/stripped caveat,
+        as_outcome carries it — semantically the non-strippable-caveat MUST.
+      - FR-011 (re-id FOUNDATION): test_fr011_a1_* (runtime-checkable ReidAttack +
+        baseline conforms), test_fr011_a2_* (exact-QI link), test_fr011_a3_*
+        (abstain), test_fr011_a7_* (runs under sandbox + registered).
+      - FR-013 (MIA SEAM): test_fr013_a1_mia_attack_protocol_seam_is_runtime_
+        checkable — SEE SCOPE-HONESTY below.
+      - AX-002 (determinism): test_ax002_a4_* (deterministic + permutation-stable +
+        tie-by-persona_id-asc), test_ax002_a9_* (equal AttackResult, wall-clock
+        excluded), test_ax002_a11_* (no nondeterminism sources / no unsafe sigs).
+      - import-isolation invariant: tests/test_attacks_import_boundary.py::
+        test_ax_isolation_attacks_layer_has_no_forbidden_imports +
+        test_ax_isolation_at_least_one_attacks_module_scanned (AST-walk, 0 imports
+        from {swarm,moe,fusion,policy}, >=1 file scanned).
+
+  (3) SCOPE HONESTY IN THE TRACE — EXEMPLARY (the headline check, UC-09):
+      The story honestly distinguishes NFR-016 (SATISFIED now) from FR-011/FR-013
+      (FOUNDATION-only). FR-011/013 are NOT claimed discharged: provisional_status
+      = AGENT_SIMULATED with the explicit caveat "a real Tier-3 LLM adversary
+      [S5-02] + a real offline DATA adversary ... are Pass-2 / cross-repo". The
+      MiaAttack Protocol is a TRUE SEAM, not a claim: reid.py:193-206 defines
+      `class MiaAttack(Protocol)` with `def membership_scores(...) -> list[float]:
+      ...` (ellipsis-only, NO body), and test_fr013_a1 asserts BOTH
+      `_is_runtime_protocol is True` AND `not isinstance(
+      BaselineDeterministicReidAttack(), MiaAttack)` — i.e. it pins that the
+      seam exists AND that the baseline does NOT implement MIA. Pass-2 swap is
+      marked by `# SWITCH-POINT(DATA)` (reid.py:73, 219). No FR-011/013 discharge
+      over-claim anywhere.
+
+  (4) DC<->MODULE — 1:1, NO SCOPE CREEP. DC-09 -> eval_framework/attacks/reid.py
+      (new, 443 LoC) + additive attacks/__init__.py (re-exports + in-place merge of
+      REID_ATTACK_REGISTRY into DEFAULT_ATTACK_REGISTRY, __init__.py:67-68).
+      Successors correctly ABSENT: no S5-02 Tier-3 LLM-adversary body, no S5-03
+      LiRA@128 MIA body — only the declared protocol seams. sandbox.py/spec.py
+      consumed read-only (byte-identical md5s in §12, re-verified).
+
+  (5) DIFF-WINDOW ARTIFACT (not an S5-01 finding). The dispatched diff
+      (0bb61b4..HEAD) shows tests/test_agentic_interception.py (+173/-16). This is
+      from commit 83b73bf "S6-02 review remediation (FR-026/AX-006 keyed
+      surrogate)" — an UNRELATED story whose commit falls inside the wide diff
+      base. S5-01's own 3 commits (RED 59b8404 / GREEN 68c5d67 / REFACTOR 9aa39bc)
+      touch ONLY the 4 owned files (verified: git log on test_agentic_interception
+      across 59b8404~1..9aa39bc = empty). No S5-01 scope creep. TDD ancestry strict
+      (RED tests-only, no reid.py; GREEN adds it; merge-base --is-ancestor both
+      exit 0).
+
+  (6) FORWARD LINKS — COHERENT. "Blocks S5-02 (reuses ReidAttack Protocol +
+      ranking + scorer) + S5-03 (reuses MiaAttack seam + boundary test)" is sound:
+      both seams are exported and the import-boundary test is standing. (S5-02/S5-03
+      story files not yet authored — expected; a predecessor precedes its
+      successors, not a dependency-not-DONE inversion.) "Feeds SDO G5 audit half +
+      Paper 1 Tier-2/3" aligns with requirements-matrix UC-09 PAPER:P1 §5 Tier-3 /
+      UC-10 PAPER:P1 §Tier-2 external_refs. "Depends on S5-04 DONE" verified:
+      S5-04 story State = "DONE (iter-2)", done_at 2026-06-01 — dependency
+      satisfied (no pattern-#6 IN_PROGRESS-dependency violation).
+
+  (7) provisional_status CASCADE (DIVERGED-cascade check): source DC-09 is NOT
+      DIVERGED; story provisional_status = AGENT_SIMULATED matches the source DC
+      state (synthetic in-tree, real adversary Pass-2). No DIVERGED cascade owed,
+      no pattern-#15 mismatch.
+
+  Net: forward FR/NFR -> Story -> Test -> DC chain intact, no phantom IDs, scope
+  honesty exemplary, DC 1:1. Two OBSERVATIONs (matrix backfill deferred-by-design
+  to sprint gate per dispatch; AX-001 construction-only -> axiom-compliance). No
+  MAJOR/CATASTROPHIC/SHOWSTOPPER. APPROVE.
+
+review_time_seconds: 300
+
+context_bounds_respected: true

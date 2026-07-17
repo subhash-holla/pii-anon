@@ -1,0 +1,153 @@
+{
+  "n": 2000,
+  "seed": 8314,
+  "micro": {
+    "precision": 0.802283,
+    "recall": 0.80497,
+    "f2": 0.804431
+  },
+  "latency_p50_ms": 0.238,
+  "per_entity": {
+    "ADDRESS": [
+      250,
+      4,
+      4
+    ],
+    "BANK_ACCOUNT": [
+      183,
+      2,
+      20
+    ],
+    "BAR_NUMBER": [
+      0,
+      0,
+      37
+    ],
+    "CREDIT_CARD": [
+      90,
+      1,
+      19
+    ],
+    "CRYPTO_WALLET": [
+      0,
+      1,
+      13
+    ],
+    "CVV": [
+      72,
+      0,
+      10
+    ],
+    "DATE_OF_BIRTH": [
+      268,
+      0,
+      19
+    ],
+    "DEA_NUMBER": [
+      0,
+      0,
+      22
+    ],
+    "DOCKET_NUMBER": [
+      43,
+      0,
+      10
+    ],
+    "DRIVERS_LICENSE": [
+      3,
+      0,
+      73
+    ],
+    "EMAIL_ADDRESS": [
+      1374,
+      8,
+      571
+    ],
+    "EMPLOYEE_ID": [
+      90,
+      0,
+      12
+    ],
+    "IP_ADDRESS": [
+      106,
+      1,
+      0
+    ],
+    "LICENSE_PLATE": [
+      36,
+      1,
+      9
+    ],
+    "LOCATION": [
+      5,
+      8,
+      30
+    ],
+    "MAC_ADDRESS": [
+      37,
+      26,
+      6
+    ],
+    "MEDICAL_RECORD_NUMBER": [
+      85,
+      2,
+      50
+    ],
+    "NATIONAL_ID": [
+      90,
+      61,
+      73
+    ],
+    "NPI_NUMBER": [
+      0,
+      0,
+      58
+    ],
+    "ORGANIZATION": [
+      264,
+      56,
+      71
+    ],
+    "PASSPORT": [
+      81,
+      2,
+      21
+    ],
+    "PERSON_NAME": [
+      3076,
+      1329,
+      648
+    ],
+    "PHONE_NUMBER": [
+      845,
+      147,
+      0
+    ],
+    "PIN": [
+      55,
+      0,
+      3
+    ],
+    "ROUTING_NUMBER": [
+      73,
+      0,
+      13
+    ],
+    "USERNAME": [
+      46,
+      21,
+      3
+    ],
+    "US_SSN": [
+      273,
+      166,
+      10
+    ],
+    "VIN": [
+      5,
+      0,
+      0
+    ]
+  },
+  "unmatchable_truth_spans": 870
+}

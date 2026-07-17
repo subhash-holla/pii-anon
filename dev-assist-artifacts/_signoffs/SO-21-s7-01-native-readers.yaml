@@ -1,0 +1,117 @@
+sign_off_id: SO-21-s7-01-native-readers
+date: 2026-06-09
+type: work-stream-close
+signer: AGENT_SIMULATED
+policy: po-required
+
+scope: >
+  S7-01 — native-format readers (DC-14, UC-24/25): PDF / image-OCR / screenshot /
+  DICOM / audio behind the SAME Iterator[IngestRecord] contract the text readers
+  emit (FR-031 MUST). The reader port + registry (ReaderCapabilities, runtime-
+  checkable NativeReader Protocol, NativeReaderRegistry with the new
+  pii_anon.readers entry-point group — the rating-registry pattern verbatim,
+  NFR-026 never-raise discovery). ONE REAL extraction implementation ships: the
+  pure-stdlib PDF text reader (FlateDecode via a BOUNDED chunked inflate, Tj/TJ
+  harvesting with a paren-balanced escape-aware literal-string scanner,
+  page-granular source_coords — FR-033 representative). OCR/DICOM/audio ship
+  capability-honest: dependency_available reported truthfully, read() raises a
+  LOUD error naming the install extra (pii-anon[ocr]/[dicom]) or the ASR Pass-2
+  seam — NEVER silent empty text (NFR-026 "no silent recall loss"). FR-032 split
+  honest: text round-trip REAL+re-pinned; native reconstruction reported
+  supports_reconstruction=False, Pass-2. FR-034 representative per-modality
+  recall harness + FR-035 teeth-proven regression gate. FEATURE work-stream —
+  no competitive_supremacy.py change, no control-path artifacts ⇒ NO SDO close.
+
+stories_closed:
+  - id: S7-01
+    title: native-format readers (PDF/image/screenshot/DICOM/audio) behind Iterator[IngestRecord] (DC-14)
+    gate: _reviews/story/S7-01/   # iter-1 REQUEST_CHANGES (2 MAJOR + 1 MINOR) -> remediated 258d3ec -> iter-2 5/5 APPROVE (0 MAJOR / 1 doc-freshness MINOR remediated at close / 4 carry-forward OBS)
+    implements: [FR-031, FR-032, FR-033, FR-034, FR-035]   # FR-032 text-real/native-Pass-2 split; FR-033/034 representative; FR-036/NFR-023 parity guard; FR-037/NFR-022 deferred-with-tracking (SHOULD)
+    upholds: [NFR-026, NFR-023, AX-001, AX-002]
+    effect: >
+      new ingestion/native.py (port + registry + capability surface + the
+      capability-honest lazy readers) + ingestion/native_pdf.py (the REAL
+      stdlib PDF reader with the 64 MiB per-stream bounded inflate). Additive:
+      FileFormat += PDF/PNG/JPEG/DICOM/WAV + detect_format branches; read_file
+      delegates native formats to the registry; ingestion re-exports; pyproject
+      extras ocr/dicom + the pii_anon.readers entry-point group + mypy
+      overrides. The orchestrator capability surface stays OFF the user-WIP
+      orchestrator (# SWITCH-POINT(ORCH)).
+
+work_stream_gate_summary:
+  stories: 1
+  story_gate: APPROVE   # iter-1 REQUEST_CHANGES -> iter-2 5/5 APPROVE
+  adversarial_close: NOT_REQUIRED   # no competitive_supremacy.py change; readers write no control-path artifacts
+  findings_remediated_in_loop:
+    - "★ security-sast MAJOR-1 (iter-1): UNBOUNDED FlateDecode inflate on untrusted PDF bytes = zip-bomb memory-DoS (~1000x amplification; a ~200KB stream inflated ~200MB, peak RSS ~459MB; max_record_chars truncated only AFTER full inflate). FIX (258d3ec): chunked decompressobj loop (1 MiB steps) with the 64 MiB per-stream ceiling applied to loop chunks AND the flush tail; over-ceiling raises zlib.error into the existing corrupt-stream skip path (never partial extraction); no-progress guard terminates corrupt streams; boundary exact (== ceiling passes, +1 raises — probe-verified). Pinned by A14 [SECURITY-TEST] (bomb skipped, honest page extracted) + A16b (multi-MiB within-ceiling extracts fully)."
+    - "code-quality MAJOR-2 (iter-1): new-module coverage 73%/66% below the >=90% DoD floor (real reachable stdlib paths untested). FIX: targeted tests A15 (escapes: octal/named/escaped-paren/CRLF-continuation; nested parens; '/\" show ops; orphan-string drop) + A16 (corrupt-zlib skip; drawing-only stream no-record; max_record_chars exact truncation) + A16b (truncated-escape guard; missing-endstream skip) + A17 (registry fail-closed TypeError + round-trip) + no-cover pragmas on the dep-gated OCR/DICOM execution bodies. native.py 91% / native_pdf.py 92%."
+    - "code-quality MINOR (iter-1): docstrings added to all four concrete capabilities() overrides."
+    - "traceability MINOR (iter-2): story §3/§12 anchor list lagged the test file — remediated at close (A14-A17 documented as gate-remediation anchors; DoD reads A1-A17)."
+  findings_dispositioned:
+    - "security-sast OBS x2: epic-gate pip-audit of the ocr/dicom extras (Pillow CVE-stream floor >=10 unpinned above) + the standing entry-point trust model — CARRY-FORWARD to the epic/release gate."
+    - "requirements-coverage OBS x2: FR-037/NFR-022 (SHOULD, OS-matrix) deferred-with-tracking for the sprint snapshot; FR-032-native + FR-034-corpus stay OPEN MUST-board rows flagged representative-this-sprint — do NOT mark fully-verified at the release gate on S7-01 alone."
+    - "axiom-compliance OBS: when real OCR/ASR backends land (Pass-2), pin AX-002 determinism-or-provenance for the inferential extraction step."
+    - "traceability OBS: AX-001/002 resolve to 00-axioms/project-axioms.yaml (the established convention), not FR/NFR rows."
+  gate_evidence_note: >
+    The review-gate workflow's scribe wrote synthesis.md only (both iterations);
+    the per-reviewer YAMLs under _reviews/story/S7-01/ were transcribed verbatim
+    from the workflows' structured results (wf_44f8b3ae-51b iter-1,
+    wf_2d10a313-630 iter-2), dispositions added at remediation/close.
+
+decisions_acknowledged:
+  - "★ The gate EARNED ITS KEEP at iter-1: the unbounded-inflate zip-bomb DoS was a REAL security hole in code that consumes untrusted document bytes (UC-24's whole point) — caught by the security-sast reviewer before any close. The bounded-inflate fix preserves honest-input behavior byte-identically (A4/A16b pins)."
+  - "★ NFR-026 is implemented in its LOUD flavor: a reader whose backend is missing reports dependency_available=False truthfully and RAISES naming the extra — silent empty text (which would silently drop every PII span in a modality) is structurally impossible (A7/A8; the audio reader refuses by design until an ASR backend is chosen)."
+  - "Capability honesty everywhere: supports_reconstruction=False on every native reader (no false FR-032 claim); audio extracts_text=False; the stdlib PDF reader's documented limits + # SWITCH-POINT(PDF-LIB) for the pypdf swap behind the same reader name."
+  - "The S2-03 orchestrator-block discipline held: the reader capability surface lives in ingestion/native.py (# SWITCH-POINT(ORCH)); orchestrator.py byte-identical (0afc6deed62bbd0653ae1051b723bace)."
+  - "AX-001/AX-002 upheld: handcrafted synthetic PDFs + synthetic-shaped values only; byte-driven deterministic reads (A5 5x replay); no random/uuid/time in either module."
+
+findings_waived_or_deferred:
+  - id: real-ocr-dicom-asr-extraction
+    disposition: pass2-optional-deps
+    detail: "pytesseract/Pillow/pydicom are not installed in this env; real extraction strength validation is Pass-2 (# SWITCH-POINT(OCR)/(DICOM)/(AUDIO-ASR)). The epic gate must pip-audit the extras before any release that recommends them."
+  - id: span-level-source-coords
+    disposition: pass2
+    detail: "FR-033-full glyph/span-level coordinates — # SWITCH-POINT(COORDS); page-granular ships now."
+  - id: corpus-scale-per-modality-benchmark
+    disposition: pass2-data
+    detail: "FR-034-full at corpus scale — # SWITCH-POINT(DATA); the representative harness + the FR-035 teeth gate ship now. FR-032-native + FR-034-corpus remain OPEN MUST-board rows."
+  - id: os-matrix-portability-certification
+    disposition: pass2-tracked-should
+    detail: "FR-037/NFR-022 (SHOULD) — the benchmark-layer machinery (make benchmark-portable-*) exists; certification deferred with tracking in the sprint snapshot."
+
+sdo_verdict:
+  committed_smoke_artifact:
+    verdict: NOT_YET
+    binding_constraint: "canonical_claim_run=False (G7 certified-run gate)"
+    note: "UNCHANGED / byte-stable vs SO-20. A reader feature flips no guarantee; the SDO gate is byte-identical."
+
+quality:
+  suite: "full xdist (PYTHONPATH=src .venv/bin/python -m pytest -n auto): EXIT=0, 3782 passed / 16 skipped / 0 failed (3798 collected; +18 over SO-20's 3780: the S7-01 A1-A17 suite)."
+  coverage: "88.82% (>= 84 gate; native.py 91% / native_pdf.py 92% >= the 90% new-module floor)."
+  lint_type: "ruff clean (src tests); mypy clean under BOTH `mypy src/pii_anon` AND `--strict` / 143 files."
+  env: "AGENT_SIMULATED on the local .venv. The port/registry/capabilities, the REAL stdlib PDF extraction (incl. the bounded inflate under live bomb probes), the loud-degradation paths, and the recall harness + teeth gate all run for REAL in-tree against SYNTHETIC fixtures. Real OCR/DICOM/ASR extraction is Pass-2."
+
+safety:
+  user_wip_md5_unchanged: true   # orchestrator.py 0afc6dee…, test_moe_enhancements.py 910e9cd6…, README.md, benchmark artifacts, docs WIP — none staged
+  off_limits_byte_identical: true   # competitor_compare.py 7cae16c8…; competitor_tiers.py d9202479…; canonical_run.py d8f0f80e…
+  sdo_gate_md5: 3b842e81c3f03eafd11f9c655c1789a0   # competitive_supremacy.py — UNCHANGED (no SDO close)
+  new_modules: ingestion/native.py + ingestion/native_pdf.py   # stdlib-only at import; optional deps lazy + loud; nothing from swarm/moe/fusion/orchestrator (A13 AST audit)
+  nothing_under_artifacts_benchmarks: true
+  recall_floor_intact: true
+  narrow_git_add_only: true   # RED 48c189f / GREEN 169ab07 / remediation 258d3ec
+  no_new_hard_dependency: true   # ocr/dicom are extras; default install unchanged
+
+content_hashes:
+  story_file: 8bf10ed43a190872ef9fbc713a6f31e9bd24e6beffa09502e15fed28d82a6e06
+  gate_synthesis: eabe3a6b79b60bf76ee62b1910c6e2178189a1c5293b0886375726607309a3f1
+  native_module: 51ad9669ab55df5bfde92412b1e292aeaa8f59519a5414bdaf50e762c41c7da2
+  native_pdf_module: 2aa41195e6db8a900df5add6464d85e52203dc87cf84387d46a81ce0a3da2e93
+  tests: 7cf52f1625921ad095541dbef0581ea971ba90d90251cb7b8ba823a4c232131e
+
+next:
+  binding_constraint: "G6 FAIL (raw-F2, draw-sensitive) on the produced certified artifact; canonical_claim_run=False (G7) on the committed smoke artifact. UNCHANGED by S7-01."
+  immediate: "S7-03 (multilingual context activation + powered worst-group fairness gate — FR-038/039/NFR-025; story pre-authored; RED suite staged). The CJK/Hangul/Arabic CONTEXT_WORDS keywords are provably DEAD today ([A-Za-zÀ-ÿ]+ tokenizer; the promised containment fallthrough was never implemented) — a clean TDD RED. NOT a control-path change (the # SWITCH-POINT(CANONICAL) wire-in is explicitly Pass-2 BECAUSE it would mandate the adversarial close)."
+  feature_surface: "then S7-05 (docs discoverability [DOCS MUST]; pre-authored; lands LAST, before Stage-6). (S6-04 + S7-01 DONE; S7-03/S7-05 remain.)"
+  rc_close: "Stage-6 Documentation -> release gate (honest SHIP-WITH-CAVEATS given G6/NOT_YET; epic-gate pip-audit of ocr/dicom extras) -> version 1.5.0rc1 + CHANGELOG -> tag v1.5.0-rc1 LOCAL ONLY (NEVER push tags — release.yml auto-publishes) -> make build + twine-check (NOT published) -> final sign-off."
+  pass2_followons: "★ full-census G6 (headline) + real Tier-C + real-NUTS J + real Tier-3/MIA adversaries + query-aware DATA scorer + the S6-04 ORCH/DATA seams + real OCR/DICOM/ASR + span-level coords + corpus per-modality benchmark + OS-matrix certification + the corpus fairness number + the G7 _safe_repr sweep + Papers 1 & 2."
+  milestone: "M4 (CODE v2) — the multimodal ingestion surface is LIVE at the honest representative bar: one real extractor (PDF), four capability-honest seams, a teeth-proven recall regression gate, and a security-hardened untrusted-bytes path. The SDO verdict is UNCHANGED."

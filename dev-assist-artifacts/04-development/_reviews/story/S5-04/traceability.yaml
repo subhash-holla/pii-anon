@@ -1,0 +1,101 @@
+reviewer: traceability
+gate: story
+scope_id: S5-04
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: TRACE-S5-04-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md:27,28
+    description: >
+      The traceability-matrix is UC-organized (UC-09/UC-10 rows for FR-011/FR-013;
+      no per-story Story/Test columns) and carries NO S5-04 row yet. The forward
+      trace is nonetheless fully faithful WITHOUT the matrix row: the story metadata
+      declares FR-011/FR-013 (+NFR-012/013/024, FR-026) and the owned test files
+      embed the governing axiom/acceptance IDs in test names + docstrings, so each
+      claim is greppable. This is the same batched sprint-gate housekeeping deferral
+      recorded for S2-05 (TRACE-S2-05) and S6-03 (TRACE-S6-03-MINOR-1, which itself
+      cites the S4-CS-01-gate TRACE-S4CS01-MINOR-2 precedent). Not a story-gate blocker.
+    suggested_resolution: >
+      At the Sprint-5 gate, backfill the UC-09 (FR-011) / UC-10 (FR-013) matrix rows
+      with a representative S5-04 test id (e.g. test_a5_well_formed_synthetic_attack_runs_to_completion,
+      test_attacks_package_has_no_unsafe_execution_call_signatures) and record DC-09's
+      isolation-substrate status, consistent with the S2-05 / S6-03 / S4-CS-01 precedent.
+context_bounds_respected: true
+notes: >
+  Forward FR/NFR -> Story -> Test -> DC chain is FAITHFUL; APPROVE.
+
+  (1) DECLARED-ID EXISTENCE — all 6 exist in requirements-document.md (no SHOWSTOPPER):
+  FR-011 (:22 "Real Tier-3 LLM-adversary re-id, de-circularized", MUST),
+  FR-013 (:24 "Full-power MIA (LiRA@128 + Secret-Sharer)", MUST),
+  FR-026 (:39 "Persist no raw PII to any channel after masking (AX-006)", MUST),
+  NFR-012 (:73 "Tier-3 RRS power", MUST), NFR-013 (:74 "MIA power >=128 shadow + Secret-Sharer", MUST),
+  NFR-024 (:87 "No real PII in repo/fixtures/logs (AX-001)", MUST). Story line cites match
+  the live requirements lines exactly. AX-001/AX-006/AX-002 confirmed in design D0 (:6).
+
+  (2) DESIGN TRACE — all resolve. DC-09 (D-implementation-ready-design.md:19) =
+  "attacks/ package: real Tier-3 LLM-adversary (de-circularized) + LiRA@128 MIA",
+  traced to FR-011/012/013, NFR-012/013 (note: DC-09 also names FR-012, which this
+  story does NOT claim — correctly, FR-012 is a successor-attack-body concern, not the
+  isolation substrate; no over-claim). CODE-owns "eval_framework/attacks/" assignment
+  confirmed at :66 (story cites :65; off-by-one in the citation, the assignment text is
+  on the cross-repo line that the tooling indexes as :66 — substance correct, OBSERVATION-grade
+  only). SME Security MAJOR #3 "sandbox the attack harness (ingests adversarial material)"
+  confirmed verbatim at :56. attacks/ package was ABSENT and is now seeded
+  (__init__.py 100% / sandbox.py 99% / spec.py 100% per story evidence).
+
+  (3) ACCEPTANCE A1-A8 -> >=1 NAMED TEST each (all mapped; spec_loader 't2', sandbox 't1'):
+  A1 (unsafe-deserialization refused) -> t2:test_a1_nested_object_in_params_is_refused,
+     test_a1_list/none_value_is_refused + property test_a1_property_every_nonscalar_params_value_is_rejected
+     (+ dual test_a1_property_every_scalar_params_value_is_accepted);
+  A2 (subprocess/shell-out / non-allow-listed runner refused) -> t2:test_a2_unknown_runner_is_refused_at_load,
+     test_a2_runner_naming_external_program_is_refused; t1:test_a2_non_allow_listed_runner_is_refused_before_execution,
+     + AST guard t1:test_attacks_package_has_no_unsafe_execution_call_signatures (asserts ZERO forbidden
+     import-heads / builtin calls / os-attr calls; AST-node based, so a docstring mention cannot
+     false-positive — finding-pattern-9 negated) + meta-guard test_ast_guard_would_catch_a_forbidden_call;
+  A3 (network egress refused) -> t1:test_a3_outbound_connect_attempt_is_refused,
+     test_a3_connect_ex_is_also_guarded, test_a3_egress_guard_is_restored_after_run;
+     t2:test_a3_network_allow_is_refused_at_load (egress test targets synthetic TEST-NET-1
+     192.0.2.1 — AX-001-clean, guard fires before any real egress);
+  A4 (over-budget terminated) -> t1:test_a4_wall_clock_overrun_is_terminated,
+     test_a4_budget_exceeded_is_subclass_of_violation, test_a4_audit_note_recorded_when_rlimit_unavailable;
+  A5 (well-formed synthetic run to completion) -> t1:test_a5_well_formed_synthetic_attack_runs_to_completion,
+     test_a5_outcome_matches_direct_call_of_wrapped_runner;
+  A6 (path allow-list enforced) -> t1:test_a6_path_not_in_allow_list_is_refused_via_shim,
+     test_a6_path_inside_allow_list_is_permitted_via_shim, test_a6_sibling_prefix_is_not_treated_as_allowed
+     (no startswith bypass); t2:test_a6_params_path_outside_allowed_paths_is_refused;
+  A7 (synthetic-only / least-privilege AX-001/AX-006) -> t1:test_a7_default_policy_is_default_deny,
+     test_a7_audit_lines_contain_no_real_pii_or_secret_shaped_values, test_a7_sandbox_grants_only_declared_capabilities;
+  A8 (import-boundary + determinism AX-002) -> t1:test_a8_attacks_package_has_no_forbidden_imports
+     (mirrors test_rating_import_boundary.py), test_a8_two_runs_yield_equal_attack_result,
+     test_a8_attack_result_equality_excludes_timing.
+
+  (4) ID-IN-TEST-NAME convention: the test naming here keys off ACCEPTANCE IDs (a1..a8)
+  rather than the bare fr_011/fr_013 form; the FR/NFR linkage is carried in the module
+  docstrings + the A1-A8 -> FR/NFR mapping in the story, and the governing axioms
+  (AX-001/AX-006/AX-002) DO appear inline. This matches the established sandbox/security-MUST
+  story convention (S2-05/S6-03) and is consistent with the UC/acceptance-organized matrix,
+  so it is acceptable forward trace — NOT finding-pattern-1.
+
+  (5) PROVISIONAL_STATUS CASCADE: story shows provisional_status=AGENT_SIMULATED with an
+  explicit Pass-2 honesty boundary (real seccomp/namespace/kernel-egress + real-adversary/
+  real-key execution deferred). DC-09's source state is the standard real-attack-body
+  successor track; this story scopes ONLY the in-process isolation substrate, which runs
+  for real in-tree (RLIMIT_CPU applied; RLIMIT_AS honestly degrades to a recorded
+  platform_limit_unavailable note on darwin; watchdog + egress interceptor + load-time
+  refusals real). AGENT_SIMULATED is the correct, honest label — no DIVERGED cascade
+  applies (DC-09 is not in a DIVERGED state) and no AGENT_SIMULATED-where-DIVERGED-expected
+  mismatch (finding-pattern-15 negated).
+
+  (6) DEPENDENCIES: "Depends on: none hard"; soft successor relationship to the real
+  Tier-3/LiRA@128 bodies is correctly forward-looking (this story ships the substrate they
+  must run inside) — no IN_PROGRESS-dependency hazard (finding-pattern-6 negated). Parent
+  epic E5 present (finding-pattern-10 negated). FR-011/FR-013 are in-scope v0.1 MUSTs, not
+  deferred-to-v0.2+ (finding-pattern-11 negated). Single owning story per FR (no dual
+  ownership; finding-pattern-12 negated).
+
+  Git ordering confirmed RED e1e7273 -> GREEN d680515 -> REFACTOR ef63d35 -> FIX eaf116c
+  -> TEST 5059c56 (topo-order); all 5 SHAs resolve. attacks/ package present on disk.
+  Only open item is the UC-organized matrix Story/Test backfill (TRACE-S5-04-MINOR-1),
+  a documented sprint-gate deferral matching the S2-05 / S6-03 / S4-CS-01 precedent.

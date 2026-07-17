@@ -1,0 +1,177 @@
+# S4-CS-01 — CompetitiveSupremacyGate (the SOTA-Dominance Objective; program completion criterion)
+# Canonical story gate. 6 reviewers, parallel, independent, read-only. Two iterations.
+gate: story
+scope_id: S4-CS-01
+final_iteration: 2
+date: 2026-06-01
+aggregate_verdict: APPROVE   # iter-2: 6/6 APPROVE (0 SHOWSTOPPER / 0 CATASTROPHIC / 0 MAJOR / 0 REQUEST_CHANGES)
+
+reviewer_set:   # select-reviewer-set.sh story S4-CS-01 → 5 default+override + performance (benchmark-path/latency)
+  - code-quality
+  - security-sast
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+  - performance-benchmark
+
+tdd_evidence:
+  iter1:
+    red:       "512311b  # verdict machine + tier registry pinned (modules absent)"
+    green:     "b8c9d9b  # gate + registry + paired_bootstrap_draws + supremacy CLI"
+    refactor:  "27ce89a  # drop unused import + dead accessor (behaviour-identical)"
+    review:    "88ba8e2"
+  iter2_remediation:
+    red:       "c407f52  # RecallFloorVerdictGuard teeth + Tier-R∪Tier-C gating + strengthen J-unavailable + boundary rationale"
+    green:     "4a04d0f  # guard (G7 + ranking coupling) + §5 gating"
+    refactor:  "719df4b  # deterministic-consistent crown tie-break"
+    docs:      "efe14fc  # evidence + history log"
+    doc_minors:"17efdb8  # verdict-predicate docstrings + competitor_compare path (code-quality + traceability minors)"
+  red_before_green_confirmed: true   # both iters; iter2 RED c407f52 fails on absent recall_floor_breachers import
+  competitor_compare_byte_identical: "src/pii_anon/evaluation/competitor_compare.py md5 7cae16c89f4c97136e1a12394dae2025 (RISK-6 honoured — sibling package, never touched)"
+
+iter1_outcome:
+  verdict: REQUEST_CHANGES
+  reviewers: { code-quality: APPROVE, security-sast: APPROVE, requirements-coverage: APPROVE, traceability: APPROVE, axiom-compliance: CHANGES_REQUESTED, performance-benchmark: APPROVE }
+  blocking: "axiom-compliance MAJOR AXIOM-S4CS01-001 (RecallFloorVerdictGuard named in §3 G7 + Epic title but ABSENT — not built, not deferred-with-marker)"
+
+iter2_reviewers:   # re-reviewed the 3 dimensions whose findings drove the remediation; other 3 unchanged-APPROVE (domains outside the read-only floor-logic blast radius)
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      MAJOR AXIOM-S4CS01-001 RESOLVED. New pure exported recall_floor_breachers() keyed on
+      RECALL-specific signals ONLY (qualification_status; recall/f1 profile floor-checks;
+      per-language ε>0.005 when present, else PENDING-not-fabricated); the conflated ensemble
+      floor_pass is deliberately CARVED OUT — confirmed axiom-correct (AX-003 is the RECALL floor;
+      latency is a separate NFR/G5; on the real artifact floor_pass=False is latency/throughput-
+      driven, so pii-anon is correctly NOT flagged). Wired into BOTH J/ranking (_guarded_rank1 drops
+      breacher columns → never J-argmax; new j_rank1_system; pii-anon self-breach forces J=0.0) AND
+      G7 (fails if top-composite OR pii-anon claimant breaches). Teeth test verified NON-VACUOUS via
+      runtime monkeypatch (guard neutered → breacher becomes J-argmax, G7 flips True → teeth FAIL).
+      Real-artifact headline UNCHANGED (NOT_YET / canonical priority #1). AX-002/004/005 + import
+      isolation + epistemic honesty NOT regressed. MINOR-2 (boundary rationale) corrected.
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      §5 Tier-R∪Tier-C gating RESOLVED — _decide now gates CLAIM_GRADE on bool(blocking_tier_c) or
+      bool(blocking_tier_r); test_unrun_tier_r_gliner2_blocks_claim_grade (UNRUN ⟹ PROVISIONAL,
+      'gliner2' in binding) + test_waived_tier_r_gliner2_unblocks_claim_grade (WAIVED ⟹ CLAIM_GRADE)
+      PASS, faithfully encoding §5 line 49. The RecallFloorVerdictGuard acceptance + G7 sub-condition
+      mapped to named tests. Real-artifact invariant holds (NOT_YET + canonical, value-independent).
+      FIX-3 strengthened (J-unavailable ⟹ Verdict.NOT_YET). No over-claim introduced. Owned suite 72 pass.
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      Iter-2 RED-before-GREEN confirmed (c407f52 RED → 4a04d0f GREEN; recall_floor_breachers/
+      j_rank1_system/unrun_tier_r absent at parent). Iter-1 MINOR remediated (J-unavailable asserts
+      Verdict.NOT_YET). New guard code idiomatic/typed/docstringed; ruff clean; mypy --strict 0/122.
+      REFACTOR 719df4b behaviour-identical (crown tie-break min(-dist,name)). Scope discipline: only
+      owned files; competitor_compare.py byte-identical. Coverage: competitive_supremacy.py 94%,
+      competitor_tiers.py 99%. One MINOR (stale verdict-predicate docstrings) → REMEDIATED in 17efdb8.
+  - reviewer: security-sast
+    verdict: APPROVE   # iter-1 (unchanged; remediation adds only read-only floor-field reads + pure logic — no new sinks/surface)
+    notes: >
+      Pure-Python JSON-read + numpy/MLE bootstrap; benchmark artifact opened READ-ONLY, never written;
+      zero code-execution / subprocess / unsafe-deserialization / network-egress / secret patterns;
+      new `supremacy` CLI is a thin typer delegate with a clean Exit(1) on --canonical-claim; Tier-C
+      run_status DERIVED from benchmark available flags, never fabricated; bootstrap RNG statistical+seeded.
+  - reviewer: traceability
+    verdict: APPROVE   # iter-1 (unchanged; remediation strengthens the AX-003→G7 chain)
+    notes: >
+      FR-007/FR-008/NFR-006 + SDO amendment + DC-11 chain faithful; G1..G7 ↔ FR/NFR honest; tests embed
+      G/FR/NFR IDs; the cross-story J PIN is REAL (imports S3-04 rank_one_probability + S3-02
+      paired_bootstrap_draws with a dedicated integration test). Two MINORs: (1) story path prose →
+      REMEDIATED in 17efdb8; (2) traceability-matrix Story/Test backfill → deferred to the S4 sprint gate.
+  - reviewer: performance-benchmark
+    verdict: APPROVE   # iter-1 (unchanged; guard adds trivial dict-iteration, bootstrap unchanged)
+    notes: >
+      G5 latency honestly PENDING (gate reads no latency this phase; p95/p99 absent in JSON, never
+      fabricated). J-fallback bootstrap seeded + reproducible (bit-identical re-runs); b parameterised.
+      from_artifacts trivially fast (~0.4s real; <1s at full Tier-R∪Tier-C ceiling); no network/sleep/
+      runaway. One OBSERVATION (bootstrap super-linear in n_systems; benign at real/expected scale).
+
+findings:
+  - id: AXIOM-S4CS01-001
+    severity: MAJOR
+    status: REMEDIATED
+    location: src/pii_anon/eval_framework/evaluation/competitive_supremacy.py (G7 + ranking)
+    description: >
+      RecallFloorVerdictGuard (story §3 G7 + Epic title: "a floor-breaching system can never top-rank")
+      was named in scope but absent — neither implemented nor deferred-with-marker (silently dropped),
+      under-reflecting the load-bearing AX-003 recall-floor axiom on the gate's claim surface.
+    remediation: >
+      Implemented (not deferred) in iter-2 (RED c407f52 → GREEN 4a04d0f). recall_floor_breachers()
+      (recall-specific keying; latency carved out) wired into J/ranking (_guarded_rank1) + G7. Non-vacuous
+      property test test_floor_breacher_with_highest_composite_never_top_ranks. Real-artifact headline
+      preserved (canonical is binding-priority #1). Axiom reviewer APPROVE at iter-2.
+  - id: REQCOV-S4CS01-§5
+    severity: OBSERVATION
+    status: REMEDIATED
+    location: competitive_supremacy.py _decide
+    description: >
+      §5 predicate says CLAIM_GRADE requires (Tier-R ∪ Tier-C) all RUN-or-WAIVED, but _decide gated only
+      on Tier-C — an unrun Tier-R gliner2 could still reach CLAIM_GRADE.
+    remediation: "iter-2 — _decide now gates on the union; unrun gliner2 caps at PROVISIONAL; 2 tests pin it."
+  - id: code-quality-story-01
+    severity: MINOR
+    status: REMEDIATED
+    location: "competitive_supremacy.py:44/46/202 (iter-1); strengthened test (iter-1 MINOR)"
+    description: >
+      (iter-1) test_j_unavailable assertion too weak → strengthened to Verdict.NOT_YET.
+      (iter-2) module + binding_constraint docstrings stale after the §5 fix.
+    remediation: "iter-1 GREEN strengthened the assertion; iter-2 doc commit 17efdb8 fixed the verdict-predicate docstrings."
+  - id: AXIOM-S4CS01-002
+    severity: MINOR
+    status: REMEDIATED
+    location: tests/test_rating_import_boundary.py (S4-CS-01 boundary test docstring)
+    description: "rationale mis-located competitor_compare.py (it's in the sibling evaluation/ package, not the scanned eval_framework/evaluation/)."
+    remediation: "iter-2 RED c407f52 corrected the docstring; story §2a path clarified in 17efdb8."
+  - id: TRACE-S4CS01-MINOR-2
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md
+    description: "S4-CS-01 Story/Test columns + SDO-amendment Status-Change-Log row not yet backfilled (matrix says DC/Story/Test fill in Stages 3-5)."
+    disposition: "Acceptable at story gate (FR/NFR IDs all exist + trace to UC-06/DC-11). Backfill at the S4 sprint gate."
+  - id: AXIOM-S4CS01-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "Teeth test's `verdict != CLAIM_GRADE` assertion is its weakest check (the j_rank1_system + G7.passed assertions carry the real teeth, verified non-vacuous). Optional future hardening: assert G7.passed drives the binding constraint."
+  - id: PERF-S4CS01-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "J-bootstrap cost O(n_systems²·b); benign at real (5) / expected (≤8) system counts (<1s). Watch-item if the competitor set grows large; knob = _J_BOOTSTRAP_B / _J_PAIR_GAMES."
+  - id: SAST-S4CS01-OBS
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "Benign read-only-artifact posture + statistical RNG; no new attack surface (5 OBS, all no-action)."
+
+cross_reviewer_patterns:
+  - pattern: "named-but-absent guarantee (the central catch)"
+    raised_by: [axiom-compliance]
+    detail: "Only the axiom reviewer caught that G7's RecallFloorVerdictGuard was silently dropped; remediated to a real, non-vacuously-tested guard."
+  - pattern: "honest Pass-2 / no-fabrication boundary"
+    raised_by: [requirements-coverage, security-sast, performance-benchmark, axiom-compliance]
+    detail: "Four reviewers independently affirm: nothing CLAIM_GRADE without a canonical run; Tier-C never fabricated; G5/G2/G4 honestly PENDING; numpyro-bayes-J + Tier-C are the only Pass-2 set."
+
+outcome:
+  invariant: >
+    The SDO CompetitiveSupremacyGate — the program's optimization function + completion criterion — is
+    LIVE in code. `pii-anon supremacy` prints exactly one verdict {CLAIM_GRADE_SOTA|PROVISIONAL_SOTA|NOT_YET}
+    + the single binding constraint every run (non-blocking exit 0; --canonical-claim exits 1 unless
+    CLAIM_GRADE). J = rank_one_probability (S3-04) with an in-tree MLE-bootstrap fallback. G1/G3/G6/G7
+    computable now; G2←S4-01, G4←S4-03, G5←S5/S6 honestly PENDING. RecallFloorVerdictGuard couples the
+    recall floor (AX-003) to top-rank. Tier-R/Tier-C registry carries the UNRUN honesty boundary.
+  current_verdict: "NOT_YET — binding_constraint = canonical_claim_run=False (G7 certified-run gate)"
+  current_j: "J=1.0, j_source=mle-bootstrap (pii-anon top composite; bayes path Pass-2)"
+  guarantees: "G1 PENDING(structural ⊇ holds; per-lang ε absent→not fabricated) · G2 PENDING(←S4-01) · G3 PASS(swarm 0.818≥0.658) · G4 PENDING(←S4-03) · G5 PENDING(←S5/S6) · G6 PASS(core F2 0.779≥Tier-R 0.697−ε; OpenAI carve-out recorded) · G7 FAIL(canonical_claim_run=False)"
+  honesty_boundary: "Tier-R RUN {gliner,presidio,scrubadub}; Tier-R UNRUN {gliner2}; Tier-C UNRUN {openai-privacy-filter,azure-ai-language,aws-comprehend} (Pass-2)"
+  tests: "full suite 2876 passed / 15 skipped / 0 failed (exit 0); owned cluster 72 passed"
+  coverage: "86.17% (≥84); gate modules 94% / 99%"
+  quality: "ruff clean; mypy --strict 0 errors / 122 files"
+  safety: "competitor_compare.py byte-identical; numpyro/jax NOT installed; user-WIP md5 unchanged; narrow git add only"
+
+followups:
+  - "S4-01 distinct anon/pseudo reversibility scorers → completes G2; recompute SDO at that seam."
+  - "S4-03 calibration/selective-risk reporter → completes G4."
+  - "S5/S6 → G5 (latency budgets + 4-channel interception presence)."
+  - "Pass-2: bayes-eval run upgrades J bayes→ (j_source); Tier-C real-API runs (or waive-with-reason) unlock CLAIM_GRADE; regenerate the CANONICAL benchmark run (S7) → canonical_claim_run=True (the #1 binding constraint)."
+  - "S4 sprint gate: backfill traceability-matrix S4-CS-01 Story/Test columns + SDO-amendment Status-Change-Log row (TRACE-S4CS01-MINOR-2)."

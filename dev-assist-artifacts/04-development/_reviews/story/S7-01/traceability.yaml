@@ -1,0 +1,44 @@
+reviewer: traceability
+story: S7-01
+gate: story
+iteration: 2
+verdict: APPROVE  # 1 MINOR (doc-freshness, remediated at close) + 2 OBSERVATIONS across iterations
+runs: wf_44f8b3ae-51b (iter-1) -> wf_2d10a313-630 (iter-2); transcribed from the workflow structured results
+summary: >
+  Trace chain intact: DC-14 -> FR-031..036 + NFR-023/026 -> story -> anchors
+  (module + per-test docstrings carry the FR binding: A1->FR-031,
+  A2/A12->FR-032, A9->FR-033, A10->FR-034, A11->FR-035, A7/A8->NFR-026,
+  A5->AX-002). No DIVERGED cascade obligation (DC-14 carries no DIVERGED
+  marker; provisional_status AGENT_SIMULATED matches the source rows).
+findings:
+  - id: traceability-story-01
+    severity: MINOR
+    location: the story file §3/§12 vs tests/test_native_readers.py
+    description: >
+      The remediation commit added anchors A14-A17 but the story's
+      acceptance list and DoD still enumerated only A1-A13 — doc-freshness
+      advisory; the new anchors trace to iter-1 gate findings, not to any
+      new FR/NFR; no claim left untested.
+    suggested_resolution: Refresh §3/§12 to A1-A17 with a gate-remediation note at story close.
+    disposition: REMEDIATED AT CLOSE — §3 now documents A14-A17 (gate-remediation anchors) and §12 reads A1-A17.
+  - id: traceability-story-02
+    severity: OBSERVATION
+    location: 00-axioms/project-axioms.yaml; tests A5
+    description: >
+      AX-001/AX-002 resolve to project axioms (synthetic-only;
+      deterministic), NOT to FR/NFR rows — the established convention
+      (SO-08/13/19/20); recorded so a future reviewer does not mistake it
+      for a non-existent-ID violation.
+    suggested_resolution: Optional cross-link of the axioms file from the story Traces row.
+    disposition: NO-ACTION (convention-consistent).
+  - id: traceability-story-03
+    severity: OBSERVATION
+    location: story Implements (FR-036/NFR-023) vs A12 (iter-1)
+    description: >
+      A12 pins reader-level stream-vs-batch IngestRecord parity, not
+      scrub-decision parity — honest representative scoping (S7-01 ships no
+      scrub path); full FR-036/NFR-023 parity remains downstream.
+    suggested_resolution: None — the claimed pin matches the asserted behavior at the reader layer.
+    disposition: NO-ACTION.
+context_bounds_respected: true
+offlimits_md5_ok: true

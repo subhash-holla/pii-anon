@@ -1,0 +1,118 @@
+reviewer: axiom-compliance
+gate: story
+scope_id: S6-03
+iteration: 1
+verdict: APPROVE
+context_bounds_respected: true
+
+# Axiom registry: dev-assist-artifacts/00-axioms/project-axioms.yaml (schema_version 1)
+# Active domain_packs: [] (developer-assistant.yaml) -> no pack-extension catalog merged;
+# agentic-runtime axiom-compliance extension confirmed NOT present. No project-axiom
+# reviewer_hook fired against this diff (AX-003/AX-005 hooks target detection/calibration
+# code, which this tokenization-store story does not touch).
+
+axiom_saturation:
+
+  - axiom: AX-pii-anon-006
+    name: least-privilege-agentic-interception / no-raw-PII-persist
+    role: HEADLINE for this story
+    status: UPHELD
+    evidence: >
+      This story closes the FR-026/AX-006 hole that the cleartext SQLiteTokenStore had.
+      Verified directly in src/pii_anon/tokenization/encrypted_store.py: every sensitive
+      field (plaintext + defense-in-depth token/scope/entity_type/version) is AEAD-encrypted
+      via AESGCM/ChaCha20Poly1305 (_encrypt_payload, lines 380-403); the value column is a
+      BLOB ciphertext, scope/token are stored only as keyed HMAC blind indexes (never
+      cleartext). A2 (test_encrypted_store.py:289-351) reads the raw .db bytes AND dumps
+      every sqlite column and asserts ABSENCE of b"jane.roe@example.test", b"Jane Roe",
+      the plaintext token, and b"EMAIL_ADDRESS"; it also asserts the value cols are BLOB.
+      Key access is the in-process EnvelopeKeyProvider protocol only: independent grep of
+      the module finds zero subprocess/process-spawn/shell-invocation calls and zero
+      os.system/Popen (the only "subprocess"/"shell-out" mentions are docstring prose
+      declaring they are NOT used, lines 50/137/162). Least-privilege: no capability
+      broadening, no unscoped trace/memory write.
+
+  - axiom: AX-pii-anon-001
+    name: synthetic-only-no-real-pii
+    status: UPHELD
+    evidence: >
+      All test PII is synthetic and never-real: SYNTH_PLAINTEXT="jane.roe@example.test"
+      (.test reserved TLD), SYNTH_NAME="Jane Roe", SYNTH_PHONE="555-0100" (reserved range)
+      (test_encrypted_store.py:51-55). The only key material in the diff is the obviously
+      synthetic test KEK (b"A"*32 / b"B"*32) and it lives ONLY in tests/ — independent grep
+      of src/pii_anon/tokenization/encrypted_store.py finds no hard-coded key bytes; the KEK
+      is caller-supplied via StaticTestKeyProvider(test_kek: bytes). No real card/SSN/secret
+      heuristic present. The headline test asserts even these synthetic values are
+      unrecoverable from the raw .db.
+
+  - axiom: AX-pii-anon-002
+    name: deterministic-reproducible-pseudonymization
+    status: UPHELD
+    evidence: >
+      The surrogate is produced UPSTREAM by DeterministicHMACTokenizer (providers.py:53-85,
+      verified byte-identical / unchanged) as HMAC-SHA256(key, scope|v|entity|plaintext);
+      the encrypted store only persists/returns it. The random 96-bit AEAD nonce
+      (os.urandom, line 400) makes the at-rest CIPHERTEXT non-deterministic by design, but
+      that is orthogonal to the surrogate: determinism is a property of the tokenizer+key,
+      not the at-rest encoding. A6 (test_encrypted_store.py:586-607) pins this end-to-end:
+      two independent tokenizer instances + two separate encrypted stores yield the IDENTICAL
+      token for the same (scope,version,entity_type,plaintext,key) and detokenize back to the
+      identical plaintext. A1 round-trip (lines 106-142) confirms get() returns the input
+      TokenMapping field-for-field. No unseeded random/uuid/time leaks into a surrogate value.
+
+  - axiom: AX-pii-anon-004
+    name: anonymization-pseudonymization-separation
+    status: UPHELD
+    evidence: >
+      The encrypted store is a pure reversible-pseudonymization component and does not
+      breach the anon-vs-pseudo wall. Independent import scan of encrypted_store.py shows it
+      imports ONLY pii_anon.errors and pii_anon.tokenization.store — nothing from
+      pii_anon.anonymizer / pii_anon.evaluation / pii_anon.scoring (the evaluation/ package
+      with compare.py + competitor_compare.py DOES exist, so the guard forbids a real path).
+      A7 guard (test_encrypted_store.py:613-638) asserts both the source-level import wall and
+      that the instance exposes ONLY the reversible surface (put/get/list_by_scope/count/
+      delete_expired/close) and has NO anonymize / anonymize_score / score /
+      irreversible_transform attribute — it never emits an anon score or merges into an anon
+      family. Encryption-at-rest is confidentiality, orthogonal to the scoring-family wall.
+
+  - axiom: AX-pii-anon-003
+    name: ensemble-recall-floor-guarantee
+    status: NOT_APPLICABLE
+    evidence: >
+      This is a tokenization-store change only. Verified: the full S6-03 commit range
+      (RED b67befd^ .. REFACTOR 36358f0) touches exactly 5 paths
+      (encrypted_store.py NEW, test_encrypted_store.py NEW, errors.py +TokenStoreIntegrityError,
+      tokenization/__init__.py additive exports, the story doc) — zero detection / recall /
+      floor / router / MoE / expert / ensemble / shared-layer / gate files. The recall-floor
+      guarantee cannot be regressed by a diff that does not touch any detection code path.
+
+cross_cutting_checks:
+  commit_chain: "RED b67befd -> GREEN 1f91c8a -> REFACTOR 36358f0; both ancestor relations git-confirmed (proper RED->GREEN->REFACTOR)."
+  off_limits_byte_identity: "store.py, providers.py, reidentification.py, key_manager.py, pii_anon/__init__.py all git diff --quiet UNCHANGED and absent from the S6-03 commit range (orchestrator.py shows pre-existing user-WIP changes outside this range, not introduced by S6-03)."
+  additive_only: "errors.py diff = +TokenStoreIntegrityError(TokenizationError) only; tokenization/__init__.py = append-only import + __all__ additions. No edits to existing symbols."
+  agent_simulated_honesty: "Real KMS/HSM/OS-keyring custody is correctly declared Pass-2/AGENT_SIMULATED; StaticTestKeyProvider is the documented in-process stand-in and is NOT claimed as real-KMS behaviour (methodology invariant respected)."
+  no_unsafe_deserialization: "On-disk payload is json.dumps/json.loads over a small explicit field dict (lines 389-431); no unsafe-deserialization loader, no eval/exec, no __reduce__ path. The decrypted-payload type is dict-checked before use."
+
+findings: []
+
+notes: >
+  APPROVE. Axiom saturation is complete and independently verified against the live diff,
+  not merely the story's self-attestation. The headline axiom (AX-006 no-raw-PII-persist) is
+  the load-bearing deliverable and is upheld: the cleartext SQLiteTokenStore confidentiality
+  hole is closed by an additive AEAD-at-rest store whose A2 byte-scan proves synthetic
+  plaintext + token + entity-type cleartext are ABSENT from the raw .db, with key access kept
+  to an in-process provider (no subprocess / no shell-out). AX-001 (synthetic-only fixtures;
+  only key material is a synthetic test KEK confined to tests/), AX-002 (determinism is a
+  tokenizer+key property unchanged by the store; the random nonce does not perturb the
+  surrogate — A6 pins this end-to-end), and AX-004 (reversible-only surface; import wall to
+  anon/eval/scoring intact; never emits an anon score) are all upheld with dedicated tests.
+  AX-003 is not-applicable: the commit range touches zero detection/floor/router code (exactly
+  the 4 owned paths + the story doc). No active domain_packs, so no pack-extension catalog was
+  merged and no project-axiom reviewer_hook fired against this diff. Zero MAJOR+ findings ->
+  APPROVE. Out of scope for this dimension and deferred to the named owners: AEAD construction
+  correctness / nonce-uniqueness rigor (security-sast), FR/NFR mapping completeness
+  (traceability / requirements-coverage), and the residual blind-index equality leak (a
+  documented conscious trade-off over derived pseudonyms, not PII — axiom-consistent).
+  Self-attestation: this review was performed independently; the verdict reflects my own
+  reading of the code, tests, axiom registry, and git history, not a restatement of the
+  story's Evidence section.

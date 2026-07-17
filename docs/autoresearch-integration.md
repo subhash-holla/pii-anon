@@ -69,8 +69,8 @@ an artefact of evaluator drift.
 `autoresearch/program.md` describes this loop formally and enumerates
 the tunable categories. The two most useful files to read first:
 
-- [`autoresearch/config.py`](../../pii-anon-autoresearch/config.py) — every knob
-- [`autoresearch/evaluate.py`](../../pii-anon-autoresearch/evaluate.py) — the immutable scorer (do not edit)
+- `autoresearch/config.py` (in the companion `pii-anon-autoresearch` repository) — every knob
+- `autoresearch/evaluate.py` (same repository) — the immutable scorer (do not edit)
 
 ---
 

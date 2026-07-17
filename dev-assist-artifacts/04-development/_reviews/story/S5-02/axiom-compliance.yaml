@@ -1,0 +1,26 @@
+reviewer: axiom-compliance
+story: S5-02
+gate: story
+verdict: APPROVE
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # synthetic-only — zero real-PII heuristic hits; _aux_tokens flattens only synthetic aux VALUES
+  - { id: AX-pii-anon-002, status: UPHELD }  # determinism — no random/uuid/time/secrets (AST-confirmed); total-order ranking; pure Wilson; A5+A14 replay-equal; aux-key order-invariant
+  - { id: NFR-016, status: UPHELD }          # caveat REUSED (imported) from reid.py; non-strippable at construction + frozen + carried in as_outcome AND asdict; A9
+  - { id: attacks-import-isolation, status: UPHELD }  # AST boundary test passes; reid_tier3.py in scanned set; 0 forbidden imports
+  - { id: FR-012-de-circularization, status: UPHELD } # attack() structurally excludes gold; A13 proves signal-following
+  - { id: SDO-verdict-invariant, status: UPHELD }     # gate byte-identical 3b842e81…; supremacy reads NOT_YET / canonical_claim_run=False
+findings:
+  - id: AXC-S502-O1
+    severity: OBSERVATION
+    title: SWITCH-POINT(LLM) is docstring-only; no concrete code-site marker
+    disposition: NO ACTION (honest scope intact — story §5 flags the real LLM adversary Pass-2; add an in-code marker when the seam is built).
+  - id: AXC-S502-O2
+    severity: OBSERVATION
+    title: RRS power emission is caveat-safe even on the asdict/replace bypass surface
+    disposition: NO ACTION (informational — the invariant is enforced at construction, stronger than as_outcome-only).
+offlimits_md5_ok: true
+notes: >
+  No SHOWSTOPPER/CATASTROPHIC/MAJOR/MINOR. No SDO close required
+  (competitive_supremacy.py byte-identical). The margin-abstain is an ADVERSARY
+  control (FR-012), not a detector confidence path, so AX-005 (calibrated
+  abstention) does not attach.

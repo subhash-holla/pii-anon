@@ -30,7 +30,7 @@ class TestCSVWriter:
         assert count == 3
         assert path.exists()
 
-        with path.open() as fh:
+        with path.open(encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
             rows = list(reader)
         assert len(rows) == 3
@@ -51,7 +51,7 @@ class TestJSONWriter:
         count = write_results(iter(_make_results()), path)
         assert count == 3
 
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert isinstance(data, list)
         assert len(data) == 3
         assert data[0]["transformed_text"] == "processed text 0"
@@ -60,7 +60,7 @@ class TestJSONWriter:
         path = tmp_path / "empty.json"
         count = write_results(iter([]), path)
         assert count == 0
-        assert json.loads(path.read_text()) == []
+        assert json.loads(path.read_text(encoding="utf-8")) == []
 
 
 class TestJSONLWriter:
@@ -69,7 +69,7 @@ class TestJSONLWriter:
         count = write_results(iter(_make_results()), path)
         assert count == 3
 
-        lines = [json.loads(line) for line in path.read_text().strip().split("\n")]
+        lines = [json.loads(line) for line in path.read_text(encoding="utf-8").strip().split("\n")]
         assert len(lines) == 3
         assert lines[2]["entities_found"] == 2
 
@@ -80,7 +80,7 @@ class TestTXTWriter:
         count = write_results(iter(_make_results()), path)
         assert count == 3
 
-        lines = path.read_text().strip().split("\n")
+        lines = path.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 3
         assert lines[0] == "processed text 0"
 
@@ -90,7 +90,7 @@ class TestExplicitFormat:
         path = tmp_path / "output.dat"
         count = write_results(iter(_make_results(1)), path, fmt=FileFormat.JSONL)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert "transformed_text" in line
 
     def test_unsupported_format_raises(self, tmp_path: Path) -> None:
@@ -108,7 +108,7 @@ class TestFlattenResult:
         results = [{"transformed_payload": "plain text", "ensemble_findings": [], "confidence_envelope": {}}]
         count = write_results(iter(results), path)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert line["transformed_text"] == "plain text"
 
 
@@ -195,7 +195,7 @@ class TestCSVWriterEdgeCases:
         count = write_results(iter([]), path)
         assert count == 0
         assert path.exists()
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         # Should be empty or just empty lines
         assert len(content.strip()) == 0
 
@@ -212,7 +212,7 @@ class TestCSVWriterEdgeCases:
         count = write_results(iter(results), path)
         assert count == 1
 
-        with path.open() as fh:
+        with path.open(encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
             rows = list(reader)
         assert len(rows) == 1
@@ -229,7 +229,7 @@ class TestCSVWriterEdgeCases:
         count = write_results(iter(results), path)
         assert count == 1
 
-        with path.open() as fh:
+        with path.open(encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
             rows = list(reader)
         assert len(rows) == 1
@@ -243,7 +243,7 @@ class TestJSONLWriterEdgeCases:
         path = tmp_path / "empty.jsonl"
         count = write_results(iter([]), path)
         assert count == 0
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         assert len(content.strip()) == 0
 
     def test_jsonl_unicode_handling(self, tmp_path: Path) -> None:
@@ -260,7 +260,7 @@ class TestJSONLWriterEdgeCases:
         count = write_results(iter(results), path)
         assert count == 1
 
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert "世界" in line["transformed_text"]
 
 
@@ -272,7 +272,7 @@ class TestTXTWriterEdgeCases:
         path = tmp_path / "empty.txt"
         count = write_results(iter([]), path)
         assert count == 0
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         assert len(content.strip()) == 0
 
     def test_txt_missing_text_key(self, tmp_path: Path) -> None:
@@ -289,7 +289,7 @@ class TestTXTWriterEdgeCases:
         count = write_results(iter(results), path)
         assert count == 1
 
-        lines = path.read_text().strip().split("\n")
+        lines = path.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 1
 
 
@@ -310,7 +310,7 @@ class TestJSONWriterEdgeCases:
         count = write_results(iter(results), path)
         assert count == 1
 
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert "こんにちは" in data[0]["transformed_text"]
 
 
@@ -331,7 +331,7 @@ class TestWriteResultsCustomTextKey:
         count = write_results(iter(results), path, text_key="output_text")
         assert count == 1
 
-        with path.open() as fh:
+        with path.open(encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
             rows = list(reader)
         assert "output_text" in rows[0]
@@ -351,7 +351,7 @@ class TestWriteResultsCustomTextKey:
         count = write_results(iter(results), path, text_key="result")
         assert count == 1
 
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert line["result"] == "custom"
 
     def test_txt_with_custom_text_key(self, tmp_path: Path) -> None:
@@ -369,7 +369,7 @@ class TestWriteResultsCustomTextKey:
         assert count == 1
 
         # The flattened result will have custom key from transformed_payload
-        content = path.read_text().strip()
+        content = path.read_text(encoding="utf-8").strip()
         assert "custom output text" in content
 
 
@@ -437,7 +437,7 @@ class TestFlattenResultEdgeCases:
         ]
         count = write_results(iter(results), path)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert "transformed_text" in line
 
     def test_flatten_missing_ensemble_findings(self, tmp_path: Path) -> None:
@@ -452,7 +452,7 @@ class TestFlattenResultEdgeCases:
         ]
         count = write_results(iter(results), path)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert line["entities_found"] == 0
 
     def test_flatten_non_dict_ensemble_findings(self, tmp_path: Path) -> None:
@@ -468,7 +468,7 @@ class TestFlattenResultEdgeCases:
         ]
         count = write_results(iter(results), path)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert line["entities_found"] == 0
 
     def test_flatten_confidence_envelope_partial(self, tmp_path: Path) -> None:
@@ -484,6 +484,6 @@ class TestFlattenResultEdgeCases:
         ]
         count = write_results(iter(results), path)
         assert count == 1
-        line = json.loads(path.read_text().strip())
+        line = json.loads(path.read_text(encoding="utf-8").strip())
         assert line["confidence_score"] == 0.75
         assert line["risk_level"] == "unknown"

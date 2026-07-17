@@ -1,0 +1,167 @@
+# S2-05 — sign + verify gate_v1.json (the MoE-router control-path qualification gate artifact)
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. One iteration.
+gate: story
+scope_id: S2-05
+final_iteration: 1
+date: 2026-06-01
+aggregate_verdict: APPROVE   # 5/5 APPROVE (0 SHOWSTOPPER / 0 CATASTROPHIC / 0 MAJOR / 0 REQUEST_CHANGES)
+
+reviewer_set:   # select-reviewer-set.sh story S2-05 → 4 config default_set + axiom-compliance (gate_overrides.story.add)
+  - code-quality
+  - security-sast          # PRIMARY (security MUST on a control-path load)
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:      "2640fdc  # test: pin detached-signature sign/verify + fail-loud verify-on-load + key rotation (modules absent)"
+  green:    "d45a5e4  # feat: sign+verify gate_v1.json (HMAC-SHA256 detached sig, fail-closed, key-ring rotation)"
+  refactor: "04cf3c7  # refactor: extract _decode_signature_value (dedupe HMAC/Ed25519 base64 fail-closed decode; behaviour-identical)"
+  review:   "5df2bd2  # docs: IN_PROGRESS → REVIEW (DoD checked + Evidence filled)"
+  red_before_green_confirmed: true   # code-quality reproduced RED at 2640fdc: ModuleNotFoundError on pii_anon.moe_gate_signing + ImportError on GateSignatureError
+  scope_discipline: "diff 2640fdc~1..04cf3c7 touches ONLY the 6 owned files (+story md); git status shows only pre-existing user-WIP M files + untracked .claude/ , docs/pii-rate-elo-value.md (none this story's)"
+
+owned_files:
+  new: [src/pii_anon/moe_gate_signing.py, tests/test_moe_gate_signing.py, tests/test_moe_gate_verify_on_load.py]
+  additive: [src/pii_anon/moe.py (load_verified_gate seam + keyword-only gate_path/key_ring; no-gate signatures + behaviour unchanged), src/pii_anon/errors.py (GateSignatureError), pyproject.toml (gate-signing optional extra)]
+
+reviewers:
+  - reviewer: security-sast      # PRIMARY
+    verdict: APPROVE
+    notes: >
+      All 7 security dimensions verified HARD against source + tests. (1) FAIL-CLOSED: verify()
+      (moe_gate_signing.py:209-242) + load_verified_gate (moe.py:26-98) have NO branch returning an
+      unverified payload on failure — only non-raising returns are the verified payload (success) and
+      None on file ABSENCE; present-but-broken RAISES (never silent-fallback to static softmax).
+      (2) CONSTANT-TIME: hmac.compare_digest (moe_gate_signing.py:239); grep found no ==/!= on the
+      digest; behavioural spy passes. (3) NO SECRET LEAK: GateSignatureError messages interpolate only
+      key_id/scheme. (4) NO DANGEROUS SINKS: JSON-only parse (json.loads, moe.py:81); AST tests + grep
+      confirm no unsafe-deserialization, no subprocess, no shell-out, no network in the new module.
+      (5) NO REAL SECRET: only key literal is b"S2-05-NON-PRODUCTION-TEST-KEY-DO-NOT-USE-IN-PROD".
+      (6) OPTIONAL-DEP HONEST: cryptography lazy-imported inside the Ed25519 functions only (delta-import
+      probe: moe_gate_signing adds ZERO crypto modules at load; AST pin is the canonical guard).
+      (7) KEY ROTATION: ring is the trust root; signer always signs with current; retired-out-of-ring key
+      rejected even with a self-consistent attacker HMAC. 62 owned tests pass. 0 unresolved MAJOR+.
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED-before-GREEN reproduced by execution (checkout 2640fdc → ModuleNotFoundError/ImportError, the
+      correct collection-level RED). REFACTOR 04cf3c7 source-only, behaviour-identical. ruff check on the
+      6 owned files + `ruff check src/ tests/` → All checks passed (the 46 pre-existing scripts/*.py ruff
+      errors are OUT OF SCOPE, untouched, and none of the owned files appear). mypy src/pii_anon (strict)
+      → Success, 123 files. 62 owned tests pass. Idiomatic (mirrors tokenization/providers.py hmac idiom);
+      every public symbol docstringed; types complete; all reject paths explicitly raise. Scope-disciplined.
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      All four claimed requirements fully verified by named passing tests. FR-018 → verify-on-load seam
+      guards MoERouter (test_a7_production_seam_uses_verify_on_load_true spies the real symbol; the seam
+      hard-codes verify_on_load=True at moe.py:294-296). NFR-005 → test_a6_replay_determinism_n5 (N=5 single
+      distinct signature) + order-invariant/value-sensitive. NFR-015 → test_a4_unknown_key_id_raises (ring,
+      not file, is the trust root) + bare-legacy-dict rejected. NFR-006 → signed envelope carries
+      provenance{trainer,run_id}+oracle_hash+key_id, mutation→raise. Ed25519 optional tests RUN in-tree
+      (cryptography 48.0.0 present), exceeding the importorskip bar. No unmapped MUST/DoD clause.
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      Forward FR/NFR → Story → Test → DC chain faithful end-to-end. All declared IDs exist in
+      requirements-document.md (FR-018:30 MUST, NFR-005:64 MUST, NFR-006:65 MUST, NFR-015:76 SHOULD) +
+      AX-002/AX-006 in the axiom roster. Each pinned by a named test; A1–A9 each map to ≥1 test. Design
+      trace verbatim: D-implementation-ready-design.md:56 (SME Security MUST #1) + :34 (DC-02 absent→static
+      softmax NFR-026), and A8 pins that absence-vs-tamper boundary. Self-attested independence.
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      AX-006 (least-privilege control-path auth) — the headline — UPHELD fail-closed BY CONSTRUCTION:
+      MoERouter admits a gate ONLY through load_verified_gate(verify_on_load=True) with True hard-wired at
+      the seam (moe.py:291-296), raises if gate_path given without key_ring; a tampered gate provably cannot
+      reach route(). AX-002 (determinism) UPHELD (sort_keys+fixed-separators; replay-stable N=5). AX-001
+      UPHELD (synthetic fixtures + obvious dummy key; real custody Pass-2). AX-003 UPHELD (zero floor/
+      SharedLayerProjector code touched; verified gate_payload is stored-only, consumed by nothing in
+      route()/route_all() — genuinely advisory, floor not regressed).
+
+findings:
+  - id: AXIOM-S205-001
+    severity: OBSERVATION
+    status: RESOLVED-BY-ADJUDICATION
+    location: requirements-document.md (FR/NFR inline AX-cites) vs project-axioms.yaml:42 / MANIFEST.md:133
+    description: >
+      Executor (and requirements-coverage REQCOV-S2-05-003 MINOR) flagged the story's AX-002 citation as
+      possibly non-canonical because the requirements-doc inline FR-trace subset cites only AX-001/AX-005/AX-006.
+    remediation: >
+      axiom-compliance (authoritative for axioms) adjudicated: AX-002 (determinism) IS canonical — enumerated
+      in project-axioms.yaml:42 and MANIFEST.md:133. The requirements-doc inline cites are a per-row annotation
+      convenience, not the registry. Determinism substance is ALSO backed by NFR-005. NO code/story change
+      required; AX-002 + NFR-005 dual citation is valid. (Optional non-blocking nicety: cross-reference (AX-002)
+      on the NFR-005 row in requirements-document.md for discoverability — deferred, not owed.)
+  - id: TRACE-S205-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md (UC-15 / FR-018 row)
+    description: "S2-05 Story/Test columns not yet backfilled (matrix header defers DC/Story/Test columns to Stages 3-5)."
+    disposition: "Acceptable at story gate (FR/NFR IDs all exist + trace to UC-15/DC-02). Backfill at the S2 sprint gate — mirrors S4-CS-01 TRACE-S4CS01-MINOR-2."
+  - id: CQ-S205-MINOR-1
+    severity: MINOR
+    status: ACCEPTED-ADVISORY
+    location: tests/test_moe_gate_signing.py, tests/test_moe_gate_verify_on_load.py
+    description: >
+      Test names use acceptance-criteria prefixes (test_a1_…test_a9_) rather than the repo's test_fr_NNN_/
+      test_nfr_NNN_ convention; FR/NFR IDs appear in docstrings + module headers, not the test names.
+    disposition: >
+      Advisory — reviewer itself rated non-blocking; acceptance criteria are fully reachable via the A-prefix +
+      docstrings (NFR-005/AX-002 cited inline; traceability reviewer confirmed the chain is faithful). The
+      A-prefix is a deliberate per-story acceptance-ID scheme. Not a substantive defect; no 62-test rename forced.
+  - id: SAST-S205-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    location: src/pii_anon/moe.py (load_verified_gate verify_on_load=False escape hatch)
+    description: >
+      The verify_on_load=False opt-out returns an unverified payload — BY DESIGN per A7 (explicit offline tooling);
+      NOT the default (default True, pinned), and the production MoERouter seam hard-codes verify_on_load=True
+      (pinned). No production path reaches the opt-out. Monitor at epic/sprint gate; consider gating it behind a
+      non-production flag when real key custody lands (Pass-2).
+  - id: SAST-S205-OBS-2
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: >
+      A naive `cryptography in sys.modules` check reads True only because the package __init__ pulls cryptography
+      via the pre-existing `crypto` extra; a delta-import probe shows moe_gate_signing itself adds zero crypto
+      modules at load. The source-level AST pin is the canonical optional-dep guard and passes.
+  - id: REQCOV-S205-OBS-1
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: >
+      NFR-006 provenance is protected-if-present but not schema-mandated by this signer; the must-be-populated
+      enforcement legitimately belongs to the producer (S2-02) / S4 CanonicalRunGate provenance story. Not a gap.
+  - id: REQCOV-S205-OBS-2
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "NFR-015 is a SHOULD (requirements-document.md:76); story Implements omits the qualifier. Substance fully pinned; real key custody is an acceptable Pass-2 deferral."
+
+cross_reviewer_patterns:
+  - pattern: "FR/NFR ID greppability in test names/docstrings"
+    raised_by: [code-quality, traceability]
+    detail: "code-quality CQ-S205-MINOR-1 (A-prefix vs fr/nfr names) + traceability TRACE-S205-OBS-1 (NFR-006 lacks a greppable docstring marker) converge on the same theme; both non-blocking — IDs are traceable, chain faithful."
+  - pattern: "honest Pass-2 boundary (no over-claim)"
+    raised_by: [security-sast, requirements-coverage, axiom-compliance]
+    detail: "Three reviewers independently affirm real key custody/HSM/KMS is correctly Pass-2; the in-tree HMAC path runs for real with a clearly NON-PRODUCTION test key; nothing claimed as real-crypto-custody."
+
+outcome:
+  invariant: >
+    The MoE control-path artifact gate_v1.json is now UNFORGEABLE and FAIL-CLOSED. A detached HMAC-SHA256
+    signature over the canonical serialization is verified on every load; tamper / missing-sig / unknown-key /
+    retired-key / malformed all raise GateSignatureError (no silent-accept, no silent-fallback). Absence → None
+    (graceful NFR-026 static softmax); present-but-broken → raise. Constant-time hmac.compare_digest; key-ring
+    rotation (current + grace previous; ring is the trust root). The verify-on-load seam guards MoERouter
+    construction (verify_on_load=True hard-wired). Optional Ed25519 behind a lazy import (gate-signing extra) runs
+    in-tree (cryptography present); default path is pure-stdlib, zero new hard deps. Discharges SME Security MUST #1.
+  tests: "full suite 2938 passed / 15 skipped / 9 deselected / 0 failed (exit 0); 62 owned tests passed"
+  coverage: "86.26% (≥84); moe_gate_signing.py 100%; moe.py 92%"
+  quality: "ruff clean (src/ tests/); mypy --strict 0 errors / 123 files"
+  safety: "user-WIP md5 unchanged; narrow git add only; moe.py no-gate path behaviourally unchanged (no public-API regression); no new hard dependency"
+  provisional_status: "AGENT_SIMULATED — in-tree HMAC-SHA256 sign/verify/canonical-serialization/rotation run for real with a NON-PRODUCTION test key; real signing-key custody (env/secret-store/HSM/KMS) is Pass-2 (never simulated as real)."
+
+followups:
+  - "S2-02 (DistilledTopKGate trainer) is the PRODUCER — it calls moe_gate_signing.sign() when it emits gate_v1.json; the verifier on the consume path is now live."
+  - "S2 sprint gate: backfill traceability-matrix S2-05 Story/Test columns (TRACE-S205-MINOR-1)."
+  - "Pass-2: real key custody behind gate_signing_key_provider; consider gating the verify_on_load=False opt-out behind an explicit non-production flag (SAST-S205-OBS-1)."

@@ -17,6 +17,15 @@ from typing import Any
 
 from .schema import FileFormat, IngestConfig, IngestRecord, detect_format
 
+# Native formats (S7-01) handled by ingestion.native registry readers.
+_NATIVE_FORMAT_READERS: dict[FileFormat, str] = {
+    FileFormat.PDF: "pdf",
+    FileFormat.PNG: "image",
+    FileFormat.JPEG: "image",
+    FileFormat.DICOM: "dicom",
+    FileFormat.WAV: "audio",
+}
+
 
 def read_file(
     path: str | Path,
@@ -42,6 +51,16 @@ def read_file(
     }
     reader = reader_map.get(fmt)
     if reader is None:
+        native_name = _NATIVE_FORMAT_READERS.get(fmt)
+        if native_name is not None:
+            # Imported lazily: ingestion.native imports ingestion.schema,
+            # so a module-level import here would be an avoidable cycle risk.
+            from .native import default_reader_registry
+
+            native_reader = default_reader_registry().get(native_name)
+            if native_reader is not None:
+                yield from native_reader.read(resolved, config)
+                return
         raise ValueError(f"Unsupported file format: {fmt}")
     yield from reader(resolved, config)
 

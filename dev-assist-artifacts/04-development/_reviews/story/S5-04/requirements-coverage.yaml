@@ -1,0 +1,160 @@
+reviewer: requirements-coverage
+gate: story
+scope_id: S5-04
+iteration: 1
+verdict: APPROVE
+findings:
+  - id: RC-S504-001
+    severity: OBSERVATION
+    title: >-
+      DEFAULT_ATTACK_REGISTRY ships exactly one synthetic runner; the real
+      FR-011 / FR-013 bodies are correctly absent and DATA-blocked on S6.
+    requirement: FR-011, FR-013 (MUST, eval)
+    where: src/pii_anon/eval_framework/attacks/sandbox.py:359-361
+    detail: >-
+      The allow-list registry contains ONLY
+      pii_anon.harness.attack.reconstruction_attack_score (a synthetic,
+      side-effect-free reconstruction runner; harness/attack.py:6-12 is pure
+      over in-memory strings, no I/O, no network, no real PII). No real Tier-3
+      LLM-adversary or LiRA@128/Secret-Sharer body is registered. This is the
+      correct and honest state: traceability-matrix.md:27-28 records both
+      bodies as DATA-blocking on S6 (assemble_paired_set for Tier-3 / canary
+      splits for MIA), so they cannot land here. The story honestly scopes the
+      bodies as deferred successors (story header "Implements ... its runner
+      must execute sandboxed"; §5 non-goals lines 47-48). No false DONE claim.
+      Recorded as an OBSERVATION only so the epic/release gate carries the
+      explicit open-successor: FR-011 + FR-013 remain UNVERIFIED-at-body until
+      a successor story lands a real runner that executes via
+      run_attack_under_sandbox. Not actionable for this story.
+    disposition: accept
+  - id: RC-S504-002
+    severity: OBSERVATION
+    title: >-
+      RLIMIT_AS self-degrades to a recorded audit note on this darwin host;
+      real memory-cap enforcement is honestly Pass-2.
+    requirement: NFR-012 / NFR-013 substrate (resource isolation), FR-026/AX-006
+    where: src/pii_anon/eval_framework/attacks/sandbox.py:213-242
+    detail: >-
+      The address-space (memory) rlimit is refused by darwin and degrades to a
+      recorded platform_limit_unavailable audit note (never a silent no-op),
+      with the wall-clock watchdog as the reliable primary terminator. This is
+      marked honestly as AGENT_SIMULATED / Pass-2 (story line 71, §5 line 48)
+      and is NOT a coverage gap for THIS story (the substrate + the fail-loud
+      degrade path are both proven: A4 test_a4_audit_note_recorded_when_rlimit_unavailable
+      and the _FakeResource branches test_rlimit_applied_branch_records_applied_audit
+      / test_rlimit_absent_branch_records_unavailable_note pin both the applied
+      and the degrade arcs). Flagged so the successor story that runs a real
+      memory-hungry attack body must confirm a real OS-level memory cap
+      (seccomp / cgroup) at Pass-2 — it is NOT verified by the in-process guard.
+    disposition: accept
+context_bounds_respected: true
+notes: >
+  SCOPE & DIMENSION. requirements-coverage at a STORY gate (gate=story,
+  scope_id=S5-04, iter=1). I do NOT pass/fail story gates on coverage breadth
+  (a single story verifies only a slice); I verify that what S5-04 CLAIMS is
+  honestly mapped and that no in-scope security-DoD clause is silently
+  unmapped. Verdict APPROVE: every A1-A8 acceptance clause maps to >=1 named
+  passing test; the substrate requirements are present + enforced; the
+  FR-011/FR-013 BODIES are honestly deferred (not falsely claimed). Two
+  OBSERVATIONs only (open-successor bookkeeping for the epic/release gate);
+  zero MAJOR+.
+
+  EVIDENCE RUN. `python3 -m pytest tests/test_attack_sandbox.py
+  tests/test_attack_spec_loader.py --no-cov` -> 67 passed, 0 failed
+  (32 in test_attack_sandbox.py + 35 in test_attack_spec_loader.py). NOTE on
+  the coverage gate: the project pyproject pins --cov-fail-under=84 GLOBALLY,
+  so running ONLY these two files trips "coverage 19.94% < 84%" — that is an
+  artifact of the narrow selection, NOT a story signal (story evidence records
+  full-suite 3060 passed / overall cov 86.83% / attacks modules 100/99/100%).
+  I re-ran with --no-cov to get the true per-file result: all green.
+
+  SUBSTRATE CLAIM (the heart of this story). The story ships the ISOLATION
+  SUBSTRATE that FR-011/FR-013 runners MUST execute inside, not the attack
+  bodies. Verified:
+   - run_attack_under_sandbox (sandbox.py:334-351) IS the single chokepoint:
+     load -> resolve runner from the in-code allow-list dict -> AttackSandbox.run.
+     AttackSandbox.run (264-292) runs the capability pre-check BEFORE the body,
+     then applies SOFT rlimits + installs the egress interceptor + runs under
+     the wall-clock watchdog. A well-formed synthetic runner runs to completion
+     inside it (A5 test_a5_well_formed_synthetic_attack_runs_to_completion,
+     outcome == direct call test_a5_outcome_matches_direct_call_of_wrapped_runner).
+   - HONEST DEFERRAL confirmed: DEFAULT_ATTACK_REGISTRY (359-361) holds ONLY the
+     synthetic reconstruction_attack_score; no real Tier-3/MIA body is present.
+     traceability-matrix.md:27-28 tracks both bodies as S6-DATA-blocking, so
+     the deferral is structurally visible, not a silent gap. requirements-doc
+     lines 22/24 confirm FR-011/FR-013 are MUST; the story does NOT mark them
+     DONE — it marks the SUBSTRATE done (AGENT_SIMULATED) and the bodies as
+     successor (RC-S504-001).
+
+  ACCEPTANCE CLAUSE -> NAMED TEST MAP (A1-A8; every security clause mapped):
+   - A1 unsafe-deserialization refused: test_a1_nested_object_in_params_is_refused,
+     _list_, _none_, + property test_a1_property_every_nonscalar_params_value_is_rejected
+     (and the dual _every_scalar_..._accepted guards against false refusal).
+     Code: spec._validate_scalar_params (136-163).
+   - A2 subprocess/shell-out / off-list runner refused BEFORE execution:
+     test_a2_non_allow_listed_runner_is_refused_before_execution,
+     test_a2_unknown_runner_is_refused_at_load,
+     test_a2_runner_naming_external_program_is_refused,
+     test_a2_sandbox_run_refuses_callable_not_matching_spec_runner (proves the
+     body is NOT invoked). AST/source guard:
+     test_attacks_package_has_no_unsafe_execution_call_signatures (ZERO
+     unsafe-deserialize imports / subprocess / shell-out / dynamic-eval), with
+     a meta-guard test_ast_guard_would_catch_a_forbidden_call proving the scan
+     is not a no-op. scanned>=3 assertion pins all three source files.
+   - A3 network egress refused: test_a3_outbound_connect_attempt_is_refused,
+     test_a3_connect_ex_is_also_guarded, test_a3_egress_guard_is_restored_after_run,
+     + load-time test_a3_network_allow_is_refused_at_load /
+     test_a3_missing_network_field_is_refused. Code: _EgressGuard (150-178).
+   - A4 over-budget terminated: test_a4_wall_clock_overrun_is_terminated
+     (SandboxBudgetExceeded, terminated_for_budget=True),
+     test_a4_budget_exceeded_is_subclass_of_violation,
+     test_a4_audit_note_recorded_when_rlimit_unavailable. Watchdog is a stdlib
+     thread join (sandbox.py:294-331), NEVER a subprocess.
+   - A5 well-formed runs to completion within budget:
+     test_a5_well_formed_synthetic_attack_runs_to_completion,
+     test_a5_outcome_matches_direct_call_of_wrapped_runner.
+   - A6 path allow-list enforced: test_a6_path_not_in_allow_list_is_refused_via_shim,
+     test_a6_path_inside_allow_list_is_permitted_via_shim,
+     test_a6_sibling_prefix_is_not_treated_as_allowed (no startswith bypass),
+     + load-time test_a6_params_path_outside_allowed_paths_is_refused /
+     _inside_..._is_accepted. Code: spec._is_within_allowed (181-200, single
+     source of truth) + SandboxPolicy.assert_path_allowed (106-117).
+   - A7 synthetic-only + least-privilege (NFR-024/AX-001 + FR-026/AX-006):
+     test_a7_audit_lines_contain_no_real_pii_or_secret_shaped_values (regex
+     audit: NO email-shape / SSN-shape / long-hex-secret-shape in any audit
+     line) -> NFR-024/AX-001 CONFIRMED; test_a7_default_policy_is_default_deny
+     + test_a7_sandbox_grants_only_declared_capabilities (empty allowed_paths,
+     network=deny is the constructor default) -> FR-026/AX-006 least-privilege
+     CONFIRMED. Every fixture spec + input is synthetic; the egress test targets
+     the unroutable 192.0.2.1 TEST-NET-1 (no real network target).
+   - A8 import-boundary + determinism (AX-002):
+     test_a8_attacks_package_has_no_forbidden_imports (no swarm/moe/fusion/policy),
+     test_a8_at_least_init_module_scanned, test_a8_two_runs_yield_equal_attack_result,
+     test_a8_attack_result_equality_excludes_timing.
+   UNMAPPED SECURITY DoD CLAUSE SCAN: none. Every A1-A8 clause and every §12
+   security-specific acceptance sub-item (a)-(g) maps to a named passing test.
+   No MAJOR (no unmapped security clause).
+
+  NFR-024/AX-001 (no real PII in repo/fixtures/logs): CONFIRMED for this
+  story's surface — A7 regex audit + manual read of both test modules: every
+  spec fixture is synthetic ("synthetic-recon-001", "[REDACTED]", "alice"/"bob"
+  placeholder tokens), no email/SSN/secret-shaped literal, egress target is
+  TEST-NET-1. FR-026/AX-006 (least-privilege, no raw PII persisted): CONFIRMED
+  — default-deny posture is the constructor default; AttackResult.audit records
+  only capability-check prose + stable budget notes (the run-varying consumed
+  -CPU value is deliberately kept OUT of the audit, both for determinism AND so
+  no host-state value leaks). No raw-PII channel is opened by the substrate.
+
+  POV / HONESTY BOUNDARY (recorded, not penalized): real seccomp / namespace /
+  cgroup wall-clock-kill OS isolation + the real Tier-3-adversary and LiRA@128
+  /Secret-Sharer attack BODIES are Pass-2 / successor — correctly marked
+  AGENT_SIMULATED, never simulated as real. RLIMIT_AS degradation to an audit
+  note on darwin is honest (RC-S504-002). For the EPIC/RELEASE gate: FR-011 +
+  FR-013 (both MUST) carry an OPEN successor (S6-DATA-blocked) and are NOT
+  body-verified by S5-04 — track them as verified-substrate / deferred-body.
+
+  PACKS: developer-assistant.yaml domain_packs: [] (none active) -> no
+  pack-extension finding patterns merged; no source_pack tags. INDEPENDENCE:
+  findings derived solely from reading the story, the requirements doc, the
+  traceability matrix, the 3 attacks/ source files, the 2 owned test files, and
+  the pytest run above. No coordination with other reviewers.

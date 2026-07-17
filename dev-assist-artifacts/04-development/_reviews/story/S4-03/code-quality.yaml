@@ -1,0 +1,97 @@
+reviewer: code-quality
+gate: story
+scope_id: S4-03
+iteration: 2
+verdict: APPROVE
+
+findings:
+  - id: code-quality-story-01
+    severity: MAJOR
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:390
+    description: >
+      mypy --strict (as configured in pyproject.toml [tool.mypy] strict = true)
+      reported "Missing type parameters for generic type 'ndarray' [type-arg]"
+      on the return annotation of `_monotone_risk_coverage`. The function was
+      declared to return `tuple[np.ndarray, np.ndarray]` but under strict mode
+      bare `np.ndarray` without type parameters is a type error.
+    status: RESOLVED
+    resolution_commit: 92a3356
+    resolution_note: >
+      `_monotone_risk_coverage` return annotation is now
+      `tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]` via
+      `import numpy.typing as npt` (line 48). `python3 -m mypy src/pii_anon
+      --strict` exits "no issues found in 129 source files". 0 errors (was 2).
+
+  - id: code-quality-story-02
+    severity: MINOR
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:418
+    description: >
+      Same bare `np.ndarray` type-arg violation on the parameter annotations of
+      `_abstention_table(coverage: np.ndarray, risk: np.ndarray)` — mypy
+      --strict flagged both as [type-arg]. Bundled with finding 01.
+    status: RESOLVED
+    resolution_commit: 92a3356
+    resolution_note: >
+      `_abstention_table` parameters are now
+      `coverage: npt.NDArray[np.float64], risk: npt.NDArray[np.float64]`
+      (line 422 in current HEAD). Both bare `np.ndarray` occurrences are fully
+      parametrized; grep confirms no remaining bare `np.ndarray` in the function
+      signatures of this file.
+
+  - id: code-quality-story-03
+    severity: MINOR
+    location: src/pii_anon/eval_framework/metrics/selective_risk.py:158
+    description: >
+      `SelectiveRiskReport.per_class_aurc` field docstring did not state the
+      discrete estimator used (per-point mean vs. trapezoidal integral), leaving
+      callers without sufficient precision to interpret the value.
+    status: RESOLVED
+    resolution_commit: 92a3356
+    resolution_note: >
+      A 3-line comment is now present immediately above `per_class_aurc` (lines
+      159-161): "AURC discrete estimator: mean of the per-point cumulative risk
+      over the confidence-ordered coverage grid (approx np.trapz under uniform
+      1/n spacing); Geifman & El-Yaniv 2017." The clarification precisely
+      identifies the estimator and its relationship to the trapezoidal
+      approximation.
+
+notes: >
+  ITER-2 AMEND VERIFIED — All three iter-1 findings are closed. The amend
+  commit 92a3356 touches exactly 2 files: the story document and
+  `selective_risk.py`. No logic lines were changed; the diff is 1 new import +
+  4 annotation token substitutions + 3 comment lines (+8 / -3 in the source
+  file). `git diff 92a3356~1 HEAD --name-only` confirms exactly 2 files across
+  both amend commits (92a3356 + 209addb); all other source modules are
+  byte-identical.
+
+  MYPY CLEAN BOTH WAYS — `python3 -m mypy src/pii_anon --strict` exits "no
+  issues found in 129 source files" (was 2 errors in selective_risk.py at lines
+  390 and 418). `.venv/bin/mypy src/pii_anon` likewise exits clean. The
+  npt.NDArray[np.float64] parametrization at all four annotation positions
+  (_monotone_risk_coverage return tuple and _abstention_table parameter pair)
+  is confirmed by direct source inspection.
+
+  TESTS + LINT — 92 passed / 0 failed / 0 errors across
+  tests/test_selective_risk.py + tests/test_competitive_supremacy.py
+  (--no-cov invocation; the full-suite coverage threshold of 84% is
+  intentionally not enforced against a 2-file sub-suite). `ruff check src/
+  tests/` exits "All checks passed." No regressions.
+
+  SCOPE DISCIPLINE — `competitor_compare.py` MD5 = 7cae16c89f4c97136e1a12394dae2025
+  (memory-pinned invariant, confirmed). `calibration.py` MD5 bcefe855c6854c4753dd6adc55b89fcb,
+  unchanged. Test files unchanged (test_selective_risk.py 454f8d51...,
+  test_competitive_supremacy.py 92d35029...). All other modules byte-identical;
+  no user-WIP files appear in the amend diff.
+
+  BEHAVIOUR IDENTITY — The amend is annotation + comment only. No runtime
+  behaviour changed. The original iter-1 notes confirming RED-before-GREEN
+  (RED commit 646fd2d / GREEN 2511bc2 / REFACTOR 5207d56), fixture correctness
+  (A2 decomposition identity, A6 deterministic calibration construction), G4
+  gate logic correctness, idioms, and public-API doc completeness all carry
+  forward unchanged from iter-1.
+
+  VERDICT — 0 SHOWSTOPPER, 0 CATASTROPHIC, 0 MAJOR, 0 MINOR (all 3 prior
+  findings RESOLVED, 0 new findings). APPROVE.
+
+review_time_seconds: 310
+context_bounds_respected: true

@@ -1,0 +1,26 @@
+gate: story
+story: S3-01-rating-engine-port
+date: "2026-05-31"
+signer: AGENT_SIMULATED
+aggregate_verdict: APPROVE
+basis: "dev-assist-development-executor TDD evidence + orchestrator independent verification (live contract/discovery, commit-scope, pyproject-diff, full-suite, user-WIP md5)."
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: "RED e5a554e precedes GREEN d5cf633; ruff clean; mypy --strict clean (115 files). registry.py is a faithful minimal mirror of engines/registry.py (thread-safe dict, register/get, discover_entrypoint_engines with entry_points().select fallback). port.py is a minimal @runtime_checkable Protocol (run_round_robin + get_rating only). Scope: exactly 7 owned files (independently confirmed via git diff --stat e5a554e~1..HEAD)."
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: "FR-003 (rating abstraction) + NFR-026 (graceful-degrade registry) pinned by test_rating_engine_port.py (test_fr_003_*, test_nfr_026_*). S3-05 import-boundary guard landed as test_rating_import_boundary.py. Traces D-EVAL DECISION 2. Unblocks S3-02/03/04."
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: "Import-isolation mandate enforced BY TEST: AST walk over eval_framework/rating/*.py asserts zero imports from {swarm,moe,fusion,policy} (GREEN). Independently re-verified live: isinstance(PIIRateEloEngine(), RatingEnginePort)=True; discover_entrypoint_engines('pii_anon.rating_engines')=['glicko-legacy'] -> PIIRateEloEngine."
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: "Entry-point load uses importlib.metadata + ep.load() identically to the existing engines registry (no new trust surface). Structural Protocol; elo.py + all 7 callers UNCHANGED (git-verified). pyproject got ONLY the 3-line rating-engines entry-point table; hypothesis dep + all else preserved."
+conditional_reviewers_skipped: [performance, requirements-coverage, accessibility, contributor-experience]
+findings:
+  - severity: OBSERVATION
+    title: "Entry-point discovery test depends on an up-to-date editable install"
+    detail: "test_rating_engine_port.py discovery assertion requires `pip install -e .` to have run AFTER the pyproject entry-point was added (editable-install entry_points metadata is regenerated at install). CI installs fresh so it is GREEN there; a developer with a stale editable install must reinstall. Standard setuptools editable-install caveat; non-blocking."
+followups:
+  - "S3-02 bradley-terry-mle (temp-local MM impl behind the port; ⛓ DATA S6 stats/bradley_terry.py) -> S3-03 bayes-bt (NumPyro NUTS, NFR-001 convergence gate) -> S3-04 coherent significance + Davidson ties."

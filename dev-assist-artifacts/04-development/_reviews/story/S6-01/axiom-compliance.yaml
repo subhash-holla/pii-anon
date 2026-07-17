@@ -1,0 +1,25 @@
+reviewer: axiom-compliance
+story: S6-01
+gate: story
+verdict: APPROVE
+axioms_in_scope:
+  - { id: AX-pii-anon-001, status: UPHELD }  # synthetic-only — example.test / 900-series SSN / placeholder name; no real PII; no bundled corpus
+  - { id: AX-pii-anon-002, status: UPHELD }  # determinism — decide + bound pure; no random/uuid/time/secrets; fixed regex + synonym constant; A7 50x replay + 6-perm identical
+  - { id: AX-pii-anon-006, status: UPHELD }  # privacy-safe default (headline) — fail-closed: NO control-flow path retains without a positive reason-stamped signal; subtractive; persists no raw PII; confirmed under live adversarial probing (A4/A5/A6)
+  - { id: AX-pii-anon-005, status: UPHELD_PARTIAL }  # every decision carries a human-readable reason; a calibrated relevance confidence/abstention band is the # SWITCH-POINT(DATA) learned-model Pass-2 (not in scope)
+findings:
+  - id: AXC-S6-01-OBS-1
+    severity: OBSERVATION
+    title: binary retain/mask with a reason but no calibrated relevance score / abstention band
+    disposition: PASS-2 NOTE (story §5) — consistent with the deterministic representative-gate scope; the learned model carries calibrated confidence at the DATA seam.
+  - id: AXC-S6-01-OBS-2
+    severity: OBSERVATION
+    title: the synonym map was rebuilt per call (micro-allocation on the hot path)
+    disposition: REMEDIATED IN-LOOP (753c90d) — hoisted _ENTITY_SYNONYMS to a module-level constant.
+offlimits_md5_ok: true
+notes: >
+  Clean axiom pass. The headline AX-006-adjacent privacy-safe default is enforced
+  STRUCTURALLY (fail-closed) and confirmed under live probing. The no-orchestrator-touch
+  (S2-03) discipline holds (orchestrator.py md5 == baseline 0afc6dee…, untouched);
+  the # SWITCH-POINT(ORCH)/(DATA) seams are honestly flagged in code + story §5. The
+  SDO verdict invariant holds (gate byte-identical 3b842e81…; supremacy NOT_YET).

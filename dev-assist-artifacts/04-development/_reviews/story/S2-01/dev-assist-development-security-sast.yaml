@@ -1,0 +1,98 @@
+# Canonical Reviewer Output — security-sast — story gate S2-01 (iteration 1)
+reviewer: dev-assist-development-security-sast
+scope_id: S2-01
+gate: story
+verdict: APPROVE
+
+findings: []
+
+notes: |
+  Story-gate security/SAST review of S2-01 ("widen route() + additive v2
+  fusion-construction seam"). Diff reviewed: RED 4ba234f -> GREEN fb591a5 ->
+  REFACTOR b38f65a (git diff 4ba234f^..b38f65a). Production files in scope:
+  src/pii_anon/moe.py, src/pii_anon/fusion.py. Verdict APPROVE — zero
+  SHOWSTOPPER / CATASTROPHIC / MAJOR / MINOR. Five required checks all PASS.
+
+  (1) S2-05 verify-on-load trust boundary NOT widened — PASS.
+      The diff does not touch load_verified_gate(...) or the verify_on_load=True
+      hard-wire. Confirmed: the only diff lines mentioning verify_on_load are the
+      UNCHANGED context lines around moe.py __init__ (the helper body
+      load_verified_gate at moe.py:~26-97 is untouched; json.loads of the gate
+      envelope at moe.py:81 is pre-existing and unchanged). The production
+      MoERouter construction path still calls
+      load_verified_gate(gate_path, key_ring=key_ring, verify_on_load=True) and
+      still raises ValueError when gate_path is supplied without a key_ring —
+      i.e. fail-closed. The new FusionBuildSpec.gate_path / .key_ring are INERT
+      carriers: build_fusion assembles the spec with gate_path=None, key_ring=None
+      hard-coded (fusion.py:~630-633), and the v2 path (register_fusion_strategy_v2
+      / _CUSTOM_FACTORIES_V2 / build_fusion's `if mode in _CUSTOM_FACTORIES_V2`)
+      NEVER calls load_verified_gate and NEVER constructs an MoERouter with a
+      gate_path. There is no new code path by which an unsigned/unverified gate
+      payload can enter route(). register_fusion_strategy_v2 only mutates the
+      in-process factory registry dict; it creates no unsafe construction path.
+
+  (2) No unsafe sinks introduced — PASS.
+      AST/grep of the FULL current moe.py + fusion.py (not just the diff) for:
+      dynamic-eval (eval/exec/compile), unsafe-deserialization
+      (the p-i-c-k-l-e / marshal / yaml.load / dill / shelve family), subprocess
+      / shell-out / os-exec-spawn family, dynamic-import / getattr-setattr /
+      globals-locals reflection, network (socket / urllib / requests / httpx /
+      aiohttp), and file-write / open-for-write / tempfile / shutil-remove —
+      ALL returned ZERO matches. The only file read in either module is the
+      PRE-EXISTING load_verified_gate JSON read (moe.py:81, Path.read_text +
+      json.loads, unchanged by this diff). No new sink of any class is added.
+
+  (3) Gate-output cannot be weaponized — PASS, validation is real + non-vacuous.
+      _normalize_weights (moe.py, new shared helper) rejects any non-finite
+      weight (math.isfinite gate returns None on NaN / +inf / -inf), clamps
+      negatives to 0.0, and returns None when total mass <= 0 after clamping —
+      route() then falls back to the static `base` on a None return
+      (normalized = validated if validated is not None else base). So a hostile
+      RoutingGate cannot propagate NaN / negative / un-normalized weights
+      downstream. Non-vacuity is pinned by adversarial tests that exercise the
+      REAL path through MoERouter.route(): _NaNGate (A5), _NegativeGate (A5),
+      _ReweightingGate un-normalized (A5), plus 5 REFACTOR edge tests directly
+      on _normalize_weights (empty -> []; +inf -> None; -inf -> None;
+      all-non-positive -> None; negative-clamp-and-renormalize order-preserving).
+      Per A4, the advisory gate is structurally bounded: the
+      test_ax003_hostile_gate_cannot_drop_floored_shared_span test runs the REAL
+      FloorProjectingFusion(MoEFusionStrategy(... gate=_HostileZeroingGate ...))
+      pipeline and asserts a checksum-gated shared-layer (regex-oss) span SURVIVES
+      a gate that zeroes that expert's weight — the floor re-injects it
+      post-fusion (FR-016/AX-003). The recall-floor cannot be defeated by the gate.
+
+  (4) Import isolation — PASS.
+      Full import enumeration of both files: moe.py imports only json, math,
+      dataclasses, pathlib, typing, pii_anon.fusion, pii_anon.moe_gate_signing,
+      pii_anon.types (+ a lazy pii_anon.errors). fusion.py imports only
+      collections, dataclasses, pathlib, typing, pii_anon.errors, pii_anon.types
+      (+ lazy pii_anon.moe / routing.floor_fusion / swarm). A targeted
+      forbidden-import grep (eval_framework / competitive_supremacy / the SDO gate
+      / a rating or attacks module) returned NONE — the one-directional
+      eval import boundary is intact; no new hard dependency is introduced.
+
+  (5) Off-limits / secrets — PASS.
+      evaluation/competitor_compare.py (resolved path
+      src/pii_anon/evaluation/competitor_compare.py) md5 =
+      7cae16c89f4c97136e1a12394dae2025 — byte-identical to the pinned value;
+      not in the diff range. The frozen v1 fusion public API is byte-identical:
+      `CustomFusionFactory = Callable[[dict[str, float], int], FusionStrategy]`
+      (fusion.py:407) and `def register_fusion_strategy(...)` (fusion.py:411) do
+      NOT appear as +/- changed lines (only a new prose comment references the
+      v1 type). No real secrets/PII in the two new test files: zero email
+      literals, zero private-key / cloud-key / token shapes; data is synthetic
+      entity-type tokens (PERSON_NAME, EMAIL_ADDRESS, US_SSN as a field/type
+      label with a structural span 0..11, regex-oss, expert-alpha) — no real
+      SSN/PII value. Determinism cross-check (AX-002): no random / secrets / uuid
+      / time / datetime source in either file; RouteContext is frozen + hashable.
+
+  Severity calibration: nothing rises to OBSERVATION. The v2 gate_path/key_ring
+  fields are currently inert; when S2-02 wires a real DistilledTopKGate through
+  build_fusion, a follow-up security review should confirm the v2 factory routes
+  any gate_path through load_verified_gate (verify_on_load=True) rather than a raw
+  read — flagged for the S2-02 gate, NOT a defect in S2-01 (the fields are
+  unsourced/None here, so there is no current breach).
+
+review_time_seconds: 360
+
+context_bounds_respected: true

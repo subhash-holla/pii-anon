@@ -1,0 +1,27 @@
+reviewer: traceability
+story: S7-05
+gate: story
+iteration: 2
+verdict: APPROVE  # 0 MAJOR/MINOR; 5 OBSERVATIONS (confirmations + one convention note)
+runs: wf_941b38c6-52f (iter-1) -> wf_d8d3ca4e-c16 (iter-2); transcribed from the workflow structured results
+summary: >
+  The FR-010 -> story -> test -> doc chain holds: FR-010
+  (requirements-document.md:21, MUST 'distinct families, no merge') is pinned
+  by A3 against the real scorer symbols (deid_families.py:172/:238) and the
+  doc states the invariant verbatim. The MAJOR-1 closure verified against the
+  producer (canonical_run.py:1275 + cli.py:908); the A5 teeth bite
+  (counterfactual executed: the old phantom path assert-FAILS). The
+  remediation diff touches only the three scoped files; program invariants +
+  user-WIP produce empty diffs across the full story range.
+findings:
+  - id: traceability-story-01
+    severity: OBSERVATION
+    location: traceability-matrix.md:25
+    description: >
+      The matrix carries no per-story rows program-wide (FR->component
+      grained); FR-010 is already traced. The story's authority chain
+      (dev-log [DOCS MUST] + SME MAJORs) is accurately documented in-story.
+    suggested_resolution: None — established convention.
+    disposition: NO-ACTION.
+context_bounds_respected: true
+offlimits_md5_ok: true

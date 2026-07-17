@@ -1,0 +1,182 @@
+"""DC-09 ``attacks/`` package — the adversarial-attack home (S5-04 substrate).
+
+This package is the DC-09 home the D6 design assigns to CODE for the real
+Tier-3 LLM re-identification adversary (FR-011) and the full-power
+membership-inference family (LiRA@128 + Secret-Sharer, FR-013). S5-04 seeds it
+with the **isolation substrate** every real attack body must run inside:
+
+- a safe structured spec loader (no unsafe-deserialization) — :mod:`.spec`
+- an in-process capability + resource sandbox (capability pre-check, SOFT
+  rlimits, an in-process network-egress interceptor, a wall-clock watchdog —
+  NEVER a subprocess) — :mod:`.sandbox`
+
+The attack bodies themselves are successor stories. The package imports only
+the stdlib + needed ``eval_framework``/``harness`` siblings; it imports nothing
+from ``swarm`` / ``moe`` / ``fusion`` / ``policy`` (an AST boundary test pins
+this). It contains ZERO unsafe-deserialization, ZERO subprocess / shell-out,
+and ZERO arbitrary dynamic-eval calls (an AST/source guard pins this).
+"""
+
+from __future__ import annotations
+
+from pii_anon.eval_framework.attacks.sandbox import (
+    DEFAULT_ATTACK_REGISTRY,
+    AttackResult,
+    AttackSandbox,
+    SandboxBudgetExceeded,
+    SandboxPolicy,
+    run_attack_under_sandbox,
+)
+from pii_anon.eval_framework.attacks.spec import (
+    DEFAULT_AS_BYTES,
+    DEFAULT_CPU_SECONDS,
+    DEFAULT_WALL_SECONDS,
+    AttackKind,
+    AttackSpec,
+    NetworkPosture,
+    ResourceBudget,
+    SandboxViolation,
+    load_attack_spec,
+)
+
+# S5-01 — the re-identification attack protocol + the deterministic baseline body
+# (DC-09; FR-011/FR-013 foundation; NFR-016 non-strippable caveat). Importing it
+# here keeps the package surface in one place and lets the import-boundary +
+# dangerous-call-signature AST guards scan reid.py alongside the substrate.
+from pii_anon.eval_framework.attacks.reid import (
+    ANTI_ANONYMITY_CAVEAT,
+    REID_ATTACK_REGISTRY,
+    BaselineDeterministicReidAttack,
+    MiaAttack,
+    ReidAttack,
+    ReidGuess,
+    ReidPersona,
+    ReidSuccessMetrics,
+    ReidTarget,
+    reid_attack_runner,
+    score_reid_attack,
+)
+
+# S5-02 — the Tier-3 representative adversary (QIC+BSL, de-circularized) + the
+# NFR-012 RRS power machinery (Wilson CIs + the 2-rung ladder). Imported here so
+# the package surface + the import-boundary / dangerous-call AST guards scan
+# reid_tier3.py alongside the substrate, and its runner registers below.
+from pii_anon.eval_framework.attacks.reid_tier3 import (
+    RRS_RUNG_REID_HIGH,
+    RRS_RUNG_REID_LOW,
+    TIER3_REID_ATTACK_REGISTRY,
+    ReidPowerCell,
+    ReidPowerLadder,
+    RepresentativeTier3ReidAttack,
+    assess_rrs_power,
+    tier3_reid_attack_runner,
+    wilson_interval,
+)
+
+# S5-03 — the representative membership-inference adversary (LiRA-shape) +
+# Secret-Sharer canary exposure + the NFR-013 TPR@low-FPR / ≥128-shadow power
+# machinery. Imported here so the package surface + the import-boundary /
+# dangerous-call AST guards scan mia.py alongside the substrate, and its runner
+# registers below.
+from pii_anon.eval_framework.attacks.mia import (
+    MIA_ATTACK_REGISTRY,
+    MIA_FPR_TARGETS,
+    MIA_MIN_SHADOW_MODELS,
+    MiaPowerReport,
+    MiaRecord,
+    MiaSuccessReport,
+    RepresentativeMiaAttack,
+    SecretSharerReport,
+    assess_mia_power,
+    canary_exposure,
+    mia_attack_runner,
+    score_mia_attack,
+    tpr_at_fpr,
+)
+
+# Additively merge the re-identification runners into the sandbox default
+# allow-list registry. ``DEFAULT_ATTACK_REGISTRY`` (defined in ``sandbox``) is the
+# single plain-dict allow-list ``run_attack_under_sandbox`` resolves against; we
+# extend it in place WITHOUT replacing it, so the S5-04 reconstruction runner
+# stays registered and the merge is the ONLY way the new bodies join the
+# allow-list (no new dynamic-import path is introduced). The registry remains a
+# plain in-code dict — the only way a spec selects code.
+for _name, _runner in {
+    **REID_ATTACK_REGISTRY,
+    **TIER3_REID_ATTACK_REGISTRY,
+    **MIA_ATTACK_REGISTRY,
+}.items():
+    # SAFETY: ``DEFAULT_ATTACK_REGISTRY`` is annotated ``Final[Mapping[...]]`` in
+    # ``sandbox.py`` so a static checker treats it as read-only, but the object
+    # bound to that name IS a plain mutable ``dict`` — it is the SAME dict the
+    # sandbox exposes (``attacks.DEFAULT_ATTACK_REGISTRY is
+    # sandbox.DEFAULT_ATTACK_REGISTRY``), so this in-place item-set mutates the
+    # live allow-list the sandbox resolves against. The merge is ADDITIVE +
+    # IDEMPOTENT: ``REID_ATTACK_REGISTRY``'s keys are disjoint from the sandbox's
+    # (the recon runner ``pii_anon.harness.attack.reconstruction_attack_score``
+    # stays registered — never overridden), and re-running this module rebinds the
+    # same runners to the same keys (no growth, no clobber). The ``index`` ignore
+    # only suppresses the Final-Mapping read-only complaint; it is sound ONLY while
+    # the underlying object stays a mutable dict. IF ``sandbox.py`` ever makes the
+    # registry truly immutable (e.g. wrapping it in ``MappingProxyType``), this
+    # item-set would raise ``TypeError`` at import; the fix THEN is to add an
+    # ``extend_default_registry(mapping)`` helper to ``sandbox.py`` and call it
+    # here (NOT in scope now — the S5-04 substrate stays byte-identical).
+    DEFAULT_ATTACK_REGISTRY[_name] = _runner  # type: ignore[index]
+del _name, _runner
+
+__all__ = [
+    # spec surface
+    "AttackSpec",
+    "AttackKind",
+    "NetworkPosture",
+    "ResourceBudget",
+    "SandboxViolation",
+    "load_attack_spec",
+    # sandbox surface
+    "AttackSandbox",
+    "SandboxPolicy",
+    "SandboxBudgetExceeded",
+    "AttackResult",
+    "run_attack_under_sandbox",
+    "DEFAULT_ATTACK_REGISTRY",
+    "DEFAULT_CPU_SECONDS",
+    "DEFAULT_AS_BYTES",
+    "DEFAULT_WALL_SECONDS",
+    # reid surface (S5-01)
+    "ReidPersona",
+    "ReidTarget",
+    "ReidGuess",
+    "ReidSuccessMetrics",
+    "ReidAttack",
+    "MiaAttack",
+    "BaselineDeterministicReidAttack",
+    "score_reid_attack",
+    "reid_attack_runner",
+    "REID_ATTACK_REGISTRY",
+    "ANTI_ANONYMITY_CAVEAT",
+    # reid tier-3 surface (S5-02)
+    "RepresentativeTier3ReidAttack",
+    "wilson_interval",
+    "ReidPowerCell",
+    "ReidPowerLadder",
+    "assess_rrs_power",
+    "tier3_reid_attack_runner",
+    "TIER3_REID_ATTACK_REGISTRY",
+    "RRS_RUNG_REID_LOW",
+    "RRS_RUNG_REID_HIGH",
+    # mia surface (S5-03)
+    "MiaRecord",
+    "RepresentativeMiaAttack",
+    "tpr_at_fpr",
+    "MiaSuccessReport",
+    "score_mia_attack",
+    "canary_exposure",
+    "SecretSharerReport",
+    "MiaPowerReport",
+    "assess_mia_power",
+    "mia_attack_runner",
+    "MIA_ATTACK_REGISTRY",
+    "MIA_MIN_SHADOW_MODELS",
+    "MIA_FPR_TARGETS",
+]

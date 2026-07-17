@@ -33,7 +33,7 @@ try:
 
     _HAS_NUMPY = True
 except ImportError:  # pragma: no cover
-    _np = None  # type: ignore[assignment]
+    _np = None  # type: ignore[assignment, unused-ignore]
     _HAS_NUMPY = False
 
 from ..metrics.base import compute_f1, safe_div
@@ -61,6 +61,34 @@ def _np_bootstrap_means(
         chunk = min(_NP_BOOTSTRAP_CHUNK, n_bootstrap - offset)
         indices = rng.integers(0, n, size=(chunk, n))
         result[offset : offset + chunk] = _np.mean(arr[indices], axis=1)
+        offset += chunk
+    return result
+
+
+def _np_bootstrap_micro_f1(
+    tp: _np.ndarray[Any, _np.dtype[_np.float64]],
+    pred: _np.ndarray[Any, _np.dtype[_np.float64]],
+    label: _np.ndarray[Any, _np.dtype[_np.float64]],
+    n_bootstrap: int,
+    rng: _np.random.Generator,
+) -> _np.ndarray[Any, _np.dtype[_np.float64]]:
+    """Vectorised cluster-bootstrap of *micro* F1, chunked to bound memory.
+
+    Resamples whole records (rows) with replacement and recomputes the pooled
+    micro F1 = ``2*Sum(tp) / (Sum(pred) + Sum(label))`` for each resample.
+    Chunked over ``_NP_BOOTSTRAP_CHUNK`` rows like :func:`_np_bootstrap_means`.
+    """
+    n = len(tp)
+    result = _np.empty(n_bootstrap, dtype=_np.float64)
+    offset = 0
+    while offset < n_bootstrap:
+        chunk = min(_NP_BOOTSTRAP_CHUNK, n_bootstrap - offset)
+        indices = rng.integers(0, n, size=(chunk, n))
+        tp_s = tp[indices].sum(axis=1)
+        den_s = pred[indices].sum(axis=1) + label[indices].sum(axis=1)
+        with _np.errstate(invalid="ignore", divide="ignore"):
+            f1s = _np.where(den_s > 0.0, 2.0 * tp_s / den_s, 0.0)
+        result[offset : offset + chunk] = f1s
         offset += chunk
     return result
 
@@ -189,6 +217,62 @@ class MetricAggregator:
         lower_idx = max(0, int(math.floor(alpha / 2.0 * n_bootstrap)))
         upper_idx = min(n_bootstrap - 1, int(math.ceil((1.0 - alpha / 2.0) * n_bootstrap)) - 1)
         return (round(bootstrap_means_list[lower_idx], 6), round(bootstrap_means_list[upper_idx], 6))
+
+    @staticmethod
+    def compute_micro_f1_confidence_interval(
+        per_record_counts: list[tuple[int, int, int]],
+        *,
+        confidence_level: float = 0.95,
+        n_bootstrap: int = 1000,
+        seed: int = 42,
+    ) -> tuple[float, float]:
+        """Bootstrap CI for the *micro* F1 over per-record ``(tp, n_pred, n_label)``.
+
+        The reported micro F1 = ``2*Sum(tp) / (Sum(n_pred) + Sum(n_label))`` is a
+        ratio of pooled counts, NOT the mean of per-record F1. Bootstrapping the
+        per-record F1 list (via :meth:`compute_confidence_intervals`) yields a CI
+        for the *macro* (per-record-averaged) statistic, which can exclude the
+        micro point estimate entirely. This resamples whole records (cluster
+        bootstrap) and recomputes the micro F1 on each resample, so the returned
+        interval is consistent with the micro F1 used as the point estimate.
+
+        Returns ``(lower, upper)`` at the given confidence level, or ``(0.0, 0.0)``
+        for empty input.
+
+        Evidence: Efron & Tibshirani (1993) "An Introduction to the Bootstrap".
+        """
+        if not per_record_counts:
+            return (0.0, 0.0)
+
+        alpha = 1.0 - confidence_level
+
+        if _HAS_NUMPY:
+            tp = _np.asarray([c[0] for c in per_record_counts], dtype=_np.float64)
+            pred = _np.asarray([c[1] for c in per_record_counts], dtype=_np.float64)
+            label = _np.asarray([c[2] for c in per_record_counts], dtype=_np.float64)
+            rng = _np.random.default_rng(seed)
+            f1s = _np_bootstrap_micro_f1(tp, pred, label, n_bootstrap, rng)
+            f1s.sort()
+            lower_idx = max(0, int(math.floor(alpha / 2.0 * n_bootstrap)))
+            upper_idx = min(n_bootstrap - 1, int(math.ceil((1.0 - alpha / 2.0) * n_bootstrap)) - 1)
+            return (round(float(f1s[lower_idx]), 6), round(float(f1s[upper_idx]), 6))
+
+        # Pure-Python fallback
+        rng_py = random_module.Random(seed)
+        n = len(per_record_counts)
+        f1_list: list[float] = []
+        for _ in range(n_bootstrap):
+            sum_tp = 0.0
+            sum_den = 0.0
+            for _ in range(n):
+                tp_i, pred_i, lab_i = per_record_counts[rng_py.randrange(n)]
+                sum_tp += tp_i
+                sum_den += pred_i + lab_i
+            f1_list.append((2.0 * sum_tp / sum_den) if sum_den > 0.0 else 0.0)
+        f1_list.sort()
+        lower_idx = max(0, int(math.floor(alpha / 2.0 * n_bootstrap)))
+        upper_idx = min(n_bootstrap - 1, int(math.ceil((1.0 - alpha / 2.0) * n_bootstrap)) - 1)
+        return (round(f1_list[lower_idx], 6), round(f1_list[upper_idx], 6))
 
     @staticmethod
     def compute_metric_confidence_intervals(

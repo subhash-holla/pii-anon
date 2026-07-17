@@ -1,0 +1,142 @@
+# S2-01 — widen MoERouter.route() to feature-conditioned routing + additive richer fusion-construction seam (DC-02 foundation)
+# Canonical story gate. 5 reviewers, parallel, independent, read-only. One iteration.
+gate: story
+scope_id: S2-01
+final_iteration: 1
+date: 2026-06-03
+aggregate_verdict: APPROVE   # 5/5 APPROVE; 0 SHOWSTOPPER / 0 CATASTROPHIC / 0 MAJOR. 2 substantive findings remediated in-loop; 2 MINOR deferred-to-sprint-gate per convention.
+
+reviewer_set:   # select-reviewer-set.sh story → 4 config default_set + axiom-compliance (gate_overrides.story.add)
+  - code-quality
+  - security-sast
+  - requirements-coverage
+  - traceability
+  - axiom-compliance
+
+tdd_evidence:
+  red:      "4ba234f  # test: S2-01 RED — pin route() widening + RoutingGate + v2 fusion seam + drift guard (NEW files only; collection-ImportError on the absent seam symbols)"
+  green:    "fb591a5  # feat: S2-01 GREEN — widen route() + RoutingGate Protocol + v2 fusion seam + single-source drift guard"
+  refactor: "b38f65a  # refactor: S2-01 — pin shared _normalize_weights helper contract (additive edge tests)"
+  remediation: "620c73d  # test: S2-01 review remediation — tighten A4 floor-survival to pin shared_floor re-injection + fix RoutingGate test-name typo"
+  red_before_green_confirmed: true   # git merge-base --is-ancestor 4ba234f fb591a5 → exit 0; RED = tests-only, failing
+  scope_discipline: "diff 4ba234f^..b38f65a touches ONLY the 4 owned files (moe.py, fusion.py, 2 new test files); v1 register_fusion_strategy/CustomFusionFactory byte-identical; competitor_compare.py 7cae16c… + routing/floor_fusion.py + routing/shared_layer.py byte-identical; user-WIP md5 unchanged"
+
+owned_files:
+  additive_src: [src/pii_anon/moe.py, src/pii_anon/fusion.py]
+  new_tests: [tests/test_moe_router_seam.py, tests/test_fusion_construction_seam.py]
+
+reviewers:
+  - reviewer: code-quality
+    verdict: APPROVE
+    notes: >
+      RED-before-GREEN git-confirmed (merge-base --is-ancestor exit 0; RED = test files only). Change is genuinely
+      additive + inert: v1 register_fusion_strategy/CustomFusionFactory byte-identical; existing route() call sites
+      untouched; context=None/gate=None reproduces prior behaviour byte-for-byte. Scope-disciplined (4 owned files).
+      ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `--strict` (129 files); 34 owned tests pass.
+      _normalize_weights shared helper covers ±inf/all-non-positive/clamp edges. A4 exercises the real
+      FloorProjectingFusion pipeline. 2 MINOR (test-name typo `routingate`; test_audit_* omit fr018_ prefix).
+  - reviewer: security-sast
+    verdict: APPROVE
+    notes: >
+      0 findings. (1) S2-05 verify-on-load trust boundary NOT widened — load_verified_gate + the verify_on_load=True
+      hard-wire untouched; the v2 FusionBuildSpec.gate_path/key_ring are inert (build_fusion assembles them None); the
+      register_fusion_strategy_v2 path never loads an unsigned gate / never constructs an MoERouter with a gate path.
+      (2) Zero new unsafe sinks (no unsafe-deserialization / subprocess / shell-out / dynamic-eval / dynamic-import /
+      network / file-write) in either changed module. (3) _normalize_weights rejects non-finite + clamps negative →
+      a hostile RoutingGate can't propagate NaN/negative and (A4) can't defeat the recall-floor; non-vacuous. (4) Import
+      isolation intact, no new hard dep. (5) competitor_compare.py 7cae16c… byte-identical; new tests synthetic-only.
+      Forward note (not a finding): S2-02's gate review must route any real gate_path through load_verified_gate(verify_on_load=True).
+  - reviewer: requirements-coverage
+    verdict: APPROVE
+    notes: >
+      FR-018 (MUST, 4-part bundle) HONESTLY partially covered, not over-claimed — this story ships only the
+      learned-routing seam, explicitly deferring the gate body→S2-02, early-exit→S2-03, SLA-bias→S2-04 (matches
+      development-log.md; traceability-matrix carries no 'done' marker for FR-018). All A1–A9 map to named, passing,
+      non-vacuous tests (34/34): A2 byte-identity vs an independent softmax oracle; A4 the real hostile-gate-vs-floor
+      pipeline; A7 two non-vacuous drift meta-checks + the closed `swarm` advertise-drift. NFR-026 (A8) + NFR-005 (A9)
+      genuinely tested. The build_fusion gate_path/key_ring/top_k hardcoding is honestly disclosed as carried-but-not-
+      yet-wired. 0 blocking; 2 OBSERVATION (NFR-026 SHOULD label; successor stories unauthored — epic-gate concern).
+  - reviewer: traceability
+    verdict: APPROVE
+    notes: >
+      FR-018 (:30), NFR-005 (:64), NFR-026 (:89), AX-002 (project-axioms :42), AX-003 (:67) all resolve with matching
+      wording (no phantom ID). Design trace resolves: DC-02 (:12) + the three D5 seam-correction MAJORs (:38) each
+      present in GREEN (widened route + RouteContext + RoutingGate; additive v2 seam with v1 byte-identical; single-source
+      _BUILTIN_FUSION_MODES + AUDIT drift guard); advisory framing (:34) upheld structurally. A1–A9 each map to ≥1 named
+      test (FR/NFR IDs embedded). RED→GREEN→REFACTOR git-verified. provisional_status AGENT_SIMULATED correct (DC-02 not
+      DIVERGED). 1 MINOR (traceability-matrix Story/Test backfill) DEFERRED-to-sprint-gate per S2-05/S4-01 convention.
+  - reviewer: axiom-compliance
+    verdict: APPROVE
+    notes: >
+      AX-003 (recall-floor, T1 load-bearing) UPHELD by construction: routing/floor_fusion.py + shared_layer.py
+      byte-identical (not in diff); the RoutingGate is advisory-on-weighting-only. A4 NON-VACUOUS — empirically
+      falsified the alternative: without the floor the hostile gate zeroing regex-oss drives route(US_SSN) →
+      total_weight==0 → cluster skipped → span DROPPED (0 survivors on the bare inner merge); only FloorProjectingFusion
+      re-injection (provenance=shared_floor) restores it. AX-002 determinism UPHELD (no random/uuid/time/secrets;
+      RouteContext frozen+hashable; cache key order-stable; _normalize_weights pure; A9). AX-001 synthetic-only.
+      AX-004/005/006 correctly NOT-TRIGGERED (diff touches no de-id/calibration/agentic path). 0 blocking;
+      2 OBSERVATION (v2 gate_path/key_ring hardwired None — correct for seam-only, S2-02 forward note; A4 assertion loose `or`).
+
+findings:
+  - id: CQ-S201-MINOR-1
+    severity: MINOR
+    status: REMEDIATED   # commit 620c73d
+    location: tests/test_moe_router_seam.py:408
+    description: "Test-name typo `routingate` (missing g) in test_fr018_routingate_protocol_is_a_fusionstrategy_independent_symbol."
+    remediation: "Renamed → test_fr018_routing_gate_protocol_is_a_fusionstrategy_independent_symbol."
+  - id: AXIOM-S201-OBS-2
+    severity: OBSERVATION
+    status: REMEDIATED   # commit 620c73d (tightened despite being OBSERVATION — AX-003 is the load-bearing invariant)
+    location: tests/test_moe_router_seam.py (test_ax003_hostile_gate_cannot_drop_floored_shared_span)
+    description: "A4 survivor assertion used a loose `or` (shared_floor in explanation OR regex-oss in engines) — the second branch doesn't prove re-injection."
+    remediation: "Dropped the loose fallback; A4 now asserts the surviving span carries the `shared_floor` provenance marker specifically — pins the SharedLayerProjector re-injection MECHANISM (FR-016/AX-003)."
+  - id: CQ-S201-MINOR-2
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: tests/test_fusion_construction_seam.py:150-225
+    description: "The six test_audit_* functions omit the fr018_ prefix the other tests use."
+    disposition: "The recurring AUDIT-keyed test-naming batch item (accepted at S2-05/S4-01/S5-04 story gates); batch-cleanup at the S2 sprint gate. Non-blocking — faithful forward trace via module docstrings + the A→FR map."
+  - id: TRACE-S201-MINOR-1
+    severity: MINOR
+    status: DEFERRED-TO-SPRINT-GATE
+    location: dev-assist-artifacts/02-requirements/traceability-matrix.md
+    description: "No S2-01 Story/Test backfill row yet (requirement + design level documented; only the Story→Test cell absent)."
+    disposition: "Backfill at the S2 sprint gate — mirrors S2-05/S4-01/S5-04/S4-CS-01 (matrix defers DC/Story/Test to Stages 3-5)."
+  - id: REQCOV-S201-OBS / AXIOM-S201-OBS-1 / SAST-S201-FWD
+    severity: OBSERVATION
+    status: ACCEPTED
+    description: "NFR-026 SHOULD-label cosmetic; successor stories S2-02/03/04 unauthored (epic-gate concern); the v2 gate_path/key_ring inert-None (correct for seam-only). The security/axiom forward note → S2-02 entry gate: route any real gate_path through load_verified_gate(verify_on_load=True)."
+
+cross_reviewer_patterns:
+  - pattern: "honest seam-scoping of FR-018 (no over-claim)"
+    raised_by: [requirements-coverage, traceability]
+    detail: "FR-018 is a MUST bundle; this story ships only the seam and defers gate-body/early-exit/SLA-bias to S2-02/03/04. Both reviewers independently confirmed the partial coverage is honestly marked (no 'done' marker on FR-018)."
+  - pattern: "v2 seam gate_path/key_ring inert-by-design → S2-02 entry-gate obligation"
+    raised_by: [security-sast, axiom-compliance]
+    detail: "build_fusion assembles FusionBuildSpec with gate_path=None/key_ring=None; the v2 path never loads an unsigned gate. Both flagged the same forward obligation for S2-02 (route any real gate_path through the S2-05 fail-closed verify-on-load boundary)."
+  - pattern: "A4 (AX-003 floor-survival) non-vacuous"
+    raised_by: [axiom-compliance]
+    detail: "Empirically falsified: the bare inner MoE merge drops the floored span under the hostile gate (0 survivors); only FloorProjectingFusion re-injection saves it. Remediation tightened the assertion to pin the shared_floor mechanism."
+
+outcome:
+  invariant: >
+    DC-02 MoE-router seam is LIVE + additive + inert: feature-conditioned route(entity_type, *, context=RouteContext|None)
+    threading an advisory @runtime_checkable RoutingGate (default None ⇒ static-softmax base unchanged, NFR-026); a v2
+    register_fusion_strategy_v2 + FusionBuildSpec construction seam carrying the richer config the FROZEN v1 factory
+    can't (v1 byte-identical, public API preserved); a single-source _BUILTIN_FUSION_MODES + a non-vacuous drift guard
+    (closes the 'register the new mode in BOTH places' SME MAJOR — and a real latent `swarm` advertise-drift). Zero
+    routing-behaviour change ships; the recall-floor (FR-016/AX-003) is the no-drop authority and is byte-identical.
+  sdo_recompute: >
+    UNCHANGED — NOT_YET, binding canonical_claim_run=False. A swarm-routing seam writes no benchmark artifact and flips
+    no guarantee; G1–G7 unchanged. Recompute folded into the S2 work-stream close.
+  tests: "full suite 3229 passed / 15 skipped / 0 failed (exit 0); 34 owned tests passed; +0 net from the remediation (rename + assertion-tighten)"
+  coverage: "87.17% (≥84)"
+  quality: "ruff clean; mypy clean under BOTH `mypy src/pii_anon` AND `mypy src/pii_anon --strict` (0 errors / 129 files)"
+  safety: "competitor_compare.py 7cae16c89f4c97136e1a12394dae2025 (RISK-6) + routing/floor_fusion.py + routing/shared_layer.py byte-identical; v1 fusion-registration public API byte-identical; user-WIP md5 unchanged; artifacts/benchmarks/* never written; narrow git add"
+  provisional_status: "AGENT_SIMULATED — the widened route() seam + RoutingGate Protocol + v2 construction seam + drift guard run for real in-tree against synthetic experts/registries; the learned DistilledTopKGate body + gate_v1.json are S2-02; a gate distilled on real survival labels is Pass-2."
+
+followups:
+  - "S2-02 DistilledTopKGate: implement the RoutingGate Protocol + the offline distillation trainer (emits + signs gate_v1.json via S2-05's signer); wire via register_fusion_strategy_v2; ENTRY GATE — route any real gate_path through load_verified_gate(verify_on_load=True)."
+  - "S2-04 aux-loss-free SLA bias: operate on the selection logits this widened route() exposes (NFR-009/010)."
+  - "S2-03 rules-first early-exit: consumes RouteContext.checksum_gated — DEFERRED (orchestrator.py wire-in blocked on user-WIP)."
+  - "S2 sprint gate: backfill traceability-matrix S2-01 row; add fr018_ prefix to the test_audit_* names (batch with the cross-story test-naming polish)."
