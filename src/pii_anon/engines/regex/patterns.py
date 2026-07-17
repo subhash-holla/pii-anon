@@ -1295,6 +1295,34 @@ _COURT_CASE_YEAR_FORM = re.compile(
 _DOCKET_FEDERAL = re.compile(
     r"\b(\d:\d{2}-(?:mj|cr|cv|md|mc)-\d{4,6}(?:-[A-Z]{2,4})?)\b"
 )
+
+# COURT_CASE_NUMBER (ECHR/Strasbourg application-number grammar): TAB-style
+# case identifiers "application (no. 39272/98)" — application number slash
+# 2-digit year.  Grounded in the TAB DEV split only (echr_dev.json,
+# 2026-07-16): 434 of 484 unique gold CODE spans are this shape; the
+# application part is 3-5 digits across the entire dev census (3x6, 4x23,
+# 5x405), the year part is always exactly 2 digits.  Two cue disciplines:
+#   * head: gated on "no."/"nos." (dot required) or "application(s) no"
+#     (dot optional behind the stronger word cue) so fractions ("3/4"),
+#     month/year dates ("12/98"), and phone fragments never fire;
+#   * list members: "nos. A, B, ... and Z" — gated on a preceding
+#     docket-shaped tail (fixed-width lookbehind "\d{3}/\d{2}") +
+#     separator, so a chain can only extend an already docket-shaped run;
+#     the 3-digit head requirement stops fraction/date pairs ("33/44,
+#     39272/98") from seeding a chain.
+# The >=3-digit application part blocks date-like "12/98" even when cued.
+# ADDITIVE: the sibling _COURT_CASE / _DOCKET value alternations are
+# hyphen-based and cannot match slash forms — nothing shadowed or narrowed.
+_COURT_CASE_APPLICATION_NO = re.compile(
+    r"\b(?:(?:applications?|appl\.?)\s*\(?\s*nos?\.?|nos?\.)\s*"
+    r"(\d{3,6}/\d{2})(?![\d/])",
+    re.IGNORECASE,
+)
+_COURT_CASE_APPLICATION_NO_LIST = re.compile(
+    r"(?<=\d{3}/\d{2})(?:,\s*(?:and\s+)?|\s+and\s+)"
+    r"(\d{3,6}/\d{2})(?![\d/])",
+    re.IGNORECASE,
+)
 _INVOICE_INV = re.compile(r"\b(INV-[A-Z0-9" + _ZW + r"]{4,12})(?![A-Za-z0-9])")
 _INVOICE_LABELED = re.compile(
     r"(?i:invoice[ \t]number)\s*[:\-]\s*"
@@ -1850,6 +1878,13 @@ PATTERN_REGISTRY: tuple[PatternSpec, ...] = (
     PatternSpec(entity_type="BIOMETRIC_ID", pattern=_BIOMETRIC_LABELED, base_confidence=0.84, group=1, explanation="regex biometric id (labeled)"),
     PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_YEAR_FORM, base_confidence=0.90, group=1, explanation="regex court case (year form)"),
     PatternSpec(entity_type="DOCKET_NUMBER", pattern=_DOCKET_FEDERAL, base_confidence=0.90, group=1, explanation="regex docket (federal form)"),
+    # NOTE: base_confidence 0.90 on BOTH forms is load-bearing — COURT_CASE_NUMBER
+    # is a Phase-3 type; every pattern must clear the swarm fast_pass_threshold
+    # (0.90) so rule-based detections route straight to emission
+    # (test_swarm_baseline_integration). No pre_filter: "/" is outside the
+    # pinned pre_filter allowlist and the dotless cue variant has no ".".
+    PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_APPLICATION_NO, base_confidence=0.90, group=1, explanation="regex court case (ECHR application no.)"),
+    PatternSpec(entity_type="COURT_CASE_NUMBER", pattern=_COURT_CASE_APPLICATION_NO_LIST, base_confidence=0.90, group=1, explanation="regex court case (ECHR application list member)"),
     PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_INV, base_confidence=0.90, group=1, explanation="regex invoice (INV-)"),
     PatternSpec(entity_type="INVOICE_NUMBER", pattern=_INVOICE_LABELED, base_confidence=0.90, group=1, explanation="regex invoice (labeled)"),
     PatternSpec(entity_type="SWIFT_BIC", pattern=_SWIFT_LABELED, base_confidence=0.88, group=1, explanation="regex swift bic (labeled)"),
