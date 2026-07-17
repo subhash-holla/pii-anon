@@ -18,6 +18,7 @@ S7-05-docs-discoverability.md).
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -172,16 +173,34 @@ def test_a6_headline_symbols_appear_in_api_reference_or_index() -> None:
 def test_a7_cli_help_mentions_the_program_surfaces() -> None:
     """[UNIT-TEST] A7: `pii-anon --help` (module invocation) mentions the
     BYO scoring surface and the native readers (additive epilog only)."""
+    # Inherit the real environment: a stripped env breaks the subprocess on
+    # Windows (no SystemRoot/APPDATA -> DLL/winsock init failures deep in the
+    # orchestrator import chain) and POSIX-only PATH entries are meaningless
+    # there. Override only what the test needs deterministic.
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(_REPO / "src"),
+        # Pin a wide terminal so typer/rich/click never hard-wrap the help
+        # text mid-token on narrow CI consoles.
+        "COLUMNS": "200",
+        # Deterministic child encoding: the epilog carries non-ASCII (·) and
+        # Windows would otherwise emit the locale code page.
+        "PYTHONIOENCODING": "utf-8",
+    }
     result = subprocess.run(
         [sys.executable, "-m", "pii_anon.cli", "--help"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=120,
         check=False,
         cwd=str(_REPO),
-        env={"PYTHONPATH": str(_REPO / "src"), "PATH": "/usr/bin:/bin"},
+        env=env,
     )
-    assert result.returncode == 0, result.stderr[-500:]
-    help_text = result.stdout
+    assert result.returncode == 0, result.stderr[-2000:]
+    # Wrap-proof normalization (belt and suspenders with COLUMNS above):
+    # collapse all newlines/whitespace runs so console-width-dependent
+    # wrapping can never split an asserted substring across lines.
+    help_text = " ".join(result.stdout.split())
     assert "BYO" in help_text
     assert "readers" in help_text

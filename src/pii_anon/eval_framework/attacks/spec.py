@@ -31,7 +31,7 @@ import json
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import PurePath
 from typing import Any, Final, Literal, get_args
 
 # Re-exported from sandbox to avoid a circular import at module-load time;
@@ -179,7 +179,7 @@ def _normalise_allowed_paths(raw: Any) -> frozenset[str]:
     return frozenset(paths)
 
 
-def _components_contained(target: PurePosixPath, base: PurePosixPath) -> bool:
+def _components_contained(target: PurePath, base: PurePath) -> bool:
     """True iff ``target`` is ``base`` or strictly under it, by path COMPONENT.
 
     Compares resolved path components (NOT a raw ``startswith``) so a sibling
@@ -214,9 +214,9 @@ def _is_within_allowed(path: str, allowed_paths: frozenset[str]) -> bool:
     component-containment boundary, so the two cannot drift on the boundary
     logic.
     """
-    target = PurePosixPath(os.path.normpath(path))
+    target = PurePath(os.path.normpath(path))
     for allowed in allowed_paths:
-        base = PurePosixPath(os.path.normpath(allowed))
+        base = PurePath(os.path.normpath(allowed))
         if _components_contained(target, base):
             return True
     return False

@@ -61,7 +61,7 @@ def test_runner_rejects_weakened_gate(tmp_path) -> None:
 def test_power_thresholds_in_markdown(tmp_path) -> None:
     run_assurance_report(_cfg(tmp_path, records=_email_records(60), outputs=("markdown",),
                               power_min_clusters=30))
-    md = (tmp_path / "report.md").read_text()
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "Power gate" in md
     assert "clusters ≥ 30" in md
 
@@ -69,5 +69,7 @@ def test_power_thresholds_in_markdown(tmp_path) -> None:
 # --- the best-effort label-scrubbing limitation is disclosed ----------------------
 def test_label_limitation_disclosed(tmp_path) -> None:
     run_assurance_report(_cfg(tmp_path, records=_email_records(60), outputs=("json",)))
-    limitations = " ".join(json.loads((tmp_path / "report.json").read_text())["limitations"])
+    limitations = " ".join(
+        json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["limitations"]
+    )
     assert "best-effort scrubbed" in limitations

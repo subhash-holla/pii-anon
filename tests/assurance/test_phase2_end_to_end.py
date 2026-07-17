@@ -45,7 +45,7 @@ def test_all_dimensions_all_outputs(tmp_path) -> None:
         assert (tmp_path / f).is_file(), f
     # the user-facing dimension expanded into utility / fairness / compliance
     assert {"detection", "leakage", "reidentification", "utility", "fairness", "compliance"} == set(rep.dimensions)
-    blob = json.loads((tmp_path / "report.json").read_text())
+    blob = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
     assert set(blob["dimensions"]) >= {"reidentification", "utility", "fairness", "compliance"}
 
 
@@ -65,7 +65,7 @@ def test_phase2_egress_gate_blocks_planted_pii_in_html(tmp_path) -> None:
         out_dir=str(tmp_path), seed=3, n_resamples=300))
     assert rep is not None
     for f in ("report.json", "report.md", "report.html", "summary.html"):
-        assert planted not in (tmp_path / f).read_text(), f
+        assert planted not in (tmp_path / f).read_text(encoding="utf-8"), f
 
 
 def test_reid_and_compliance_never_measured_in_output(tmp_path) -> None:
@@ -73,7 +73,7 @@ def test_reid_and_compliance_never_measured_in_output(tmp_path) -> None:
         records=_rows(), pipeline=_email_only_pipe(), dataset_name="acme-tix",
         dimensions=("reidentification", "utility_fairness_compliance"),
         outputs=("json",), out_dir=str(tmp_path), seed=7, n_resamples=300))
-    blob = json.loads((tmp_path / "report.json").read_text())
+    blob = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
     for sysmap in (blob["dimensions"]["reidentification"], blob["dimensions"]["compliance"]):
         for r in sysmap.values():
             assert r["claim_strength"] != "measured"  # never publishable head-to-head

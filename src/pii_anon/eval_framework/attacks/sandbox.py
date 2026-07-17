@@ -35,7 +35,7 @@ import threading
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import PurePath
 from typing import Any, Callable, Final
 
 from pii_anon.eval_framework.attacks.spec import (
@@ -126,9 +126,9 @@ class SandboxPolicy:
         resolves symlinks via the filesystem — documented FS dependence here,
         whereas load-time stays purely lexical/deterministic).
         """
-        real_target = PurePosixPath(os.path.realpath(path))
+        real_target = PurePath(os.path.realpath(path))
         for allowed in self.allowed_paths:
-            real_base = PurePosixPath(os.path.realpath(allowed))
+            real_base = PurePath(os.path.realpath(allowed))
             if _components_contained(real_target, real_base):
                 return path
         raise SandboxViolation(f"path {path!r} is not in the allow-list {sorted(self.allowed_paths)!r}")
