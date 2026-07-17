@@ -237,17 +237,41 @@ class SwarmConfig:
         widened.setdefault("NATIONALITY", 0.85)
         widened.setdefault("JOB_TITLE", 0.90)
         base.single_engine_min_confidence = widened
-        # gliner's raw confidence caps ~0.87 for semantic types, so the
-        # per-type JOB_TITLE 0.90 bar above is unreachable for the ONLY
-        # engine that emits JOB_TITLE (gliner 'occupation') — inert even in
-        # this profile (2026-07-17 investigation). Give it a gliner overlay
-        # at the same level as the other gliner semantic bars.
+        # Profile v2 (2026-07-17, measured): the fusion-discard ablation
+        # showed the singleton bars + the emission gate are THE discard
+        # mechanisms on document/anonymization registers (the type-set
+        # Jaccard prune measured as a no-op). Parameters below were selected
+        # by a LEAKAGE-SAFE grid: tuned on ai4privacy+nemotron+piibench
+        # ONLY; TAB was the untouched HOLDOUT (relaxed-reach F2 0.627 ->
+        # 0.654 under this config); gretel the do-no-harm guard (its
+        # DEFAULT row is unaffected — this profile is opt-in, and applying
+        # it to short-record precision-limited corpora measurably hurts).
+        # All three changes are ADDITIVE-ONLY on emissions (more maskable
+        # findings, never fewer) — the leak-safe direction.
+        # - gliner semantic singletons at 0.62 (existing per-type overlays
+        #   kept where already present);
+        # - presidio semantic singletons at 0.85 (its recognizers' fixed
+        #   score — previously presidio had NO singleton route at all);
+        # - emission gate 0.50 -> 0.35 for the meta path.
         by_engine = {
             eng: dict(bars)
             for eng, bars in base.single_engine_min_confidence_by_engine.items()
         }
-        by_engine.setdefault("gliner-compatible", {}).setdefault("JOB_TITLE", 0.82)
+        semantic_types = (
+            "PERSON_NAME", "ORGANIZATION", "LOCATION", "ADDRESS", "DATE_TIME",
+            "USERNAME", "JOB_TITLE", "NATIONALITY", "PHONE_NUMBER", "EMAIL_ADDRESS",
+        )
+        gliner = by_engine.setdefault("gliner-compatible", {})
+        presidio = by_engine.setdefault("presidio-compatible", {})
+        # JOB_TITLE at 0.82 (the level the other gliner semantic overlays
+        # use — and the exact config the grid measured); remaining semantic
+        # types open at the grid winner's 0.62.
+        gliner.setdefault("JOB_TITLE", 0.82)
+        for etype in semantic_types:
+            gliner.setdefault(etype, 0.62)
+            presidio[etype] = 0.85
         base.single_engine_min_confidence_by_engine = by_engine
+        base.emission_threshold = 0.35
         return base
 
 
