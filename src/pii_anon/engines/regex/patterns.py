@@ -28,8 +28,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from pii_anon.engines.regex.unicode_norm import COMBINING_MARKS_CLASS
-
 
 @dataclass(frozen=True, slots=True)
 class PatternSpec:
@@ -96,15 +94,7 @@ class PatternSpec:
 # emails carry Hangul/CJK/Arabic/diacritic local parts, e.g.
 # 예진.박86@outlook.com); domain and TLD stay ASCII-only, so IDN domains
 # remain out of scope.
-# The CONTINUATION class additionally accepts category-M combining marks:
-# ``\w`` excludes them, so an abugida/harakat local part (Thai vowel signs,
-# Bengali matras, Arabic diacritics — e.g. สมชาย.ทองดี88@outlook.com) used to
-# terminate at the first mark, scoring as a missed email AND a truncated-span
-# FP. The FIRST character class is unchanged (marks never begin a local part),
-# so every previous match start is preserved — strictly additive widening.
-_EMAIL = re.compile(
-    r"\b[\w.%+-][\w.%+-" + COMBINING_MARKS_CLASS + r"]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
-)
+_EMAIL = re.compile(r"\b[\w.%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 # ── Core: SSN (3 formats) ─────────────────────────────────────────────────
 # Dash-separated: 123-45-6789.
