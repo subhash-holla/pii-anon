@@ -93,37 +93,47 @@ def resolve_benchmark_dataset_path(
     if name in _V11_NAME_MAP:
         name_variants.append(_V11_NAME_MAP[name])
 
-    candidates: list[Path] = []
+    def _candidates_for(variants: list[str]) -> list[Path]:
+        candidates: list[Path] = []
+        for dataset_name in variants:
+            suffixes = [f"{dataset_name}.jsonl.gz", f"{dataset_name}.jsonl"]
+            for base_dir in base_dirs:
+                for fname in suffixes:
+                    rel_path = base_dir / fname
 
-    for dataset_name in name_variants:
-        suffixes = [f"{dataset_name}.jsonl.gz", f"{dataset_name}.jsonl"]
-        for base_dir in base_dirs:
-            for fname in suffixes:
-                rel_path = base_dir / fname
+                    # Installed dataset package path (preferred for wheel installs).
+                    try:
+                        pkg_root = resources.files("pii_anon_datasets")
+                        candidates.append(Path(str(pkg_root.joinpath(*rel_path.parts))))
+                    except Exception:
+                        pass
 
-                # Installed dataset package path (preferred for wheel installs).
-                try:
-                    pkg_root = resources.files("pii_anon_datasets")
-                    candidates.append(Path(str(pkg_root.joinpath(*rel_path.parts))))
-                except Exception:
-                    pass
+                    if source == "auto":
+                        env_root = os.getenv("PII_ANON_DATASET_ROOT") or os.getenv("PII_VEIL_DATASET_ROOT")
+                        if env_root:
+                            candidates.insert(0, Path(env_root) / rel_path)
 
-                if source == "auto":
-                    env_root = os.getenv("PII_ANON_DATASET_ROOT") or os.getenv("PII_VEIL_DATASET_ROOT")
-                    if env_root:
-                        candidates.insert(0, Path(env_root) / rel_path)
+                        # Sibling repo path (pii-anon-eval-data next to pii-anon-code).
+                        code_root = Path(__file__).resolve().parents[3]
+                        candidates.append(code_root.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets" / rel_path)
 
-                    # Sibling repo path (pii-anon-eval-data next to pii-anon-code).
-                    code_root = Path(__file__).resolve().parents[3]
-                    candidates.append(code_root.parent / "pii-anon-eval-data" / "src" / "pii_anon_datasets" / rel_path)
+                        # Local monorepo datasets package path (works in dev without install).
+                        candidates.append(code_root / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / rel_path)
 
-                    # Local monorepo datasets package path (works in dev without install).
-                    candidates.append(code_root / "packages" / "pii_anon_datasets" / "src" / "pii_anon_datasets" / rel_path)
+                        # Legacy in-core path for backward compatibility.
+                        candidates.append(Path(__file__).resolve().parent / "data" / fname)
+        return candidates
 
-                    # Legacy in-core path for backward compatibility.
-                    candidates.append(Path(__file__).resolve().parent / "data" / fname)
+    for candidate in _candidates_for(name_variants):
+        if candidate.exists():
+            return candidate
 
-    for candidate in candidates:
+    # Versioned v1 filename fallback: the in-repo monorepo copy ships as
+    # {name}_v1.jsonl.gz (packages/.../pii_anon_benchmark_v1.jsonl.gz), which a
+    # fresh checkout (CI, standalone clone) has when no dataset package, env
+    # root, or sibling repo is present. Probed strictly AFTER every unversioned
+    # candidate so existing resolution order is unchanged.
+    for candidate in _candidates_for([f"{name}_v1" for name in name_variants]):
         if candidate.exists():
             return candidate
     return None

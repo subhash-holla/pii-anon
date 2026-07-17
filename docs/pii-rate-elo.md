@@ -156,7 +156,7 @@ composite becomes a unified weighted average across all active components
 Dataset v2.2.0 ships populated `behavioral_signals`, `privacy_risk.re_identification_resistance_score`,
 and the 4-variant `context_preservation` block (including `anonymized_llm_sanitized`)
 so Tier 3 inputs are available out-of-the-box — see
-[../pii-anon-eval-data/CHANGELOG.md](../../pii-anon-eval-data/CHANGELOG.md).
+[pii-anon-eval-data/CHANGELOG.md](https://github.com/subhash-holla/pii-anon-eval-data/blob/main/CHANGELOG.md).
 
 ---
 
@@ -305,7 +305,7 @@ tournament for you if you haven't already — it's the one-call path.
 |---|---|
 | Algorithm source | [src/pii_anon/eval_framework/metrics/composite.py](../src/pii_anon/eval_framework/metrics/composite.py) |
 | Elo engine source | [src/pii_anon/eval_framework/rating/elo.py](../src/pii_anon/eval_framework/rating/elo.py) |
-| Reference benchmark data | [../pii-anon-eval-data](../../pii-anon-eval-data) (v2.2.0: 159,891 records) |
+| Reference benchmark data | [pii-anon-eval-data](https://github.com/subhash-holla/pii-anon-eval-data) (v2.2.0: 159,891 records) |
 | Committed baseline leaderboard | [artifacts/benchmarks/benchmark-results.json](../artifacts/benchmarks/benchmark-results.json) |
 | Research references | `pii_anon.eval_framework.research.references` (`all_references()`) |
 | Design paper | `../pii-anon-research-paper/Paper1-PII-Rate-Elo-Framework-v10.md` |

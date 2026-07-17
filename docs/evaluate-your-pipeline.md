@@ -63,7 +63,7 @@ Predictor = Callable[[str], Iterable[tuple[str, int, int]]]
   - `start`/`end` are 0-indexed, half-open offsets into the input string.
   - `entity_type` is a non-empty string. Common names (`PERSON_NAME`,
     `EMAIL_ADDRESS`, `US_SSN`, etc.) match our taxonomy — see
-    [TAXONOMY](../../pii-anon-eval-data/TAXONOMY.md).
+    [TAXONOMY](https://github.com/subhash-holla/pii-anon-eval-data/blob/main/TAXONOMY.md).
 - **Extra tuple elements** are ignored. A detector that returns
   `(type, start, end, confidence)` will work fine.
 - **Malformed spans** — out-of-bounds offsets, empty entity types, reversed
@@ -471,7 +471,7 @@ The dataset (`pii-anon-datasets` ≥ v1.3.0) ships per-record
 `behavioral_signals`, `re_identification_resistance_score`, and a 4th
 anonymized variant (`anonymized_llm_sanitized`) so you can drive this
 evaluation locally. See the
-[CHANGELOG](../../pii-anon-eval-data/CHANGELOG.md) for schema details.
+[CHANGELOG](https://github.com/subhash-holla/pii-anon-eval-data/blob/main/CHANGELOG.md) for schema details.
 
 ---
 
@@ -491,7 +491,7 @@ evaluation locally. See the
 ## The external assessment (pii-anon-eval-data baselines)
 
 pii-anon and pii-anon-swarm are registered as ordinary detectors in the
-sibling [pii-anon-eval-data](../../pii-anon-eval-data) benchmark's
+sibling [pii-anon-eval-data](https://github.com/subhash-holla/pii-anon-eval-data) benchmark's
 `baselines` harness — the SAME strict-span evaluation that scores AWS
 Comprehend, GCP DLP, Azure, GLiNER, Presidio and the other public detectors.
 Nothing is special-cased: the adapters wrap the public

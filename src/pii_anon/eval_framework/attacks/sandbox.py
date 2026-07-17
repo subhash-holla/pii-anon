@@ -227,8 +227,30 @@ def _apply_soft_rlimits(budget: ResourceBudget, audit: list[str]) -> list[tuple[
 
     cpu_soft = int(consumed_cpu_seconds + budget.cpu_seconds) + 1  # +1s headroom, ceil
 
+    # RLIMIT_AS is likewise measured against the WHOLE process's mapped address
+    # space, not this call. Setting the bare budget as the soft limit would cap
+    # the process BELOW what it already has mapped once the host (test runner,
+    # loaded models) grows past the budget — on Linux the next thread-stack
+    # mmap then fails ("can't start new thread") before the watchdog even
+    # starts. Mirror the CPU treatment: soft = already-mapped + budget, so it
+    # caps THIS attack's additional address space. /proc/self/statm is the only
+    # stdlib-reachable reader of mapped-size; where absent (macOS — which does
+    # not enforce RLIMIT_AS anyway) the bare budget is used as before.
+    consumed_as_bytes: int | None = None
+    try:
+        with open("/proc/self/statm", "rb") as statm:
+            page_size = int(os.sysconf("SC_PAGE_SIZE")) if hasattr(os, "sysconf") else 4096
+            consumed_as_bytes = int(statm.read().split()[0]) * page_size
+    except (OSError, ValueError, IndexError):
+        consumed_as_bytes = None
+    as_soft = (
+        budget.address_space_bytes
+        if consumed_as_bytes is None
+        else consumed_as_bytes + budget.address_space_bytes
+    )
+
     for name, which, soft_value in (
-        ("RLIMIT_AS", getattr(_resource, "RLIMIT_AS", None), budget.address_space_bytes),
+        ("RLIMIT_AS", getattr(_resource, "RLIMIT_AS", None), as_soft),
         ("RLIMIT_CPU", getattr(_resource, "RLIMIT_CPU", None), cpu_soft),
     ):
         if which is None:
@@ -244,16 +266,18 @@ def _apply_soft_rlimits(budget: ResourceBudget, audit: list[str]) -> list[tuple[
             _resource.setrlimit(which, (new_soft, cur_hard))
             # Determinism (AX-002 / A8): the audit line is part of AttackResult
             # equality, so it must NOT embed the run-varying consumed-CPU value
-            # or the consumed-relative soft number. For RLIMIT_CPU we record the
-            # stable BUDGET, noting the relative-to-consumed application; for
-            # RLIMIT_AS the soft value is the budget (already deterministic).
+            # or the consumed-relative soft number. Both limits record the
+            # stable BUDGET, noting the relative-to-consumed application.
             if name == "RLIMIT_CPU":
                 audit.append(
                     f"rlimit {name} applied: budget={budget.cpu_seconds}s "
                     f"(soft set relative to CPU already consumed)"
                 )
             else:
-                audit.append(f"rlimit {name} applied: soft={new_soft}")
+                audit.append(
+                    f"rlimit {name} applied: budget={budget.address_space_bytes} bytes "
+                    f"(soft set relative to address space already mapped)"
+                )
         except (ValueError, OSError) as exc:
             audit.append(f"platform_limit_unavailable: {name} setrlimit refused ({exc}); relying on wall-clock watchdog")
     return saved
