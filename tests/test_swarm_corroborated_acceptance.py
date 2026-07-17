@@ -76,3 +76,21 @@ class TestDeadEntriesLive:
         cfg = SwarmConfig.anonymization_profile()
         gliner = cfg.single_engine_min_confidence_by_engine.get("gliner-compatible", {})
         assert gliner.get("JOB_TITLE") is not None and gliner["JOB_TITLE"] <= 0.87
+
+
+class TestGlinerModelOverride:
+    def test_default_checkpoint_unchanged(self) -> None:
+        from pii_anon.engines.gliner_adapter import GLiNERAdapter
+        a = GLiNERAdapter(enabled=False)
+        assert a._model_name == "knowledgator/gliner-pii-base-v1.0"
+
+    def test_constructor_override_wins(self) -> None:
+        from pii_anon.engines.gliner_adapter import GLiNERAdapter
+        a = GLiNERAdapter(enabled=False, model_name="urchade/gliner_multi_pii-v1")
+        assert a._model_name == "urchade/gliner_multi_pii-v1"
+
+    def test_env_override(self, monkeypatch) -> None:
+        from pii_anon.engines.gliner_adapter import GLiNERAdapter
+        monkeypatch.setenv("PII_ANON_GLINER_MODEL", "knowledgator/gliner-pii-large-v1.0")
+        a = GLiNERAdapter(enabled=False)
+        assert a._model_name == "knowledgator/gliner-pii-large-v1.0"

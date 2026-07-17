@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -78,9 +79,20 @@ class GLiNERAdapter(EngineAdapter):
     SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
     EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
-    def __init__(self, enabled: bool = False) -> None:
+    #: Default checkpoint — PII-specialized, apache-2.0. Overridable per
+    #: instance (``model_name=``) or process (``PII_ANON_GLINER_MODEL``) so a
+    #: stronger/multilingual GLiNER variant can be evaluated or deployed
+    #: without a code change.
+    DEFAULT_MODEL = "knowledgator/gliner-pii-base-v1.0"
+
+    def __init__(self, enabled: bool = False, model_name: str | None = None) -> None:
         super().__init__(enabled=enabled)
         self._model: Any | None = None
+        self._model_name = (
+            model_name
+            or os.environ.get("PII_ANON_GLINER_MODEL")
+            or self.DEFAULT_MODEL
+        )
         self._native_import_probe_ok: bool | None = None
 
     def capabilities(self) -> EngineCapabilities:
@@ -118,7 +130,7 @@ class GLiNERAdapter(EngineAdapter):
             GLiNER = importlib.import_module("gliner").GLiNER
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*copying from a non-meta parameter.*")
-                self._model = GLiNER.from_pretrained("knowledgator/gliner-pii-base-v1.0")
+                self._model = GLiNER.from_pretrained(self._model_name)
             return self._model
         except Exception:
             return None
