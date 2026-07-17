@@ -237,6 +237,17 @@ class SwarmConfig:
         widened.setdefault("NATIONALITY", 0.85)
         widened.setdefault("JOB_TITLE", 0.90)
         base.single_engine_min_confidence = widened
+        # gliner's raw confidence caps ~0.87 for semantic types, so the
+        # per-type JOB_TITLE 0.90 bar above is unreachable for the ONLY
+        # engine that emits JOB_TITLE (gliner 'occupation') — inert even in
+        # this profile (2026-07-17 investigation). Give it a gliner overlay
+        # at the same level as the other gliner semantic bars.
+        by_engine = {
+            eng: dict(bars)
+            for eng, bars in base.single_engine_min_confidence_by_engine.items()
+        }
+        by_engine.setdefault("gliner-compatible", {}).setdefault("JOB_TITLE", 0.82)
+        base.single_engine_min_confidence_by_engine = by_engine
         return base
 
 

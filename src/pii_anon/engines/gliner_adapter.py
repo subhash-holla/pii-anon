@@ -44,6 +44,10 @@ class GLiNERAdapter(EngineAdapter):
         "organization",
         "location",
         "occupation",
+        # Plain calendar dates (beyond DOB): without this label the shipped
+        # per-(engine,type) DATE_TIME acceptance bar has no gliner emitter at
+        # all (2026-07-17 investigation: the 0.82 cell was dead code).
+        "date",
     ]
 
     _LABEL_MAP: dict[str, str] = {
@@ -66,6 +70,7 @@ class GLiNERAdapter(EngineAdapter):
         "organization": "ORGANIZATION",
         "company": "ORGANIZATION",
         "location": "LOCATION",
+        "date": "DATE_TIME",
         "city": "LOCATION",
         "occupation": "JOB_TITLE",
     }
