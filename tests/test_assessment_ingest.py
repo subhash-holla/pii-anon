@@ -289,7 +289,12 @@ class TestRateEloAssessmentCLI:
         self, tmp_path: Path
     ) -> None:
         # RecursionError is NOT a JSONDecodeError — the S7-02 CLI DoV class.
+        # Version note: on Python <= 3.13 json.loads blows the recursion guard
+        # ("could not parse"); Python 3.14's parser handles this nesting, so
+        # the artifact PARSES and fails schema validation instead. The pinned
+        # property is version-independent: a clean typed ValueError, never a
+        # RecursionError leak.
         path = tmp_path / "deep.json"
         path.write_text("[" * 60000 + "]" * 60000, encoding="utf-8")
-        with pytest.raises(ValueError, match="could not parse"):
+        with pytest.raises(ValueError):
             load_assessment(path)
